@@ -16,7 +16,7 @@ ComponentTypeId ComponentRegistry::stable_id(std::string_view name) noexcept {
     return hash == invalid_type ? 1 : hash;
 }
 
-bool ComponentRegistry::register_type(std::string name, std::string category, bool builtin) {
+bool ComponentRegistry::register_type(std::string name, std::string category, bool builtin, bool allow_multiple) {
     if (name.empty() || by_name_.contains(name)) {
         return false;
     }
@@ -26,7 +26,7 @@ bool ComponentRegistry::register_type(std::string name, std::string category, bo
         return false;
     }
 
-    ComponentDescriptor descriptor{id, std::move(name), std::move(category), builtin};
+    ComponentDescriptor descriptor{id, std::move(name), std::move(category), builtin, allow_multiple, {}};
     by_name_.emplace(descriptor.name, descriptor.id);
     by_id_.emplace(descriptor.id, std::move(descriptor));
     return true;
@@ -39,6 +39,21 @@ bool ComponentRegistry::unregister_type(ComponentTypeId id) {
     }
     by_name_.erase(it->second.name);
     by_id_.erase(it);
+    return true;
+}
+
+bool ComponentRegistry::register_property(ComponentTypeId component, PropertyDescriptor property) {
+    auto it = by_id_.find(component);
+    if (it == by_id_.end() || property.name.empty()) {
+        return false;
+    }
+    const auto duplicate = std::find_if(it->second.properties.begin(), it->second.properties.end(), [&](const auto& existing) {
+        return existing.name == property.name;
+    });
+    if (duplicate != it->second.properties.end()) {
+        return false;
+    }
+    it->second.properties.push_back(std::move(property));
     return true;
 }
 
