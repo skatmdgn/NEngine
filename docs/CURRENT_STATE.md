@@ -4,42 +4,40 @@ Version: 0.2.3-dev
 Milestone: Windows editor foundation
 
 ## Verified checkpoints
-- [x] Core/Editor model architecture established and tested.
-- [x] Previous native Win32 host checkpoint passed GitHub CI on Ubuntu and Windows.
-- [x] Entity/World lifetime, hierarchy safety, component pools and reflection metadata.
-- [x] Deep World cloning for Play Mode.
-- [x] Versioned object/Transform scene serialization with transactional loading.
-- [x] Prefab template and override-patch data representation.
+- [x] Core/Editor architecture and cross-platform EditorModel tests established.
+- [x] Earlier native Win32 host checkpoint passed GitHub CI on Ubuntu and Windows.
+- [x] Entity/World, component pools, reflection metadata, Scene and Prefab foundations.
 - [x] Selection, Undo/Redo, Play/Pause/Step.
 - [x] Hierarchy/Inspector/Toolbar presentation models.
-- [x] Win32 shell binds hierarchy selection and inspector edits through Commands.
-- [x] Win32 Open/Save scene workflow uses native file dialogs.
-- [x] Scene file APIs accept filesystem paths so Windows Unicode paths are representable at the Core boundary.
-- [x] CI matrix is fail-fast disabled; Windows compile runs even if another OS fails.
-- [x] Successful Windows CI builds publish NEngineEditor.exe as an artifact.
+- [x] Win32 shell binds hierarchy selection and inspector editing through Commands.
+- [x] Native Win32 Scene Open/Save workflow implemented through Core SceneSerializer.
+- [x] UTF-8 engine strings <-> UTF-16 Win32 UI conversion is explicit.
+- [x] Scene file API uses std::filesystem::path for Unicode-capable Windows paths.
+- [x] CI matrix does not fail-fast; Windows compile always runs.
+- [x] Successful Windows CI builds are configured to publish NEngineEditor.exe artifacts.
 
 ## Current Win32 editor behavior
 - Open / Save scene
 - Undo / Redo
 - Play / Pause-Resume / Step / Stop
-- Hierarchy list with parent depth and selection
+- Hierarchy list with parent depth, active marker and selection
 - Inspector name + active state
-- Transform position/quaternion/scale editing through Undoable Commands
-- Scene preview showing object positions in a top-down diagnostic view
+- Transform position/quaternion/scale edits through Undoable Commands
+- Diagnostic top-down Scene View
 - Console placeholder/log lines
 
-The GDI Scene View backend is temporary. The permanent World/Selection/Inspector/Command/Play boundaries are not.
+The diagnostic GDI Scene View is temporary presentation only. The permanent EditorModel/World/Command/Inspector boundaries remain when Vulkan replaces it.
 
 ## Important serialization boundary
-The scene serializer currently persists object metadata, hierarchy and Transform. Generic native/C# component property serialization adapters remain pending.
+The Scene serializer currently persists object metadata, hierarchy and Transform. Generic native/C# component property serialization adapters remain pending.
 
 ## 0.2 remaining
 - [ ] Windows runtime interaction QA for the shell.
-- [ ] Scene gizmo interaction.
-- [ ] Assets panel backed by the future Asset Database.
+- [ ] Scene selection/gizmo interaction.
+- [ ] Assets panel backed by Asset Database.
 - [ ] Structured Console/log model.
-- [ ] Generic reflection-to-command property editing beyond Transform.
+- [ ] Generic reflection-to-command editing beyond Transform.
 - [ ] Docking/layout persistence.
 
 ## QA rule
-CI compile/test is not interactive GUI/GPU QA. A feature is only marked Windows-runtime-verified after actual execution on Windows.
+CI build/test is not interactive GUI/GPU QA. Windows UI behavior is marked runtime-verified only after actual execution.
