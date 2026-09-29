@@ -9,9 +9,9 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Scene data model
 - [x] Versioned serializer
 - [x] Tests and CI
-- [ ] General component storage/reflection properties
-- [ ] Prefab data model and override patch representation
-- [ ] World clone/snapshot for Play Mode
+- [x] General component storage/reflection properties
+- [x] Prefab data model and override patch representation
+- [x] World clone/snapshot for Play Mode
 
 ## 0.2 — Windows editor foundation
 - Native window/application layer
