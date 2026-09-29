@@ -5,9 +5,11 @@
 
 #include "nengine/core/component_registry.hpp"
 #include "nengine/core/scene.hpp"
+#include "nengine/core/prefab.hpp"
 #include "nengine/core/world.hpp"
 
 namespace {
+struct TestHealth { int value{100}; };
 int failures = 0;
 
 void check(bool condition, const char* message) {
@@ -43,6 +45,22 @@ int main() {
     const auto transform_type = registry.find("NEngine.Transform");
     check(transform_type != nullptr, "component lookup by name succeeds");
     check(transform_type && registry.find(transform_type->id) == transform_type, "component lookup by id succeeds");
+    check(transform_type && registry.register_property(transform_type->id, {"Local Position", PropertyKind::Vec3}), "component property metadata registers");
+    check(transform_type && !registry.register_property(transform_type->id, {"Local Position", PropertyKind::Vec3}), "duplicate property metadata rejected");
+
+    const auto health_type = ComponentRegistry::stable_id("Tests.Health");
+    auto* health = world.add_component<TestHealth>(child, health_type);
+    check(health != nullptr && health->value == 100, "typed component can be added");
+    health->value = 42;
+    check(world.has_component(child, health_type), "component presence query succeeds");
+    check(world.get_component<TestHealth>(child, health_type)->value == 42, "typed component can be retrieved");
+
+    World cloned = world.clone();
+    check(cloned.size() == world.size(), "world clone preserves entity count");
+    check(cloned.get_component<TestHealth>(child, health_type) != nullptr, "world clone preserves typed components");
+    check(cloned.get_component<TestHealth>(child, health_type)->value == 42, "world clone deep-copies component values");
+    cloned.get_component<TestHealth>(child, health_type)->value = 7;
+    check(world.get_component<TestHealth>(child, health_type)->value == 42, "world clone does not alias component storage");
 
     const auto captured = SceneSerializer::capture(world, "CoreTest");
     check(captured.objects.size() == 2, "scene captures all objects");
@@ -78,6 +96,27 @@ int main() {
     const auto sentinel = untouched.create("Sentinel");
     check(!SceneSerializer::instantiate(invalid_scene, untouched, &error), "cyclic serialized hierarchy rejected transactionally");
     check(untouched.size() == 1 && untouched.is_alive(sentinel), "failed scene load does not mutate destination world");
+
+    PrefabData prefab;
+    prefab.name = "ParentWithChild";
+    prefab.template_scene = loaded;
+    prefab.root_local_id = loaded.objects.front().local_id;
+    check(PrefabModel::validate(prefab, &error), "valid prefab model accepted");
+
+    PrefabOverridePatch patch;
+    patch.operation = PrefabOverrideOperation::SetProperty;
+    patch.object_local_id = prefab.root_local_id;
+    patch.component_type = World::transform_type;
+    patch.property_path = "local_position";
+    patch.value = Vec3{5.0f, 6.0f, 7.0f};
+    check(PrefabModel::validate_override(prefab, patch, &error), "valid prefab property override accepted");
+
+    patch.property_path.clear();
+    check(!PrefabModel::validate_override(prefab, patch, &error), "malformed prefab property override rejected");
+
+    PrefabData bad_prefab = prefab;
+    bad_prefab.root_local_id = 999999;
+    check(!PrefabModel::validate(bad_prefab, &error), "missing prefab root rejected");
 
     const auto stale = child;
     check(world.destroy(child), "destroy succeeds");
