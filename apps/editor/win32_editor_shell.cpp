@@ -193,6 +193,8 @@ struct Win32EditorShell::Impl {
             if (!RegisterClassExW(&scene_class)) return false;
         }
 
+        open_scene = create_control(parent, L"BUTTON", L"Open", BS_PUSHBUTTON, IdOpen);
+        save_scene = create_control(parent, L"BUTTON", L"Save", BS_PUSHBUTTON, IdSave);
         undo = create_control(parent, L"BUTTON", L"Undo", BS_PUSHBUTTON, IdUndo);
         redo = create_control(parent, L"BUTTON", L"Redo", BS_PUSHBUTTON, IdRedo);
         play = create_control(parent, L"BUTTON", L"Play", BS_PUSHBUTTON, IdPlay);
@@ -249,6 +251,8 @@ struct Win32EditorShell::Impl {
         int x = kPadding;
         const int button_width = 78;
         const int button_height = 26;
+        MoveWindow(open_scene, x, 6, button_width, button_height, TRUE); x += button_width + 4;
+        MoveWindow(save_scene, x, 6, button_width, button_height, TRUE); x += button_width + 16;
         MoveWindow(undo, x, 6, button_width, button_height, TRUE); x += button_width + 4;
         MoveWindow(redo, x, 6, button_width, button_height, TRUE); x += button_width + 18;
         MoveWindow(play, x, 6, button_width, button_height, TRUE); x += button_width + 4;
@@ -315,6 +319,8 @@ struct Win32EditorShell::Impl {
 
     void refresh_toolbar() {
         const auto state = nengine::editor::build_toolbar(editor);
+        EnableWindow(open_scene, editor.can_edit());
+        EnableWindow(save_scene, editor.can_edit());
         EnableWindow(undo, state.can_undo);
         EnableWindow(redo, state.can_redo);
         EnableWindow(play, state.can_play);

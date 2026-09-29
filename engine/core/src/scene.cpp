@@ -195,7 +195,7 @@ bool SceneSerializer::read(std::istream& input, SceneData& scene, std::string* e
     return true;
 }
 
-bool SceneSerializer::save_file(const SceneData& scene, const std::string& path, std::string* error) {
+bool SceneSerializer::save_file(const SceneData& scene, const std::filesystem::path& path, std::string* error) {
     std::ofstream output(path, std::ios::binary | std::ios::trunc);
     if (!output) {
         set_error(error, "could not open scene file for writing");
@@ -204,7 +204,7 @@ bool SceneSerializer::save_file(const SceneData& scene, const std::string& path,
     return write(scene, output, error);
 }
 
-bool SceneSerializer::load_file(const std::string& path, SceneData& scene, std::string* error) {
+bool SceneSerializer::load_file(const std::filesystem::path& path, SceneData& scene, std::string* error) {
     std::ifstream input(path, std::ios::binary);
     if (!input) {
         set_error(error, "could not open scene file for reading");

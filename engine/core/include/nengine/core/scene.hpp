@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <iosfwd>
 #include <string>
 #include <vector>
@@ -34,8 +35,8 @@ public:
     static bool write(const SceneData& scene, std::ostream& output, std::string* error = nullptr);
     static bool read(std::istream& input, SceneData& scene, std::string* error = nullptr);
 
-    static bool save_file(const SceneData& scene, const std::string& path, std::string* error = nullptr);
-    static bool load_file(const std::string& path, SceneData& scene, std::string* error = nullptr);
+    static bool save_file(const SceneData& scene, const std::filesystem::path& path, std::string* error = nullptr);
+    static bool load_file(const std::filesystem::path& path, SceneData& scene, std::string* error = nullptr);
 };
 
 } // namespace nengine::core
