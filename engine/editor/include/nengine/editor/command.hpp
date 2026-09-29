@@ -17,7 +17,7 @@ public:
     virtual ~EditorCommand() = default;
     virtual bool execute(core::World& world) = 0;
     virtual void undo(core::World& world) = 0;
-    virtual std::string name() const = 0;
+    virtual std::string_view name() const noexcept = 0;
 };
 
 class CommandStack {
@@ -46,7 +46,7 @@ public:
 
     bool execute(core::World& world) override;
     void undo(core::World& world) override;
-    std::string name() const override { return "Rename Entity"; }
+    std::string_view name() const noexcept override { return "Rename Entity"; }
 
 private:
     core::Entity entity_{};
@@ -62,7 +62,7 @@ public:
 
     bool execute(core::World& world) override;
     void undo(core::World& world) override;
-    std::string name() const override { return "Set Active"; }
+    std::string_view name() const noexcept override { return "Set Active"; }
 
 private:
     core::Entity entity_{};
@@ -78,7 +78,7 @@ public:
 
     bool execute(core::World& world) override;
     void undo(core::World& world) override;
-    std::string name() const override { return "Set Transform"; }
+    std::string_view name() const noexcept override { return "Set Transform"; }
 
 private:
     core::Entity entity_{};
