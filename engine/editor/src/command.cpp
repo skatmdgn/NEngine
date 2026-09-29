@@ -31,6 +31,16 @@ void CommandStack::clear() noexcept {
     cursor_ = 0;
 }
 
+std::string_view CommandStack::undo_name() const noexcept {
+    if (!can_undo()) return {};
+    return history_[cursor_ - 1]->name();
+}
+
+std::string_view CommandStack::redo_name() const noexcept {
+    if (!can_redo()) return {};
+    return history_[cursor_]->name();
+}
+
 bool RenameEntityCommand::execute(core::World& world) {
     if (!world.is_alive(entity_) || new_name_.empty()) return false;
     if (!captured_) {
@@ -42,6 +52,19 @@ bool RenameEntityCommand::execute(core::World& world) {
 
 void RenameEntityCommand::undo(core::World& world) {
     if (captured_ && world.is_alive(entity_)) world.set_name(entity_, old_name_);
+}
+
+bool SetActiveCommand::execute(core::World& world) {
+    if (!world.is_alive(entity_)) return false;
+    if (!captured_) {
+        old_value_ = world.active(entity_);
+        captured_ = true;
+    }
+    return world.set_active(entity_, new_value_);
+}
+
+void SetActiveCommand::undo(core::World& world) {
+    if (captured_ && world.is_alive(entity_)) world.set_active(entity_, old_value_);
 }
 
 bool SetTransformCommand::execute(core::World& world) {

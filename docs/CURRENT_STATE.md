@@ -1,53 +1,39 @@
 # Current state
 
-Version: 0.2.0-dev
+Version: 0.2.1-dev
 Milestone: Windows editor foundation
 
-## Verified locally
-- [x] CMake project builds on Linux with C++20.
-- [x] Generational 64-bit entity handles.
-- [x] Object World create/destroy/name/active state.
-- [x] Transform component storage and hierarchy safety.
-- [x] Stable component type registry and reflection metadata foundation.
+## Verified
+- [x] Linux local C++20 build and tests.
+- [x] GitHub CI on Ubuntu and Windows for the previous native Win32 host checkpoint.
+- [x] Generational Entity / World lifetime and hierarchy safety.
 - [x] Type-erased native component pools with typed access.
-- [x] Deep World cloning, including component pools.
-- [x] Prefab template data model and override-patch representation with validation.
-- [x] Versioned `.nscene` object/Transform serialization with scene-local IDs.
-- [x] Transactional scene loading.
-- [x] Core unit tests.
-- [x] Cross-platform editor-model tests.
+- [x] Component registry and reflection property metadata foundation.
+- [x] Deep World cloning for Play Mode.
+- [x] Versioned object/Transform scene serialization with transactional loading.
+- [x] Prefab template and override-patch data representation.
 - [x] Editor Selection model.
-- [x] Undo/Redo command stack.
-- [x] Play/Pause/Step model backed by cloned runtime World.
-- [x] Platform window contract with Win32 implementation and non-Windows build stub.
-- [x] CI definition for Ubuntu and Windows.
+- [x] Undo/Redo command stack, including name/active/Transform edits.
+- [x] Play/Pause/Step editor state backed by a cloned Runtime World.
+- [x] Platform window contract and Win32 native window backend.
+- [x] Hierarchy presentation model generated from the World hierarchy.
+- [x] Inspector presentation model driven by Component Registry metadata.
+- [x] Toolbar presentation state driven by PlaySession and CommandStack.
 
 ## Important serialization boundary
-The current scene serializer persists object metadata, hierarchy and Transform. Generic native/C# component property serialization adapters are intentionally still pending.
+The scene serializer currently persists object metadata, hierarchy and Transform. Generic native/C# component property serialization adapters remain pending and are tracked explicitly.
 
-## 0.1 Core foundation
-- [x] Entity/World/Transform lifetime foundation.
-- [x] Component storage/reflection metadata foundation.
-- [x] Scene core serialization and transactional loading.
-- [x] Prefab/override data representation.
-- [x] World deep clone for Play Mode.
-- [ ] Generic component serialization adapter contract (to be completed as built-in components and scripting land).
-
-## 0.2 Windows editor foundation
-- [x] Cross-platform editor model separated from presentation.
-- [x] Selection model with stale-entity sanitization.
-- [x] Undo/Redo foundation.
-- [x] Play/Pause/Step state model.
-- [x] OS window abstraction.
-- [x] Win32 native window host implementation.
-- [ ] Dockable editor presentation (Hierarchy / Inspector / Scene / Assets / Console).
-- [ ] Property inspector binding to reflection metadata.
-- [ ] Scene-view presentation and gizmo interaction.
+## 0.2 remaining
+- [ ] Win32 editor shell binds Hierarchy/Inspector/Toolbar view models to actual controls.
+- [ ] Scene View surface and gizmo interaction.
+- [ ] Assets and Console panels.
 - [ ] Native file dialogs/project open-save flow.
+- [ ] Property-edit binding from Inspector controls back into Commands.
+- [ ] Docking/layout persistence.
 
 ## Not started
-- Assets/import database
-- C# host/compilation/hot reload/debug attach
+- Asset/import database
+- C# host/compile/hot reload/debug attach
 - Vulkan renderer
 - Physics 3D/2D
 - Animation
@@ -58,11 +44,8 @@ The current scene serializer persists object metadata, hierarchy and Transform. 
 - Particles
 - Profiler/frame debugger
 - Package/plugin manager
-- Windows player exporter
+- Windows Player exporter
 - Android exporter/toolchain manager
 
-## QA status
-Linux local build/tests pass. Windows CI compiles/tests the Windows-specific source, but a CI build is not a substitute for interactive Windows GUI/GPU QA.
-
-## Historical prototype
-A previous disposable Win32 prototype proved that a Windows x64 PE editor executable could be produced. It is not the production architecture and is not the source of truth.
+## QA rule
+CI compilation is not interactive GUI/GPU QA. Windows UI behavior and later Vulkan behavior require an actual Windows run before being marked runtime-verified.

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "nengine/core/component_registry.hpp"
 #include "nengine/core/world.hpp"
 #include "nengine/editor/command.hpp"
 #include "nengine/editor/play_session.hpp"
@@ -9,8 +10,13 @@ namespace nengine::editor {
 
 class EditorModel {
 public:
+    EditorModel();
+
     core::World& world() noexcept { return world_; }
     const core::World& world() const noexcept { return world_; }
+
+    core::ComponentRegistry& component_registry() noexcept { return component_registry_; }
+    const core::ComponentRegistry& component_registry() const noexcept { return component_registry_; }
 
     Selection& selection() noexcept { return selection_; }
     const Selection& selection() const noexcept { return selection_; }
@@ -26,6 +32,7 @@ public:
 
 private:
     core::World world_{};
+    core::ComponentRegistry component_registry_{};
     Selection selection_{};
     CommandStack commands_{};
     PlaySession play_session_{};

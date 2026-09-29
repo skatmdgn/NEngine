@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -30,6 +31,8 @@ public:
     bool can_redo() const noexcept { return cursor_ < history_.size(); }
     std::size_t size() const noexcept { return history_.size(); }
     std::size_t cursor() const noexcept { return cursor_; }
+    std::string_view undo_name() const noexcept;
+    std::string_view redo_name() const noexcept;
 
 private:
     std::vector<std::unique_ptr<EditorCommand>> history_{};
@@ -49,6 +52,22 @@ private:
     core::Entity entity_{};
     std::string old_name_{};
     std::string new_name_{};
+    bool captured_{false};
+};
+
+class SetActiveCommand final : public EditorCommand {
+public:
+    SetActiveCommand(core::Entity entity, bool active)
+        : entity_(entity), new_value_(active) {}
+
+    bool execute(core::World& world) override;
+    void undo(core::World& world) override;
+    std::string name() const override { return "Set Active"; }
+
+private:
+    core::Entity entity_{};
+    bool old_value_{true};
+    bool new_value_{true};
     bool captured_{false};
 };
 
