@@ -2,6 +2,7 @@ add_library(NEngineCore STATIC
   src/world.cpp
   src/component_registry.cpp
   src/scene.cpp
+  src/prefab.cpp
 )
 
 target_include_directories(NEngineCore
