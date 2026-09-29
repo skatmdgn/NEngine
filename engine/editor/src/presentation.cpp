@@ -1,6 +1,5 @@
 #include "nengine/editor/presentation.hpp"
 
-#include <functional>
 #include <string>
 #include <unordered_set>
 
@@ -30,12 +29,12 @@ void append_branch(
     }
 }
 
-InspectorComponent build_transform_component(const EditorModel& editor, core::Entity entity) {
+InspectorComponent build_transform_component(const EditorModel& editor, const core::World& world, core::Entity entity) {
     InspectorComponent component;
     component.type = core::World::transform_type;
     component.name = "Transform";
 
-    const auto* transform = editor.world().transform(entity);
+    const auto* transform = world.transform(entity);
     const auto* descriptor = editor.component_registry().find(core::World::transform_type);
     if (!transform || !descriptor) return component;
 
@@ -43,7 +42,8 @@ InspectorComponent build_transform_component(const EditorModel& editor, core::En
         InspectorField field;
         field.label = property.name;
         field.kind = property.kind;
-        field.editable = core::has_flag(property.flags, core::PropertyFlags::Editable) &&
+        field.editable = editor.can_edit() &&
+                         core::has_flag(property.flags, core::PropertyFlags::Editable) &&
                          !core::has_flag(property.flags, core::PropertyFlags::ReadOnly);
 
         if (property.name == "Local Position") {
@@ -68,7 +68,7 @@ std::vector<HierarchyRow> build_hierarchy(const EditorModel& editor) {
     std::vector<HierarchyRow> rows;
     std::unordered_set<core::Entity::value_type> visited;
 
-    const auto& world = editor.world();
+    const auto& world = editor.presentation_world();
     const auto entities = world.entities();
     rows.reserve(entities.size());
     visited.reserve(entities.size());
@@ -80,7 +80,6 @@ std::vector<HierarchyRow> build_hierarchy(const EditorModel& editor) {
         }
     }
 
-    // Defensive fallback: a corrupt/unlinked object should remain visible in the editor.
     for (const auto entity : entities) {
         if (!visited.contains(entity.value)) {
             append_branch(world, editor.selection(), entity, 0, visited, rows);
@@ -93,16 +92,17 @@ std::vector<HierarchyRow> build_hierarchy(const EditorModel& editor) {
 InspectorSnapshot build_inspector(const EditorModel& editor) {
     InspectorSnapshot snapshot;
     const auto entity = editor.selection().active();
-    if (!editor.world().is_alive(entity)) return snapshot;
+    const auto& world = editor.presentation_world();
+    if (!world.is_alive(entity)) return snapshot;
 
     snapshot.valid = true;
     snapshot.entity = entity;
-    snapshot.name = std::string{editor.world().name(entity)};
-    snapshot.active = editor.world().active(entity);
+    snapshot.name = std::string{world.name(entity)};
+    snapshot.active = world.active(entity);
 
-    for (const auto type : editor.world().component_types(entity)) {
+    for (const auto type : world.component_types(entity)) {
         if (type == core::World::transform_type) {
-            snapshot.components.push_back(build_transform_component(editor, entity));
+            snapshot.components.push_back(build_transform_component(editor, world, entity));
             continue;
         }
 

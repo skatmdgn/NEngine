@@ -15,6 +15,16 @@ public:
     core::World& world() noexcept { return world_; }
     const core::World& world() const noexcept { return world_; }
 
+    core::World& presentation_world() noexcept {
+        if (auto* runtime = play_session_.runtime_world()) return *runtime;
+        return world_;
+    }
+
+    const core::World& presentation_world() const noexcept {
+        if (const auto* runtime = play_session_.runtime_world()) return *runtime;
+        return world_;
+    }
+
     core::ComponentRegistry& component_registry() noexcept { return component_registry_; }
     const core::ComponentRegistry& component_registry() const noexcept { return component_registry_; }
 
@@ -28,7 +38,7 @@ public:
     const PlaySession& play_session() const noexcept { return play_session_; }
 
     bool can_edit() const noexcept { return !play_session_.is_playing(); }
-    void sanitize_selection() { selection_.sanitize(world_); }
+    void sanitize_selection() { selection_.sanitize(presentation_world()); }
 
 private:
     core::World world_{};

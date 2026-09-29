@@ -69,6 +69,10 @@ int main() {
     check(runtime && runtime->is_alive(child), "runtime clone preserves entity handles");
     runtime->set_name(child, "Runtime Only");
     check(world.name(child) == "Renamed", "runtime mutations do not alter editor world");
+
+    const auto runtime_inspector = editor::build_inspector(model);
+    check(runtime_inspector.name == "Runtime Only", "inspector presents runtime world while playing");
+
     check(model.play_session().pause(), "play session pauses");
     toolbar = editor::build_toolbar(model);
     check(toolbar.can_resume && toolbar.can_step, "toolbar exposes resume and step while paused");
@@ -78,6 +82,9 @@ int main() {
     check(model.play_session().stop(), "play session stops");
     check(model.play_session().runtime_world() == nullptr, "runtime world discarded on stop");
     check(model.can_edit(), "editing re-enabled after stop");
+
+    const auto restored_inspector = editor::build_inspector(model);
+    check(restored_inspector.name == "Renamed", "stopping play returns inspector to edit world");
 
     world.destroy(child);
     model.sanitize_selection();
