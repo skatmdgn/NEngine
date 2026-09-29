@@ -1,0 +1,4 @@
+add_executable(NEngineCoreTests core_tests.cpp)
+target_link_libraries(NEngineCoreTests PRIVATE NEngineCore)
+target_compile_features(NEngineCoreTests PRIVATE cxx_std_20)
+add_test(NAME NEngineCoreTests COMMAND NEngineCoreTests)
