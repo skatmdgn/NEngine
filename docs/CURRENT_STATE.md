@@ -1,6 +1,6 @@
 # Current state
 
-Version: 0.1.1-dev
+Version: 0.1.3-dev
 Milestone: Core foundation
 
 ## Verified locally
@@ -12,6 +12,11 @@ Milestone: Core foundation
 - [x] Child detachment when parent is destroyed.
 - [x] Entity slot reuse without stale-handle aliasing.
 - [x] Stable component type registry with collision/duplicate rejection.
+- [x] Reflection metadata foundation with property kinds/flags.
+- [x] Type-erased native component pool architecture with typed access.
+- [x] Transform migrated onto the same component storage model as future native components.
+- [x] Deep World cloning, including component pools, for future Play Mode snapshots.
+- [x] Prefab template data model and typed override-patch representation with validation.
 - [x] Versioned `.nscene` scene data format.
 - [x] Scene capture, deterministic text serialization and restore.
 - [x] Scene parent references use scene-local IDs rather than runtime entity handles.
@@ -21,9 +26,6 @@ Milestone: Core foundation
 
 ## Started but not product-ready
 - [ ] Native Windows editor shell.
-- [ ] General component storage/reflection properties beyond Transform metadata.
-- [ ] Prefab data/override model.
-- [ ] Play Mode world cloning.
 
 ## Not started
 - Assets/import database
