@@ -48,22 +48,47 @@ enum ControlId : int {
     IdConsole,
 };
 
-std::wstring widen_ascii(std::string_view text) {
-    std::wstring result;
-    result.reserve(text.size());
-    for (unsigned char ch : text) result.push_back(static_cast<wchar_t>(ch));
+std::wstring utf8_to_wide(std::string_view text) {
+    if (text.empty()) return {};
+    const int count = MultiByteToWideChar(
+        CP_UTF8, MB_ERR_INVALID_CHARS,
+        text.data(), static_cast<int>(text.size()),
+        nullptr, 0);
+    if (count <= 0) return {};
+    std::wstring result(static_cast<std::size_t>(count), L'\0');
+    MultiByteToWideChar(
+        CP_UTF8, MB_ERR_INVALID_CHARS,
+        text.data(), static_cast<int>(text.size()),
+        result.data(), count);
+    return result;
+}
+
+std::string wide_to_utf8(std::wstring_view text) {
+    if (text.empty()) return {};
+    const int count = WideCharToMultiByte(
+        CP_UTF8, WC_ERR_INVALID_CHARS,
+        text.data(), static_cast<int>(text.size()),
+        nullptr, 0, nullptr, nullptr);
+    if (count <= 0) return {};
+    std::string result(static_cast<std::size_t>(count), '\0');
+    WideCharToMultiByte(
+        CP_UTF8, WC_ERR_INVALID_CHARS,
+        text.data(), static_cast<int>(text.size()),
+        result.data(), count, nullptr, nullptr);
     return result;
 }
 
 std::string read_text(HWND control) {
-    const int length = GetWindowTextLengthA(control);
-    std::string value(static_cast<std::size_t>(length), '\0');
-    if (length > 0) GetWindowTextA(control, value.data(), length + 1);
-    return value;
+    const int length = GetWindowTextLengthW(control);
+    if (length <= 0) return {};
+    std::wstring value(static_cast<std::size_t>(length), L'\0');
+    GetWindowTextW(control, value.data(), length + 1);
+    return wide_to_utf8(value);
 }
 
 void set_text(HWND control, std::string_view text) {
-    SetWindowTextA(control, std::string{text}.c_str());
+    const auto wide = utf8_to_wide(text);
+    SetWindowTextW(control, wide.c_str());
 }
 
 void set_float(HWND control, float value) {
@@ -328,8 +353,8 @@ struct Win32EditorShell::Impl {
         EnableWindow(pause, state.can_pause || state.can_resume);
         EnableWindow(step, state.can_step);
 
-        SetWindowTextW(undo, widen_ascii(state.undo_label).c_str());
-        SetWindowTextW(redo, widen_ascii(state.redo_label).c_str());
+        SetWindowTextW(undo, utf8_to_wide(state.undo_label).c_str());
+        SetWindowTextW(redo, utf8_to_wide(state.redo_label).c_str());
         SetWindowTextW(pause, state.can_resume ? L"Resume" : L"Pause");
     }
 
@@ -343,7 +368,7 @@ struct Win32EditorShell::Impl {
             std::string text(row.depth * 3u, ' ');
             if (!row.active) text += "[off] ";
             text += row.name;
-            SendMessageW(hierarchy, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(widen_ascii(text).c_str()));
+            SendMessageW(hierarchy, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(utf8_to_wide(text).c_str()));
             if (row.selected) selected_index = static_cast<int>(i);
         }
         if (selected_index >= 0) SendMessageW(hierarchy, LB_SETCURSEL, selected_index, 0);
@@ -521,7 +546,7 @@ struct Win32EditorShell::Impl {
 
             SetBkMode(dc, TRANSPARENT);
             SetTextColor(dc, RGB(230, 230, 230));
-            const auto label = widen_ascii(world.name(entity));
+            const auto label = utf8_to_wide(world.name(entity));
             TextOutW(dc, x + 8, y - 8, label.c_str(), static_cast<int>(label.size()));
         }
 
