@@ -1,3 +1,3 @@
 add_executable(NEngineEditor main.cpp)
-target_link_libraries(NEngineEditor PRIVATE NEngineCore NEngineEditorModel)
+target_link_libraries(NEngineEditor PRIVATE NEngineCore NEnginePlatform NEngineEditorModel)
 target_compile_features(NEngineEditor PRIVATE cxx_std_20)
