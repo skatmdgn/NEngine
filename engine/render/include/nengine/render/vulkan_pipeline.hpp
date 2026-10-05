@@ -3,6 +3,7 @@
 #include <string>
 
 #include "nengine/render/vulkan_device.hpp"
+#include "nengine/render/vulkan_render_pass.hpp"
 #include "nengine/render/vulkan_render_targets.hpp"
 #include "nengine/render/vulkan_shader.hpp"
 
@@ -22,6 +23,12 @@ public:
     bool create(
         const VulkanDevice& device,
         const VulkanRenderTargets& targets,
+        const VulkanShaderModule& vertex_shader,
+        const VulkanShaderModule& fragment_shader);
+
+    bool create(
+        const VulkanDevice& device,
+        const VulkanRenderPass& render_pass,
         const VulkanShaderModule& vertex_shader,
         const VulkanShaderModule& fragment_shader);
 
