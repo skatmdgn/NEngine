@@ -58,7 +58,7 @@ Implemented:
 - Win32 Scene View attempts Vulkan window-context bootstrap.
 - Vulkan bootstrap success/failure is reported to Console without making Vulkan availability an editor-startup requirement.
 
-The Scene View still uses GDI by default for visible diagnostic object/gizmo drawing. An opt-in **VK Preview** toolbar toggle now presents a real Vulkan indexed diagnostic quad using the built-in SPIR-V/graphics-pipeline path. Turning it off immediately returns to the GDI interaction view.
+The Scene View still uses GDI by default for interactive diagnostic object/gizmo drawing. An opt-in **VK Preview** toolbar toggle now renders the actual presentation World through Vulkan when supported: it reads the active Camera plus MeshRenderer items from RenderSnapshot, resolves built-in Cube/Quad AssetGuids to cached GPU meshes, computes per-object MVP matrices, and submits multiple indexed draws in one render pass. Turning the toggle off immediately returns to the GDI interaction view.
 
 ## Project / Asset database
 
@@ -157,7 +157,9 @@ Implemented:
 - Resize/recreate lifecycle through VulkanContext.
 - Swapchain image views.
 - Color-only render pass.
-- Per-swapchain-image framebuffers.
+- Shared device-local depth image + depth image view.
+- Color+depth render pass.
+- Per-swapchain-image framebuffers using the shared depth attachment.
 - Command pool/buffers.
 - Acquire/semaphore/fence/submit/present frame synchronization.
 - Render-pass clear/present frame path.
@@ -180,10 +182,14 @@ Implemented:
 - Indexed mesh draw command recording with vkCmdDrawIndexed.
 - Built-in diagnostic GLSL sources + audited SPIR-V fixtures.
 - Headless CI graphics-pipeline creation using the diagnostic shaders.
-- Opt-in Win32 Scene View Vulkan Preview using the indexed diagnostic quad.
+- Opt-in Win32 Scene View Vulkan Preview.
+- Stable built-in Unit Cube/Quad AssetGuids.
+- Built-in CPU mesh GUID resolver and per-device Vulkan GPU mesh cache.
+- Multi-draw indexed submission in one render pass.
+- VK Preview renders the actual presentation World Camera + supported built-in MeshRenderer snapshot.
+- Depth-tested pipelines with depth clear/write/LESS compare.
 
 Not yet implemented:
-- Depth image/depth attachment.
 - GPU texture image/image-view/sampler resources.
 - Material resource/binding model.
 - Shader source compiler and reflection.
@@ -205,10 +211,9 @@ The concrete Vulkan backend currently grows beneath this contract. The long-term
 
 ## Immediate next work
 
-1. Keep Windows + Ubuntu CI green with the VK Preview integration.
-2. Add depth target support and depth-tested 3D mesh rendering.
-3. Feed RenderSnapshot camera/object matrices into the draw path instead of the fixed diagnostic quad.
-4. Add GPU texture resources and material/descriptor binding.
-5. Replace GDI Scene presentation only after Vulkan can reproduce the existing interactive diagnostic scene reliably.
-6. Add a shader compiler toolchain path rather than making glslang/DXC a hidden build dependency.
-7. Return to .NET hosting after the renderer/resource boundary is stable.
+1. Keep Windows + Ubuntu CI green while VK Preview expands from built-in meshes to imported render assets.
+2. Add GPU texture image/view/sampler resources plus descriptor/material binding.
+3. Decode/cook a first real model format (glTF) into MeshData and reuse the existing GPU mesh upload path.
+4. Make VK Preview cover imported mesh/material assets before replacing the GDI interaction view.
+5. Add a shader compiler toolchain path rather than making glslang/DXC a hidden build dependency.
+6. Return to .NET hosting after the renderer/resource boundary is stable.
