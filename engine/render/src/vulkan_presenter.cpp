@@ -58,6 +58,15 @@ VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT =
 constexpr std::uint32_t
 VK_SUBPASS_CONTENTS_INLINE = 0u;
 
+constexpr std::uint32_t
+VK_PIPELINE_BIND_POINT_GRAPHICS = 0u;
+
+constexpr std::uint32_t
+VK_SHADER_STAGE_VERTEX_BIT = 0x00000001u;
+
+constexpr std::uint32_t
+VK_INDEX_TYPE_UINT32 = 1u;
+
 struct VkCommandPoolCreateInfo {
     std::uint32_t sType;
     const void* pNext;
@@ -78,6 +87,15 @@ struct VkCommandBufferBeginInfo {
     const void* pNext;
     std::uint32_t flags;
     const void* pInheritanceInfo;
+};
+
+struct VkViewport {
+    float x;
+    float y;
+    float width;
+    float height;
+    float minDepth;
+    float maxDepth;
 };
 
 struct VkSemaphoreCreateInfo {
@@ -234,6 +252,59 @@ using CmdBeginRenderPass =
 
 using CmdEndRenderPass =
     void (*)(void*);
+
+using CmdBindPipeline =
+    void (*)(
+        void*,
+        std::uint32_t,
+        void*);
+
+using CmdSetViewport =
+    void (*)(
+        void*,
+        std::uint32_t,
+        std::uint32_t,
+        const VkViewport*);
+
+using CmdSetScissor =
+    void (*)(
+        void*,
+        std::uint32_t,
+        std::uint32_t,
+        const VkRect2D*);
+
+using CmdBindVertexBuffers =
+    void (*)(
+        void*,
+        std::uint32_t,
+        std::uint32_t,
+        void* const*,
+        const std::uint64_t*);
+
+using CmdBindIndexBuffer =
+    void (*)(
+        void*,
+        void*,
+        std::uint64_t,
+        std::uint32_t);
+
+using CmdPushConstants =
+    void (*)(
+        void*,
+        void*,
+        std::uint32_t,
+        std::uint32_t,
+        std::uint32_t,
+        const void*);
+
+using CmdDrawIndexed =
+    void (*)(
+        void*,
+        std::uint32_t,
+        std::uint32_t,
+        std::uint32_t,
+        std::int32_t,
+        std::uint32_t);
 
 using AcquireNextImage =
     VkResult (*)(
@@ -533,9 +604,64 @@ bool VulkanClearPresenter::present_clear(
     float blue,
     float alpha) {
 
+    return present_frame(
+        nullptr,
+        nullptr,
+        nullptr,
+        red,
+        green,
+        blue,
+        alpha);
+}
+
+bool VulkanClearPresenter::present_mesh(
+    const VulkanGraphicsPipeline& pipeline,
+    const VulkanMeshResource& mesh,
+    const Mat4& mvp,
+    float clear_red,
+    float clear_green,
+    float clear_blue,
+    float clear_alpha) {
+
+    return present_frame(
+        &pipeline,
+        &mesh,
+        &mvp,
+        clear_red,
+        clear_green,
+        clear_blue,
+        clear_alpha);
+}
+
+bool VulkanClearPresenter::present_frame(
+    const VulkanGraphicsPipeline* pipeline,
+    const VulkanMeshResource* mesh,
+    const Mat4* mvp,
+    float red,
+    float green,
+    float blue,
+    float alpha) {
+
     if (!ready()) {
         diagnostic_ =
-            "Vulkan clear presenter is not initialized";
+            "Vulkan presenter is not initialized";
+        return false;
+    }
+
+    const bool draw_mesh =
+        pipeline ||
+        mesh ||
+        mvp;
+
+    if (draw_mesh &&
+        (!pipeline ||
+         !mesh ||
+         !mvp ||
+         !pipeline->valid() ||
+         !mesh->valid())) {
+
+        diagnostic_ =
+            "valid pipeline mesh and MVP are required for indexed draw";
         return false;
     }
 
@@ -581,6 +707,55 @@ bool VulkanClearPresenter::present_clear(
             *device_api_,
             "vkCmdEndRenderPass");
 
+    const auto bind_pipeline =
+        draw_mesh
+            ? load_proc<CmdBindPipeline>(
+                *device_api_,
+                "vkCmdBindPipeline")
+            : nullptr;
+
+    const auto set_viewport =
+        draw_mesh
+            ? load_proc<CmdSetViewport>(
+                *device_api_,
+                "vkCmdSetViewport")
+            : nullptr;
+
+    const auto set_scissor =
+        draw_mesh
+            ? load_proc<CmdSetScissor>(
+                *device_api_,
+                "vkCmdSetScissor")
+            : nullptr;
+
+    const auto bind_vertex_buffers =
+        draw_mesh
+            ? load_proc<CmdBindVertexBuffers>(
+                *device_api_,
+                "vkCmdBindVertexBuffers")
+            : nullptr;
+
+    const auto bind_index_buffer =
+        draw_mesh
+            ? load_proc<CmdBindIndexBuffer>(
+                *device_api_,
+                "vkCmdBindIndexBuffer")
+            : nullptr;
+
+    const auto push_constants =
+        draw_mesh
+            ? load_proc<CmdPushConstants>(
+                *device_api_,
+                "vkCmdPushConstants")
+            : nullptr;
+
+    const auto draw_indexed =
+        draw_mesh
+            ? load_proc<CmdDrawIndexed>(
+                *device_api_,
+                "vkCmdDrawIndexed")
+            : nullptr;
+
     const auto queue_submit =
         load_proc<QueueSubmit>(
             *device_api_,
@@ -600,7 +775,15 @@ bool VulkanClearPresenter::present_clear(
         !begin_render_pass ||
         !end_render_pass ||
         !queue_submit ||
-        !queue_present) {
+        !queue_present ||
+        (draw_mesh &&
+         (!bind_pipeline ||
+          !set_viewport ||
+          !set_scissor ||
+          !bind_vertex_buffers ||
+          !bind_index_buffer ||
+          !push_constants ||
+          !draw_indexed))) {
 
         diagnostic_ =
             "required Vulkan render-pass frame functions are unavailable";
@@ -757,6 +940,81 @@ bool VulkanClearPresenter::present_clear(
         &render_pass_info,
         VK_SUBPASS_CONTENTS_INLINE);
 
+    if (draw_mesh) {
+        const VkViewport viewport{
+            0.0f,
+            0.0f,
+            static_cast<float>(
+                width_),
+            static_cast<float>(
+                height_),
+            0.0f,
+            1.0f
+        };
+
+        const VkRect2D scissor{
+            {0, 0},
+            {width_, height_}
+        };
+
+        bind_pipeline(
+            command,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            pipeline->native_pipeline());
+
+        set_viewport(
+            command,
+            0,
+            1,
+            &viewport);
+
+        set_scissor(
+            command,
+            0,
+            1,
+            &scissor);
+
+        void* vertex_buffer =
+            mesh
+                ->vertex_buffer()
+                .native_buffer();
+
+        constexpr std::uint64_t
+            vertex_offset = 0;
+
+        bind_vertex_buffers(
+            command,
+            0,
+            1,
+            &vertex_buffer,
+            &vertex_offset);
+
+        bind_index_buffer(
+            command,
+            mesh
+                ->index_buffer()
+                .native_buffer(),
+            0,
+            VK_INDEX_TYPE_UINT32);
+
+        push_constants(
+            command,
+            pipeline->native_layout(),
+            VK_SHADER_STAGE_VERTEX_BIT,
+            0,
+            static_cast<std::uint32_t>(
+                sizeof(Mat4)),
+            mvp->value.data());
+
+        draw_indexed(
+            command,
+            mesh->index_count(),
+            1,
+            0,
+            0,
+            0);
+    }
+
     end_render_pass(command);
 
     status =
@@ -849,7 +1107,9 @@ bool VulkanClearPresenter::present_clear(
     }
 
     diagnostic_ =
-        "Vulkan render-pass clear frame presented";
+        draw_mesh
+            ? "Vulkan indexed mesh frame presented"
+            : "Vulkan render-pass clear frame presented";
 
     return true;
 }
