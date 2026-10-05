@@ -1,4 +1,5 @@
 add_library(NEngineRender STATIC
+  src/asset_resources.cpp
   src/registration.cpp
   src/render_snapshot.cpp
 )
