@@ -261,6 +261,86 @@ resolve_texture_asset(
     return result;
 }
 
+bool read_shader_asset_metadata(
+    std::istream& input,
+    ShaderAssetMetadata& metadata,
+    std::string* error) {
+
+    ShaderAssetMetadata parsed;
+    std::string token;
+    std::uint32_t version = 0;
+
+    if (!(input >> token >> version) ||
+        token != "NENGINE_SHADER" ||
+        version != 1) {
+
+        set_error(
+            error,
+            "invalid shader descriptor header");
+        return false;
+    }
+
+    if (!(input >> token) ||
+        token != "FORMAT" ||
+        !(input >> std::quoted(
+            parsed.format))) {
+
+        set_error(
+            error,
+            "missing shader format");
+        return false;
+    }
+
+    if (!(input >> token) ||
+        token != "STAGE" ||
+        !(input >> std::quoted(
+            parsed.stage))) {
+
+        set_error(
+            error,
+            "missing shader stage");
+        return false;
+    }
+
+    if (!(input >> token) ||
+        token != "WORDS" ||
+        !(input >> parsed.words)) {
+
+        set_error(
+            error,
+            "missing shader word count");
+        return false;
+    }
+
+    std::string source;
+
+    if (!(input >> token) ||
+        token != "SOURCE" ||
+        !(input >> std::quoted(source))) {
+
+        set_error(
+            error,
+            "missing shader source artifact");
+        return false;
+    }
+
+    if (!(input >> token) ||
+        token != "END_SHADER") {
+
+        set_error(
+            error,
+            "missing shader descriptor terminator");
+        return false;
+    }
+
+    parsed.source_file =
+        std::filesystem::path{
+            std::move(source)};
+
+    metadata = std::move(parsed);
+    return true;
+}
+
 std::optional<ResolvedModelAsset>
 resolve_model_asset(
     assets::AssetGuid guid,
@@ -313,6 +393,136 @@ resolve_model_asset(
             input,
             result.metadata,
             error)) {
+        return std::nullopt;
+    }
+
+    return result;
+}
+
+std::optional<ResolvedShaderAsset>
+resolve_shader_asset(
+    assets::AssetGuid guid,
+    const assets::CachedArtifactSet& artifacts,
+    std::string* error) {
+
+    if (!guid.valid()) {
+        set_error(
+            error,
+            "shader AssetGuid is invalid");
+        return std::nullopt;
+    }
+
+    const auto* descriptor =
+        find_role(
+            artifacts,
+            "shader-descriptor");
+
+    const auto* source =
+        find_role(
+            artifacts,
+            "source");
+
+    if (!descriptor || !source) {
+        set_error(
+            error,
+            "shader cache is missing source or descriptor artifact");
+        return std::nullopt;
+    }
+
+    std::ifstream descriptor_input(
+        descriptor->path,
+        std::ios::binary);
+
+    if (!descriptor_input) {
+        set_error(
+            error,
+            "could not open shader descriptor");
+        return std::nullopt;
+    }
+
+    ResolvedShaderAsset result;
+    result.guid = guid;
+    result.descriptor_path =
+        descriptor->path;
+    result.source_path =
+        source->path;
+
+    if (!read_shader_asset_metadata(
+            descriptor_input,
+            result.metadata,
+            error)) {
+        return std::nullopt;
+    }
+
+    if (result.metadata.format !=
+        "spirv") {
+        set_error(
+            error,
+            "unsupported shader binary format");
+        return std::nullopt;
+    }
+
+    std::ifstream source_input(
+        source->path,
+        std::ios::binary |
+            std::ios::ate);
+
+    if (!source_input) {
+        set_error(
+            error,
+            "could not open SPIR-V source artifact");
+        return std::nullopt;
+    }
+
+    const auto byte_count =
+        source_input.tellg();
+
+    if (byte_count <= 0 ||
+        (static_cast<std::uint64_t>(
+            byte_count) %
+         sizeof(std::uint32_t)) != 0) {
+
+        set_error(
+            error,
+            "SPIR-V artifact size is invalid");
+        return std::nullopt;
+    }
+
+    const auto word_count =
+        static_cast<std::uint64_t>(
+            byte_count) /
+        sizeof(std::uint32_t);
+
+    if (result.metadata.words !=
+        word_count ||
+        word_count < 5) {
+
+        set_error(
+            error,
+            "SPIR-V descriptor word count does not match artifact");
+        return std::nullopt;
+    }
+
+    result.spirv.resize(
+        static_cast<std::size_t>(
+            word_count));
+
+    source_input.seekg(0);
+
+    source_input.read(
+        reinterpret_cast<char*>(
+            result.spirv.data()),
+        static_cast<std::streamsize>(
+            word_count *
+            sizeof(std::uint32_t)));
+
+    if (!source_input ||
+        result.spirv.front() !=
+            0x07230203u) {
+
+        set_error(
+            error,
+            "SPIR-V artifact header is invalid");
         return std::nullopt;
     }
 
