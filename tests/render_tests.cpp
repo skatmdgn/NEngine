@@ -21,6 +21,7 @@
 #include "nengine/render/rhi.hpp"
 #include "nengine/render/vulkan_buffer.hpp"
 #include "nengine/render/vulkan_loader.hpp"
+#include "nengine/render/vulkan_depth_target.hpp"
 #include "nengine/render/vulkan_device.hpp"
 #include "nengine/render/vulkan_instance.hpp"
 #include "nengine/render/vulkan_mesh.hpp"
@@ -695,6 +696,46 @@ int main() {
                                 diagnostic_fragment),
                             "diagnostic SPIR-V creates real Vulkan graphics pipeline");
 
+                        render::VulkanDepthTarget
+                            headless_depth;
+
+                        check(
+                            headless_depth.create(
+                                loader,
+                                instance,
+                                device,
+                                64u,
+                                64u) &&
+                            headless_depth.valid(),
+                            "headless Vulkan depth image allocates and creates view");
+
+                        render::VulkanRenderPass
+                            depth_render_pass;
+
+                        check(
+                            headless_depth.valid() &&
+                            depth_render_pass.create_color_depth(
+                                device,
+                                37u,
+                                headless_depth.format()),
+                            "headless Vulkan color+depth render pass creates");
+
+                        render::VulkanGraphicsPipeline
+                            depth_pipeline;
+
+                        check(
+                            depth_render_pass.valid() &&
+                            depth_render_pass.has_depth() &&
+                            depth_pipeline.create(
+                                device,
+                                depth_render_pass,
+                                diagnostic_vertex,
+                                diagnostic_fragment),
+                            "diagnostic Vulkan pipeline creates with depth test state");
+
+                        depth_pipeline.destroy();
+                        depth_render_pass.destroy();
+                        headless_depth.destroy();
                         headless_pipeline.destroy();
                         headless_render_pass.destroy();
                         diagnostic_fragment.destroy();
@@ -911,6 +952,14 @@ int main() {
                     0.5f,
                     0.0f},
             "built-in quad mesh topology and bounds are valid");
+    }
+
+    {
+        render::VulkanDepthTarget depth;
+
+        check(
+            !depth.valid(),
+            "default Vulkan depth target is invalid");
     }
 
     {
