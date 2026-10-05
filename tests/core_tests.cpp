@@ -224,14 +224,32 @@ int main() {
         if (restored.name(entity) == "Child") restored_child = entity;
     }
     check(restored_parent.valid() && restored_child.valid(), "restored entities located by name");
-    check(restored.transform(restored_child)->parent == restored_parent, "scene hierarchy roundtrip");
-    check(restored.transform(restored_parent)->local_position == Vec3{10.0f, 20.0f, 30.0f}, "parent transform roundtrip");
-    check(restored.transform(restored_child)->local_position == Vec3{1.0f, 2.0f, 3.0f}, "child transform roundtrip");
+
+    if (restored_parent.valid() &&
+        restored_child.valid()) {
+
+        check(
+            restored.transform(restored_child)->parent ==
+                restored_parent,
+            "scene hierarchy roundtrip");
+
+        check(
+            restored.transform(restored_parent)->local_position ==
+                Vec3{10.0f, 20.0f, 30.0f},
+            "parent transform roundtrip");
+
+        check(
+            restored.transform(restored_child)->local_position ==
+                Vec3{1.0f, 2.0f, 3.0f},
+            "child transform roundtrip");
+    }
 
     const auto* restored_link =
-        restored.get_component<TestLink>(
-            restored_child,
-            link_type);
+        restored_child.valid()
+            ? restored.get_component<TestLink>(
+                restored_child,
+                link_type)
+            : nullptr;
 
     check(
         restored_link != nullptr,
