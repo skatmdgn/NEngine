@@ -170,8 +170,53 @@ int main() {
         "project startup scene parses");
 
     check(
-        startup_scene_data.objects.size() == 3,
-        "default startup scene contains camera and demo objects");
+        startup_scene_data.objects.size() == 4,
+        "default startup scene contains camera light and demo objects");
+
+    core::World startup_world;
+
+    check(
+        core::SceneSerializer::instantiate(
+            startup_scene_data,
+            startup_world,
+            &startup_scene_error,
+            &model.component_serialization()),
+        "default startup scene instantiates with engine components");
+
+    core::Entity startup_camera =
+        core::Entity::invalid();
+
+    core::Entity startup_light =
+        core::Entity::invalid();
+
+    for (const auto entity :
+         startup_world.entities()) {
+        if (startup_world.name(entity) ==
+            "Main Camera") {
+            startup_camera = entity;
+        }
+
+        if (startup_world.name(entity) ==
+            "Directional Light") {
+            startup_light = entity;
+        }
+    }
+
+    check(
+        startup_camera.valid() &&
+        startup_world.get_component<
+            render::Camera>(
+                startup_camera,
+                render::camera_type()) != nullptr,
+        "startup Main Camera owns native Camera component");
+
+    check(
+        startup_light.valid() &&
+        startup_world.get_component<
+            render::Light>(
+                startup_light,
+                render::light_type()) != nullptr,
+        "startup Directional Light owns native Light component");
 
     check(
         model.project().manifest().target_windows &&
