@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <span>
 #include <string>
 
 #include "nengine/render/matrix.hpp"
@@ -48,6 +49,13 @@ public:
         const VulkanGraphicsPipeline& pipeline,
         const VulkanMeshResource& mesh,
         const Mat4& mvp,
+        float clear_red = 0.08f,
+        float clear_green = 0.09f,
+        float clear_blue = 0.11f,
+        float clear_alpha = 1.0f);
+
+    bool present_meshes(
+        std::span<const VulkanMeshDraw> draws,
         float clear_red = 0.08f,
         float clear_green = 0.09f,
         float clear_blue = 0.11f,
