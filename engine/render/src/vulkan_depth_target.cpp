@@ -654,14 +654,14 @@ bool VulkanDepthTarget::create(
     if (status != VK_SUCCESS ||
         !view) {
 
-        free_memory(
-            device.native_device(),
-            memory,
-            nullptr);
-
         destroy_image(
             device.native_device(),
             image,
+            nullptr);
+
+        free_memory(
+            device.native_device(),
+            memory,
             nullptr);
 
         diagnostic_ =
