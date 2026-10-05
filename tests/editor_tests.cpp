@@ -8,9 +8,15 @@
 
 #include "nengine/editor/editor_model.hpp"
 #include "nengine/editor/presentation.hpp"
+#include "nengine/editor/property_command.hpp"
 #include "nengine/editor/scene_interaction.hpp"
 
 namespace {
+
+struct TestHealth {
+    std::int64_t value{100};
+};
+
 int failures = 0;
 void check(bool condition, const char* message) {
     if (!condition) {
@@ -79,6 +85,82 @@ int main() {
     const auto child = world.create("Child");
     world.set_parent(child, root);
     model.selection().set(child);
+
+    const auto health_type =
+        core::ComponentRegistry::stable_id(
+            "Tests.Health");
+
+    check(
+        model.component_registry().register_type(
+            "Tests.Health",
+            "Tests",
+            false,
+            false),
+        "custom component descriptor registers");
+
+    check(
+        model.component_registry().register_property(
+            health_type,
+            {
+                "Value",
+                core::PropertyKind::Integer,
+                core::PropertyFlags::Serializable |
+                    core::PropertyFlags::Editable
+            }),
+        "custom component property metadata registers");
+
+    auto* health =
+        world.add_component<TestHealth>(
+            child,
+            health_type);
+
+    check(
+        health != nullptr,
+        "custom component attaches to world entity");
+
+    check(
+        model.property_access().register_property(
+            health_type,
+            "Value",
+            core::PropertyKind::Integer,
+            [health_type](
+                const core::World& world_value,
+                core::Entity entity)
+                -> std::optional<core::PropertyValue> {
+
+                const auto* component =
+                    world_value.get_component<TestHealth>(
+                        entity,
+                        health_type);
+
+                if (!component) return std::nullopt;
+
+                return core::PropertyValue{
+                    component->value
+                };
+            },
+            [health_type](
+                core::World& world_value,
+                core::Entity entity,
+                const core::PropertyValue& value) {
+
+                auto* component =
+                    world_value.get_component<TestHealth>(
+                        entity,
+                        health_type);
+
+                const auto* typed =
+                    std::get_if<std::int64_t>(
+                        &value);
+
+                if (!component || !typed) {
+                    return false;
+                }
+
+                component->value = *typed;
+                return true;
+            }),
+        "custom property accessor registers");
 
     check(model.selection().active() == child, "selection tracks active entity");
     check(model.commands().execute(world, std::make_unique<editor::RenameEntityCommand>(child, "Renamed")), "rename command executes");
@@ -189,9 +271,89 @@ int main() {
     const auto inspector = editor::build_inspector(model);
     check(inspector.valid && inspector.entity == child, "inspector follows active selection");
     check(inspector.name == "Renamed", "inspector snapshots object metadata");
-    check(inspector.components.size() == 1, "transform is exposed as inspector component");
-    check(inspector.components[0].fields.size() == 3, "transform reflection produces inspector fields");
-    check(std::get<core::Vec3>(inspector.components[0].fields[0].value) == core::Vec3{4.0f, 5.0f, 6.0f}, "inspector field reads live transform data");
+    check(
+        inspector.components.size() == 2,
+        "generic inspector exposes Transform and custom component");
+
+    bool saw_transform = false;
+    bool saw_health = false;
+
+    for (const auto& component :
+         inspector.components) {
+
+        if (component.type ==
+            core::World::transform_type) {
+
+            saw_transform = true;
+
+            check(
+                component.fields.size() == 3,
+                "transform reflection produces inspector fields");
+
+            check(
+                std::get<core::Vec3>(
+                    component.fields[0].value) ==
+                    core::Vec3{4.0f, 5.0f, 6.0f},
+                "generic inspector reads Transform through property adapter");
+        }
+
+        if (component.type == health_type) {
+            saw_health = true;
+
+            check(
+                component.fields.size() == 1,
+                "custom component reflection produces inspector field");
+
+            check(
+                std::get<std::int64_t>(
+                    component.fields[0].value) == 100,
+                "generic inspector reads arbitrary native component");
+        }
+    }
+
+    check(
+        saw_transform && saw_health,
+        "generic inspector enumerates registered component types");
+
+    check(
+        model.commands().execute(
+            world,
+            std::make_unique<
+                editor::SetPropertyCommand>(
+                    &model.property_access(),
+                    child,
+                    health_type,
+                    "Value",
+                    core::PropertyValue{
+                        std::int64_t{55}
+                    })),
+        "generic property command executes");
+
+    check(
+        world.get_component<TestHealth>(
+            child,
+            health_type)->value == 55,
+        "generic property command writes custom component");
+
+    check(
+        model.commands().undo(world),
+        "generic property command undo succeeds");
+
+    check(
+        world.get_component<TestHealth>(
+            child,
+            health_type)->value == 100,
+        "generic property command undo restores custom component");
+
+    check(
+        model.commands().redo(world),
+        "generic property command redo succeeds");
+
+    check(
+        world.get_component<TestHealth>(
+            child,
+            health_type)->value == 55,
+        "generic property command redo reapplies custom component");
 
     check(model.play_session().play(world), "play clones edit world");
     check(!model.can_edit(), "edit operations can be gated during play");
