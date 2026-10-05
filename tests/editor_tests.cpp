@@ -466,6 +466,12 @@ int main() {
 
     model.commands().clear();
 
+    check(
+        world.destroy(render_entity),
+        "render integration test entity cleanup succeeds");
+
+    model.selection().clear();
+
     const auto root = world.create("Root");
     const auto child = world.create("Child");
     world.set_parent(child, root);
