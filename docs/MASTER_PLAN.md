@@ -353,17 +353,18 @@ Implemented foundation includes:
 - sampler.
 - material combined-image-sampler descriptor.
 - material descriptor binding.
+- diagnostic textured vertex/fragment shader path.
+- real combined-image-sampler texture sampling in VK Preview.
 
 Immediate implementation order:
-1. Diagnostic textured shader and real sampled-pixel preview.
-2. Decoded-pixel texture cache keyed by AssetGuid.
-3. First real glTF MeshData/material cooking path.
-4. Imported mesh/material rendering in VK Preview.
-5. Shader compiler toolchain.
-6. Replace remaining GDI presentation where appropriate.
-7. Vulkan Game View.
-8. PBR/lights/shadows/sprites.
-9. Android Vulkan surface.
+1. Decoded-pixel texture cache keyed by AssetGuid.
+2. First real glTF MeshData/material cooking path.
+3. Imported mesh/material rendering in VK Preview.
+4. Shader compiler toolchain.
+5. Replace remaining GDI presentation where appropriate.
+6. Vulkan Game View.
+7. PBR/lights/shadows/sprites.
+8. Android Vulkan surface.
 
 ### 0.5 — C# scripting + IDE
 Goal: real gameplay scripting.
@@ -432,7 +433,7 @@ The active development line is currently Renderer 0.4.
 
 The immediate sequence is:
 
-`descriptor binding -> textured sample path -> decoded texture asset cache -> glTF mesh/material cooking -> imported asset VK Preview -> shader toolchain`
+`decoded texture asset cache -> glTF mesh/material cooking -> imported asset VK Preview -> shader toolchain`
 
 After the renderer/resource boundary is proven with real assets, development returns to the .NET gameplay runtime.
 
