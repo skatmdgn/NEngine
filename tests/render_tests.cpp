@@ -1,4 +1,7 @@
+#include <chrono>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -6,6 +9,7 @@
 #include "nengine/assets/asset_guid.hpp"
 #include "nengine/core/scene.hpp"
 #include "nengine/core/world.hpp"
+#include "nengine/render/asset_resources.hpp"
 #include "nengine/render/components.hpp"
 #include "nengine/render/registration.hpp"
 #include "nengine/render/render_snapshot.hpp"
@@ -247,6 +251,133 @@ int main() {
         !restored_mesh_component
             ->receive_shadows,
         "MeshRenderer AssetReferences survive Scene roundtrip");
+
+    {
+        std::stringstream texture_descriptor;
+        texture_descriptor
+            << "NENGINE_TEXTURE 1\n"
+            << "FORMAT \"png\"\n"
+            << "WIDTH 64\n"
+            << "HEIGHT 32\n"
+            << "COLOR_SPACE \"sRGB\"\n"
+            << "SOURCE \"source.png\"\n"
+            << "END_TEXTURE\n";
+
+        render::TextureAssetMetadata metadata;
+        std::string metadata_error;
+
+        check(
+            render::read_texture_asset_metadata(
+                texture_descriptor,
+                metadata,
+                &metadata_error) &&
+            metadata.width == 64 &&
+            metadata.height == 32 &&
+            metadata.format == "png",
+            "renderer parses imported texture metadata");
+
+        std::stringstream model_descriptor;
+        model_descriptor
+            << "NENGINE_MODEL 1\n"
+            << "FORMAT \".gltf\"\n"
+            << "SOURCE \"source.gltf\"\n"
+            << "SOURCE_BYTES 1234\n"
+            << "END_MODEL\n";
+
+        render::ModelAssetMetadata model_metadata;
+
+        check(
+            render::read_model_asset_metadata(
+                model_descriptor,
+                model_metadata,
+                &metadata_error) &&
+            model_metadata.source_bytes == 1234 &&
+            model_metadata.format == ".gltf",
+            "renderer parses imported model metadata");
+    }
+
+    {
+        const auto stamp =
+            std::chrono::high_resolution_clock::now()
+                .time_since_epoch()
+                .count();
+
+        const auto root =
+            std::filesystem::temp_directory_path() /
+            ("nengine_render_asset_" +
+             std::to_string(stamp));
+
+        std::filesystem::create_directories(root);
+
+        const auto source =
+            root / "source.png";
+
+        const auto descriptor =
+            root / "texture.nasset";
+
+        {
+            std::ofstream output(
+                source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output << "source";
+        }
+
+        {
+            std::ofstream output(
+                descriptor,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output
+                << "NENGINE_TEXTURE 1\n"
+                << "FORMAT \"png\"\n"
+                << "WIDTH 128\n"
+                << "HEIGHT 96\n"
+                << "COLOR_SPACE \"sRGB\"\n"
+                << "SOURCE \"source.png\"\n"
+                << "END_TEXTURE\n";
+        }
+
+        assets::CachedArtifactSet cached;
+        cached.importer_id =
+            "NEngine.Texture";
+
+        cached.artifacts.push_back({
+            source,
+            "source"
+        });
+
+        cached.artifacts.push_back({
+            descriptor,
+            "texture-descriptor"
+        });
+
+        const auto texture_guid =
+            assets::AssetGuid::generate();
+
+        std::string resolve_error;
+
+        const auto resolved =
+            render::resolve_texture_asset(
+                texture_guid,
+                cached,
+                &resolve_error);
+
+        check(
+            resolved.has_value() &&
+            resolved->guid == texture_guid &&
+            resolved->metadata.width == 128 &&
+            resolved->metadata.height == 96 &&
+            resolved->source_path == source,
+            "renderer resolves texture GUID from validated cache artifacts");
+
+        std::error_code cleanup_error;
+        std::filesystem::remove_all(
+            root,
+            cleanup_error);
+    }
 
     render::BufferHandle invalid_buffer;
     check(
