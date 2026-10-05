@@ -35,6 +35,10 @@ ProjectSession::ProjectSession() {
         assets::audio_source_importer);
 
     import_pipeline_.register_processor(
+        "NEngine.Shader",
+        assets::shader_source_importer);
+
+    import_pipeline_.register_processor(
         "NEngine.Raw",
         assets::copy_source_importer);
 }
@@ -63,6 +67,12 @@ void ProjectSession::register_builtin_importers() {
     importers_.register_importer({
         "NEngine.Audio", 1,
         {".wav", ".ogg", ".mp3", ".flac"},
+        false
+    });
+
+    importers_.register_importer({
+        "NEngine.Shader", 1,
+        {".spv"},
         false
     });
 
