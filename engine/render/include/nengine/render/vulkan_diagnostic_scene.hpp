@@ -5,8 +5,10 @@
 #include "nengine/core/world.hpp"
 #include "nengine/render/vulkan_builtin_mesh_cache.hpp"
 #include "nengine/render/vulkan_context.hpp"
+#include "nengine/render/vulkan_material.hpp"
 #include "nengine/render/vulkan_pipeline.hpp"
 #include "nengine/render/vulkan_shader.hpp"
+#include "nengine/render/vulkan_texture.hpp"
 
 namespace nengine::render {
 
@@ -39,6 +41,8 @@ public:
         return vertex_shader_.valid() &&
             fragment_shader_.valid() &&
             mesh_cache_.ready() &&
+            texture_.valid() &&
+            material_.valid() &&
             pipeline_.valid();
     }
 
@@ -50,6 +54,8 @@ private:
     VulkanShaderModule vertex_shader_{};
     VulkanShaderModule fragment_shader_{};
     VulkanBuiltinMeshCache mesh_cache_{};
+    VulkanTextureResource texture_{};
+    VulkanMaterialResource material_{};
     VulkanGraphicsPipeline pipeline_{};
     std::string diagnostic_{};
 };
