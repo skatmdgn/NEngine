@@ -23,6 +23,7 @@
 #include "nengine/render/vulkan_device.hpp"
 #include "nengine/render/vulkan_instance.hpp"
 #include "nengine/render/vulkan_mesh.hpp"
+#include "nengine/render/vulkan_pipeline.hpp"
 #include "nengine/render/vulkan_presenter.hpp"
 #include "nengine/render/vulkan_shader.hpp"
 
@@ -857,6 +858,27 @@ int main() {
                     0.5f,
                     0.0f},
             "built-in quad mesh topology and bounds are valid");
+    }
+
+    {
+        render::VulkanGraphicsPipeline pipeline;
+        render::VulkanDevice no_device;
+        render::VulkanRenderTargets no_targets;
+        render::VulkanShaderModule no_vertex;
+        render::VulkanShaderModule no_fragment;
+
+        check(
+            !pipeline.valid(),
+            "default Vulkan graphics pipeline is invalid");
+
+        check(
+            !pipeline.create(
+                no_device,
+                no_targets,
+                no_vertex,
+                no_fragment) &&
+            !pipeline.diagnostic().empty(),
+            "Vulkan graphics pipeline rejects missing runtime resources");
     }
 
     {
