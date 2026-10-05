@@ -20,6 +20,10 @@ struct ProjectManifest {
 
 class ProjectManifestSerializer {
 public:
+    static bool validate(
+        const ProjectManifest& manifest,
+        std::string* error = nullptr);
+
     static bool save(
         const ProjectManifest& manifest,
         const std::filesystem::path& path,
