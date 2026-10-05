@@ -73,7 +73,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] GPU texture/sampler resource
 - [x] Combined-image-sampler material descriptor resource
 - [x] Graphics pipeline layout accepts material descriptor set layout
-- [ ] Bind material descriptor set during indexed draw
+- [x] Bind material descriptor set during indexed draw
 - [ ] Textured fragment shader/sample path
 - [ ] Scene View Vulkan presentation replacement
 - [ ] Android Vulkan surface
