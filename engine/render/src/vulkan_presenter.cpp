@@ -915,11 +915,38 @@ bool VulkanClearPresenter::present_frame(
                 status));
     }
 
-    VkClearValue clear{};
-    clear.color.float32[0] = red;
-    clear.color.float32[1] = green;
-    clear.color.float32[2] = blue;
-    clear.color.float32[3] = alpha;
+    VkClearValue clear_values[2]{};
+
+    clear_values[0]
+        .color
+        .float32[0] = red;
+
+    clear_values[0]
+        .color
+        .float32[1] = green;
+
+    clear_values[0]
+        .color
+        .float32[2] = blue;
+
+    clear_values[0]
+        .color
+        .float32[3] = alpha;
+
+    clear_values[1]
+        .depthStencil
+        .depth = 1.0f;
+
+    clear_values[1]
+        .depthStencil
+        .stencil = 0;
+
+    const auto clear_count =
+        targets_
+            ->render_pass_resource()
+            .has_depth()
+            ? 2u
+            : 1u;
 
     const VkRenderPassBeginInfo render_pass_info{
         VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -931,8 +958,8 @@ bool VulkanClearPresenter::present_frame(
             {0, 0},
             {width_, height_}
         },
-        1,
-        &clear
+        clear_count,
+        clear_values
     };
 
     begin_render_pass(
