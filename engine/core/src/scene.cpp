@@ -54,6 +54,21 @@ bool write_property_value(
         return false;
     }
 
+    if (property.kind == PropertyKind::AssetReference) {
+        if (const auto* asset =
+                std::get_if<std::string>(&value)) {
+            output
+                << "ASSET "
+                << std::quoted(*asset);
+            return true;
+        }
+
+        set_error(
+            error,
+            "AssetReference property must be stored as a GUID string");
+        return false;
+    }
+
     if (std::holds_alternative<std::monostate>(value)) {
         output << "NIL";
         return true;
@@ -190,6 +205,18 @@ bool read_property_value(
             return false;
         }
         property.kind = PropertyKind::String;
+        value = std::move(raw);
+        return true;
+    }
+
+    if (tag == "ASSET") {
+        std::string raw;
+        if (!(input >> std::quoted(raw))) {
+            set_error(error, "malformed ASSET property");
+            return false;
+        }
+        property.kind =
+            PropertyKind::AssetReference;
         value = std::move(raw);
         return true;
     }
