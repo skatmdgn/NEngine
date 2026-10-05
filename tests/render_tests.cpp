@@ -22,6 +22,7 @@
 #include "nengine/render/rhi.hpp"
 #include "nengine/render/vulkan_buffer.hpp"
 #include "nengine/render/vulkan_loader.hpp"
+#include "nengine/render/vulkan_material.hpp"
 #include "nengine/render/vulkan_depth_target.hpp"
 #include "nengine/render/vulkan_device.hpp"
 #include "nengine/render/vulkan_instance.hpp"
@@ -662,6 +663,18 @@ int main() {
                             gpu_texture.native_sampler() != nullptr,
                             "Vulkan RGBA8 texture stages pixels and creates sampled image/view/sampler");
 
+                        render::VulkanMaterialResource
+                            gpu_material;
+
+                        check(
+                            gpu_material.create_textured(
+                                device,
+                                gpu_texture) &&
+                            gpu_material.valid() &&
+                            gpu_material.native_descriptor_set_layout() != nullptr &&
+                            gpu_material.native_descriptor_set() != nullptr,
+                            "Vulkan textured material creates descriptor layout pool and combined image sampler set");
+
                         render::VulkanMeshResource
                             gpu_cube;
 
@@ -725,6 +738,20 @@ int main() {
                                 diagnostic_fragment),
                             "diagnostic SPIR-V creates real Vulkan graphics pipeline");
 
+                        render::VulkanGraphicsPipeline
+                            textured_pipeline;
+
+                        check(
+                            headless_render_pass.valid() &&
+                            gpu_material.valid() &&
+                            textured_pipeline.create(
+                                device,
+                                headless_render_pass,
+                                diagnostic_vertex,
+                                diagnostic_fragment,
+                                gpu_material),
+                            "Vulkan graphics pipeline layout accepts textured material descriptor set layout");
+
                         render::VulkanDepthTarget
                             headless_depth;
 
@@ -765,11 +792,13 @@ int main() {
                         depth_pipeline.destroy();
                         depth_render_pass.destroy();
                         headless_depth.destroy();
+                        textured_pipeline.destroy();
                         headless_pipeline.destroy();
                         headless_render_pass.destroy();
                         diagnostic_fragment.destroy();
                         diagnostic_vertex.destroy();
                         gpu_cube.destroy();
+                        gpu_material.destroy();
                         gpu_texture.destroy();
                         device_buffer.destroy();
                         host_buffer.destroy();
@@ -1022,6 +1051,14 @@ int main() {
                     0.5f,
                     0.0f},
             "built-in quad mesh topology and bounds are valid");
+    }
+
+    {
+        render::VulkanMaterialResource material;
+
+        check(
+            !material.valid(),
+            "default Vulkan material resource is invalid");
     }
 
     {
