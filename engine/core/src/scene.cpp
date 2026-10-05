@@ -29,6 +29,31 @@ bool write_property_value(
 
     const auto& value = property.value;
 
+    if (property.kind == PropertyKind::EntityReference) {
+        if (scene_version < 3) {
+            set_error(
+                error,
+                "EntityReference component properties require Scene v3");
+            return false;
+        }
+
+        if (const auto* local = std::get_if<std::uint64_t>(&value)) {
+            output << "ENTITY_LOCAL " << *local;
+            return true;
+        }
+
+        if (const auto* null_ref = std::get_if<std::int64_t>(&value);
+            null_ref && *null_ref < 0) {
+            output << "ENTITY_LOCAL -1";
+            return true;
+        }
+
+        set_error(
+            error,
+            "EntityReference property was not remapped to a scene-local id");
+        return false;
+    }
+
     if (std::holds_alternative<std::monostate>(value)) {
         output << "NIL";
         return true;
@@ -79,31 +104,6 @@ bool write_property_value(
                << typed->z << ' '
                << typed->w;
         return true;
-    }
-
-    if (property.kind == PropertyKind::EntityReference) {
-        if (scene_version < 3) {
-            set_error(
-                error,
-                "EntityReference component properties require Scene v3");
-            return false;
-        }
-
-        if (const auto* local = std::get_if<std::uint64_t>(&value)) {
-            output << "ENTITY_LOCAL " << *local;
-            return true;
-        }
-
-        if (const auto* null_ref = std::get_if<std::int64_t>(&value);
-            null_ref && *null_ref < 0) {
-            output << "ENTITY_LOCAL -1";
-            return true;
-        }
-
-        set_error(
-            error,
-            "EntityReference property was not remapped to a scene-local id");
-        return false;
     }
 
     if (std::holds_alternative<Entity>(value)) {
