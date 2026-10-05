@@ -13,17 +13,22 @@
 
 namespace nengine::editor {
 
-struct AssetPollResult {
-    std::vector<assets::FileChange> changes{};
-    assets::AssetScanResult scan{};
-};
-
 struct AssetImportSummary {
     std::size_t attempted{0};
     std::size_t imported{0};
     std::size_t cache_hits{0};
     std::size_t unsupported{0};
     std::size_t failed{0};
+
+    bool changed_cache() const noexcept {
+        return imported != 0;
+    }
+};
+
+struct AssetPollResult {
+    std::vector<assets::FileChange> changes{};
+    assets::AssetScanResult scan{};
+    AssetImportSummary imports{};
 };
 
 class ProjectSession {
@@ -70,9 +75,9 @@ public:
     AssetPollResult poll_assets();
 
     assets::ImportResult import_asset(
-        assets::AssetGuid guid) const;
+        assets::AssetGuid guid);
 
-    AssetImportSummary import_supported_assets() const;
+    AssetImportSummary import_supported_assets();
 
 private:
     void register_builtin_importers();
