@@ -430,6 +430,131 @@ struct Win32EditorShell::Impl {
         return DefWindowProcW(hwnd, message, wparam, lparam);
     }
 
+    static LRESULT CALLBACK splitter_proc(
+        HWND hwnd,
+        UINT message,
+        WPARAM,
+        LPARAM lparam) {
+
+        auto* self = reinterpret_cast<Impl*>(
+            GetWindowLongPtrW(
+                hwnd,
+                GWLP_USERDATA));
+
+        if (message == WM_NCCREATE) {
+            const auto* create =
+                reinterpret_cast<CREATESTRUCTW*>(
+                    lparam);
+
+            self =
+                static_cast<Impl*>(
+                    create->lpCreateParams);
+
+            SetWindowLongPtrW(
+                hwnd,
+                GWLP_USERDATA,
+                reinterpret_cast<LONG_PTR>(
+                    self));
+        }
+
+        if (!self) {
+            return DefWindowProcW(
+                hwnd,
+                message,
+                0,
+                lparam);
+        }
+
+        switch (message) {
+        case WM_SETCURSOR: {
+            const int id =
+                GetDlgCtrlID(hwnd);
+
+            SetCursor(
+                LoadCursorW(
+                    nullptr,
+                    id == IdSplitBottom
+                        ? IDC_SIZENS
+                        : IDC_SIZEWE));
+
+            return TRUE;
+        }
+
+        case WM_LBUTTONDOWN: {
+            POINT point{};
+            GetCursorPos(&point);
+            ScreenToClient(
+                self->host,
+                &point);
+
+            self->begin_layout_drag(
+                GetDlgCtrlID(hwnd),
+                point.x,
+                point.y);
+
+            SetCapture(hwnd);
+            return 0;
+        }
+
+        case WM_MOUSEMOVE:
+            if (self->layout_drag !=
+                    LayoutDrag::None &&
+                GetCapture() == hwnd) {
+
+                POINT point{};
+                GetCursorPos(&point);
+                ScreenToClient(
+                    self->host,
+                    &point);
+
+                self->update_layout_drag(
+                    point.x,
+                    point.y);
+
+                return 0;
+            }
+            break;
+
+        case WM_LBUTTONUP:
+            if (self->layout_drag !=
+                LayoutDrag::None) {
+
+                self->end_layout_drag();
+
+                if (GetCapture() == hwnd) {
+                    ReleaseCapture();
+                }
+
+                return 0;
+            }
+            break;
+
+        case WM_CAPTURECHANGED:
+            if (self->layout_drag !=
+                LayoutDrag::None) {
+                self->end_layout_drag();
+                return 0;
+            }
+            break;
+
+        case WM_NCDESTROY:
+            SetWindowLongPtrW(
+                hwnd,
+                GWLP_USERDATA,
+                0);
+            break;
+
+        default:
+            break;
+        }
+
+        return DefWindowProcW(
+            hwnd,
+            message,
+            0,
+            lparam);
+    }
+
     bool attach(void* native) {
         shell_log("attach begin");
 
@@ -457,6 +582,16 @@ struct Win32EditorShell::Impl {
                 reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1),
                 LoadCursorW(nullptr, IDC_CROSS))) {
             shell_log("attach failed: RegisterClassExW(SceneView)");
+            return false;
+        }
+
+        shell_log("registering Splitter window class");
+        if (!register_basic_class(
+                kSplitterClassName,
+                &Impl::splitter_proc,
+                reinterpret_cast<HBRUSH>(COLOR_3DSHADOW + 1),
+                LoadCursorW(nullptr, IDC_ARROW))) {
+            shell_log("attach failed: RegisterClassExW(Splitter)");
             return false;
         }
 
@@ -510,6 +645,64 @@ struct Win32EditorShell::Impl {
             !refresh_assets || !undo || !redo ||
             !play || !pause || !step || !stop) {
             shell_log("attach failed: toolbar control creation");
+            return false;
+        }
+
+        shell_log("creating layout splitters");
+
+        split_hierarchy = CreateWindowExW(
+            0,
+            kSplitterClassName,
+            L"",
+            WS_CHILD | WS_VISIBLE,
+            0,
+            0,
+            kSplitterSize,
+            10,
+            host,
+            reinterpret_cast<HMENU>(
+                static_cast<INT_PTR>(
+                    IdSplitHierarchy)),
+            GetModuleHandleW(nullptr),
+            this);
+
+        split_inspector = CreateWindowExW(
+            0,
+            kSplitterClassName,
+            L"",
+            WS_CHILD | WS_VISIBLE,
+            0,
+            0,
+            kSplitterSize,
+            10,
+            host,
+            reinterpret_cast<HMENU>(
+                static_cast<INT_PTR>(
+                    IdSplitInspector)),
+            GetModuleHandleW(nullptr),
+            this);
+
+        split_bottom = CreateWindowExW(
+            0,
+            kSplitterClassName,
+            L"",
+            WS_CHILD | WS_VISIBLE,
+            10,
+            10,
+            10,
+            kSplitterSize,
+            host,
+            reinterpret_cast<HMENU>(
+                static_cast<INT_PTR>(
+                    IdSplitBottom)),
+            GetModuleHandleW(nullptr),
+            this);
+
+        if (!split_hierarchy ||
+            !split_inspector ||
+            !split_bottom) {
+            shell_log(
+                "attach failed: splitter creation");
             return false;
         }
 
