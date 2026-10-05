@@ -6,6 +6,7 @@
 #include "nengine/render/vulkan_device.hpp"
 #include "nengine/render/vulkan_instance.hpp"
 #include "nengine/render/vulkan_loader.hpp"
+#include "nengine/render/vulkan_presenter.hpp"
 #include "nengine/render/vulkan_surface.hpp"
 #include "nengine/render/vulkan_swapchain.hpp"
 
@@ -33,10 +34,17 @@ public:
         std::uint32_t width,
         std::uint32_t height);
 
+    bool present_clear(
+        float red,
+        float green,
+        float blue,
+        float alpha = 1.0f);
+
     void shutdown() noexcept;
 
     bool ready() const noexcept {
-        return swapchain_.valid();
+        return swapchain_.valid() &&
+            presenter_.ready();
     }
 
     const VulkanLoader& loader() const noexcept {
@@ -69,6 +77,7 @@ private:
     VulkanSurface surface_{};
     VulkanDevice device_{};
     VulkanSwapchain swapchain_{};
+    VulkanClearPresenter presenter_{};
     bool vsync_{true};
     std::string diagnostic_{};
 };
