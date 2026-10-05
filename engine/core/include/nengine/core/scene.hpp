@@ -22,7 +22,7 @@ struct SceneObjectData {
 };
 
 struct SceneData {
-    static constexpr std::uint32_t current_version = 2;
+    static constexpr std::uint32_t current_version = 3;
 
     std::uint32_t version{current_version};
     std::string name{"Untitled"};
