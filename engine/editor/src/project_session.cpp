@@ -4,6 +4,7 @@
 
 #include "nengine/assets/builtin_processors.hpp"
 #include "nengine/core/scene.hpp"
+#include "nengine/render/builtin_assets.hpp"
 #include "nengine/render/components.hpp"
 #include "nengine/render/registration.hpp"
 #include <system_error>
@@ -249,6 +250,17 @@ bool ProjectSession::open(
             default_world.create(
                 "Cube");
 
+        if (auto* renderer =
+                default_world.add_component<
+                    render::MeshRenderer>(
+                        cube,
+                        render::mesh_renderer_type())) {
+
+            renderer->mesh =
+                render::
+                    builtin_unit_cube_mesh_guid();
+        }
+
         const auto child =
             default_world.create(
                 "Child Cube");
@@ -260,6 +272,17 @@ bool ProjectSession::open(
         default_world.set_parent(
             child,
             cube);
+
+        if (auto* renderer =
+                default_world.add_component<
+                    render::MeshRenderer>(
+                        child,
+                        render::mesh_renderer_type())) {
+
+            renderer->mesh =
+                render::
+                    builtin_unit_cube_mesh_guid();
+        }
 
         core::ComponentSerializationRegistry
             bootstrap_serialization;
