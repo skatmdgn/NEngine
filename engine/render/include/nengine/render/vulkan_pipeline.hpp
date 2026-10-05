@@ -55,6 +55,10 @@ public:
         return pipeline_;
     }
 
+    bool supports_material_descriptors() const noexcept {
+        return material_descriptor_layout_;
+    }
+
     const std::string& diagnostic() const noexcept {
         return diagnostic_;
     }
@@ -71,6 +75,7 @@ private:
     void* device_{nullptr};
     void* layout_{nullptr};
     void* pipeline_{nullptr};
+    bool material_descriptor_layout_{false};
     std::string diagnostic_{};
 };
 
