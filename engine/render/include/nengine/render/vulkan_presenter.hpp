@@ -1,11 +1,11 @@
 #pragma once
 
-#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
 
 #include "nengine/render/vulkan_device.hpp"
+#include "nengine/render/vulkan_render_targets.hpp"
 #include "nengine/render/vulkan_swapchain.hpp"
 
 namespace nengine::render {
@@ -23,7 +23,8 @@ public:
 
     bool initialize(
         const VulkanDevice& device,
-        const VulkanSwapchain& swapchain);
+        const VulkanSwapchain& swapchain,
+        const VulkanRenderTargets& targets);
 
     bool present_clear(
         float red,
@@ -35,6 +36,7 @@ public:
 
     bool ready() const noexcept {
         return device_api_ != nullptr &&
+            targets_ != nullptr &&
             command_pool_ != nullptr &&
             image_available_ != nullptr &&
             render_finished_ != nullptr &&
@@ -52,16 +54,17 @@ public:
 
 private:
     const VulkanDevice* device_api_{nullptr};
+    const VulkanRenderTargets* targets_{nullptr};
     void* device_{nullptr};
     void* queue_{nullptr};
     void* swapchain_{nullptr};
-    std::vector<void*> images_{};
     std::vector<void*> command_buffers_{};
-    std::vector<bool> image_initialized_{};
     void* command_pool_{nullptr};
     void* image_available_{nullptr};
     void* render_finished_{nullptr};
     void* frame_fence_{nullptr};
+    std::uint32_t width_{0};
+    std::uint32_t height_{0};
     bool needs_resize_{false};
     std::string diagnostic_{};
 };
