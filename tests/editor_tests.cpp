@@ -80,6 +80,30 @@ int main() {
         script_asset->importer_id == "NEngine.Script",
         "project chooses script importer");
 
+    const auto first_import =
+        model.project().import_asset(
+            script_asset->guid);
+
+    check(
+        first_import.success &&
+        !first_import.cache_hit,
+        "project imports script into Library cache");
+
+    check(
+        !first_import.artifacts.empty() &&
+        std::filesystem::exists(
+            first_import.artifacts[0].path),
+        "project import artifact exists");
+
+    const auto second_import =
+        model.project().import_asset(
+            script_asset->guid);
+
+    check(
+        second_import.success &&
+        second_import.cache_hit,
+        "project script import reuses cache");
+
     auto& world = model.world();
     const auto root = world.create("Root");
     const auto child = world.create("Child");
