@@ -1,6 +1,7 @@
 #pragma once
 
 #include "nengine/core/component_registry.hpp"
+#include "nengine/core/component_serialization.hpp"
 #include "nengine/core/world.hpp"
 #include "nengine/editor/command.hpp"
 #include "nengine/editor/console_model.hpp"
@@ -30,6 +31,16 @@ public:
 
     core::ComponentRegistry& component_registry() noexcept {
         return component_registry_;
+    }
+
+    core::ComponentSerializationRegistry&
+    component_serialization() noexcept {
+        return component_serialization_;
+    }
+
+    const core::ComponentSerializationRegistry&
+    component_serialization() const noexcept {
+        return component_serialization_;
     }
 
     const core::ComponentRegistry& component_registry() const noexcept {
@@ -65,6 +76,7 @@ public:
 private:
     core::World world_{};
     core::ComponentRegistry component_registry_{};
+    core::ComponentSerializationRegistry component_serialization_{};
     Selection selection_{};
     CommandStack commands_{};
     PlaySession play_session_{};
