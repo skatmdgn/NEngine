@@ -1367,15 +1367,31 @@ struct Win32EditorShell::Impl {
     void end_scene_drag() {
         if (!scene_dragging) return;
 
-        ReleaseCapture();
+        const auto entity =
+            scene_drag_entity;
 
         auto* transform =
-            editor.world().transform(
-                scene_drag_entity);
+            editor.world().transform(entity);
+
+        nengine::core::Transform final_value{};
+        bool has_final_value = false;
 
         if (transform) {
-            const auto final_value =
-                *transform;
+            final_value = *transform;
+            has_final_value = true;
+        }
+
+        scene_dragging = false;
+        scene_drag_axis =
+            nengine::editor::
+                SceneGizmoAxis::None;
+        scene_drag_entity =
+            nengine::core::Entity::invalid();
+
+        ReleaseCapture();
+
+        if (transform &&
+            has_final_value) {
 
             const bool changed =
                 final_value.local_position !=
@@ -1391,17 +1407,10 @@ struct Win32EditorShell::Impl {
                     std::make_unique<
                         nengine::editor::
                             SetTransformCommand>(
-                                scene_drag_entity,
+                                entity,
                                 final_value));
             }
         }
-
-        scene_dragging = false;
-        scene_drag_axis =
-            nengine::editor::
-                SceneGizmoAxis::None;
-        scene_drag_entity =
-            nengine::core::Entity::invalid();
 
         refresh();
     }
