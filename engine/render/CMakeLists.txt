@@ -4,6 +4,7 @@ add_library(NEngineRender STATIC
   src/render_snapshot.cpp
   src/vulkan_device.cpp
   src/vulkan_instance.cpp
+  src/vulkan_swapchain.cpp
 )
 
 if(WIN32)
