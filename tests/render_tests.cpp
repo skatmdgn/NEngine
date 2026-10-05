@@ -11,6 +11,7 @@
 #include "nengine/core/world.hpp"
 #include "nengine/render/asset_resources.hpp"
 #include "nengine/render/components.hpp"
+#include "nengine/render/mesh_data.hpp"
 #include "nengine/render/registration.hpp"
 #include "nengine/render/render_snapshot.hpp"
 #include "nengine/render/rhi.hpp"
@@ -470,6 +471,52 @@ int main() {
 
             (void)extensions;
         }
+    }
+
+    {
+        const auto cube =
+            render::make_unit_cube_mesh();
+
+        check(
+            cube.valid() &&
+            cube.vertices.size() == 24 &&
+            cube.indices.size() == 36,
+            "built-in cube mesh has expected face-split topology");
+
+        bool cube_indices_valid = true;
+
+        for (const auto index :
+             cube.indices) {
+
+            if (index >=
+                cube.vertices.size()) {
+                cube_indices_valid = false;
+                break;
+            }
+        }
+
+        check(
+            cube_indices_valid &&
+            cube.bounds.extents ==
+                core::Vec3{
+                    0.5f,
+                    0.5f,
+                    0.5f},
+            "built-in cube indices and bounds are valid");
+
+        const auto quad =
+            render::make_unit_quad_mesh();
+
+        check(
+            quad.valid() &&
+            quad.vertices.size() == 4 &&
+            quad.indices.size() == 6 &&
+            quad.bounds.extents ==
+                core::Vec3{
+                    0.5f,
+                    0.5f,
+                    0.0f},
+            "built-in quad mesh topology and bounds are valid");
     }
 
     render::BufferHandle invalid_buffer;
