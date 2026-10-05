@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
 
 #include "nengine/editor/editor_model.hpp"
@@ -185,6 +186,106 @@ int main() {
                 return true;
             }),
         "custom property accessor registers");
+
+    check(
+        model.component_serialization().register_codec({
+            health_type,
+            1,
+            "Tests.Health",
+            [health_type](
+                const core::World& source,
+                core::Entity entity)
+                -> std::optional<
+                    core::SerializedComponentData> {
+
+                const auto* component =
+                    source.get_component<TestHealth>(
+                        entity,
+                        health_type);
+
+                if (!component) {
+                    return std::nullopt;
+                }
+
+                core::SerializedComponentData data;
+                data.type = health_type;
+                data.version = 1;
+                data.type_name = "Tests.Health";
+                data.properties.push_back({
+                    "Value",
+                    core::PropertyValue{
+                        component->value
+                    }
+                });
+                return data;
+            },
+            [health_type](
+                core::World& destination,
+                core::Entity entity,
+                const core::SerializedComponentData& data,
+                std::string* error) {
+
+                std::int64_t value = 100;
+                bool found = false;
+
+                for (const auto& property :
+                     data.properties) {
+
+                    if (property.name != "Value") {
+                        continue;
+                    }
+
+                    const auto* typed =
+                        std::get_if<std::int64_t>(
+                            &property.value);
+
+                    if (!typed) {
+                        if (error) {
+                            *error =
+                                "Health.Value has wrong type";
+                        }
+                        return false;
+                    }
+
+                    value = *typed;
+                    found = true;
+                }
+
+                if (!found) {
+                    if (error) {
+                        *error =
+                            "Health.Value missing";
+                    }
+                    return false;
+                }
+
+                auto* component =
+                    destination.get_component<
+                        TestHealth>(
+                            entity,
+                            health_type);
+
+                if (!component) {
+                    component =
+                        destination.add_component<
+                            TestHealth>(
+                                entity,
+                                health_type);
+                }
+
+                if (!component) {
+                    if (error) {
+                        *error =
+                            "could not create Health component";
+                    }
+                    return false;
+                }
+
+                component->value = value;
+                return true;
+            }
+        }),
+        "custom component serialization codec registers");
 
     check(model.selection().active() == child, "selection tracks active entity");
     check(model.commands().execute(world, std::make_unique<editor::RenameEntityCommand>(child, "Renamed")), "rename command executes");
@@ -378,6 +479,68 @@ int main() {
             child,
             health_type)->value == 55,
         "generic property command redo reapplies custom component");
+
+    const auto component_scene =
+        core::SceneSerializer::capture(
+            world,
+            "ComponentRoundTrip",
+            &model.component_serialization());
+
+    std::stringstream component_stream;
+    std::string component_scene_error;
+
+    check(
+        core::SceneSerializer::write(
+            component_scene,
+            component_stream,
+            &component_scene_error),
+        "Scene v2 serializes registered native component");
+
+    core::SceneData component_loaded;
+
+    check(
+        core::SceneSerializer::read(
+            component_stream,
+            component_loaded,
+            &component_scene_error),
+        "Scene v2 parses registered native component");
+
+    core::World component_restored;
+
+    check(
+        core::SceneSerializer::instantiate(
+            component_loaded,
+            component_restored,
+            &component_scene_error,
+            &model.component_serialization()),
+        "Scene v2 restores registered native component");
+
+    core::Entity restored_health_entity =
+        core::Entity::invalid();
+
+    for (const auto entity :
+         component_restored.entities()) {
+        if (component_restored.name(entity) ==
+            "Renamed") {
+            restored_health_entity = entity;
+            break;
+        }
+    }
+
+    check(
+        restored_health_entity.valid(),
+        "Scene v2 restored custom component owner");
+
+    const auto* restored_health =
+        component_restored.get_component<
+            TestHealth>(
+                restored_health_entity,
+                health_type);
+
+    check(
+        restored_health &&
+        restored_health->value == 55,
+        "Scene v2 preserves custom component property value");
 
     check(model.play_session().play(world), "play clones edit world");
     check(!model.can_edit(), "edit operations can be gated during play");
