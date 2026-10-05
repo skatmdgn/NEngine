@@ -1,5 +1,7 @@
 #include "nengine/render/vulkan_diagnostic_scene.hpp"
 
+#include <cstdint>
+#include <span>
 #include <vector>
 
 #include "nengine/core/transform.hpp"
@@ -29,7 +31,7 @@ bool VulkanDiagnosticScene::initialize(
     if (!vertex_shader_.create(
             context.device(),
             VulkanShaderStage::Vertex,
-            diagnostic_vertex_spirv())) {
+            diagnostic_textured_vertex_spirv())) {
 
         diagnostic_ =
             "diagnostic vertex shader failed: " +
@@ -42,7 +44,7 @@ bool VulkanDiagnosticScene::initialize(
     if (!fragment_shader_.create(
             context.device(),
             VulkanShaderStage::Fragment,
-            diagnostic_fragment_spirv())) {
+            diagnostic_textured_fragment_spirv())) {
 
         diagnostic_ =
             "diagnostic fragment shader failed: " +
@@ -65,14 +67,53 @@ bool VulkanDiagnosticScene::initialize(
         return false;
     }
 
-    if (!pipeline_.create(
+    const std::uint8_t pixels[] = {
+        255u,  48u,  48u, 255u,
+         48u, 255u,  96u, 255u,
+         48u,  96u, 255u, 255u,
+        255u, 224u,  48u, 255u
+    };
+
+    if (!texture_.create_rgba8(
+            context.loader(),
+            context.instance(),
             context.device(),
-            context.render_targets(),
-            vertex_shader_,
-            fragment_shader_)) {
+            2u,
+            2u,
+            pixels,
+            sizeof(pixels),
+            VulkanTextureColorSpace::SRgb)) {
 
         diagnostic_ =
-            "diagnostic graphics pipeline failed: " +
+            "diagnostic sampled texture failed: " +
+            texture_.diagnostic();
+
+        shutdown();
+        return false;
+    }
+
+    if (!material_.create_textured(
+            context.device(),
+            texture_)) {
+
+        diagnostic_ =
+            "diagnostic textured material failed: " +
+            material_.diagnostic();
+
+        shutdown();
+        return false;
+    }
+
+    if (!pipeline_.create(
+            context.device(),
+            context.render_targets()
+                .render_pass_resource(),
+            vertex_shader_,
+            fragment_shader_,
+            material_)) {
+
+        diagnostic_ =
+            "diagnostic textured graphics pipeline failed: " +
             pipeline_.diagnostic();
 
         shutdown();
@@ -80,7 +121,7 @@ bool VulkanDiagnosticScene::initialize(
     }
 
     diagnostic_ =
-        "Vulkan preview shaders mesh cache and pipeline ready";
+        "Vulkan textured preview shaders mesh cache texture material and pipeline ready";
 
     return true;
 }
@@ -141,10 +182,17 @@ bool VulkanDiagnosticScene::present(
             projection,
             model);
 
-    if (!context.present_mesh(
-            pipeline_,
-            *quad,
-            mvp)) {
+    const VulkanMeshDraw draw{
+        &pipeline_,
+        quad,
+        mvp,
+        &material_
+    };
+
+    if (!context.present_meshes(
+            std::span<const VulkanMeshDraw>{
+                &draw,
+                1})) {
 
         diagnostic_ =
             context.diagnostic();
@@ -152,7 +200,7 @@ bool VulkanDiagnosticScene::present(
     }
 
     diagnostic_ =
-        "Vulkan diagnostic indexed quad presented";
+        "Vulkan diagnostic textured quad presented";
 
     return true;
 }
@@ -227,7 +275,8 @@ bool VulkanDiagnosticScene::present_world(
             mesh,
             multiply(
                 matrices->view_projection,
-                item.world)
+                item.world),
+            &material_
         });
     }
 
@@ -267,6 +316,8 @@ bool VulkanDiagnosticScene::present_world(
 
 void VulkanDiagnosticScene::shutdown() noexcept {
     pipeline_.destroy();
+    material_.destroy();
+    texture_.destroy();
     mesh_cache_.shutdown();
     fragment_shader_.destroy();
     vertex_shader_.destroy();
