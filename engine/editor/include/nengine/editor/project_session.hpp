@@ -8,12 +8,21 @@
 #include "nengine/assets/asset_importer.hpp"
 #include "nengine/assets/dependency_graph.hpp"
 #include "nengine/assets/file_watcher.hpp"
+#include "nengine/assets/import_pipeline.hpp"
 
 namespace nengine::editor {
 
 struct AssetPollResult {
     std::vector<assets::FileChange> changes{};
     assets::AssetScanResult scan{};
+};
+
+struct AssetImportSummary {
+    std::size_t attempted{0};
+    std::size_t imported{0};
+    std::size_t cache_hits{0};
+    std::size_t unsupported{0};
+    std::size_t failed{0};
 };
 
 class ProjectSession {
@@ -52,6 +61,11 @@ public:
     assets::AssetScanResult refresh_assets();
     AssetPollResult poll_assets();
 
+    assets::ImportResult import_asset(
+        assets::AssetGuid guid) const;
+
+    AssetImportSummary import_supported_assets() const;
+
 private:
     void register_builtin_importers();
 
@@ -63,6 +77,7 @@ private:
     assets::AssetDatabase assets_{};
     assets::PollingFileWatcher watcher_{};
     assets::AssetDependencyGraph dependency_graph_{};
+    assets::AssetImportPipeline import_pipeline_{};
 };
 
 } // namespace nengine::editor
