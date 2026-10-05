@@ -4,11 +4,22 @@ namespace nengine::editor {
 
 bool CommandStack::execute(core::World& world, std::unique_ptr<EditorCommand> command) {
     if (!command || !command->execute(world)) return false;
+
     if (cursor_ < history_.size()) {
-        history_.erase(history_.begin() + static_cast<std::ptrdiff_t>(cursor_), history_.end());
+        history_.erase(
+            history_.begin() +
+                static_cast<std::ptrdiff_t>(cursor_),
+            history_.end());
+
+        state_ids_.erase(
+            state_ids_.begin() +
+                static_cast<std::ptrdiff_t>(cursor_ + 1),
+            state_ids_.end());
     }
+
     history_.push_back(std::move(command));
-    cursor_ = history_.size();
+    ++cursor_;
+    state_ids_.push_back(next_state_id_++);
     return true;
 }
 
@@ -29,6 +40,8 @@ bool CommandStack::redo(core::World& world) {
 void CommandStack::clear() noexcept {
     history_.clear();
     cursor_ = 0;
+    state_ids_.clear();
+    state_ids_.push_back(next_state_id_++);
 }
 
 std::string_view CommandStack::undo_name() const noexcept {
