@@ -1,3 +1,4 @@
+#include <array>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -8,6 +9,7 @@
 #include "nengine/assets/asset_database.hpp"
 #include "nengine/assets/asset_guid.hpp"
 #include "nengine/assets/asset_importer.hpp"
+#include "nengine/assets/builtin_processors.hpp"
 #include "nengine/assets/dependency_graph.hpp"
 #include "nengine/assets/file_watcher.hpp"
 #include "nengine/assets/import_pipeline.hpp"
@@ -25,7 +27,44 @@ void check(bool condition, const char* message) {
 void write_file(const std::filesystem::path& path, std::string_view content) {
     std::filesystem::create_directories(path.parent_path());
     std::ofstream output(path, std::ios::binary | std::ios::trunc);
-    output << content;
+    output.write(
+        content.data(),
+        static_cast<std::streamsize>(
+            content.size()));
+}
+
+void write_bytes(
+    const std::filesystem::path& path,
+    const std::vector<unsigned char>& bytes) {
+
+    std::filesystem::create_directories(
+        path.parent_path());
+
+    std::ofstream output(
+        path,
+        std::ios::binary |
+            std::ios::trunc);
+
+    output.write(
+        reinterpret_cast<
+            const char*>(
+                bytes.data()),
+        static_cast<std::streamsize>(
+            bytes.size()));
+}
+
+std::string read_all(
+    const std::filesystem::path& path) {
+
+    std::ifstream input(
+        path,
+        std::ios::binary);
+
+    return {
+        std::istreambuf_iterator<char>{
+            input},
+        std::istreambuf_iterator<char>{}
+    };
 }
 }
 
@@ -39,6 +78,7 @@ int main() {
 
     ImporterRegistry importers;
     check(importers.register_importer({"Texture", 1, {".png", ".jpg"}, false}), "register texture importer");
+    check(importers.register_importer({"Audio", 1, {".wav"}, false}), "register audio importer");
     check(importers.register_importer({"Scene", 1, {".nscene"}, false}), "register scene importer");
     check(importers.register_importer({"Raw", 1, {}, true}), "register fallback importer");
     check(importers.find_for_path("image.PNG")->id == "Texture", "extension matching is case-insensitive");
@@ -54,16 +94,50 @@ int main() {
     std::filesystem::create_directories(root);
 
     const auto image = root / "Textures" / "hero.png";
+    const auto audio = root / "Audio" / "tone.wav";
     const auto scene = root / "Scenes" / "Main.nscene";
-    write_file(image, "png-data");
+
+    // Minimal PNG signature + IHDR header. CRC/data are not
+    // required by the metadata-only importer.
+    write_bytes(
+        image,
+        {
+            0x89, 'P', 'N', 'G',
+            0x0D, 0x0A, 0x1A, 0x0A,
+            0x00, 0x00, 0x00, 0x0D,
+            'I', 'H', 'D', 'R',
+            0x00, 0x00, 0x00, 0x40,
+            0x00, 0x00, 0x00, 0x20
+        });
+
+    // 44-byte PCM WAV header + one stereo 16-bit frame.
+    write_bytes(
+        audio,
+        {
+            'R','I','F','F',
+            40,0,0,0,
+            'W','A','V','E',
+            'f','m','t',' ',
+            16,0,0,0,
+            1,0,
+            2,0,
+            0x44,0xAC,0x00,0x00,
+            0x10,0xB1,0x02,0x00,
+            4,0,
+            16,0,
+            'd','a','t','a',
+            4,0,0,0,
+            0,0,0,0
+        });
+
     write_file(scene, "scene-data");
 
     AssetDatabase database(root);
     database.set_importers(&importers);
 
     const auto first_scan = database.scan(true);
-    check(database.size() == 2, "database scans asset files");
-    check(first_scan.meta_created == 2, "missing meta files are created");
+    check(database.size() == 3, "database scans asset files");
+    check(first_scan.meta_created == 3, "missing meta files are created");
 
     const auto* image_record = database.find_relative("Textures/hero.png");
     check(image_record != nullptr, "asset lookup by relative path");
@@ -113,6 +187,18 @@ int main() {
 
     check(
         pipeline.register_processor(
+            "Texture",
+            texture_source_importer),
+        "texture metadata processor registers");
+
+    check(
+        pipeline.register_processor(
+            "Audio",
+            audio_source_importer),
+        "audio metadata processor registers");
+
+    check(
+        pipeline.register_processor(
             "Raw",
             copy_source_importer),
         "raw copy-source processor registers");
@@ -143,6 +229,90 @@ int main() {
         std::filesystem::exists(
             import_result.artifacts[0].path),
         "import artifact is written to cache");
+
+    const auto* texture_record =
+        database.find_relative(
+            "Textures/Characters/hero.png");
+
+    check(
+        texture_record != nullptr,
+        "moved texture record available for import");
+
+    const auto texture_result =
+        pipeline.import(
+            *texture_record,
+            importers,
+            cache_root);
+
+    check(
+        texture_result.success &&
+        texture_result.artifacts.size() == 2,
+        "texture importer produces source and descriptor");
+
+    std::filesystem::path texture_descriptor;
+
+    for (const auto& artifact :
+         texture_result.artifacts) {
+        if (artifact.role ==
+            "texture-descriptor") {
+            texture_descriptor =
+                artifact.path;
+        }
+    }
+
+    const auto texture_text =
+        read_all(
+            texture_descriptor);
+
+    check(
+        texture_text.find("WIDTH 64") !=
+            std::string::npos &&
+        texture_text.find("HEIGHT 32") !=
+            std::string::npos,
+        "texture descriptor records PNG dimensions");
+
+    const auto* audio_record =
+        database.find_relative(
+            "Audio/tone.wav");
+
+    check(
+        audio_record != nullptr,
+        "audio record available for import");
+
+    const auto audio_result =
+        pipeline.import(
+            *audio_record,
+            importers,
+            cache_root);
+
+    check(
+        audio_result.success &&
+        audio_result.artifacts.size() == 2,
+        "audio importer produces source and descriptor");
+
+    std::filesystem::path audio_descriptor;
+
+    for (const auto& artifact :
+         audio_result.artifacts) {
+        if (artifact.role ==
+            "audio-descriptor") {
+            audio_descriptor =
+                artifact.path;
+        }
+    }
+
+    const auto audio_text =
+        read_all(
+            audio_descriptor);
+
+    check(
+        audio_text.find("CHANNELS 2") !=
+            std::string::npos &&
+        audio_text.find("SAMPLE_RATE 44100") !=
+            std::string::npos &&
+        audio_text.find("BITS_PER_SAMPLE 16") !=
+            std::string::npos,
+        "audio descriptor records WAV metadata");
 
     const auto raw_record =
         AssetRecord{
