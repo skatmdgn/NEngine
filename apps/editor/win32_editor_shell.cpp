@@ -53,6 +53,7 @@ enum ControlId : int {
     IdPause,
     IdStep,
     IdStop,
+    IdVulkanPreview,
     IdHierarchy,
     IdName,
     IdActive,
@@ -277,6 +278,7 @@ struct Win32EditorShell::Impl {
     HWND pause{nullptr};
     HWND step{nullptr};
     HWND stop{nullptr};
+    HWND vulkan_preview{nullptr};
 
     HWND hierarchy{nullptr};
     HWND scene{nullptr};
@@ -322,6 +324,7 @@ struct Win32EditorShell::Impl {
 
     int vulkan_scene_width{-1};
     int vulkan_scene_height{-1};
+    bool vulkan_preview_enabled{false};
 
     bool scene_dragging{false};
     nengine::editor::SceneGizmoAxis scene_drag_axis{
@@ -454,7 +457,11 @@ struct Win32EditorShell::Impl {
         case WM_PAINT: {
             PAINTSTRUCT paint{};
             HDC dc = BeginPaint(hwnd, &paint);
-            self->paint_scene(dc, hwnd);
+
+            if (!self->vulkan_preview_enabled) {
+                self->paint_scene(dc, hwnd);
+            }
+
             EndPaint(hwnd, &paint);
             return 0;
         }
@@ -687,10 +694,17 @@ struct Win32EditorShell::Impl {
         pause = create_control(host, L"BUTTON", L"Pause", BS_PUSHBUTTON, IdPause);
         step = create_control(host, L"BUTTON", L"Step", BS_PUSHBUTTON, IdStep);
         stop = create_control(host, L"BUTTON", L"Stop", BS_PUSHBUTTON, IdStop);
+        vulkan_preview = create_control(
+            host,
+            L"BUTTON",
+            L"VK Preview",
+            BS_AUTOCHECKBOX | BS_PUSHLIKE,
+            IdVulkanPreview);
 
         if (!open_scene || !save_scene || !new_entity || !delete_entity ||
             !refresh_assets || !scripts || !undo || !redo ||
-            !play || !pause || !step || !stop) {
+            !play || !pause || !step || !stop ||
+            !vulkan_preview) {
             shell_log("attach failed: toolbar control creation");
             return false;
         }
@@ -1076,6 +1090,17 @@ struct Win32EditorShell::Impl {
                 ->initialize(
                     *vulkan_context)) {
 
+            vulkan_preview_enabled =
+                false;
+
+            if (vulkan_preview) {
+                SendMessageW(
+                    vulkan_preview,
+                    BM_SETCHECK,
+                    BST_UNCHECKED,
+                    0);
+            }
+
             editor.console().warning(
                 "Renderer",
                 "Vulkan diagnostic resources failed after resize: " +
@@ -1106,6 +1131,44 @@ struct Win32EditorShell::Impl {
         }
 
         poll_vulkan_scene_resize();
+
+        if (vulkan_preview_enabled &&
+            vulkan_context &&
+            vulkan_context->ready() &&
+            vulkan_diagnostic_scene &&
+            vulkan_diagnostic_scene->ready()) {
+
+            if (!vulkan_diagnostic_scene
+                    ->present(
+                        *vulkan_context)) {
+
+                vulkan_preview_enabled =
+                    false;
+
+                if (vulkan_preview) {
+                    SendMessageW(
+                        vulkan_preview,
+                        BM_SETCHECK,
+                        BST_UNCHECKED,
+                        0);
+                }
+
+                editor.console().warning(
+                    "Renderer",
+                    "Vulkan Preview stopped after present failure: " +
+                        vulkan_diagnostic_scene
+                            ->diagnostic());
+
+                if (scene) {
+                    InvalidateRect(
+                        scene,
+                        nullptr,
+                        TRUE);
+                }
+
+                refresh_console();
+            }
+        }
 
         const ULONGLONG now = GetTickCount64();
         if (now >= next_asset_poll_tick) {
@@ -1423,6 +1486,15 @@ struct Win32EditorShell::Impl {
             x,
             6,
             button_width,
+            button_height,
+            TRUE);
+        x += button_width + 12;
+
+        MoveWindow(
+            vulkan_preview,
+            x,
+            6,
+            88,
             button_height,
             TRUE);
 
@@ -2808,6 +2880,55 @@ struct Win32EditorShell::Impl {
         case IdStop:
             if (notification != BN_CLICKED) return false;
             editor.play_session().stop();
+            handled = true;
+            break;
+
+        case IdVulkanPreview:
+            if (notification != BN_CLICKED) return false;
+            {
+                const bool requested =
+                    SendMessageW(
+                        vulkan_preview,
+                        BM_GETCHECK,
+                        0,
+                        0) == BST_CHECKED;
+
+                if (requested &&
+                    (!vulkan_context ||
+                     !vulkan_context->ready() ||
+                     !vulkan_diagnostic_scene ||
+                     !vulkan_diagnostic_scene->ready())) {
+
+                    vulkan_preview_enabled =
+                        false;
+
+                    SendMessageW(
+                        vulkan_preview,
+                        BM_SETCHECK,
+                        BST_UNCHECKED,
+                        0);
+
+                    editor.console().warning(
+                        "Renderer",
+                        "Vulkan Preview is unavailable: the diagnostic Vulkan pipeline is not ready.");
+                } else {
+                    vulkan_preview_enabled =
+                        requested;
+
+                    editor.console().info(
+                        "Renderer",
+                        requested
+                            ? "Vulkan Preview enabled: indexed diagnostic quad presentation is active."
+                            : "Vulkan Preview disabled: returned to GDI Scene View.");
+
+                    if (scene) {
+                        InvalidateRect(
+                            scene,
+                            nullptr,
+                            TRUE);
+                    }
+                }
+            }
             handled = true;
             break;
 
