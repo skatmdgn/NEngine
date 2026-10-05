@@ -29,6 +29,10 @@ constexpr std::uint32_t
 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR = 0u;
 
 constexpr std::uint32_t
+VK_IMAGE_USAGE_TRANSFER_DST_BIT =
+    0x00000002u;
+
+constexpr std::uint32_t
 VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT =
     0x00000010u;
 
@@ -514,6 +518,18 @@ bool VulkanSwapchain::create(
         return false;
     }
 
+    constexpr std::uint32_t image_usage =
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+    if ((capabilities.supportedUsageFlags &
+         image_usage) != image_usage) {
+
+        diagnostic_ =
+            "Vulkan surface does not support color-attachment + transfer-dst swapchain images";
+        return false;
+    }
+
     const VkSwapchainCreateInfoKHR info{
         VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         nullptr,
@@ -524,7 +540,7 @@ bool VulkanSwapchain::create(
         chosen_format.colorSpace,
         extent,
         1,
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        image_usage,
         VK_SHARING_MODE_EXCLUSIVE,
         0,
         nullptr,
