@@ -11,6 +11,7 @@
 #include "nengine/editor/editor_model.hpp"
 #include "nengine/editor/presentation.hpp"
 #include "nengine/editor/property_command.hpp"
+#include "nengine/editor/property_text.hpp"
 #include "nengine/editor/scene_interaction.hpp"
 
 namespace {
@@ -37,6 +38,75 @@ int main() {
     check(
         !model.scene_dirty(),
         "fresh editor savepoint is clean");
+
+    {
+        core::PropertyValue parsed;
+        std::string parse_error;
+
+        check(
+            editor::parse_property_value(
+                core::PropertyKind::Boolean,
+                "true",
+                parsed,
+                &parse_error) &&
+            std::get<bool>(parsed),
+            "generic property parser reads boolean");
+
+        check(
+            editor::parse_property_value(
+                core::PropertyKind::Integer,
+                "-42",
+                parsed,
+                &parse_error) &&
+            std::get<std::int64_t>(parsed) == -42,
+            "generic property parser reads signed integer");
+
+        check(
+            editor::parse_property_value(
+                core::PropertyKind::Float,
+                "3.25",
+                parsed,
+                &parse_error) &&
+            std::get<double>(parsed) == 3.25,
+            "generic property parser reads float");
+
+        check(
+            editor::parse_property_value(
+                core::PropertyKind::Vec3,
+                "1, 2, 3",
+                parsed,
+                &parse_error) &&
+            std::get<core::Vec3>(parsed) ==
+                core::Vec3{1.0f, 2.0f, 3.0f},
+            "generic property parser reads Vec3");
+
+        check(
+            editor::parse_property_value(
+                core::PropertyKind::Quaternion,
+                "0 0 0 1",
+                parsed,
+                &parse_error) &&
+            std::get<core::Quat>(parsed) ==
+                core::Quat{0.0f, 0.0f, 0.0f, 1.0f},
+            "generic property parser reads Quaternion");
+
+        check(
+            editor::parse_property_value(
+                core::PropertyKind::EntityReference,
+                "none",
+                parsed,
+                &parse_error) &&
+            !std::get<core::Entity>(parsed).valid(),
+            "generic property parser reads null EntityReference");
+
+        check(
+            !editor::parse_property_value(
+                core::PropertyKind::Vec3,
+                "1 2",
+                parsed,
+                &parse_error),
+            "generic property parser rejects malformed Vec3");
+    }
 
     model.console().info("Test", "hello");
     model.console().info("Test", "hello");
