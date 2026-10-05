@@ -28,6 +28,11 @@ public:
         const VulkanDevice& device,
         std::uint32_t color_format);
 
+    bool create_color_depth(
+        const VulkanDevice& device,
+        std::uint32_t color_format,
+        std::uint32_t depth_format);
+
     void destroy() noexcept;
 
     bool valid() const noexcept {
@@ -42,6 +47,14 @@ public:
         return color_format_;
     }
 
+    std::uint32_t depth_format() const noexcept {
+        return depth_format_;
+    }
+
+    bool has_depth() const noexcept {
+        return depth_format_ != 0;
+    }
+
     const std::string& diagnostic() const noexcept {
         return diagnostic_;
     }
@@ -51,6 +64,7 @@ private:
     void* device_{nullptr};
     void* render_pass_{nullptr};
     std::uint32_t color_format_{0};
+    std::uint32_t depth_format_{0};
     std::string diagnostic_{};
 };
 
