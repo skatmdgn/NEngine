@@ -105,8 +105,23 @@ int main() {
             {1.0f, 0.8f, 0.6f};
     }
 
+    const auto mesh_parent =
+        world.create("Mesh Parent");
+
+    world.transform(mesh_parent)
+        ->local_position =
+        {5.0f, 0.0f, 0.0f};
+
     const auto mesh_entity =
         world.create("Renderable");
+
+    world.transform(mesh_entity)
+        ->local_position =
+        {2.0f, 0.0f, 0.0f};
+
+    world.set_parent(
+        mesh_entity,
+        mesh_parent);
 
     auto* mesh_renderer =
         world.add_component<
@@ -167,6 +182,21 @@ int main() {
         snapshot.meshes[0].renderer.material ==
             material_guid,
         "render snapshot preserves asset GUID references");
+
+    if (snapshot.meshes.size() == 1) {
+        const auto resolved_origin =
+            render::transform_point(
+                snapshot.meshes[0].world,
+                {0.0f, 0.0f, 0.0f});
+
+        check(
+            resolved_origin ==
+                core::Vec3{
+                    7.0f,
+                    0.0f,
+                    0.0f},
+            "render snapshot resolves parent hierarchy into world matrix");
+    }
 
     const auto scene =
         core::SceneSerializer::capture(
