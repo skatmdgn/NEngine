@@ -127,17 +127,17 @@ bool VulkanShaderModule::create(
     destroy();
     diagnostic_.clear();
 
-    if (!device.valid()) {
-        diagnostic_ =
-            "valid Vulkan device is required";
-        return false;
-    }
-
     if (spirv.size() < 5 ||
         spirv.front() != SPIRV_MAGIC) {
 
         diagnostic_ =
             "valid SPIR-V binary header is required";
+        return false;
+    }
+
+    if (!device.valid()) {
+        diagnostic_ =
+            "valid Vulkan device is required";
         return false;
     }
 
