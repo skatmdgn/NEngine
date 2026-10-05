@@ -33,7 +33,8 @@ public:
     void destroy() noexcept;
 
     bool valid() const noexcept {
-        return render_pass_.valid() &&
+        return depth_target_.valid() &&
+            render_pass_.valid() &&
             !image_views_.empty() &&
             framebuffers_.size() ==
                 image_views_.size();
