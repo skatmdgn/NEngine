@@ -14,6 +14,7 @@
 #include "nengine/render/asset_resources.hpp"
 #include "nengine/render/builtin_assets.hpp"
 #include "nengine/render/components.hpp"
+#include "nengine/render/decoded_texture.hpp"
 #include "nengine/render/diagnostic_shaders.hpp"
 #include "nengine/render/matrix.hpp"
 #include "nengine/render/mesh_data.hpp"
@@ -420,6 +421,232 @@ int main() {
             resolved->metadata.height == 96 &&
             resolved->source_path == source,
             "renderer resolves texture GUID from validated cache artifacts");
+
+        const auto bmp_source =
+            root / "decoded.bmp";
+
+        const auto bmp_descriptor =
+            root / "decoded_texture.nasset";
+
+        std::array<std::uint8_t, 70>
+            bmp_bytes{};
+
+        bmp_bytes[0] = 'B';
+        bmp_bytes[1] = 'M';
+        bmp_bytes[2] = 70u;
+        bmp_bytes[10] = 54u;
+        bmp_bytes[14] = 40u;
+        bmp_bytes[18] = 2u;
+        bmp_bytes[22] = 2u;
+        bmp_bytes[26] = 1u;
+        bmp_bytes[28] = 24u;
+        bmp_bytes[34] = 16u;
+
+        // Bottom BMP row: blue, white.
+        bmp_bytes[54] = 255u;
+        bmp_bytes[55] = 0u;
+        bmp_bytes[56] = 0u;
+        bmp_bytes[57] = 255u;
+        bmp_bytes[58] = 255u;
+        bmp_bytes[59] = 255u;
+
+        // Top BMP row: red, green.
+        bmp_bytes[62] = 0u;
+        bmp_bytes[63] = 0u;
+        bmp_bytes[64] = 255u;
+        bmp_bytes[65] = 0u;
+        bmp_bytes[66] = 255u;
+        bmp_bytes[67] = 0u;
+
+        {
+            std::ofstream output(
+                bmp_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output.write(
+                reinterpret_cast<const char*>(
+                    bmp_bytes.data()),
+                static_cast<std::streamsize>(
+                    bmp_bytes.size()));
+        }
+
+        {
+            std::ofstream output(
+                bmp_descriptor,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output
+                << "NENGINE_TEXTURE 1\n"
+                << "FORMAT \"bmp\"\n"
+                << "WIDTH 2\n"
+                << "HEIGHT 2\n"
+                << "COLOR_SPACE \"sRGB\"\n"
+                << "SOURCE \"decoded.bmp\"\n"
+                << "END_TEXTURE\n";
+        }
+
+        assets::CachedArtifactSet
+            decoded_cached;
+
+        decoded_cached.fingerprint =
+            "bmp-v1";
+
+        decoded_cached.importer_id =
+            "NEngine.Texture";
+
+        decoded_cached.artifacts.push_back({
+            bmp_source,
+            "source"
+        });
+
+        decoded_cached.artifacts.push_back({
+            bmp_descriptor,
+            "texture-descriptor"
+        });
+
+        const auto decoded_guid =
+            assets::AssetGuid::generate();
+
+        render::DecodedTextureCache
+            decoded_cache;
+
+        const auto* decoded =
+            decoded_cache.load(
+                decoded_guid,
+                decoded_cached,
+                &resolve_error);
+
+        check(
+            decoded &&
+            decoded->valid() &&
+            decoded->width == 2u &&
+            decoded->height == 2u &&
+            decoded->rgba8.size() == 16u &&
+            decoded->rgba8[0] == 255u &&
+            decoded->rgba8[1] == 0u &&
+            decoded->rgba8[2] == 0u &&
+            decoded->rgba8[4] == 0u &&
+            decoded->rgba8[5] == 255u &&
+            decoded->rgba8[8] == 0u &&
+            decoded->rgba8[9] == 0u &&
+            decoded->rgba8[10] == 255u &&
+            decoded_cache.size() == 1u &&
+            decoded_cache.find(decoded_guid) ==
+                decoded,
+            "decoded texture cache resolves BMP AssetGuid into top-left RGBA8 pixels");
+
+        const auto* cached_again =
+            decoded_cache.load(
+                decoded_guid,
+                decoded_cached,
+                &resolve_error);
+
+        check(
+            cached_again == decoded &&
+            decoded_cache.size() == 1u,
+            "decoded texture cache reuses matching AssetGuid fingerprint");
+
+        // Change top-left pixel from red to yellow and advance
+        // the import fingerprint. The cache must decode again.
+        bmp_bytes[62] = 0u;
+        bmp_bytes[63] = 255u;
+        bmp_bytes[64] = 255u;
+
+        {
+            std::ofstream output(
+                bmp_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output.write(
+                reinterpret_cast<const char*>(
+                    bmp_bytes.data()),
+                static_cast<std::streamsize>(
+                    bmp_bytes.size()));
+        }
+
+        decoded_cached.fingerprint =
+            "bmp-v2";
+
+        const auto* refreshed =
+            decoded_cache.load(
+                decoded_guid,
+                decoded_cached,
+                &resolve_error);
+
+        check(
+            refreshed &&
+            refreshed->rgba8[0] == 255u &&
+            refreshed->rgba8[1] == 255u &&
+            refreshed->rgba8[2] == 0u &&
+            decoded_cache.size() == 1u,
+            "decoded texture cache invalidates stale pixels when import fingerprint changes");
+
+        const auto tga_source =
+            root / "decoded.tga";
+
+        std::array<std::uint8_t, 24>
+            tga_bytes{};
+
+        tga_bytes[2] = 2u;
+        tga_bytes[12] = 2u;
+        tga_bytes[14] = 1u;
+        tga_bytes[16] = 24u;
+        tga_bytes[17] = 0x20u;
+
+        // Top-left origin: red then blue.
+        tga_bytes[18] = 0u;
+        tga_bytes[19] = 0u;
+        tga_bytes[20] = 255u;
+        tga_bytes[21] = 255u;
+        tga_bytes[22] = 0u;
+        tga_bytes[23] = 0u;
+
+        {
+            std::ofstream output(
+                tga_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output.write(
+                reinterpret_cast<const char*>(
+                    tga_bytes.data()),
+                static_cast<std::streamsize>(
+                    tga_bytes.size()));
+        }
+
+        render::ResolvedTextureAsset
+            resolved_tga;
+
+        resolved_tga.guid =
+            assets::AssetGuid::generate();
+        resolved_tga.metadata.format =
+            "tga";
+        resolved_tga.metadata.width = 2u;
+        resolved_tga.metadata.height = 1u;
+        resolved_tga.metadata.color_space =
+            "sRGB";
+        resolved_tga.source_path =
+            tga_source;
+
+        render::DecodedTextureData
+            decoded_tga;
+
+        check(
+            render::decode_texture_rgba8(
+                resolved_tga,
+                decoded_tga,
+                &resolve_error) &&
+            decoded_tga.valid() &&
+            decoded_tga.rgba8[0] == 255u &&
+            decoded_tga.rgba8[1] == 0u &&
+            decoded_tga.rgba8[2] == 0u &&
+            decoded_tga.rgba8[4] == 0u &&
+            decoded_tga.rgba8[5] == 0u &&
+            decoded_tga.rgba8[6] == 255u,
+            "TGA decoder produces normalized top-left RGBA8 pixels");
 
         const auto shader_source =
             root / "source.vert.spv";
