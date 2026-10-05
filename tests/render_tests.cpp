@@ -12,6 +12,7 @@
 #include "nengine/core/scene.hpp"
 #include "nengine/core/world.hpp"
 #include "nengine/render/asset_resources.hpp"
+#include "nengine/render/builtin_assets.hpp"
 #include "nengine/render/components.hpp"
 #include "nengine/render/diagnostic_shaders.hpp"
 #include "nengine/render/matrix.hpp"
@@ -906,6 +907,46 @@ int main() {
                 1.0f) <
                 1.0e-4f,
             "Vulkan LH projection maps near/far depth to 0..1");
+    }
+
+    {
+        const auto cube_guid =
+            render::builtin_unit_cube_mesh_guid();
+
+        const auto quad_guid =
+            render::builtin_unit_quad_mesh_guid();
+
+        check(
+            cube_guid.valid() &&
+            quad_guid.valid() &&
+            cube_guid != quad_guid,
+            "built-in mesh AssetGuids are stable valid and distinct");
+
+        const auto builtin_cube =
+            render::builtin_mesh_data(
+                cube_guid);
+
+        const auto builtin_quad =
+            render::builtin_mesh_data(
+                quad_guid);
+
+        check(
+            builtin_cube.has_value() &&
+            builtin_cube->vertices.size() == 24 &&
+            builtin_cube->indices.size() == 36,
+            "built-in cube AssetGuid resolves to expected CPU mesh");
+
+        check(
+            builtin_quad.has_value() &&
+            builtin_quad->vertices.size() == 4 &&
+            builtin_quad->indices.size() == 6,
+            "built-in quad AssetGuid resolves to expected CPU mesh");
+
+        check(
+            !render::builtin_mesh_data(
+                assets::AssetGuid::generate())
+                .has_value(),
+            "unknown AssetGuid does not resolve as built-in mesh");
     }
 
     {
