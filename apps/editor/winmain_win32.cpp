@@ -131,7 +131,7 @@ int run_editor() {
             L"The base window will remain open for diagnosis.\n"
             L"Log: %%LOCALAPPDATA%%\\NEngine\\Logs\\editor.log",
             static_cast<unsigned long>(error));
-        MessageBoxW(window.native_handle(), message, L"NEngine Editor - UI Error", MB_OK | MB_ICONERROR);
+        MessageBoxW(static_cast<HWND>(window.native_handle()), message, L"NEngine Editor - UI Error", MB_OK | MB_ICONERROR);
     } else {
         shell.refresh();
         write_log("OK: editor shell attached");
