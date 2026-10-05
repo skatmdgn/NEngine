@@ -11,4 +11,10 @@ diagnostic_vertex_spirv();
 const std::vector<std::uint32_t>&
 diagnostic_fragment_spirv();
 
+const std::vector<std::uint32_t>&
+diagnostic_textured_vertex_spirv();
+
+const std::vector<std::uint32_t>&
+diagnostic_textured_fragment_spirv();
+
 } // namespace nengine::render
