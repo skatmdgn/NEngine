@@ -21,6 +21,7 @@
 #include "nengine/render/vulkan_loader.hpp"
 #include "nengine/render/vulkan_device.hpp"
 #include "nengine/render/vulkan_instance.hpp"
+#include "nengine/render/vulkan_mesh.hpp"
 #include "nengine/render/vulkan_presenter.hpp"
 
 namespace {
@@ -521,6 +522,23 @@ int main() {
                             !device_buffer.host_visible(),
                             "Vulkan device-local buffer stages initial data");
 
+                        render::VulkanMeshResource
+                            gpu_cube;
+
+                        const auto cpu_cube =
+                            render::make_unit_cube_mesh();
+
+                        check(
+                            gpu_cube.create(
+                                loader,
+                                instance,
+                                device,
+                                cpu_cube) &&
+                            gpu_cube.valid() &&
+                            gpu_cube.index_count() == 36,
+                            "Vulkan mesh resource uploads built-in cube vertex and index buffers");
+
+                        gpu_cube.destroy();
                         device_buffer.destroy();
                         host_buffer.destroy();
                     }
@@ -732,6 +750,15 @@ int main() {
                     0.5f,
                     0.0f},
             "built-in quad mesh topology and bounds are valid");
+    }
+
+    {
+        render::VulkanMeshResource mesh;
+
+        check(
+            !mesh.valid() &&
+            mesh.index_count() == 0,
+            "default Vulkan mesh resource is invalid");
     }
 
     {
