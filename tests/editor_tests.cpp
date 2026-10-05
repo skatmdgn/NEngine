@@ -79,6 +79,25 @@ int main() {
         "project manifest provides default startup scene");
 
     check(
+        std::filesystem::exists(
+            model.project().startup_scene_path()),
+        "new project creates startup scene file");
+
+    core::SceneData startup_scene_data;
+    std::string startup_scene_error;
+
+    check(
+        core::SceneSerializer::load_file(
+            model.project().startup_scene_path(),
+            startup_scene_data,
+            &startup_scene_error),
+        "project startup scene parses");
+
+    check(
+        startup_scene_data.objects.size() == 3,
+        "default startup scene contains camera and demo objects");
+
+    check(
         model.project().manifest().target_windows &&
         model.project().manifest().target_android,
         "project manifest enables agreed Windows and Android targets");
