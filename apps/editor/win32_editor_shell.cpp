@@ -37,6 +37,8 @@ constexpr int kPadding = 8;
 enum ControlId : int {
     IdOpen = 1001,
     IdSave,
+    IdNewEntity,
+    IdDeleteEntity,
     IdRefreshAssets,
     IdUndo,
     IdRedo,
@@ -242,6 +244,8 @@ struct Win32EditorShell::Impl {
 
     HWND open_scene{nullptr};
     HWND save_scene{nullptr};
+    HWND new_entity{nullptr};
+    HWND delete_entity{nullptr};
     HWND refresh_assets{nullptr};
     HWND undo{nullptr};
     HWND redo{nullptr};
@@ -476,6 +480,8 @@ struct Win32EditorShell::Impl {
         shell_log("creating toolbar controls");
         open_scene = create_control(host, L"BUTTON", L"Open", BS_PUSHBUTTON, IdOpen);
         save_scene = create_control(host, L"BUTTON", L"Save", BS_PUSHBUTTON, IdSave);
+        new_entity = create_control(host, L"BUTTON", L"New", BS_PUSHBUTTON, IdNewEntity);
+        delete_entity = create_control(host, L"BUTTON", L"Delete", BS_PUSHBUTTON, IdDeleteEntity);
         refresh_assets = create_control(host, L"BUTTON", L"Assets", BS_PUSHBUTTON, IdRefreshAssets);
         undo = create_control(host, L"BUTTON", L"Undo", BS_PUSHBUTTON, IdUndo);
         redo = create_control(host, L"BUTTON", L"Redo", BS_PUSHBUTTON, IdRedo);
@@ -484,7 +490,8 @@ struct Win32EditorShell::Impl {
         step = create_control(host, L"BUTTON", L"Step", BS_PUSHBUTTON, IdStep);
         stop = create_control(host, L"BUTTON", L"Stop", BS_PUSHBUTTON, IdStop);
 
-        if (!open_scene || !save_scene || !refresh_assets || !undo || !redo ||
+        if (!open_scene || !save_scene || !new_entity || !delete_entity ||
+            !refresh_assets || !undo || !redo ||
             !play || !pause || !step || !stop) {
             shell_log("attach failed: toolbar control creation");
             return false;
@@ -684,6 +691,10 @@ struct Win32EditorShell::Impl {
         MoveWindow(open_scene, x, 6, button_width, button_height, TRUE);
         x += button_width + 4;
         MoveWindow(save_scene, x, 6, button_width, button_height, TRUE);
+        x += button_width + 4;
+        MoveWindow(new_entity, x, 6, button_width, button_height, TRUE);
+        x += button_width + 4;
+        MoveWindow(delete_entity, x, 6, button_width, button_height, TRUE);
         x += button_width + 4;
         MoveWindow(refresh_assets, x, 6, button_width, button_height, TRUE);
         x += button_width + 16;
@@ -1099,6 +1110,12 @@ struct Win32EditorShell::Impl {
 
         EnableWindow(open_scene, editor.can_edit());
         EnableWindow(save_scene, editor.can_edit());
+        EnableWindow(new_entity, editor.can_edit());
+        EnableWindow(
+            delete_entity,
+            editor.can_edit() &&
+            editor.presentation_world().is_alive(
+                editor.selection().active()));
         EnableWindow(refresh_assets, editor.project().is_open());
         EnableWindow(undo, state.can_undo);
         EnableWindow(redo, state.can_redo);
@@ -1324,6 +1341,57 @@ struct Win32EditorShell::Impl {
         case IdSave:
             if (notification != BN_CLICKED) return false;
             save_scene_file(false);
+            handled = true;
+            break;
+
+        case IdNewEntity:
+            if (notification != BN_CLICKED) return false;
+            if (editor.can_edit()) {
+                auto command =
+                    std::make_unique<
+                        nengine::editor::
+                            CreateEntityCommand>(
+                                "GameObject");
+
+                auto* command_ptr =
+                    command.get();
+
+                if (editor.commands().execute(
+                        editor.world(),
+                        std::move(command))) {
+
+                    editor.selection().set(
+                        command_ptr->
+                            created_entity());
+
+                    editor.console().info(
+                        "Editor",
+                        "Created GameObject.");
+                }
+            }
+            handled = true;
+            break;
+
+        case IdDeleteEntity:
+            if (notification != BN_CLICKED) return false;
+            if (editor.can_edit()) {
+                const auto entity =
+                    editor.selection().active();
+
+                if (editor.world().is_alive(entity) &&
+                    editor.commands().execute(
+                        editor.world(),
+                        std::make_unique<
+                            nengine::editor::
+                                DeleteEntityCommand>(
+                                    entity))) {
+
+                    editor.selection().clear();
+                    editor.console().info(
+                        "Editor",
+                        "Deleted selected object subtree.");
+                }
+            }
             handled = true;
             break;
 
