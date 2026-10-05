@@ -568,6 +568,115 @@ int main() {
     const auto restored_inspector = editor::build_inspector(model);
     check(restored_inspector.name == "Renamed", "stopping play returns inspector to edit world");
 
+    {
+        auto create_command =
+            std::make_unique<
+                editor::CreateEntityCommand>(
+                    "Created",
+                    root);
+
+        auto* create_command_ptr =
+            create_command.get();
+
+        check(
+            model.commands().execute(
+                world,
+                std::move(create_command)),
+            "create entity command executes");
+
+        const auto created =
+            create_command_ptr->created_entity();
+
+        check(
+            world.is_alive(created) &&
+            world.name(created) == "Created",
+            "create entity command creates object");
+
+        check(
+            world.transform(created)->parent ==
+                root,
+            "create entity command assigns parent");
+
+        check(
+            model.commands().undo(world),
+            "create entity undo succeeds");
+
+        check(
+            !world.is_alive(created),
+            "create entity undo removes object");
+
+        check(
+            model.commands().redo(world),
+            "create entity redo succeeds");
+
+        const auto recreated =
+            create_command_ptr->created_entity();
+
+        check(
+            world.is_alive(recreated),
+            "create entity redo recreates object");
+    }
+
+    const auto delete_root =
+        world.create("DeleteRoot");
+
+    const auto delete_child =
+        world.create("DeleteChild");
+
+    world.set_parent(
+        delete_child,
+        delete_root);
+
+    auto* delete_health =
+        world.add_component<TestHealth>(
+            delete_child,
+            health_type);
+
+    if (delete_health) {
+        delete_health->value = 777;
+    }
+
+    check(
+        model.commands().execute(
+            world,
+            std::make_unique<
+                editor::DeleteEntityCommand>(
+                    delete_root)),
+        "delete entity command executes");
+
+    check(
+        !world.is_alive(delete_root) &&
+        !world.is_alive(delete_child),
+        "delete entity command removes subtree");
+
+    check(
+        model.commands().undo(world),
+        "delete entity undo succeeds");
+
+    check(
+        world.is_alive(delete_root) &&
+        world.is_alive(delete_child),
+        "delete entity undo restores subtree");
+
+    const auto* restored_delete_health =
+        world.get_component<TestHealth>(
+            delete_child,
+            health_type);
+
+    check(
+        restored_delete_health &&
+        restored_delete_health->value == 777,
+        "delete entity undo restores component pools");
+
+    check(
+        model.commands().redo(world),
+        "delete entity redo succeeds");
+
+    check(
+        !world.is_alive(delete_root) &&
+        !world.is_alive(delete_child),
+        "delete entity redo removes subtree again");
+
     world.destroy(child);
     model.sanitize_selection();
     check(model.selection().empty(), "selection drops destroyed entities");
