@@ -739,8 +739,16 @@ bool VulkanBufferResource::create(
         return false;
     }
 
-    const auto native_usage =
+    auto native_usage =
         translate_usage(usage);
+
+    if (initial_data &&
+        memory ==
+            VulkanMemoryPreference::DeviceLocal) {
+
+        native_usage |=
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    }
 
     if (native_usage == 0) {
         diagnostic_ =
