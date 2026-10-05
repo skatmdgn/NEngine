@@ -16,6 +16,7 @@ namespace nengine::core {
 
 struct SerializedPropertyData {
     std::string name{};
+    PropertyKind kind{PropertyKind::String};
     PropertyValue value{};
 };
 
