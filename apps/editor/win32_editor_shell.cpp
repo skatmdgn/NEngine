@@ -27,11 +27,10 @@ namespace {
 
 constexpr wchar_t kHostClassName[] = L"NEngine.EditorHost";
 constexpr wchar_t kSceneClassName[] = L"NEngine.SceneView";
+constexpr wchar_t kSplitterClassName[] = L"NEngine.Splitter";
 
 constexpr int kToolbarHeight = 38;
-constexpr int kHierarchyWidth = 270;
-constexpr int kInspectorWidth = 330;
-constexpr int kBottomHeight = 150;
+constexpr int kSplitterSize = 6;
 constexpr int kPadding = 8;
 
 enum ControlId : int {
@@ -62,6 +61,9 @@ enum ControlId : int {
     IdApplyTransform,
     IdAssets,
     IdConsole,
+    IdSplitHierarchy,
+    IdSplitInspector,
+    IdSplitBottom,
 };
 
 std::filesystem::path shell_log_path() {
@@ -272,6 +274,10 @@ struct Win32EditorShell::Impl {
 
     HWND assets_list{nullptr};
     HWND console{nullptr};
+
+    HWND split_hierarchy{nullptr};
+    HWND split_inspector{nullptr};
+    HWND split_bottom{nullptr};
     std::vector<nengine::editor::HierarchyRow> hierarchy_rows{};
     std::vector<nengine::assets::AssetRecord> asset_rows{};
     std::filesystem::path current_scene_path{};
@@ -285,6 +291,16 @@ struct Win32EditorShell::Impl {
     nengine::core::Transform scene_drag_original{};
     int scene_drag_start_x{0};
     int scene_drag_start_y{0};
+
+    enum class LayoutDrag {
+        None,
+        Hierarchy,
+        Inspector,
+        Bottom,
+    };
+
+    LayoutDrag layout_drag{
+        LayoutDrag::None};
 
     static LRESULT CALLBACK host_proc(
         HWND hwnd,
