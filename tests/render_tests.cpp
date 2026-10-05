@@ -14,6 +14,7 @@
 #include "nengine/render/registration.hpp"
 #include "nengine/render/render_snapshot.hpp"
 #include "nengine/render/rhi.hpp"
+#include "nengine/render/vulkan_loader.hpp"
 
 namespace {
 int failures = 0;
@@ -377,6 +378,21 @@ int main() {
         std::filesystem::remove_all(
             root,
             cleanup_error);
+    }
+
+    {
+        render::VulkanLoader loader;
+
+        check(
+            !loader.diagnostic().empty(),
+            "Vulkan loader always reports diagnostics");
+
+        if (loader.loaded()) {
+            check(
+                loader.get_proc_address(
+                    "vkCreateInstance") != nullptr,
+                "loaded Vulkan loader resolves vkCreateInstance");
+        }
     }
 
     render::BufferHandle invalid_buffer;
