@@ -66,6 +66,13 @@ int main() {
         "project creates persistent manifest");
 
     check(
+        std::filesystem::exists(
+            project_root /
+            "Packages" /
+            "managed-packages.txt"),
+        "project creates managed NuGet package manifest template");
+
+    check(
         model.project().manifest().startup_scene ==
             std::filesystem::path{
                 "Assets/Scenes/Main.nscene"},
