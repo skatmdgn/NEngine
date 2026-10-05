@@ -7,6 +7,7 @@
 
 #include "nengine/render/matrix.hpp"
 #include "nengine/render/vulkan_device.hpp"
+#include "nengine/render/vulkan_material.hpp"
 #include "nengine/render/vulkan_mesh.hpp"
 #include "nengine/render/vulkan_pipeline.hpp"
 #include "nengine/render/vulkan_render_targets.hpp"
@@ -18,6 +19,7 @@ struct VulkanMeshDraw {
     const VulkanGraphicsPipeline* pipeline{nullptr};
     const VulkanMeshResource* mesh{nullptr};
     Mat4 mvp{};
+    const VulkanMaterialResource* material{nullptr};
 };
 
 class VulkanClearPresenter {
