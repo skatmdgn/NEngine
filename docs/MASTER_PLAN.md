@@ -355,11 +355,13 @@ Implemented foundation includes:
 - material descriptor binding.
 - diagnostic textured vertex/fragment shader path.
 - real combined-image-sampler texture sampling in VK Preview.
+- AssetGuid + fingerprint decoded RGBA8 cache with BMP/TGA decoding foundation.
+- per-device Vulkan texture/material AssetGuid cache.
 
 Immediate implementation order:
-1. Decoded-pixel texture cache keyed by AssetGuid.
-2. First real glTF MeshData/material cooking path.
-3. Imported mesh/material rendering in VK Preview.
+1. First real glTF MeshData/material cooking path.
+2. Imported mesh/material rendering in VK Preview.
+3. Production PNG/JPEG/WebP image decoding/transcoding.
 4. Shader compiler toolchain.
 5. Replace remaining GDI presentation where appropriate.
 6. Vulkan Game View.
@@ -433,7 +435,7 @@ The active development line is currently Renderer 0.4.
 
 The immediate sequence is:
 
-`decoded texture asset cache -> glTF mesh/material cooking -> imported asset VK Preview -> shader toolchain`
+`glTF mesh/material cooking -> imported asset VK Preview -> production image decode/transcode -> shader toolchain`
 
 After the renderer/resource boundary is proven with real assets, development returns to the .NET gameplay runtime.
 
