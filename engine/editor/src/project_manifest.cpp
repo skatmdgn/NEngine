@@ -18,10 +18,79 @@ void set_error(
 
 } // namespace
 
+bool ProjectManifestSerializer::validate(
+    const ProjectManifest& manifest,
+    std::string* error) {
+
+    if (manifest.name.empty()) {
+        set_error(
+            error,
+            "project name cannot be empty");
+        return false;
+    }
+
+    if (manifest.startup_scene.empty() ||
+        manifest.startup_scene.is_absolute()) {
+        set_error(
+            error,
+            "startup scene must be a project-relative path");
+        return false;
+    }
+
+    for (const auto& part :
+         manifest.startup_scene) {
+        if (part == "..") {
+            set_error(
+                error,
+                "startup scene cannot escape the project root");
+            return false;
+        }
+    }
+
+    if (manifest.startup_scene.extension() !=
+        ".nscene") {
+        set_error(
+            error,
+            "startup scene must use the .nscene extension");
+        return false;
+    }
+
+    if (manifest.scripting.empty()) {
+        set_error(
+            error,
+            "scripting mode cannot be empty");
+        return false;
+    }
+
+    if (!manifest.target_windows &&
+        !manifest.target_android) {
+        set_error(
+            error,
+            "project must enable at least one build target");
+        return false;
+    }
+
+    if (manifest.target_android &&
+        manifest.android_toolchain.empty()) {
+        set_error(
+            error,
+            "Android target requires a toolchain profile");
+        return false;
+    }
+
+    return true;
+}
+
 bool ProjectManifestSerializer::save(
     const ProjectManifest& manifest,
     const std::filesystem::path& path,
     std::string* error) {
+
+    if (!validate(
+            manifest,
+            error)) {
+        return false;
+    }
 
     std::ofstream output(
         path,
@@ -189,6 +258,12 @@ bool ProjectManifestSerializer::load(
         set_error(
             error,
             "missing project manifest terminator");
+        return false;
+    }
+
+    if (!validate(
+            parsed,
+            error)) {
         return false;
     }
 
