@@ -1,5 +1,6 @@
 #include "nengine/editor/project_session.hpp"
 
+#include <fstream>
 #include <system_error>
 #include <utility>
 
@@ -85,6 +86,52 @@ bool ProjectSession::open(
                 *error =
                     "could not create project directory: " +
                     directory.generic_string();
+            }
+            close();
+            return false;
+        }
+    }
+
+    const auto managed_packages_path =
+        root_ /
+        "Packages" /
+        "managed-packages.txt";
+
+    ec.clear();
+
+    if (!std::filesystem::exists(
+            managed_packages_path,
+            ec) ||
+        ec) {
+
+        ec.clear();
+
+        std::ofstream packages(
+            managed_packages_path,
+            std::ios::binary |
+                std::ios::trunc);
+
+        if (!packages) {
+            if (error) {
+                *error =
+                    "could not create managed package manifest";
+            }
+            close();
+            return false;
+        }
+
+        packages
+            << "# NEngine managed NuGet package references\n"
+            << "# Format: Package.Id Version\n"
+            << "# Example:\n"
+            << "# Newtonsoft.Json 13.0.3\n";
+
+        packages.flush();
+
+        if (!packages.good()) {
+            if (error) {
+                *error =
+                    "failed writing managed package manifest";
             }
             close();
             return false;
