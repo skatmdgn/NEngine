@@ -22,6 +22,8 @@
 #include "nengine/core/scene.hpp"
 #include "nengine/editor/command.hpp"
 #include "nengine/editor/presentation.hpp"
+#include "nengine/editor/property_command.hpp"
+#include "nengine/editor/property_text.hpp"
 #include "nengine/editor/scene_interaction.hpp"
 #include "nengine/scripting/managed_project.hpp"
 
@@ -63,11 +65,24 @@ enum ControlId : int {
     IdScaleY,
     IdScaleZ,
     IdApplyTransform,
+    IdGenericProperties,
+    IdGenericValue,
+    IdApplyProperty,
     IdAssets,
     IdConsole,
     IdSplitHierarchy,
     IdSplitInspector,
     IdSplitBottom,
+};
+
+struct GenericPropertyBinding {
+    nengine::core::ComponentTypeId component{
+        nengine::core::ComponentRegistry::invalid_type};
+    std::string property{};
+    nengine::core::PropertyKind kind{
+        nengine::core::PropertyKind::String};
+    nengine::core::PropertyValue value{};
+    bool editable{false};
 };
 
 std::filesystem::path shell_log_path() {
@@ -276,6 +291,13 @@ struct Win32EditorShell::Impl {
     std::array<HWND, 4> rotation{};
     std::array<HWND, 3> scale{};
     HWND apply_transform{nullptr};
+
+    HWND generic_title{nullptr};
+    HWND generic_properties{nullptr};
+    HWND generic_value{nullptr};
+    HWND apply_property{nullptr};
+    std::vector<GenericPropertyBinding>
+        generic_property_rows{};
 
     HWND assets_list{nullptr};
     HWND console{nullptr};
@@ -781,12 +803,44 @@ struct Win32EditorShell::Impl {
             BS_PUSHBUTTON,
             IdApplyTransform);
 
+        generic_title = create_control(
+            host,
+            L"STATIC",
+            L"Reflection Properties",
+            SS_LEFT);
+
+        generic_properties = create_control(
+            host,
+            L"LISTBOX",
+            L"",
+            LBS_NOTIFY | WS_BORDER |
+                WS_VSCROLL | WS_HSCROLL,
+            IdGenericProperties);
+
+        generic_value = create_control(
+            host,
+            L"EDIT",
+            L"",
+            WS_BORDER | ES_AUTOHSCROLL,
+            IdGenericValue);
+
+        apply_property = create_control(
+            host,
+            L"BUTTON",
+            L"Apply Property",
+            BS_PUSHBUTTON,
+            IdApplyProperty);
+
         if (!inspector_title || !label_name || !name || !active ||
             !label_position || !position[0] || !position[1] || !position[2] ||
             !label_rotation || !rotation[0] || !rotation[1] ||
             !rotation[2] || !rotation[3] ||
             !label_scale || !scale[0] || !scale[1] || !scale[2] ||
-            !apply_transform) {
+            !apply_transform ||
+            !generic_title ||
+            !generic_properties ||
+            !generic_value ||
+            !apply_property) {
             shell_log("attach failed: inspector control creation");
             return false;
         }
@@ -1369,6 +1423,52 @@ struct Win32EditorShell::Impl {
             iw,
             27,
             TRUE);
+        iy += 36;
+
+        MoveWindow(
+            generic_title,
+            ix,
+            iy,
+            iw,
+            20,
+            TRUE);
+        iy += 22;
+
+        const int inspector_bottom =
+            bottom_split_y - kPadding;
+
+        const int generic_list_height =
+            std::max(
+                60,
+                inspector_bottom -
+                    iy -
+                    62);
+
+        MoveWindow(
+            generic_properties,
+            ix,
+            iy,
+            iw,
+            generic_list_height,
+            TRUE);
+        iy += generic_list_height + 4;
+
+        MoveWindow(
+            generic_value,
+            ix,
+            iy,
+            iw,
+            24,
+            TRUE);
+        iy += 28;
+
+        MoveWindow(
+            apply_property,
+            ix,
+            iy,
+            iw,
+            27,
+            TRUE);
 
         const int bottom_y =
             bottom_split_y +
@@ -1807,6 +1907,226 @@ struct Win32EditorShell::Impl {
         }
     }
 
+    void refresh_generic_property_editor(
+        const nengine::editor::InspectorSnapshot& snapshot) {
+
+        generic_property_rows.clear();
+
+        if (!generic_properties) {
+            return;
+        }
+
+        SendMessageW(
+            generic_properties,
+            LB_RESETCONTENT,
+            0,
+            0);
+
+        for (const auto& component :
+             snapshot.components) {
+
+            if (component.type ==
+                nengine::core::World::transform_type) {
+                continue;
+            }
+
+            for (const auto& field :
+                 component.fields) {
+
+                GenericPropertyBinding binding;
+                binding.component =
+                    component.type;
+                binding.property =
+                    field.property_path;
+                binding.kind =
+                    field.kind;
+                binding.value =
+                    field.value;
+                binding.editable =
+                    field.editable;
+
+                generic_property_rows.push_back(
+                    binding);
+
+                std::string line =
+                    component.name +
+                    "." +
+                    field.label +
+                    " = " +
+                    nengine::editor::
+                        format_property_value(
+                            field.value);
+
+                if (!field.editable) {
+                    line += " [read-only]";
+                }
+
+                const auto wide =
+                    utf8_to_wide(line);
+
+                SendMessageW(
+                    generic_properties,
+                    LB_ADDSTRING,
+                    0,
+                    reinterpret_cast<LPARAM>(
+                        wide.c_str()));
+            }
+        }
+
+        if (generic_property_rows.empty()) {
+            set_text(
+                generic_value,
+                "");
+
+            EnableWindow(
+                generic_value,
+                FALSE);
+
+            EnableWindow(
+                apply_property,
+                FALSE);
+
+            return;
+        }
+
+        SendMessageW(
+            generic_properties,
+            LB_SETCURSEL,
+            0,
+            0);
+
+        refresh_generic_property_value();
+    }
+
+    void refresh_generic_property_value() {
+        if (!generic_properties ||
+            generic_property_rows.empty()) {
+            return;
+        }
+
+        const int index =
+            static_cast<int>(
+                SendMessageW(
+                    generic_properties,
+                    LB_GETCURSEL,
+                    0,
+                    0));
+
+        if (index < 0 ||
+            static_cast<std::size_t>(index) >=
+                generic_property_rows.size()) {
+            return;
+        }
+
+        const auto& binding =
+            generic_property_rows[
+                static_cast<std::size_t>(
+                    index)];
+
+        set_text(
+            generic_value,
+            nengine::editor::
+                format_property_value(
+                    binding.value));
+
+        const bool editable =
+            editor.can_edit() &&
+            binding.editable;
+
+        EnableWindow(
+            generic_value,
+            editable);
+
+        EnableWindow(
+            apply_property,
+            editable);
+    }
+
+    bool apply_generic_property_edit() {
+        if (!editor.can_edit()) {
+            return false;
+        }
+
+        const int index =
+            static_cast<int>(
+                SendMessageW(
+                    generic_properties,
+                    LB_GETCURSEL,
+                    0,
+                    0));
+
+        if (index < 0 ||
+            static_cast<std::size_t>(index) >=
+                generic_property_rows.size()) {
+            return false;
+        }
+
+        const auto binding =
+            generic_property_rows[
+                static_cast<std::size_t>(
+                    index)];
+
+        if (!binding.editable) {
+            return false;
+        }
+
+        nengine::core::PropertyValue parsed;
+        std::string error;
+
+        if (!nengine::editor::
+                parse_property_value(
+                    binding.kind,
+                    read_text(
+                        generic_value),
+                    parsed,
+                    &error)) {
+
+            editor.console().warning(
+                "Inspector",
+                "Property parse failed: " +
+                    error);
+
+            refresh_console();
+            return false;
+        }
+
+        const auto entity =
+            editor.selection().active();
+
+        if (!editor.world().is_alive(
+                entity)) {
+            return false;
+        }
+
+        const bool applied =
+            editor.commands().execute(
+                editor.world(),
+                std::make_unique<
+                    nengine::editor::
+                        SetPropertyCommand>(
+                            &editor.property_access(),
+                            entity,
+                            binding.component,
+                            binding.property,
+                            parsed));
+
+        if (!applied) {
+            editor.console().warning(
+                "Inspector",
+                "Property edit could not be applied.");
+
+            refresh_console();
+            return false;
+        }
+
+        editor.console().info(
+            "Inspector",
+            "Updated " +
+                binding.property);
+
+        return true;
+    }
+
     void refresh_inspector() {
         const auto snapshot =
             nengine::editor::build_inspector(editor);
@@ -1817,6 +2137,10 @@ struct Win32EditorShell::Impl {
         EnableWindow(name, enabled);
         EnableWindow(active, enabled);
         EnableWindow(apply_transform, enabled);
+
+        EnableWindow(
+            generic_properties,
+            snapshot.valid);
 
         for (auto handle : position) {
             EnableWindow(handle, enabled);
@@ -1830,11 +2154,33 @@ struct Win32EditorShell::Impl {
 
         if (!snapshot.valid) {
             set_text(name, "");
+
             SendMessageW(
                 active,
                 BM_SETCHECK,
                 BST_UNCHECKED,
                 0);
+
+            SendMessageW(
+                generic_properties,
+                LB_RESETCONTENT,
+                0,
+                0);
+
+            generic_property_rows.clear();
+
+            set_text(
+                generic_value,
+                "");
+
+            EnableWindow(
+                generic_value,
+                FALSE);
+
+            EnableWindow(
+                apply_property,
+                FALSE);
+
             return;
         }
 
@@ -1888,6 +2234,9 @@ struct Win32EditorShell::Impl {
         set_float(
             scale[2],
             transform->local_scale.z);
+
+        refresh_generic_property_editor(
+            snapshot);
     }
 
     bool apply_transform_edit() {
@@ -2363,6 +2712,24 @@ struct Win32EditorShell::Impl {
                     }
                 }
             }
+            handled = true;
+            break;
+
+        case IdGenericProperties:
+            if (notification != LBN_SELCHANGE) {
+                return false;
+            }
+
+            refresh_generic_property_value();
+            handled = true;
+            break;
+
+        case IdApplyProperty:
+            if (notification != BN_CLICKED) {
+                return false;
+            }
+
+            apply_generic_property_edit();
             handled = true;
             break;
 
