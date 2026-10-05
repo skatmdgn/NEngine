@@ -5,6 +5,7 @@
 #include <iosfwd>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "nengine/assets/asset_guid.hpp"
 #include "nengine/assets/import_pipeline.hpp"
@@ -39,6 +40,21 @@ struct ResolvedModelAsset {
     std::filesystem::path source_path{};
 };
 
+struct ShaderAssetMetadata {
+    std::string format{};
+    std::string stage{};
+    std::uint64_t words{0};
+    std::filesystem::path source_file{};
+};
+
+struct ResolvedShaderAsset {
+    assets::AssetGuid guid{};
+    ShaderAssetMetadata metadata{};
+    std::filesystem::path descriptor_path{};
+    std::filesystem::path source_path{};
+    std::vector<std::uint32_t> spirv{};
+};
+
 bool read_texture_asset_metadata(
     std::istream& input,
     TextureAssetMetadata& metadata,
@@ -49,6 +65,11 @@ bool read_model_asset_metadata(
     ModelAssetMetadata& metadata,
     std::string* error = nullptr);
 
+bool read_shader_asset_metadata(
+    std::istream& input,
+    ShaderAssetMetadata& metadata,
+    std::string* error = nullptr);
+
 std::optional<ResolvedTextureAsset>
 resolve_texture_asset(
     assets::AssetGuid guid,
@@ -57,6 +78,12 @@ resolve_texture_asset(
 
 std::optional<ResolvedModelAsset>
 resolve_model_asset(
+    assets::AssetGuid guid,
+    const assets::CachedArtifactSet& artifacts,
+    std::string* error = nullptr);
+
+std::optional<ResolvedShaderAsset>
+resolve_shader_asset(
     assets::AssetGuid guid,
     const assets::CachedArtifactSet& artifacts,
     std::string* error = nullptr);
