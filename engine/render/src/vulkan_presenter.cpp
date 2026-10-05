@@ -702,6 +702,13 @@ bool VulkanClearPresenter::present_frame(
                 return false;
             }
 
+            if (!draw.pipeline
+                    ->supports_material_descriptors()) {
+                diagnostic_ =
+                    "Vulkan mesh draw material requires a pipeline created with a material descriptor layout";
+                return false;
+            }
+
             bind_materials = true;
         }
     }
