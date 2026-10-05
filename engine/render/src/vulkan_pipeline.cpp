@@ -356,6 +356,44 @@ bool VulkanGraphicsPipeline::create(
     const VulkanShaderModule& vertex_shader,
     const VulkanShaderModule& fragment_shader) {
 
+    return create_internal(
+        device,
+        render_pass,
+        vertex_shader,
+        fragment_shader,
+        nullptr);
+}
+
+bool VulkanGraphicsPipeline::create(
+    const VulkanDevice& device,
+    const VulkanRenderPass& render_pass,
+    const VulkanShaderModule& vertex_shader,
+    const VulkanShaderModule& fragment_shader,
+    const VulkanMaterialResource& material) {
+
+    if (!material.valid()) {
+        destroy();
+        diagnostic_ =
+            "valid Vulkan material is required";
+        return false;
+    }
+
+    return create_internal(
+        device,
+        render_pass,
+        vertex_shader,
+        fragment_shader,
+        material
+            .native_descriptor_set_layout());
+}
+
+bool VulkanGraphicsPipeline::create_internal(
+    const VulkanDevice& device,
+    const VulkanRenderPass& render_pass,
+    const VulkanShaderModule& vertex_shader,
+    const VulkanShaderModule& fragment_shader,
+    void* descriptor_set_layout) {
+
     destroy();
     diagnostic_.clear();
 
@@ -404,12 +442,20 @@ bool VulkanGraphicsPipeline::create(
             sizeof(Mat4))
     };
 
+    void* descriptor_set_layouts[] = {
+        descriptor_set_layout
+    };
+
     const VkPipelineLayoutCreateInfo layout_info{
         VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         nullptr,
         0,
-        0,
-        nullptr,
+        descriptor_set_layout
+            ? 1u
+            : 0u,
+        descriptor_set_layout
+            ? descriptor_set_layouts
+            : nullptr,
         1,
         &push_constant
     };
@@ -664,7 +710,9 @@ bool VulkanGraphicsPipeline::create(
     pipeline_ = pipeline;
 
     diagnostic_ =
-        "Vulkan MeshVertex graphics pipeline created";
+        descriptor_set_layout
+            ? "Vulkan MeshVertex textured graphics pipeline created"
+            : "Vulkan MeshVertex graphics pipeline created";
 
     return true;
 }
