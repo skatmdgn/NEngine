@@ -347,6 +347,39 @@ int main() {
         cached_result.cache_hit,
         "unchanged import resolves from cache manifest");
 
+    const auto cached_artifacts =
+        pipeline.cached_artifacts(
+            raw_record,
+            importers,
+            cache_root);
+
+    check(
+        cached_artifacts.has_value() &&
+        !cached_artifacts->artifacts.empty(),
+        "validated cache lookup returns current artifacts");
+
+    write_file(
+        scene,
+        "scene-data-changed");
+
+    database.scan(true);
+
+    const auto* changed_scene =
+        database.find_relative(
+            "Scenes/Main.nscene");
+
+    check(
+        changed_scene != nullptr,
+        "changed source remains in asset database");
+
+    check(
+        changed_scene &&
+        !pipeline.cached_artifacts(
+            *changed_scene,
+            importers,
+            cache_root).has_value(),
+        "source fingerprint change invalidates cached artifact lookup");
+
     const auto a = AssetGuid::generate();
     const auto b = AssetGuid::generate();
     const auto c = AssetGuid::generate();
