@@ -2,6 +2,7 @@
 
 #include <windows.h>
 #include <commdlg.h>
+#include <shellapi.h>
 
 #include <algorithm>
 #include <array>
@@ -22,6 +23,7 @@
 #include "nengine/editor/command.hpp"
 #include "nengine/editor/presentation.hpp"
 #include "nengine/editor/scene_interaction.hpp"
+#include "nengine/scripting/managed_project.hpp"
 
 namespace nengine::app {
 namespace {
@@ -40,6 +42,7 @@ enum ControlId : int {
     IdNewEntity,
     IdDeleteEntity,
     IdRefreshAssets,
+    IdScripts,
     IdUndo,
     IdRedo,
     IdPlay,
@@ -250,6 +253,7 @@ struct Win32EditorShell::Impl {
     HWND new_entity{nullptr};
     HWND delete_entity{nullptr};
     HWND refresh_assets{nullptr};
+    HWND scripts{nullptr};
     HWND undo{nullptr};
     HWND redo{nullptr};
     HWND play{nullptr};
@@ -635,6 +639,7 @@ struct Win32EditorShell::Impl {
         new_entity = create_control(host, L"BUTTON", L"New", BS_PUSHBUTTON, IdNewEntity);
         delete_entity = create_control(host, L"BUTTON", L"Delete", BS_PUSHBUTTON, IdDeleteEntity);
         refresh_assets = create_control(host, L"BUTTON", L"Assets", BS_PUSHBUTTON, IdRefreshAssets);
+        scripts = create_control(host, L"BUTTON", L"Scripts", BS_PUSHBUTTON, IdScripts);
         undo = create_control(host, L"BUTTON", L"Undo", BS_PUSHBUTTON, IdUndo);
         redo = create_control(host, L"BUTTON", L"Redo", BS_PUSHBUTTON, IdRedo);
         play = create_control(host, L"BUTTON", L"Play", BS_PUSHBUTTON, IdPlay);
@@ -643,7 +648,7 @@ struct Win32EditorShell::Impl {
         stop = create_control(host, L"BUTTON", L"Stop", BS_PUSHBUTTON, IdStop);
 
         if (!open_scene || !save_scene || !new_entity || !delete_entity ||
-            !refresh_assets || !undo || !redo ||
+            !refresh_assets || !scripts || !undo || !redo ||
             !play || !pause || !step || !stop) {
             shell_log("attach failed: toolbar control creation");
             return false;
@@ -1075,6 +1080,15 @@ struct Win32EditorShell::Impl {
 
         MoveWindow(
             refresh_assets,
+            x,
+            6,
+            button_width,
+            button_height,
+            TRUE);
+        x += button_width + 4;
+
+        MoveWindow(
+            scripts,
             x,
             6,
             button_width,
@@ -1666,6 +1680,7 @@ struct Win32EditorShell::Impl {
             editor.presentation_world().is_alive(
                 editor.selection().active()));
         EnableWindow(refresh_assets, editor.project().is_open());
+        EnableWindow(scripts, editor.project().is_open());
         EnableWindow(undo, state.can_undo);
         EnableWindow(redo, state.can_redo);
         EnableWindow(play, state.can_play);
@@ -1877,6 +1892,116 @@ struct Win32EditorShell::Impl {
                     value));
     }
 
+    bool generate_and_open_scripts() {
+        if (!editor.project().is_open()) {
+            editor.console().warning(
+                "Scripting",
+                "No project is open.");
+            refresh_console();
+            return false;
+        }
+
+        const auto package_manifest =
+            editor.project().root() /
+            "Packages" /
+            "managed-packages.txt";
+
+        std::string package_error;
+
+        const auto packages =
+            nengine::scripting::
+                ManagedProjectGenerator::
+                    load_package_manifest(
+                        package_manifest,
+                        &package_error);
+
+        if (!package_error.empty()) {
+            editor.console().warning(
+                "Scripting",
+                "Package manifest warning: " +
+                    package_error);
+        }
+
+        nengine::scripting::
+            ManagedProjectConfig config;
+
+        config.project_name =
+            "GameScripts";
+
+        config.project_root =
+            editor.project().root();
+
+        config.packages =
+            packages;
+
+        nengine::scripting::
+            ManagedProjectOutput output;
+
+        std::string error;
+
+        if (!nengine::scripting::
+                ManagedProjectGenerator::
+                    generate(
+                        config,
+                        output,
+                        &error)) {
+
+            editor.console().error(
+                "Scripting",
+                "Managed project generation failed: " +
+                    error);
+
+            refresh_console();
+            return false;
+        }
+
+        editor.console().info(
+            "Scripting",
+            "Generated " +
+                wide_to_utf8(
+                    output.solution_path
+                        .filename()
+                        .wstring()) +
+                " with " +
+                std::to_string(
+                    packages.size()) +
+                " NuGet package reference(s).");
+
+        const auto solution =
+            output.solution_path.wstring();
+
+        const HINSTANCE launched =
+            ShellExecuteW(
+                host,
+                L"open",
+                solution.c_str(),
+                nullptr,
+                editor.project()
+                    .root()
+                    .wstring()
+                    .c_str(),
+                SW_SHOWNORMAL);
+
+        const auto result =
+            reinterpret_cast<INT_PTR>(
+                launched);
+
+        if (result <= 32) {
+            editor.console().warning(
+                "Scripting",
+                "Solution generated, but Windows could not open it. Install/associate Visual Studio, Rider, or another .sln editor.");
+            refresh_console();
+            return false;
+        }
+
+        editor.console().info(
+            "Scripting",
+            "Opened managed solution.");
+
+        refresh_console();
+        return true;
+    }
+
     bool on_command(int id, int notification) {
         bool handled = false;
 
@@ -1991,6 +2116,12 @@ struct Win32EditorShell::Impl {
                     }
                 }
             }
+            handled = true;
+            break;
+
+        case IdScripts:
+            if (notification != BN_CLICKED) return false;
+            generate_and_open_scripts();
             handled = true;
             break;
 
