@@ -15,6 +15,7 @@
 #include "nengine/render/render_snapshot.hpp"
 #include "nengine/render/rhi.hpp"
 #include "nengine/render/vulkan_loader.hpp"
+#include "nengine/render/vulkan_instance.hpp"
 
 namespace {
 int failures = 0;
@@ -392,6 +393,56 @@ int main() {
                 loader.get_proc_address(
                     "vkCreateInstance") != nullptr,
                 "loaded Vulkan loader resolves vkCreateInstance");
+
+            std::string extension_error;
+
+            const auto extensions =
+                render::VulkanInstance::
+                    enumerate_extensions(
+                        loader,
+                        &extension_error);
+
+            check(
+                extension_error.empty(),
+                "Vulkan loader can enumerate instance extensions");
+
+            render::VulkanInstance rejected;
+
+            check(
+                !rejected.create(
+                    loader,
+                    "NEngineRenderTests",
+                    {
+                        "VK_NENGINE_extension_that_does_not_exist"
+                    }),
+                "Vulkan bootstrap rejects missing required extension");
+
+            check(
+                !rejected.diagnostic().empty(),
+                "failed Vulkan bootstrap reports diagnostic");
+
+            render::VulkanInstance instance;
+
+            if (instance.create(
+                    loader,
+                    "NEngineRenderTests")) {
+
+                check(
+                    instance.valid(),
+                    "Vulkan instance is valid after successful creation");
+
+                instance.destroy();
+
+                check(
+                    !instance.valid(),
+                    "Vulkan instance destroy clears native handle");
+            } else {
+                check(
+                    !instance.diagnostic().empty(),
+                    "Vulkan instance failure is diagnostic rather than fatal");
+            }
+
+            (void)extensions;
         }
     }
 
