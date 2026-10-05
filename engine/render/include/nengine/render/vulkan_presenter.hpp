@@ -4,7 +4,10 @@
 #include <string>
 #include <vector>
 
+#include "nengine/render/matrix.hpp"
 #include "nengine/render/vulkan_device.hpp"
+#include "nengine/render/vulkan_mesh.hpp"
+#include "nengine/render/vulkan_pipeline.hpp"
 #include "nengine/render/vulkan_render_targets.hpp"
 #include "nengine/render/vulkan_swapchain.hpp"
 
@@ -32,6 +35,15 @@ public:
         float blue,
         float alpha = 1.0f);
 
+    bool present_mesh(
+        const VulkanGraphicsPipeline& pipeline,
+        const VulkanMeshResource& mesh,
+        const Mat4& mvp,
+        float clear_red = 0.08f,
+        float clear_green = 0.09f,
+        float clear_blue = 0.11f,
+        float clear_alpha = 1.0f);
+
     void shutdown() noexcept;
 
     bool ready() const noexcept {
@@ -53,6 +65,15 @@ public:
     }
 
 private:
+    bool present_frame(
+        const VulkanGraphicsPipeline* pipeline,
+        const VulkanMeshResource* mesh,
+        const Mat4* mvp,
+        float red,
+        float green,
+        float blue,
+        float alpha);
+
     const VulkanDevice* device_api_{nullptr};
     const VulkanRenderTargets* targets_{nullptr};
     void* device_{nullptr};
