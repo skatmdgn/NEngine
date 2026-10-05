@@ -107,6 +107,22 @@ int main() {
         model.project().manifest().target_android,
         "project manifest enables agreed Windows and Android targets");
 
+    {
+        auto invalid_manifest =
+            model.project().manifest();
+
+        invalid_manifest.startup_scene =
+            "../Outside.nscene";
+
+        std::string manifest_error;
+
+        check(
+            !editor::ProjectManifestSerializer::validate(
+                invalid_manifest,
+                &manifest_error),
+            "project manifest rejects startup-scene path traversal");
+    }
+
     model.layout().hierarchy_width = 310;
     model.layout().inspector_width = 360;
     model.layout().bottom_height = 190;
