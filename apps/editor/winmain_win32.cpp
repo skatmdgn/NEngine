@@ -123,6 +123,32 @@ int run_editor() {
         "STEP: constructing EditorModel");
 
     nengine::editor::EditorModel editor;
+
+    std::string project_error;
+    std::error_code cwd_error;
+    auto project_root =
+        std::filesystem::current_path(cwd_error);
+
+    if (cwd_error) {
+        project_root = L".";
+    }
+
+    project_root /= L"NEngineProject";
+
+    if (editor.project().open(
+            project_root,
+            &project_error)) {
+        editor.console().info(
+            "Project",
+            "Opened project: " +
+                project_root.generic_string());
+    } else {
+        editor.console().error(
+            "Project",
+            "Failed to open project: " +
+                project_error);
+    }
+
     initialize_demo_world(editor);
 
     write_log(
