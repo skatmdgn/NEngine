@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iomanip>
 #include <istream>
+#include <string_view>
 #include <utility>
 
 namespace nengine::render {
