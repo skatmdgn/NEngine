@@ -887,83 +887,388 @@ struct Win32EditorShell::Impl {
         }
     }
 
+    void begin_layout_drag(
+        int control_id,
+        int,
+        int) {
+
+        switch (control_id) {
+        case IdSplitHierarchy:
+            layout_drag =
+                LayoutDrag::Hierarchy;
+            break;
+        case IdSplitInspector:
+            layout_drag =
+                LayoutDrag::Inspector;
+            break;
+        case IdSplitBottom:
+            layout_drag =
+                LayoutDrag::Bottom;
+            break;
+        default:
+            layout_drag =
+                LayoutDrag::None;
+            break;
+        }
+    }
+
+    void update_layout_drag(
+        int x,
+        int y) {
+
+        if (layout_drag ==
+            LayoutDrag::None) {
+            return;
+        }
+
+        RECT rect{};
+        if (!GetClientRect(
+                host,
+                &rect)) {
+            return;
+        }
+
+        const int width =
+            rect.right - rect.left;
+
+        const int height =
+            rect.bottom - rect.top;
+
+        auto& state =
+            editor.layout();
+
+        switch (layout_drag) {
+        case LayoutDrag::Hierarchy:
+            state.hierarchy_width = x;
+            break;
+
+        case LayoutDrag::Inspector:
+            state.inspector_width =
+                width - x;
+            break;
+
+        case LayoutDrag::Bottom:
+            state.bottom_height =
+                height - y;
+            break;
+
+        case LayoutDrag::None:
+            break;
+        }
+
+        state.clamp(
+            width,
+            height);
+
+        layout(
+            width,
+            height);
+    }
+
+    void end_layout_drag() {
+        if (layout_drag ==
+            LayoutDrag::None) {
+            return;
+        }
+
+        layout_drag =
+            LayoutDrag::None;
+
+        if (editor.project().is_open()) {
+            const auto path =
+                editor.project().root() /
+                "ProjectSettings" /
+                "EditorLayout.layout";
+
+            std::string error;
+
+            if (!nengine::editor::
+                    EditorLayoutSerializer::save(
+                        editor.layout(),
+                        path,
+                        &error)) {
+
+                editor.console().warning(
+                    "Layout",
+                    "Could not save editor layout: " +
+                        error);
+            } else {
+                editor.console().info(
+                    "Layout",
+                    "Editor pane layout saved.");
+            }
+
+            refresh_console();
+        }
+    }
+
     void layout(int width, int height) {
         if (!controls_ready) return;
 
-        width = (width < 900) ? 900 : width;
-        height = (height < 600) ? 600 : height;
+        width =
+            (width < 900)
+                ? 900
+                : width;
+
+        height =
+            (height < 600)
+                ? 600
+                : height;
+
+        auto& state =
+            editor.layout();
+
+        state.clamp(
+            width,
+            height);
+
+        const int hierarchy_width =
+            state.hierarchy_width;
+
+        const int inspector_width =
+            state.inspector_width;
+
+        const int bottom_height =
+            state.bottom_height;
 
         int x = kPadding;
+
         constexpr int button_width = 72;
         constexpr int button_height = 26;
 
-        MoveWindow(open_scene, x, 6, button_width, button_height, TRUE);
+        MoveWindow(
+            open_scene,
+            x,
+            6,
+            button_width,
+            button_height,
+            TRUE);
         x += button_width + 4;
-        MoveWindow(save_scene, x, 6, button_width, button_height, TRUE);
+
+        MoveWindow(
+            save_scene,
+            x,
+            6,
+            button_width,
+            button_height,
+            TRUE);
         x += button_width + 4;
-        MoveWindow(new_entity, x, 6, button_width, button_height, TRUE);
+
+        MoveWindow(
+            new_entity,
+            x,
+            6,
+            button_width,
+            button_height,
+            TRUE);
         x += button_width + 4;
-        MoveWindow(delete_entity, x, 6, button_width, button_height, TRUE);
+
+        MoveWindow(
+            delete_entity,
+            x,
+            6,
+            button_width,
+            button_height,
+            TRUE);
         x += button_width + 4;
-        MoveWindow(refresh_assets, x, 6, button_width, button_height, TRUE);
+
+        MoveWindow(
+            refresh_assets,
+            x,
+            6,
+            button_width,
+            button_height,
+            TRUE);
         x += button_width + 16;
 
-        MoveWindow(undo, x, 6, button_width, button_height, TRUE);
+        MoveWindow(
+            undo,
+            x,
+            6,
+            button_width,
+            button_height,
+            TRUE);
         x += button_width + 4;
-        MoveWindow(redo, x, 6, button_width, button_height, TRUE);
+
+        MoveWindow(
+            redo,
+            x,
+            6,
+            button_width,
+            button_height,
+            TRUE);
         x += button_width + 16;
 
-        MoveWindow(play, x, 6, button_width, button_height, TRUE);
+        MoveWindow(
+            play,
+            x,
+            6,
+            button_width,
+            button_height,
+            TRUE);
         x += button_width + 4;
-        MoveWindow(pause, x, 6, button_width, button_height, TRUE);
-        x += button_width + 4;
-        MoveWindow(step, x, 6, button_width, button_height, TRUE);
-        x += button_width + 4;
-        MoveWindow(stop, x, 6, button_width, button_height, TRUE);
 
-        const int content_top = kToolbarHeight;
-        const int bottom_top = height - kBottomHeight;
-        const int content_height = bottom_top - content_top - kPadding;
+        MoveWindow(
+            pause,
+            x,
+            6,
+            button_width,
+            button_height,
+            TRUE);
+        x += button_width + 4;
+
+        MoveWindow(
+            step,
+            x,
+            6,
+            button_width,
+            button_height,
+            TRUE);
+        x += button_width + 4;
+
+        MoveWindow(
+            stop,
+            x,
+            6,
+            button_width,
+            button_height,
+            TRUE);
+
+        const int content_top =
+            kToolbarHeight;
+
+        const int bottom_top =
+            height - bottom_height;
+
+        const int bottom_split_y =
+            bottom_top -
+            kSplitterSize / 2;
+
+        const int content_height =
+            bottom_split_y -
+            content_top;
+
+        const int left_split_x =
+            hierarchy_width -
+            kSplitterSize / 2;
+
+        const int inspector_x =
+            width - inspector_width;
+
+        const int right_split_x =
+            inspector_x -
+            kSplitterSize / 2;
+
+        MoveWindow(
+            split_hierarchy,
+            left_split_x,
+            content_top,
+            kSplitterSize,
+            content_height,
+            TRUE);
+
+        MoveWindow(
+            split_inspector,
+            right_split_x,
+            content_top,
+            kSplitterSize,
+            content_height,
+            TRUE);
+
+        MoveWindow(
+            split_bottom,
+            kPadding,
+            bottom_split_y,
+            width - 2 * kPadding,
+            kSplitterSize,
+            TRUE);
 
         MoveWindow(
             hierarchy,
             kPadding,
             content_top,
-            kHierarchyWidth - kPadding,
+            std::max(
+                10,
+                left_split_x -
+                    2 * kPadding),
             content_height,
             TRUE);
 
-        const int inspector_x = width - kInspectorWidth;
+        const int scene_x =
+            left_split_x +
+            kSplitterSize;
 
         MoveWindow(
             scene,
-            kHierarchyWidth,
+            scene_x,
             content_top,
-            inspector_x - kHierarchyWidth - kPadding,
+            std::max(
+                10,
+                right_split_x -
+                    scene_x),
             content_height,
             TRUE);
 
-        int iy = content_top + 8;
-        const int ix = inspector_x + 10;
-        const int iw = kInspectorWidth - 20;
+        int iy =
+            content_top + 8;
 
-        MoveWindow(inspector_title, ix, iy, iw, 20, TRUE);
+        const int ix =
+            inspector_x + 10;
+
+        const int iw =
+            inspector_width - 20;
+
+        MoveWindow(
+            inspector_title,
+            ix,
+            iy,
+            iw,
+            20,
+            TRUE);
         iy += 28;
 
-        MoveWindow(label_name, ix, iy + 4, 70, 20, TRUE);
-        MoveWindow(name, ix + 72, iy, iw - 72, 24, TRUE);
+        MoveWindow(
+            label_name,
+            ix,
+            iy + 4,
+            70,
+            20,
+            TRUE);
+
+        MoveWindow(
+            name,
+            ix + 72,
+            iy,
+            iw - 72,
+            24,
+            TRUE);
         iy += 32;
 
-        MoveWindow(active, ix, iy, 100, 24, TRUE);
+        MoveWindow(
+            active,
+            ix,
+            iy,
+            100,
+            24,
+            TRUE);
         iy += 34;
 
-        MoveWindow(label_position, ix, iy + 4, iw, 20, TRUE);
+        MoveWindow(
+            label_position,
+            ix,
+            iy + 4,
+            iw,
+            20,
+            TRUE);
         iy += 24;
 
-        const int third = (iw - 8) / 3;
+        const int third =
+            (iw - 8) / 3;
+
         for (int i = 0; i < 3; ++i) {
             MoveWindow(
-                position[static_cast<std::size_t>(i)],
+                position[
+                    static_cast<std::size_t>(i)],
                 ix + i * (third + 4),
                 iy,
                 third,
@@ -972,13 +1277,22 @@ struct Win32EditorShell::Impl {
         }
         iy += 34;
 
-        MoveWindow(label_rotation, ix, iy + 4, iw, 20, TRUE);
+        MoveWindow(
+            label_rotation,
+            ix,
+            iy + 4,
+            iw,
+            20,
+            TRUE);
         iy += 24;
 
-        const int quarter = (iw - 12) / 4;
+        const int quarter =
+            (iw - 12) / 4;
+
         for (int i = 0; i < 4; ++i) {
             MoveWindow(
-                rotation[static_cast<std::size_t>(i)],
+                rotation[
+                    static_cast<std::size_t>(i)],
                 ix + i * (quarter + 4),
                 iy,
                 quarter,
@@ -987,12 +1301,19 @@ struct Win32EditorShell::Impl {
         }
         iy += 34;
 
-        MoveWindow(label_scale, ix, iy + 4, iw, 20, TRUE);
+        MoveWindow(
+            label_scale,
+            ix,
+            iy + 4,
+            iw,
+            20,
+            TRUE);
         iy += 24;
 
         for (int i = 0; i < 3; ++i) {
             MoveWindow(
-                scale[static_cast<std::size_t>(i)],
+                scale[
+                    static_cast<std::size_t>(i)],
                 ix + i * (third + 4),
                 iy,
                 third,
@@ -1001,19 +1322,35 @@ struct Win32EditorShell::Impl {
         }
         iy += 34;
 
-        MoveWindow(apply_transform, ix, iy, iw, 27, TRUE);
+        MoveWindow(
+            apply_transform,
+            ix,
+            iy,
+            iw,
+            27,
+            TRUE);
 
         const int bottom_y =
-            bottom_top + kPadding;
+            bottom_split_y +
+            kSplitterSize +
+            kPadding / 2;
 
         const int bottom_h =
-            kBottomHeight - 2 * kPadding;
+            std::max(
+                30,
+                height -
+                    bottom_y -
+                    kPadding);
 
         const int assets_w =
-            (width - 3 * kPadding) * 2 / 5;
+            (width -
+             3 * kPadding) *
+            2 / 5;
 
         const int console_x =
-            kPadding + assets_w + kPadding;
+            kPadding +
+            assets_w +
+            kPadding;
 
         MoveWindow(
             assets_list,
@@ -1027,7 +1364,9 @@ struct Win32EditorShell::Impl {
             console,
             console_x,
             bottom_y,
-            width - console_x - kPadding,
+            width -
+                console_x -
+                kPadding,
             bottom_h,
             TRUE);
     }
