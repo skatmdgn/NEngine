@@ -4,7 +4,9 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <string>
+#include <vector>
 
 #include "nengine/assets/asset_database.hpp"
 #include "nengine/assets/asset_guid.hpp"
