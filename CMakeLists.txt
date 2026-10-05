@@ -20,6 +20,7 @@ option(NENGINE_BUILD_EDITOR "Build the editor bootstrap" ON)
 add_subdirectory(engine/core)
 add_subdirectory(engine/platform)
 add_subdirectory(engine/assets)
+add_subdirectory(engine/render)
 add_subdirectory(engine/scripting)
 add_subdirectory(engine/editor)
 
