@@ -564,6 +564,12 @@ struct Win32EditorShell::Impl {
         shell_log("attach begin");
 
         parent = static_cast<HWND>(native);
+
+        if (editor.project().is_open()) {
+            current_scene_path =
+                editor.project().startup_scene_path();
+        }
+
         if (!parent || !IsWindow(parent)) {
             shell_log("attach failed: invalid parent HWND");
             SetLastError(ERROR_INVALID_WINDOW_HANDLE);
@@ -1589,6 +1595,7 @@ struct Win32EditorShell::Impl {
         current_scene_path = path;
         editor.selection().clear();
         editor.commands().clear();
+        editor.mark_scene_saved();
 
         editor.console().info(
             "Scene",
@@ -1646,6 +1653,7 @@ struct Win32EditorShell::Impl {
         }
 
         current_scene_path = std::move(path);
+        editor.mark_scene_saved();
 
         editor.console().info(
             "Scene",
@@ -1657,6 +1665,37 @@ struct Win32EditorShell::Impl {
         refresh_assets_panel();
         refresh_console();
         return true;
+    }
+
+    void refresh_window_title() {
+        if (!parent) return;
+
+        std::string title =
+            "NEngine Editor";
+
+        if (editor.project().is_open()) {
+            title += " - " +
+                editor.project().manifest().name;
+        }
+
+        if (!current_scene_path.empty()) {
+            title += " - " +
+                wide_to_utf8(
+                    current_scene_path
+                        .filename()
+                        .wstring());
+        }
+
+        if (editor.scene_dirty()) {
+            title += " *";
+        }
+
+        const auto wide =
+            utf8_to_wide(title);
+
+        SetWindowTextW(
+            parent,
+            wide.c_str());
     }
 
     void refresh() {
@@ -1676,6 +1715,7 @@ struct Win32EditorShell::Impl {
 
         refresh_assets_panel();
         refresh_console();
+        refresh_window_title();
 
         shell_log("refresh scene invalidate");
         if (scene) {
