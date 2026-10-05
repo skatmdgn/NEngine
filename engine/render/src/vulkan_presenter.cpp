@@ -35,7 +35,7 @@ constexpr std::uint32_t
 VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO = 42;
 
 constexpr std::uint32_t
-VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER = 45;
+VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO = 43;
 
 constexpr std::uint32_t
 VK_STRUCTURE_TYPE_PRESENT_INFO_KHR = 1000001001;
@@ -52,31 +52,11 @@ constexpr std::uint32_t
 VK_COMMAND_BUFFER_LEVEL_PRIMARY = 0u;
 
 constexpr std::uint32_t
-VK_IMAGE_LAYOUT_UNDEFINED = 0u;
+VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT =
+    0x00000400u;
 
 constexpr std::uint32_t
-VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL = 7u;
-
-constexpr std::uint32_t
-VK_IMAGE_LAYOUT_PRESENT_SRC_KHR = 1000001002u;
-
-constexpr std::uint32_t
-VK_ACCESS_TRANSFER_WRITE_BIT = 0x00001000u;
-
-constexpr std::uint32_t
-VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT = 0x00000001u;
-
-constexpr std::uint32_t
-VK_PIPELINE_STAGE_TRANSFER_BIT = 0x00001000u;
-
-constexpr std::uint32_t
-VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT = 0x00002000u;
-
-constexpr std::uint32_t
-VK_IMAGE_ASPECT_COLOR_BIT = 0x00000001u;
-
-constexpr std::uint32_t
-VK_QUEUE_FAMILY_IGNORED = 0xFFFFFFFFu;
+VK_SUBPASS_CONTENTS_INLINE = 0u;
 
 struct VkCommandPoolCreateInfo {
     std::uint32_t sType;
@@ -112,31 +92,43 @@ struct VkFenceCreateInfo {
     std::uint32_t flags;
 };
 
-struct VkImageSubresourceRange {
-    std::uint32_t aspectMask;
-    std::uint32_t baseMipLevel;
-    std::uint32_t levelCount;
-    std::uint32_t baseArrayLayer;
-    std::uint32_t layerCount;
+struct VkOffset2D {
+    std::int32_t x;
+    std::int32_t y;
 };
 
-struct VkImageMemoryBarrier {
-    std::uint32_t sType;
-    const void* pNext;
-    std::uint32_t srcAccessMask;
-    std::uint32_t dstAccessMask;
-    std::uint32_t oldLayout;
-    std::uint32_t newLayout;
-    std::uint32_t srcQueueFamilyIndex;
-    std::uint32_t dstQueueFamilyIndex;
-    void* image;
-    VkImageSubresourceRange subresourceRange;
+struct VkExtent2D {
+    std::uint32_t width;
+    std::uint32_t height;
+};
+
+struct VkRect2D {
+    VkOffset2D offset;
+    VkExtent2D extent;
 };
 
 union VkClearColorValue {
     float float32[4];
     std::int32_t int32[4];
     std::uint32_t uint32[4];
+};
+
+union VkClearValue {
+    VkClearColorValue color;
+    struct {
+        float depth;
+        std::uint32_t stencil;
+    } depthStencil;
+};
+
+struct VkRenderPassBeginInfo {
+    std::uint32_t sType;
+    const void* pNext;
+    void* renderPass;
+    void* framebuffer;
+    VkRect2D renderArea;
+    std::uint32_t clearValueCount;
+    const VkClearValue* pClearValues;
 };
 
 struct VkSubmitInfo {
@@ -232,30 +224,16 @@ using BeginCommandBuffer =
         const VkCommandBufferBeginInfo*);
 
 using EndCommandBuffer =
-    VkResult (*)(
-        void*);
+    VkResult (*)(void*);
 
-using CmdPipelineBarrier =
+using CmdBeginRenderPass =
     void (*)(
         void*,
-        std::uint32_t,
-        std::uint32_t,
-        std::uint32_t,
-        std::uint32_t,
-        const void*,
-        std::uint32_t,
-        const void*,
-        std::uint32_t,
-        const VkImageMemoryBarrier*);
+        const VkRenderPassBeginInfo*,
+        std::uint32_t);
 
-using CmdClearColorImage =
-    void (*)(
-        void*,
-        void*,
-        std::uint32_t,
-        const VkClearColorValue*,
-        std::uint32_t,
-        const VkImageSubresourceRange*);
+using CmdEndRenderPass =
+    void (*)(void*);
 
 using AcquireNextImage =
     VkResult (*)(
@@ -308,17 +286,21 @@ VulkanClearPresenter::~VulkanClearPresenter() {
 
 bool VulkanClearPresenter::initialize(
     const VulkanDevice& device,
-    const VulkanSwapchain& swapchain) {
+    const VulkanSwapchain& swapchain,
+    const VulkanRenderTargets& targets) {
 
     shutdown();
     diagnostic_.clear();
     needs_resize_ = false;
 
     if (!device.valid() ||
-        !swapchain.valid()) {
+        !swapchain.valid() ||
+        !targets.valid() ||
+        targets.count() !=
+            swapchain.images().size()) {
 
         diagnostic_ =
-            "Vulkan device and swapchain are required";
+            "valid matching Vulkan device swapchain and render targets are required";
         return false;
     }
 
@@ -379,7 +361,7 @@ bool VulkanClearPresenter::initialize(
     }
 
     std::vector<void*> command_buffers(
-        swapchain.images().size());
+        targets.count());
 
     const VkCommandBufferAllocateInfo allocate_info{
         VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -518,19 +500,15 @@ bool VulkanClearPresenter::initialize(
     }
 
     device_api_ = &device;
+    targets_ = &targets;
     device_ =
         device.native_device();
     queue_ =
         device.graphics_queue();
     swapchain_ =
         swapchain.native_handle();
-    images_ =
-        swapchain.images();
     command_buffers_ =
         std::move(command_buffers);
-    image_initialized_.assign(
-        images_.size(),
-        false);
     command_pool_ = pool;
     image_available_ =
         image_available;
@@ -538,9 +516,13 @@ bool VulkanClearPresenter::initialize(
         render_finished;
     frame_fence_ =
         frame_fence;
+    width_ =
+        swapchain.width();
+    height_ =
+        swapchain.height();
 
     diagnostic_ =
-        "Vulkan clear presenter ready";
+        "Vulkan render-pass presenter ready";
 
     return true;
 }
@@ -589,15 +571,15 @@ bool VulkanClearPresenter::present_clear(
             *device_api_,
             "vkEndCommandBuffer");
 
-    const auto barrier =
-        load_proc<CmdPipelineBarrier>(
+    const auto begin_render_pass =
+        load_proc<CmdBeginRenderPass>(
             *device_api_,
-            "vkCmdPipelineBarrier");
+            "vkCmdBeginRenderPass");
 
-    const auto clear_image =
-        load_proc<CmdClearColorImage>(
+    const auto end_render_pass =
+        load_proc<CmdEndRenderPass>(
             *device_api_,
-            "vkCmdClearColorImage");
+            "vkCmdEndRenderPass");
 
     const auto queue_submit =
         load_proc<QueueSubmit>(
@@ -615,13 +597,13 @@ bool VulkanClearPresenter::present_clear(
         !reset_command ||
         !begin_command ||
         !end_command ||
-        !barrier ||
-        !clear_image ||
+        !begin_render_pass ||
+        !end_render_pass ||
         !queue_submit ||
         !queue_present) {
 
         diagnostic_ =
-            "required Vulkan frame functions are unavailable";
+            "required Vulkan render-pass frame functions are unavailable";
         return false;
     }
 
@@ -682,10 +664,12 @@ bool VulkanClearPresenter::present_clear(
     }
 
     if (image_index >=
-        command_buffers_.size()) {
+            command_buffers_.size() ||
+        image_index >=
+            targets_->count()) {
 
         diagnostic_ =
-            "Vulkan acquired image index is outside command buffer range";
+            "Vulkan acquired image index is outside render-target range";
         return false;
     }
 
@@ -729,13 +713,12 @@ bool VulkanClearPresenter::present_clear(
                 status));
     }
 
-    const VkCommandBufferBeginInfo
-        begin_info{
-            VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-            nullptr,
-            0,
-            nullptr
-        };
+    const VkCommandBufferBeginInfo begin_info{
+        VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        nullptr,
+        0,
+        nullptr
+    };
 
     status =
         begin_command(
@@ -749,88 +732,30 @@ bool VulkanClearPresenter::present_clear(
                 status));
     }
 
-    const VkImageSubresourceRange range{
-        VK_IMAGE_ASPECT_COLOR_BIT,
-        0,
-        1,
-        0,
-        1
-    };
-
-    const bool initialized =
-        image_initialized_[
-            image_index];
-
-    const VkImageMemoryBarrier
-        to_transfer{
-            VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            nullptr,
-            0,
-            VK_ACCESS_TRANSFER_WRITE_BIT,
-            initialized
-                ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-                : VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            VK_QUEUE_FAMILY_IGNORED,
-            VK_QUEUE_FAMILY_IGNORED,
-            images_[image_index],
-            range
-        };
-
-    barrier(
-        command,
-        initialized
-            ? VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT
-            : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        0,
-        0,
-        nullptr,
-        0,
-        nullptr,
-        1,
-        &to_transfer);
-
-    const VkClearColorValue color{{
-        red,
-        green,
-        blue,
-        alpha
+    const VkClearValue clear{{
+        {red, green, blue, alpha}
     }};
 
-    clear_image(
-        command,
-        images_[image_index],
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        &color,
-        1,
-        &range);
-
-    const VkImageMemoryBarrier
-        to_present{
-            VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            nullptr,
-            VK_ACCESS_TRANSFER_WRITE_BIT,
-            0,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-            VK_QUEUE_FAMILY_IGNORED,
-            VK_QUEUE_FAMILY_IGNORED,
-            images_[image_index],
-            range
-        };
-
-    barrier(
-        command,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-        0,
-        0,
+    const VkRenderPassBeginInfo render_pass_info{
+        VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
         nullptr,
-        0,
-        nullptr,
+        targets_->render_pass(),
+        targets_->framebuffer(
+            image_index),
+        {
+            {0, 0},
+            {width_, height_}
+        },
         1,
-        &to_present);
+        &clear
+    };
+
+    begin_render_pass(
+        command,
+        &render_pass_info,
+        VK_SUBPASS_CONTENTS_INLINE);
+
+    end_render_pass(command);
 
     status =
         end_command(command);
@@ -850,7 +775,7 @@ bool VulkanClearPresenter::present_clear(
 
     constexpr std::uint32_t
         wait_stage =
-            VK_PIPELINE_STAGE_TRANSFER_BIT;
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
     const VkSubmitInfo submit{
         VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -897,9 +822,6 @@ bool VulkanClearPresenter::present_clear(
             queue_,
             &present);
 
-    image_initialized_[
-        image_index] = true;
-
     if (status ==
             VK_ERROR_OUT_OF_DATE_KHR ||
         status ==
@@ -925,7 +847,7 @@ bool VulkanClearPresenter::present_clear(
     }
 
     diagnostic_ =
-        "Vulkan clear frame presented";
+        "Vulkan render-pass clear frame presented";
 
     return true;
 }
@@ -935,16 +857,17 @@ void VulkanClearPresenter::shutdown() noexcept {
         !device_) {
 
         device_api_ = nullptr;
+        targets_ = nullptr;
         device_ = nullptr;
         queue_ = nullptr;
         swapchain_ = nullptr;
-        images_.clear();
         command_buffers_.clear();
-        image_initialized_.clear();
         command_pool_ = nullptr;
         image_available_ = nullptr;
         render_finished_ = nullptr;
         frame_fence_ = nullptr;
+        width_ = 0;
+        height_ = 0;
         needs_resize_ = false;
         return;
     }
@@ -1010,16 +933,17 @@ void VulkanClearPresenter::shutdown() noexcept {
     }
 
     device_api_ = nullptr;
+    targets_ = nullptr;
     device_ = nullptr;
     queue_ = nullptr;
     swapchain_ = nullptr;
-    images_.clear();
     command_buffers_.clear();
-    image_initialized_.clear();
     command_pool_ = nullptr;
     image_available_ = nullptr;
     render_finished_ = nullptr;
     frame_fence_ = nullptr;
+    width_ = 0;
+    height_ = 0;
     needs_resize_ = false;
 }
 
