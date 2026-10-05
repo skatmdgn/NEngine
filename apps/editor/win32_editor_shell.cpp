@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <commdlg.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdio>
