@@ -1,53 +1,62 @@
 # Current state
 
-Version: 0.2.5-dev
+Version: 0.2.7-dev
 Milestone: Windows editor foundation
 
-## Verified checkpoints
-- [x] Core/Editor architecture and cross-platform EditorModel tests established.
-- [x] Native Win32 host compiles on GitHub Windows CI.
-- [x] Entity/World, component pools, reflection metadata, Scene and Prefab foundations.
-- [x] Selection, Undo/Redo, Play/Pause/Step.
-- [x] Hierarchy/Inspector/Toolbar presentation models.
-- [x] Native Win32 Scene Open/Save workflow through Core SceneSerializer.
-- [x] UTF-8 engine strings <-> UTF-16 Win32 UI conversion.
-- [x] Scene file API uses std::filesystem::path for Unicode-capable Windows paths.
-- [x] Windows editor builds as a GUI subsystem executable with statically linked MSVC runtime.
-- [x] Startup diagnostics write to %LOCALAPPDATA%/NEngine/Logs/editor.log.
-- [x] Previous 0.2.4 Windows build/test/artifact generation succeeded in CI.
+## Windows runtime verified
+The user has now verified the 0.2.6 editor on Windows:
+- [x] Editor window remains open normally.
+- [x] Hierarchy shows Main Camera / Cube / Child Cube.
+- [x] Hierarchy selection updates Inspector.
+- [x] Name editing works.
+- [x] Position editing + Apply Transform works.
+- [x] Undo / Redo work.
+- [x] Play / Pause / Step / Stop work.
+- [x] .nscene Save / Open round-trip works.
+- [x] Korean object names such as 플레이어 display correctly.
 
-## 0.2.5 runtime-stability change
-The user reported that 0.2.4 created the native top-level window but exited during Win32EditorShell::attach().
+This closes the 0.2.6 startup/runtime-stability checkpoint.
 
-0.2.5 removes the risky top-level WNDPROC subclassing path entirely:
-- the platform-owned main window is no longer modified by Editor UI code;
-- a dedicated NEngine.EditorHost child window owns all editor controls;
-- the host is resized from the main loop via Win32EditorShell::tick();
-- attach() writes fine-grained progress markers for class registration, host creation, toolbar, hierarchy, Scene View, Inspector, Console and initial layout;
-- the startup log is truncated on each run so the latest run is unambiguous.
+## 0.2.7 Scene View interaction
+Implemented:
+- [x] Platform-independent Scene View projection module.
+- [x] Parent-aware diagnostic world-position calculation.
+- [x] Scene View object picking.
+- [x] X/Z translation gizmo hit-testing.
+- [x] Screen drag delta -> local Transform conversion.
+- [x] Win32 Scene View click-to-select.
+- [x] Selected object draws X and Z translation axes.
+- [x] Dragging an axis previews the Transform live.
+- [x] Mouse release commits exactly one SetTransformCommand.
+- [x] Undo / Redo therefore treat one drag as one edit.
+- [x] Lost mouse capture restores the pre-drag Transform.
+- [x] Scene interaction math has cross-platform unit coverage.
 
-## Current Windows editor behavior
-- Open / Save scene
-- Undo / Redo
-- Play / Pause-Resume / Step / Stop
-- Hierarchy selection
-- Inspector name + active state
-- Transform edits through Undoable Commands
-- Diagnostic top-down Scene View
-- Console placeholder/log lines
+## Existing foundations
+- Generational Entity / World lifetime.
+- Parent/child Transform hierarchy safety.
+- Type-erased native Component pools.
+- Reflection metadata foundation.
+- Scene and Prefab foundations.
+- Selection and CommandStack.
+- Play Mode cloned Runtime World.
+- Reflection-driven Inspector presentation.
+- Dedicated Win32 EditorHost child window.
+- UTF-8 engine strings <-> UTF-16 Win32 UI.
+- Native Scene Open / Save.
+- Windows CI artifacts.
 
-## Runtime QA status
-- 0.2.3: user reported brief window + console, then exit.
-- 0.2.4: user reported immediate exit; log proved main Win32 window creation succeeded and failure occurred inside shell attach.
-- 0.2.5: pending CI and user-side runtime verification.
+## Rendering boundary
+The current Scene View still uses GDI as a diagnostic/editor presentation surface.
+Projection, picking and gizmo interaction are platform-independent Editor code so the behavior survives the future Vulkan viewport replacement.
 
-## Important serialization boundary
-Scene serialization currently persists object metadata, hierarchy and Transform. Generic native/C# component property serialization adapters remain pending.
+## Serialization boundary
+Scene serialization currently persists object metadata, hierarchy and Transform.
+Generic native/C# Component property serialization adapters remain pending.
 
 ## 0.2 remaining
-- [ ] Windows runtime confirmation of 0.2.5 startup.
-- [ ] Scene selection/gizmo interaction.
-- [ ] Assets panel backed by Asset Database.
+- [ ] User-side Windows runtime verification of click-selection and X/Z gizmo dragging.
 - [ ] Structured Console/log model.
-- [ ] Generic reflection-to-command editing beyond Transform.
+- [ ] Asset Database + Assets panel.
+- [ ] Generic reflection-to-command property editing beyond Transform.
 - [ ] Docking/layout persistence.
