@@ -41,6 +41,90 @@ std::string_view CommandStack::redo_name() const noexcept {
     return history_[cursor_]->name();
 }
 
+bool CreateEntityCommand::execute(
+    core::World& world) {
+
+    if (parent_.valid() &&
+        !world.is_alive(parent_)) {
+        return false;
+    }
+
+    created_ =
+        world.create(object_name_);
+
+    if (parent_.valid() &&
+        !world.set_parent(
+            created_,
+            parent_)) {
+
+        world.destroy(created_);
+        created_ =
+            core::Entity::invalid();
+        return false;
+    }
+
+    return true;
+}
+
+void CreateEntityCommand::undo(
+    core::World& world) {
+
+    if (world.is_alive(created_)) {
+        world.destroy(created_);
+    }
+}
+
+bool DeleteEntityCommand::execute(
+    core::World& world) {
+
+    if (!world.is_alive(entity_)) {
+        return false;
+    }
+
+    if (!before_) {
+        before_.emplace(world.clone());
+    }
+
+    std::vector<core::Entity> stack{
+        entity_
+    };
+
+    std::vector<core::Entity> ordered;
+
+    while (!stack.empty()) {
+        const auto current =
+            stack.back();
+        stack.pop_back();
+
+        if (!world.is_alive(current)) {
+            continue;
+        }
+
+        ordered.push_back(current);
+
+        for (const auto child :
+             world.children(current)) {
+            stack.push_back(child);
+        }
+    }
+
+    for (auto it = ordered.rbegin();
+         it != ordered.rend();
+         ++it) {
+        world.destroy(*it);
+    }
+
+    return true;
+}
+
+void DeleteEntityCommand::undo(
+    core::World& world) {
+
+    if (before_) {
+        world = before_->clone();
+    }
+}
+
 bool RenameEntityCommand::execute(core::World& world) {
     if (!world.is_alive(entity_) || new_name_.empty()) return false;
     if (!captured_) {
