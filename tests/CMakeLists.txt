@@ -7,3 +7,8 @@ add_executable(NEngineEditorTests editor_tests.cpp)
 target_link_libraries(NEngineEditorTests PRIVATE NEngineEditorModel)
 target_compile_features(NEngineEditorTests PRIVATE cxx_std_20)
 add_test(NAME NEngineEditorTests COMMAND NEngineEditorTests)
+
+add_executable(NEngineAssetTests asset_tests.cpp)
+target_link_libraries(NEngineAssetTests PRIVATE NEngineAssets)
+target_compile_features(NEngineAssetTests PRIVATE cxx_std_20)
+add_test(NAME NEngineAssetTests COMMAND NEngineAssetTests)
