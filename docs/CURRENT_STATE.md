@@ -189,12 +189,26 @@ Implemented:
 - VK Preview renders the actual presentation World Camera + supported built-in MeshRenderer snapshot.
 - Depth-tested pipelines with depth clear/write/LESS compare.
 
+Implemented:
+- RGBA8 Vulkan texture upload from decoded CPU pixels.
+- Host-visible staging buffer -> device-local sampled VkImage.
+- Image layout transitions to shader-read-only.
+- Texture VkImageView.
+- Default linear/repeat VkSampler.
+- Textured material descriptor resource:
+  - set 0 / binding 0 combined image sampler layout.
+  - descriptor pool + descriptor set allocation.
+  - image view/sampler descriptor update.
+- Graphics pipeline layouts can optionally include the material descriptor-set layout.
+- Headless Vulkan CI validates texture upload, sampler creation, material descriptors and textured-compatible pipeline layout creation.
+
 Not yet implemented:
-- GPU texture image/image-view/sampler resources.
-- Material resource/binding model.
+- Binding the material descriptor set in indexed draw commands.
+- A fragment shader that actually samples the bound texture.
+- Material AssetGuid/serialization model and imported material cache.
 - Shader source compiler and reflection.
-- Descriptor sets/uniform binding.
-- Actual mesh rendering in Scene/Game view.
+- General descriptor/uniform binding beyond the first texture slot.
+- Imported mesh rendering and a Vulkan Game View.
 - PBR/lights/shadows/sprites.
 - Android Vulkan surface.
 
@@ -211,9 +225,10 @@ The concrete Vulkan backend currently grows beneath this contract. The long-term
 
 ## Immediate next work
 
-1. Keep Windows + Ubuntu CI green while VK Preview expands from built-in meshes to imported render assets.
-2. Add GPU texture image/view/sampler resources plus descriptor/material binding.
-3. Decode/cook a first real model format (glTF) into MeshData and reuse the existing GPU mesh upload path.
-4. Make VK Preview cover imported mesh/material assets before replacing the GDI interaction view.
-5. Add a shader compiler toolchain path rather than making glslang/DXC a hidden build dependency.
-6. Return to .NET hosting after the renderer/resource boundary is stable.
+1. Bind the material descriptor set during Vulkan indexed draws.
+2. Add a diagnostic textured fragment shader and verify sampled pixels through the VK Preview path.
+3. Add a small decoded-pixel texture cache keyed by AssetGuid.
+4. Decode/cook a first real model format (glTF) into MeshData and reuse the existing GPU mesh upload path.
+5. Make VK Preview cover imported mesh/material assets before replacing the GDI interaction view.
+6. Add a shader compiler toolchain path rather than making glslang/DXC a hidden build dependency.
+7. Return to .NET hosting after the renderer/resource boundary is stable.
