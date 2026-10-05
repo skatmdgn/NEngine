@@ -10,6 +10,7 @@
 #include "nengine/assets/asset_importer.hpp"
 #include "nengine/assets/dependency_graph.hpp"
 #include "nengine/assets/file_watcher.hpp"
+#include "nengine/assets/import_pipeline.hpp"
 
 namespace {
 int failures = 0;
@@ -102,6 +103,73 @@ int main() {
     std::filesystem::remove(script);
     changes = watcher.poll();
     check(changes.size() == 1 && changes[0].kind == FileChangeKind::Removed, "watcher detects removed file");
+
+    AssetImportPipeline pipeline;
+    check(
+        pipeline.register_processor(
+            "Raw",
+            copy_source_importer),
+        "copy-source importer processor registers");
+
+    const auto* scene_record =
+        database.find_relative("Scenes/Main.nscene");
+
+    check(
+        scene_record != nullptr,
+        "scene record available for import pipeline");
+
+    const auto cache_root =
+        root / "Library" / "Cache";
+
+    auto import_result =
+        pipeline.import(
+            *scene_record,
+            importers,
+            cache_root);
+
+    check(
+        import_result.success &&
+        !import_result.cache_hit,
+        "first supported import creates artifact");
+
+    check(
+        import_result.artifacts.size() == 1 &&
+        std::filesystem::exists(
+            import_result.artifacts[0].path),
+        "import artifact is written to cache");
+
+    const auto raw_record =
+        AssetRecord{
+            scene_record->guid,
+            scene_record->source_path,
+            scene_record->relative_path,
+            scene_record->meta_path,
+            "Raw",
+            scene_record->file_size,
+            scene_record->write_stamp
+        };
+
+    import_result =
+        pipeline.import(
+            raw_record,
+            importers,
+            cache_root);
+
+    check(
+        import_result.success &&
+        !import_result.cache_hit,
+        "changing importer invalidates cache fingerprint");
+
+    const auto cached_result =
+        pipeline.import(
+            raw_record,
+            importers,
+            cache_root);
+
+    check(
+        cached_result.success &&
+        cached_result.cache_hit,
+        "unchanged import resolves from cache manifest");
 
     const auto a = AssetGuid::generate();
     const auto b = AssetGuid::generate();
