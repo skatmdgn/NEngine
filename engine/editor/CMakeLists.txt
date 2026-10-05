@@ -3,6 +3,8 @@ add_library(NEngineEditorModel STATIC
   src/console_model.cpp
   src/editor_model.cpp
   src/play_session.cpp
+  src/property_access.cpp
+  src/property_command.cpp
   src/project_session.cpp
   src/presentation.cpp
   src/scene_interaction.cpp
