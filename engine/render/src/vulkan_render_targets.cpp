@@ -116,17 +116,21 @@ VulkanRenderTargets::~VulkanRenderTargets() {
 }
 
 bool VulkanRenderTargets::create(
+    const VulkanLoader& loader,
+    const VulkanInstance& instance,
     const VulkanDevice& device,
     const VulkanSwapchain& swapchain) {
 
     destroy();
     diagnostic_.clear();
 
-    if (!device.valid() ||
+    if (!loader.loaded() ||
+        !instance.valid() ||
+        !device.valid() ||
         !swapchain.valid()) {
 
         diagnostic_ =
-            "valid Vulkan device and swapchain are required";
+            "valid Vulkan runtime device and swapchain are required";
         return false;
     }
 
@@ -204,9 +208,24 @@ bool VulkanRenderTargets::create(
         image_views_.push_back(view);
     }
 
-    if (!render_pass_.create_color(
+    if (!depth_target_.create(
+            loader,
+            instance,
             device,
-            swapchain.format())) {
+            swapchain.width(),
+            swapchain.height())) {
+
+        diagnostic_ =
+            depth_target_.diagnostic();
+
+        destroy();
+        return false;
+    }
+
+    if (!render_pass_.create_color_depth(
+            device,
+            swapchain.format(),
+            depth_target_.format())) {
 
         diagnostic_ =
             render_pass_.diagnostic();
@@ -222,7 +241,8 @@ bool VulkanRenderTargets::create(
          image_views_) {
 
         void* attachments[] = {
-            view
+            view,
+            depth_target_.native_view()
         };
 
         const VkFramebufferCreateInfo
@@ -232,7 +252,7 @@ bool VulkanRenderTargets::create(
                 0,
                 render_pass_
                     .native_handle(),
-                1,
+                2,
                 attachments,
                 swapchain.width(),
                 swapchain.height(),
@@ -265,7 +285,7 @@ bool VulkanRenderTargets::create(
     }
 
     diagnostic_ =
-        "Vulkan render targets created";
+        "Vulkan color+depth render targets created";
 
     return true;
 }
@@ -300,6 +320,7 @@ void VulkanRenderTargets::destroy() noexcept {
         framebuffers_.clear();
 
         render_pass_.destroy();
+        depth_target_.destroy();
 
         if (destroy_view) {
             for (auto* view :
@@ -315,6 +336,7 @@ void VulkanRenderTargets::destroy() noexcept {
         }
     } else {
         render_pass_.destroy();
+        depth_target_.destroy();
         framebuffers_.clear();
     }
 
