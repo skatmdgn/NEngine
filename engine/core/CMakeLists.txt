@@ -1,6 +1,7 @@
 add_library(NEngineCore STATIC
   src/world.cpp
   src/component_registry.cpp
+  src/component_serialization.cpp
   src/scene.cpp
   src/prefab.cpp
 )
