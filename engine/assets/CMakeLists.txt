@@ -3,6 +3,7 @@ add_library(NEngineAssets STATIC
   src/asset_importer.cpp
   src/asset_database.cpp
   src/file_watcher.cpp
+  src/import_pipeline.cpp
   src/dependency_graph.cpp
 )
 
