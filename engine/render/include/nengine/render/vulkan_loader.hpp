@@ -26,7 +26,10 @@ public:
             get_instance_proc_addr_ != nullptr;
     }
 
-    void* get_proc_address(
+    using Function =
+        void (*)();
+
+    Function get_proc_address(
         const char* name) const noexcept;
 
     const std::string& diagnostic() const noexcept {
@@ -35,7 +38,7 @@ public:
 
 private:
     using GetInstanceProcAddr =
-        void* (*)(void*, const char*);
+        Function (*)(void*, const char*);
 
     void close() noexcept;
 
