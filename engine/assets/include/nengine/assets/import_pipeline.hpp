@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -32,6 +33,13 @@ struct ImportResult {
     std::vector<AssetGuid> dependencies{};
 };
 
+struct CachedArtifactSet {
+    std::string fingerprint{};
+    std::string importer_id{};
+    std::uint32_t importer_version{0};
+    std::vector<ImportArtifact> artifacts{};
+};
+
 class AssetImportPipeline {
 public:
     using Processor =
@@ -45,6 +53,11 @@ public:
         std::string_view importer_id) const noexcept;
 
     ImportResult import(
+        const AssetRecord& asset,
+        const ImporterRegistry& registry,
+        const std::filesystem::path& cache_root) const;
+
+    std::optional<CachedArtifactSet> cached_artifacts(
         const AssetRecord& asset,
         const ImporterRegistry& registry,
         const std::filesystem::path& cache_root) const;
