@@ -1059,6 +1059,12 @@ int main() {
         check(
             !material.valid(),
             "default Vulkan material resource is invalid");
+
+        render::VulkanMeshDraw draw;
+
+        check(
+            draw.material == nullptr,
+            "default Vulkan mesh draw has no material descriptor binding");
     }
 
     {
