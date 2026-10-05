@@ -9,6 +9,7 @@ add_library(NEngineRender STATIC
   src/vulkan_device.cpp
   src/vulkan_instance.cpp
   src/vulkan_mesh.cpp
+  src/vulkan_pipeline.cpp
   src/vulkan_presenter.cpp
   src/vulkan_render_targets.cpp
   src/vulkan_shader.cpp
