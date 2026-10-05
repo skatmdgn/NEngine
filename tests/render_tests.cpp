@@ -481,6 +481,50 @@ int main() {
                             0xFFFFFFFFu,
                         "Vulkan logical device exposes graphics queue state");
 
+                    {
+                        const std::uint32_t sample_data[] = {
+                            11u,
+                            22u,
+                            33u,
+                            44u
+                        };
+
+                        render::VulkanBufferResource
+                            host_buffer;
+
+                        check(
+                            host_buffer.create(
+                                loader,
+                                instance,
+                                device,
+                                sizeof(sample_data),
+                                render::VulkanBufferUsage::Uniform,
+                                render::VulkanMemoryPreference::HostVisible,
+                                sample_data) &&
+                            host_buffer.valid() &&
+                            host_buffer.host_visible(),
+                            "Vulkan host-visible buffer creates and accepts initial upload");
+
+                        render::VulkanBufferResource
+                            device_buffer;
+
+                        check(
+                            device_buffer.create(
+                                loader,
+                                instance,
+                                device,
+                                sizeof(sample_data),
+                                render::VulkanBufferUsage::Vertex,
+                                render::VulkanMemoryPreference::DeviceLocal,
+                                sample_data) &&
+                            device_buffer.valid() &&
+                            !device_buffer.host_visible(),
+                            "Vulkan device-local buffer stages initial data");
+
+                        device_buffer.destroy();
+                        host_buffer.destroy();
+                    }
+
                     device.destroy();
 
                     check(
