@@ -4,6 +4,7 @@ add_library(NEngineRender STATIC
   src/mesh_data.cpp
   src/registration.cpp
   src/render_snapshot.cpp
+  src/vulkan_buffer.cpp
   src/vulkan_context.cpp
   src/vulkan_device.cpp
   src/vulkan_instance.cpp
