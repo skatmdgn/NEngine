@@ -917,14 +917,16 @@ struct Win32EditorShell::Impl {
         const int width =
             std::max(
                 1,
-                rect.right -
-                    rect.left);
+                static_cast<int>(
+                    rect.right -
+                    rect.left));
 
         const int height =
             std::max(
                 1,
-                rect.bottom -
-                    rect.top);
+                static_cast<int>(
+                    rect.bottom -
+                    rect.top));
 
         auto context =
             std::make_unique<
