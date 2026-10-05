@@ -13,6 +13,7 @@
 #include "nengine/editor/property_command.hpp"
 #include "nengine/editor/property_text.hpp"
 #include "nengine/editor/scene_interaction.hpp"
+#include "nengine/render/builtin_assets.hpp"
 #include "nengine/render/components.hpp"
 
 namespace {
@@ -189,6 +190,12 @@ int main() {
     core::Entity startup_light =
         core::Entity::invalid();
 
+    core::Entity startup_cube =
+        core::Entity::invalid();
+
+    core::Entity startup_child_cube =
+        core::Entity::invalid();
+
     for (const auto entity :
          startup_world.entities()) {
         if (startup_world.name(entity) ==
@@ -199,6 +206,16 @@ int main() {
         if (startup_world.name(entity) ==
             "Directional Light") {
             startup_light = entity;
+        }
+
+        if (startup_world.name(entity) ==
+            "Cube") {
+            startup_cube = entity;
+        }
+
+        if (startup_world.name(entity) ==
+            "Child Cube") {
+            startup_child_cube = entity;
         }
     }
 
@@ -217,6 +234,36 @@ int main() {
                 startup_light,
                 render::light_type()) != nullptr,
         "startup Directional Light owns native Light component");
+
+    const auto* startup_cube_renderer =
+        startup_cube.valid()
+            ? startup_world.get_component<
+                render::MeshRenderer>(
+                    startup_cube,
+                    render::mesh_renderer_type())
+            : nullptr;
+
+    const auto* startup_child_renderer =
+        startup_child_cube.valid()
+            ? startup_world.get_component<
+                render::MeshRenderer>(
+                    startup_child_cube,
+                    render::mesh_renderer_type())
+            : nullptr;
+
+    check(
+        startup_cube_renderer &&
+        startup_cube_renderer->mesh ==
+            render::
+                builtin_unit_cube_mesh_guid(),
+        "startup Cube owns MeshRenderer referencing built-in unit cube");
+
+    check(
+        startup_child_renderer &&
+        startup_child_renderer->mesh ==
+            render::
+                builtin_unit_cube_mesh_guid(),
+        "startup Child Cube owns MeshRenderer referencing built-in unit cube");
 
     check(
         model.project().manifest().target_windows &&
