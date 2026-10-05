@@ -13,7 +13,7 @@ Target scope:
 
 ## Current milestone
 
-`0.3.0-dev — Asset database complete enough for renderer integration; 0.4 renderer foundation in progress`
+`0.3.0-dev — Asset pipeline is integrated with the first concrete Vulkan runtime/GPU resource path`
 
 The repository currently includes:
 - generational Entity/World lifetime and Transform hierarchy
@@ -26,13 +26,19 @@ The repository currently includes:
 - selection, Undo/Redo, Scene dirty tracking and persistent pane layout
 - reflection-driven generic property editing
 - GUID/.meta Asset Database, watcher, import cache and dependency graph
-- texture/audio/model import descriptors
+- texture/audio/model descriptors and validated SPIR-V shader import
 - generated C# solution/project and NuGet manifest foundation
-- render Camera/Light/MeshRenderer components
-- RenderSnapshot and RHI contracts
+- Camera/Light/MeshRenderer components
+- RenderSnapshot with resolved world matrices
+- camera matrix math and built-in Cube/Quad CPU meshes
+- dynamic Vulkan loader, instance, device, Win32 surface and swapchain
+- swapchain image views, render pass, framebuffers and acquire/submit/present synchronization
+- host-visible and staged device-local Vulkan buffers
+- GPU vertex/index mesh resources
+- SPIR-V shader-module resources
 - Windows + Ubuntu CI tests
 
-The current Scene View is still a GDI diagnostic/editor viewport. The Vulkan runtime backend, real GPU resources, shader system and draw submission are **not implemented yet**.
+The Win32 Scene View still uses GDI for visible diagnostic object/gizmo drawing. Vulkan now has a real window context and render-pass clear/present path, but the graphics-pipeline/indexed-draw path is still in progress.
 
 C# project generation exists, but the embedded .NET runtime/compile/reload path is **not implemented yet**.
 
