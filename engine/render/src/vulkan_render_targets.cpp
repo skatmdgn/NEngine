@@ -18,9 +18,6 @@ constexpr std::uint32_t
 VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO = 37;
 
 constexpr std::uint32_t
-VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO = 38;
-
-constexpr std::uint32_t
 VK_IMAGE_VIEW_TYPE_2D = 1;
 
 constexpr std::uint32_t
@@ -28,33 +25,6 @@ VK_COMPONENT_SWIZZLE_IDENTITY = 0;
 
 constexpr std::uint32_t
 VK_IMAGE_ASPECT_COLOR_BIT = 0x00000001u;
-
-constexpr std::uint32_t
-VK_SAMPLE_COUNT_1_BIT = 0x00000001u;
-
-constexpr std::uint32_t
-VK_ATTACHMENT_LOAD_OP_CLEAR = 1;
-
-constexpr std::uint32_t
-VK_ATTACHMENT_STORE_OP_STORE = 0;
-
-constexpr std::uint32_t
-VK_ATTACHMENT_LOAD_OP_DONT_CARE = 2;
-
-constexpr std::uint32_t
-VK_ATTACHMENT_STORE_OP_DONT_CARE = 1;
-
-constexpr std::uint32_t
-VK_IMAGE_LAYOUT_UNDEFINED = 0;
-
-constexpr std::uint32_t
-VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL = 2;
-
-constexpr std::uint32_t
-VK_IMAGE_LAYOUT_PRESENT_SRC_KHR = 1000001002u;
-
-constexpr std::uint32_t
-VK_PIPELINE_BIND_POINT_GRAPHICS = 0;
 
 struct VkComponentMapping {
     std::uint32_t r;
@@ -82,55 +52,6 @@ struct VkImageViewCreateInfo {
     VkImageSubresourceRange subresourceRange;
 };
 
-struct VkAttachmentDescription {
-    std::uint32_t flags;
-    std::uint32_t format;
-    std::uint32_t samples;
-    std::uint32_t loadOp;
-    std::uint32_t storeOp;
-    std::uint32_t stencilLoadOp;
-    std::uint32_t stencilStoreOp;
-    std::uint32_t initialLayout;
-    std::uint32_t finalLayout;
-};
-
-struct VkAttachmentReference {
-    std::uint32_t attachment;
-    std::uint32_t layout;
-};
-
-struct VkSubpassDescription {
-    std::uint32_t flags;
-    std::uint32_t pipelineBindPoint;
-    std::uint32_t inputAttachmentCount;
-    const VkAttachmentReference*
-        pInputAttachments;
-    std::uint32_t colorAttachmentCount;
-    const VkAttachmentReference*
-        pColorAttachments;
-    const VkAttachmentReference*
-        pResolveAttachments;
-    const VkAttachmentReference*
-        pDepthStencilAttachment;
-    std::uint32_t preserveAttachmentCount;
-    const std::uint32_t*
-        pPreserveAttachments;
-};
-
-struct VkRenderPassCreateInfo {
-    std::uint32_t sType;
-    const void* pNext;
-    std::uint32_t flags;
-    std::uint32_t attachmentCount;
-    const VkAttachmentDescription*
-        pAttachments;
-    std::uint32_t subpassCount;
-    const VkSubpassDescription*
-        pSubpasses;
-    std::uint32_t dependencyCount;
-    const void* pDependencies;
-};
-
 struct VkFramebufferCreateInfo {
     std::uint32_t sType;
     const void* pNext;
@@ -151,19 +72,6 @@ using CreateImageView =
         void**);
 
 using DestroyImageView =
-    void (*)(
-        void*,
-        void*,
-        const void*);
-
-using CreateRenderPass =
-    VkResult (*)(
-        void*,
-        const VkRenderPassCreateInfo*,
-        const void*,
-        void**);
-
-using DestroyRenderPass =
     void (*)(
         void*,
         void*,
@@ -227,18 +135,12 @@ bool VulkanRenderTargets::create(
             device,
             "vkCreateImageView");
 
-    const auto create_render_pass =
-        load_proc<CreateRenderPass>(
-            device,
-            "vkCreateRenderPass");
-
     const auto create_framebuffer =
         load_proc<CreateFramebuffer>(
             device,
             "vkCreateFramebuffer");
 
     if (!create_view ||
-        !create_render_pass ||
         !create_framebuffer) {
 
         diagnostic_ =
@@ -302,71 +204,16 @@ bool VulkanRenderTargets::create(
         image_views_.push_back(view);
     }
 
-    const VkAttachmentDescription color_attachment{
-        0,
-        swapchain.format(),
-        VK_SAMPLE_COUNT_1_BIT,
-        VK_ATTACHMENT_LOAD_OP_CLEAR,
-        VK_ATTACHMENT_STORE_OP_STORE,
-        VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-        VK_ATTACHMENT_STORE_OP_DONT_CARE,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-    };
-
-    const VkAttachmentReference color_reference{
-        0,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-    };
-
-    const VkSubpassDescription subpass{
-        0,
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
-        0,
-        nullptr,
-        1,
-        &color_reference,
-        nullptr,
-        nullptr,
-        0,
-        nullptr
-    };
-
-    const VkRenderPassCreateInfo
-        render_pass_info{
-            VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-            nullptr,
-            0,
-            1,
-            &color_attachment,
-            1,
-            &subpass,
-            0,
-            nullptr
-        };
-
-    void* render_pass = nullptr;
-
-    auto status =
-        create_render_pass(
-            device_,
-            &render_pass_info,
-            nullptr,
-            &render_pass);
-
-    if (status != VK_SUCCESS ||
-        !render_pass) {
+    if (!render_pass_.create_color(
+            device,
+            swapchain.format())) {
 
         diagnostic_ =
-            result_message(
-                "vkCreateRenderPass",
-                status);
+            render_pass_.diagnostic();
 
         destroy();
         return false;
     }
-
-    render_pass_ = render_pass;
 
     framebuffers_.reserve(
         image_views_.size());
@@ -383,7 +230,8 @@ bool VulkanRenderTargets::create(
                 VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
                 nullptr,
                 0,
-                render_pass_,
+                render_pass_
+                    .native_handle(),
                 1,
                 attachments,
                 swapchain.width(),
@@ -393,7 +241,7 @@ bool VulkanRenderTargets::create(
 
         void* framebuffer = nullptr;
 
-        status =
+        const auto status =
             create_framebuffer(
                 device_,
                 &framebuffer_info,
@@ -431,11 +279,6 @@ void VulkanRenderTargets::destroy() noexcept {
                 *device_api_,
                 "vkDestroyFramebuffer");
 
-        const auto destroy_render_pass =
-            load_proc<DestroyRenderPass>(
-                *device_api_,
-                "vkDestroyRenderPass");
-
         const auto destroy_view =
             load_proc<DestroyImageView>(
                 *device_api_,
@@ -454,14 +297,9 @@ void VulkanRenderTargets::destroy() noexcept {
             }
         }
 
-        if (destroy_render_pass &&
-            render_pass_) {
+        framebuffers_.clear();
 
-            destroy_render_pass(
-                device_,
-                render_pass_,
-                nullptr);
-        }
+        render_pass_.destroy();
 
         if (destroy_view) {
             for (auto* view :
@@ -475,11 +313,12 @@ void VulkanRenderTargets::destroy() noexcept {
                 }
             }
         }
+    } else {
+        render_pass_.destroy();
+        framebuffers_.clear();
     }
 
-    framebuffers_.clear();
     image_views_.clear();
-    render_pass_ = nullptr;
     device_ = nullptr;
     device_api_ = nullptr;
 }
