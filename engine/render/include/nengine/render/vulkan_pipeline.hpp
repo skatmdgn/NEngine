@@ -1,0 +1,55 @@
+#pragma once
+
+#include <string>
+
+#include "nengine/render/vulkan_device.hpp"
+#include "nengine/render/vulkan_render_targets.hpp"
+#include "nengine/render/vulkan_shader.hpp"
+
+namespace nengine::render {
+
+class VulkanGraphicsPipeline {
+public:
+    VulkanGraphicsPipeline() = default;
+    ~VulkanGraphicsPipeline();
+
+    VulkanGraphicsPipeline(
+        const VulkanGraphicsPipeline&) = delete;
+
+    VulkanGraphicsPipeline& operator=(
+        const VulkanGraphicsPipeline&) = delete;
+
+    bool create(
+        const VulkanDevice& device,
+        const VulkanRenderTargets& targets,
+        const VulkanShaderModule& vertex_shader,
+        const VulkanShaderModule& fragment_shader);
+
+    void destroy() noexcept;
+
+    bool valid() const noexcept {
+        return layout_ != nullptr &&
+            pipeline_ != nullptr;
+    }
+
+    void* native_layout() const noexcept {
+        return layout_;
+    }
+
+    void* native_pipeline() const noexcept {
+        return pipeline_;
+    }
+
+    const std::string& diagnostic() const noexcept {
+        return diagnostic_;
+    }
+
+private:
+    const VulkanDevice* device_api_{nullptr};
+    void* device_{nullptr};
+    void* layout_{nullptr};
+    void* pipeline_{nullptr};
+    std::string diagnostic_{};
+};
+
+} // namespace nengine::render
