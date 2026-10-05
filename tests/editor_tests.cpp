@@ -138,6 +138,17 @@ int main() {
         script_asset->importer_id == "NEngine.Script",
         "project chooses script importer");
 
+    const auto script_activation =
+        model.project().activation_for(
+            script_asset->guid);
+
+    check(
+        script_activation.kind ==
+            editor::AssetActivationKind::OpenScript &&
+        script_activation.source_path ==
+            script_asset->source_path,
+        "script asset routes to external script editor");
+
     const auto first_import =
         model.project().import_asset(
             script_asset->guid);
@@ -161,6 +172,67 @@ int main() {
         second_import.success &&
         second_import.cache_hit,
         "project script import reuses cache");
+
+    // Consume the watcher event for Player.cs so the next poll
+    // observes only the newly created texture.
+    const auto script_poll =
+        model.project().poll_assets();
+
+    check(
+        !script_poll.changes.empty(),
+        "project watcher observes previously created script");
+
+    const auto texture_path =
+        project_root /
+        "Assets" /
+        "Textures" /
+        "checker.png";
+
+    std::filesystem::create_directories(
+        texture_path.parent_path());
+
+    {
+        std::ofstream texture(
+            texture_path,
+            std::ios::binary |
+                std::ios::trunc);
+
+        texture
+            << "\x89PNG\r\n\x1A\n"
+            << "NEngineTextureTest";
+    }
+
+    const auto texture_poll =
+        model.project().poll_assets();
+
+    check(
+        texture_poll.changes.size() == 1 &&
+        texture_poll.changes[0].kind ==
+            assets::FileChangeKind::Added,
+        "project watcher isolates newly added texture");
+
+    check(
+        texture_poll.imports.attempted == 1 &&
+        texture_poll.imports.imported == 1 &&
+        texture_poll.imports.failed == 0,
+        "new texture is automatically imported");
+
+    const auto* texture_asset =
+        model.project().assets().find_relative(
+            "Textures/checker.png");
+
+    check(
+        texture_asset &&
+        texture_asset->importer_id ==
+            "NEngine.Texture",
+        "texture asset selects built-in texture importer");
+
+    check(
+        texture_asset &&
+        model.project().activation_for(
+            texture_asset->guid).kind ==
+            editor::AssetActivationKind::OpenExternal,
+        "texture asset routes to external preview fallback");
 
     auto& world = model.world();
     const auto root = world.create("Root");
