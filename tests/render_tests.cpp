@@ -30,6 +30,7 @@
 #include "nengine/render/vulkan_presenter.hpp"
 #include "nengine/render/vulkan_render_pass.hpp"
 #include "nengine/render/vulkan_shader.hpp"
+#include "nengine/render/vulkan_texture.hpp"
 
 namespace {
 int failures = 0;
@@ -634,6 +635,33 @@ int main() {
                             !device_buffer.host_visible(),
                             "Vulkan device-local buffer stages initial data");
 
+                        const std::uint8_t texture_pixels[] = {
+                            255u,   0u,   0u, 255u,
+                              0u, 255u,   0u, 255u,
+                              0u,   0u, 255u, 255u,
+                            255u, 255u, 255u, 255u
+                        };
+
+                        render::VulkanTextureResource
+                            gpu_texture;
+
+                        check(
+                            gpu_texture.create_rgba8(
+                                loader,
+                                instance,
+                                device,
+                                2u,
+                                2u,
+                                texture_pixels,
+                                sizeof(texture_pixels),
+                                render::VulkanTextureColorSpace::Linear) &&
+                            gpu_texture.valid() &&
+                            gpu_texture.width() == 2u &&
+                            gpu_texture.height() == 2u &&
+                            gpu_texture.native_view() != nullptr &&
+                            gpu_texture.native_sampler() != nullptr,
+                            "Vulkan RGBA8 texture stages pixels and creates sampled image/view/sampler");
+
                         render::VulkanMeshResource
                             gpu_cube;
 
@@ -742,6 +770,7 @@ int main() {
                         diagnostic_fragment.destroy();
                         diagnostic_vertex.destroy();
                         gpu_cube.destroy();
+                        gpu_texture.destroy();
                         device_buffer.destroy();
                         host_buffer.destroy();
                     }
@@ -993,6 +1022,14 @@ int main() {
                     0.5f,
                     0.0f},
             "built-in quad mesh topology and bounds are valid");
+    }
+
+    {
+        render::VulkanTextureResource texture;
+
+        check(
+            !texture.valid(),
+            "default Vulkan texture resource is invalid");
     }
 
     {
