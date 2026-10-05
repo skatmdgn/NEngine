@@ -23,6 +23,7 @@
 #include "nengine/render/vulkan_instance.hpp"
 #include "nengine/render/vulkan_mesh.hpp"
 #include "nengine/render/vulkan_presenter.hpp"
+#include "nengine/render/vulkan_shader.hpp"
 
 namespace {
 int failures = 0;
@@ -750,6 +751,31 @@ int main() {
                     0.5f,
                     0.0f},
             "built-in quad mesh topology and bounds are valid");
+    }
+
+    {
+        render::VulkanShaderModule shader;
+        render::VulkanDevice no_device;
+
+        check(
+            !shader.valid(),
+            "default Vulkan shader module is invalid");
+
+        check(
+            !shader.create(
+                no_device,
+                render::VulkanShaderStage::Vertex,
+                {
+                    0xDEADBEEFu,
+                    0u,
+                    0u,
+                    0u,
+                    0u
+                }) &&
+            shader.diagnostic().find(
+                "SPIR-V") !=
+                std::string::npos,
+            "Vulkan shader module rejects invalid SPIR-V before device access");
     }
 
     {
