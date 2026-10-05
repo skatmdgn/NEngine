@@ -6,6 +6,7 @@
 #include "nengine/editor/console_model.hpp"
 #include "nengine/editor/play_session.hpp"
 #include "nengine/editor/project_session.hpp"
+#include "nengine/editor/property_access.hpp"
 #include "nengine/editor/selection.hpp"
 
 namespace nengine::editor {
@@ -50,6 +51,14 @@ public:
     ProjectSession& project() noexcept { return project_; }
     const ProjectSession& project() const noexcept { return project_; }
 
+    PropertyAccessRegistry& property_access() noexcept {
+        return property_access_;
+    }
+
+    const PropertyAccessRegistry& property_access() const noexcept {
+        return property_access_;
+    }
+
     bool can_edit() const noexcept { return !play_session_.is_playing(); }
     void sanitize_selection() { selection_.sanitize(presentation_world()); }
 
@@ -61,6 +70,7 @@ private:
     PlaySession play_session_{};
     ConsoleModel console_{};
     ProjectSession project_{};
+    PropertyAccessRegistry property_access_{};
 };
 
 } // namespace nengine::editor
