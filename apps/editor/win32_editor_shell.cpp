@@ -26,6 +26,7 @@
 #include "nengine/editor/property_text.hpp"
 #include "nengine/editor/scene_interaction.hpp"
 #include "nengine/scripting/managed_project.hpp"
+#include "nengine/render/vulkan_context.hpp"
 
 namespace nengine::app {
 namespace {
@@ -309,6 +310,13 @@ struct Win32EditorShell::Impl {
     std::vector<nengine::assets::AssetRecord> asset_rows{};
     std::filesystem::path current_scene_path{};
     ULONGLONG next_asset_poll_tick{0};
+
+    std::unique_ptr<
+        nengine::render::VulkanContext>
+        vulkan_context{};
+
+    int vulkan_scene_width{-1};
+    int vulkan_scene_height{-1};
 
     bool scene_dragging{false};
     nengine::editor::SceneGizmoAxis scene_drag_axis{
@@ -883,11 +891,136 @@ struct Win32EditorShell::Impl {
             "Editor",
             "Editor host attached.");
 
+        initialize_vulkan_scene_context();
+
         refresh_assets_panel();
         refresh_console();
 
         shell_log("attach complete");
         return true;
+    }
+
+    void initialize_vulkan_scene_context() {
+        if (!scene ||
+            !IsWindow(scene)) {
+            return;
+        }
+
+        RECT rect{};
+
+        if (!GetClientRect(
+                scene,
+                &rect)) {
+            return;
+        }
+
+        const int width =
+            std::max(
+                1,
+                rect.right -
+                    rect.left);
+
+        const int height =
+            std::max(
+                1,
+                rect.bottom -
+                    rect.top);
+
+        auto context =
+            std::make_unique<
+                nengine::render::
+                    VulkanContext>();
+
+        if (context->initialize_for_window(
+                GetModuleHandleW(nullptr),
+                scene,
+                static_cast<std::uint32_t>(
+                    width),
+                static_cast<std::uint32_t>(
+                    height),
+                true)) {
+
+            vulkan_scene_width =
+                width;
+
+            vulkan_scene_height =
+                height;
+
+            editor.console().info(
+                "Renderer",
+                "Vulkan bootstrap ready: " +
+                    std::to_string(width) +
+                    "x" +
+                    std::to_string(height) +
+                    ", " +
+                    std::to_string(
+                        context
+                            ->swapchain()
+                            .images()
+                            .size()) +
+                    " swapchain image(s). GDI Scene View presentation remains active for now.");
+        } else {
+            editor.console().info(
+                "Renderer",
+                "Vulkan bootstrap unavailable; using GDI Scene View: " +
+                    context->diagnostic());
+        }
+
+        vulkan_context =
+            std::move(context);
+    }
+
+    void poll_vulkan_scene_resize() {
+        if (!vulkan_context ||
+            !vulkan_context->ready() ||
+            !scene ||
+            !IsWindow(scene)) {
+            return;
+        }
+
+        RECT rect{};
+
+        if (!GetClientRect(
+                scene,
+                &rect)) {
+            return;
+        }
+
+        const int width =
+            rect.right -
+            rect.left;
+
+        const int height =
+            rect.bottom -
+            rect.top;
+
+        if (width ==
+                vulkan_scene_width &&
+            height ==
+                vulkan_scene_height) {
+            return;
+        }
+
+        vulkan_scene_width =
+            width;
+
+        vulkan_scene_height =
+            height;
+
+        if (!vulkan_context->resize(
+                static_cast<std::uint32_t>(
+                    std::max(0, width)),
+                static_cast<std::uint32_t>(
+                    std::max(0, height)))) {
+
+            editor.console().warning(
+                "Renderer",
+                "Vulkan swapchain resize failed: " +
+                    vulkan_context
+                        ->diagnostic());
+
+            refresh_console();
+        }
     }
 
     void tick() {
@@ -908,6 +1041,8 @@ struct Win32EditorShell::Impl {
             last_parent_height = height;
             MoveWindow(host, 0, 0, width, height, TRUE);
         }
+
+        poll_vulkan_scene_resize();
 
         const ULONGLONG now = GetTickCount64();
         if (now >= next_asset_poll_tick) {
