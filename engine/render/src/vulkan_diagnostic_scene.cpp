@@ -1,9 +1,12 @@
 #include "nengine/render/vulkan_diagnostic_scene.hpp"
 
+#include <vector>
+
 #include "nengine/core/transform.hpp"
+#include "nengine/render/builtin_assets.hpp"
 #include "nengine/render/diagnostic_shaders.hpp"
 #include "nengine/render/matrix.hpp"
-#include "nengine/render/mesh_data.hpp"
+#include "nengine/render/render_snapshot.hpp"
 
 namespace nengine::render {
 
@@ -49,18 +52,14 @@ bool VulkanDiagnosticScene::initialize(
         return false;
     }
 
-    const auto cpu_mesh =
-        make_unit_quad_mesh();
-
-    if (!mesh_.create(
+    if (!mesh_cache_.initialize(
             context.loader(),
             context.instance(),
-            context.device(),
-            cpu_mesh)) {
+            context.device())) {
 
         diagnostic_ =
-            "diagnostic GPU mesh failed: " +
-            mesh_.diagnostic();
+            "built-in Vulkan mesh cache failed: " +
+            mesh_cache_.diagnostic();
 
         shutdown();
         return false;
@@ -81,7 +80,7 @@ bool VulkanDiagnosticScene::initialize(
     }
 
     diagnostic_ =
-        "Vulkan diagnostic indexed-draw resources ready";
+        "Vulkan preview shaders mesh cache and pipeline ready";
 
     return true;
 }
@@ -103,6 +102,16 @@ bool VulkanDiagnosticScene::present(
     if (height == 0) {
         diagnostic_ =
             "Vulkan diagnostic scene cannot present to zero-height swapchain";
+        return false;
+    }
+
+    const auto* quad =
+        mesh_cache_.find(
+            builtin_unit_quad_mesh_guid());
+
+    if (!quad) {
+        diagnostic_ =
+            "built-in diagnostic quad is unavailable";
         return false;
     }
 
@@ -134,7 +143,7 @@ bool VulkanDiagnosticScene::present(
 
     if (!context.present_mesh(
             pipeline_,
-            mesh_,
+            *quad,
             mvp)) {
 
         diagnostic_ =
@@ -143,14 +152,122 @@ bool VulkanDiagnosticScene::present(
     }
 
     diagnostic_ =
-        "Vulkan diagnostic indexed mesh presented";
+        "Vulkan diagnostic indexed quad presented";
+
+    return true;
+}
+
+bool VulkanDiagnosticScene::present_world(
+    VulkanContext& context,
+    const core::World& world) {
+
+    if (!ready() ||
+        !context.ready()) {
+
+        diagnostic_ =
+            "Vulkan World preview is not ready";
+        return false;
+    }
+
+    const auto height =
+        context.swapchain().height();
+
+    if (height == 0) {
+        diagnostic_ =
+            "Vulkan World preview cannot present to zero-height swapchain";
+        return false;
+    }
+
+    const float aspect =
+        static_cast<float>(
+            context.swapchain().width()) /
+        static_cast<float>(
+            height);
+
+    const auto snapshot =
+        build_render_snapshot(
+            world);
+
+    if (snapshot.cameras.empty()) {
+        diagnostic_ =
+            "World contains no active Camera; using diagnostic fallback";
+
+        return present(context);
+    }
+
+    const auto matrices =
+        build_camera_matrices(
+            world,
+            snapshot.cameras.front().entity,
+            aspect);
+
+    if (!matrices) {
+        diagnostic_ =
+            "active Camera matrices could not be built";
+        return false;
+    }
+
+    std::vector<VulkanMeshDraw> draws;
+    draws.reserve(
+        snapshot.meshes.size());
+
+    for (const auto& item :
+         snapshot.meshes) {
+
+        const auto* mesh =
+            mesh_cache_.find(
+                item.renderer.mesh);
+
+        if (!mesh) {
+            continue;
+        }
+
+        draws.push_back({
+            &pipeline_,
+            mesh,
+            multiply(
+                matrices->view_projection,
+                item.world)
+        });
+    }
+
+    if (draws.empty()) {
+        if (!context.present_clear(
+                0.08f,
+                0.09f,
+                0.11f,
+                1.0f)) {
+
+            diagnostic_ =
+                context.diagnostic();
+            return false;
+        }
+
+        diagnostic_ =
+            "Vulkan World preview cleared; no supported built-in MeshRenderer items found";
+        return true;
+    }
+
+    if (!context.present_meshes(
+            draws)) {
+
+        diagnostic_ =
+            context.diagnostic();
+        return false;
+    }
+
+    diagnostic_ =
+        "Vulkan World preview presented " +
+        std::to_string(
+            draws.size()) +
+        " draw(s)";
 
     return true;
 }
 
 void VulkanDiagnosticScene::shutdown() noexcept {
     pipeline_.destroy();
-    mesh_.destroy();
+    mesh_cache_.shutdown();
     fragment_shader_.destroy();
     vertex_shader_.destroy();
 }
