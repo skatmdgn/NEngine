@@ -732,9 +732,11 @@ bool VulkanClearPresenter::present_clear(
                 status));
     }
 
-    const VkClearValue clear{{
-        {red, green, blue, alpha}
-    }};
+    VkClearValue clear{};
+    clear.color.float32[0] = red;
+    clear.color.float32[1] = green;
+    clear.color.float32[2] = blue;
+    clear.color.float32[3] = alpha;
 
     const VkRenderPassBeginInfo render_pass_info{
         VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
