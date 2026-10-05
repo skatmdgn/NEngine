@@ -807,4 +807,116 @@ ImportResult audio_source_importer(
     return result;
 }
 
+ImportResult shader_source_importer(
+    const ImportContext& context) {
+
+    ImportResult result;
+
+    if (!context.asset ||
+        !context.importer) {
+
+        result.message =
+            "invalid import context";
+        return result;
+    }
+
+    if ((context.asset->file_size %
+         sizeof(std::uint32_t)) != 0 ||
+        context.asset->file_size <
+            5u * sizeof(std::uint32_t)) {
+
+        result.message =
+            "SPIR-V binary size is invalid";
+        return result;
+    }
+
+    std::ifstream input(
+        context.asset->source_path,
+        std::ios::binary);
+
+    std::uint32_t magic = 0;
+
+    input.read(
+        reinterpret_cast<char*>(&magic),
+        sizeof(magic));
+
+    if (!input ||
+        magic != 0x07230203u) {
+
+        result.message =
+            "SPIR-V magic is invalid";
+        return result;
+    }
+
+    std::filesystem::path source;
+
+    if (!stage_source(
+            context,
+            result,
+            source)) {
+        return result;
+    }
+
+    std::string stage =
+        "unknown";
+
+    const auto stage_extension =
+        lowercase(
+            context.asset
+                ->source_path
+                .stem()
+                .extension()
+                .string());
+
+    if (stage_extension == ".vert" ||
+        stage_extension == ".vs") {
+        stage = "vertex";
+    } else if (
+        stage_extension == ".frag" ||
+        stage_extension == ".fs") {
+        stage = "fragment";
+    }
+
+    const auto descriptor =
+        context.cache_directory /
+        "shader.nasset";
+
+    std::ostringstream text;
+
+    text
+        << "NENGINE_SHADER 1\n"
+        << "FORMAT "
+        << std::quoted("spirv")
+        << "\n"
+        << "STAGE "
+        << std::quoted(stage)
+        << "\n"
+        << "WORDS "
+        << (context.asset->file_size /
+            sizeof(std::uint32_t))
+        << "\n"
+        << "SOURCE "
+        << std::quoted(
+            source.filename()
+                .generic_string())
+        << "\n"
+        << "END_SHADER\n";
+
+    if (!write_descriptor(
+            descriptor,
+            text.str(),
+            result,
+            "shader-descriptor")) {
+        return result;
+    }
+
+    result.success = true;
+    result.message =
+        stage == "unknown"
+            ? "SPIR-V shader staged; stage hint unavailable"
+            : "SPIR-V shader staged";
+
+    return result;
+}
+
 } // namespace nengine::assets
