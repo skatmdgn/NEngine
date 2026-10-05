@@ -7,6 +7,7 @@ add_library(NEngineRender STATIC
   src/registration.cpp
   src/render_snapshot.cpp
   src/vulkan_buffer.cpp
+  src/vulkan_builtin_mesh_cache.cpp
   src/vulkan_context.cpp
   src/vulkan_depth_target.cpp
   src/vulkan_device.cpp
