@@ -1,6 +1,8 @@
 #include "nengine/editor/project_session.hpp"
 
 #include <fstream>
+
+#include "nengine/core/scene.hpp"
 #include <system_error>
 #include <utility>
 
@@ -171,6 +173,73 @@ bool ProjectSession::open(
         if (!ProjectManifestSerializer::save(
                 manifest_,
                 manifest_path_,
+                error)) {
+            close();
+            return false;
+        }
+    }
+
+    const auto startup_scene =
+        startup_scene_path();
+
+    ec.clear();
+
+    if (!std::filesystem::exists(
+            startup_scene,
+            ec) ||
+        ec) {
+
+        ec.clear();
+
+        std::filesystem::create_directories(
+            startup_scene.parent_path(),
+            ec);
+
+        if (ec) {
+            if (error) {
+                *error =
+                    "could not create startup scene directory";
+            }
+            close();
+            return false;
+        }
+
+        core::World default_world;
+
+        const auto camera =
+            default_world.create(
+                "Main Camera");
+
+        default_world.transform(camera)
+            ->local_position =
+            {0.0f, 4.0f, -8.0f};
+
+        const auto cube =
+            default_world.create(
+                "Cube");
+
+        const auto child =
+            default_world.create(
+                "Child Cube");
+
+        default_world.transform(child)
+            ->local_position =
+            {2.0f, 0.0f, 1.0f};
+
+        default_world.set_parent(
+            child,
+            cube);
+
+        const auto scene =
+            core::SceneSerializer::capture(
+                default_world,
+                startup_scene
+                    .stem()
+                    .string());
+
+        if (!core::SceneSerializer::save_file(
+                scene,
+                startup_scene,
                 error)) {
             close();
             return false;
