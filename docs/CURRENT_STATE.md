@@ -58,7 +58,7 @@ Implemented:
 - Win32 Scene View attempts Vulkan window-context bootstrap.
 - Vulkan bootstrap success/failure is reported to Console without making Vulkan availability an editor-startup requirement.
 
-The Scene View still uses GDI for its visible diagnostic object/gizmo drawing. Vulkan has a real swapchain/render-pass/present path underneath, but mesh drawing has not replaced the GDI presentation yet.
+The Scene View still uses GDI by default for visible diagnostic object/gizmo drawing. An opt-in **VK Preview** toolbar toggle now presents a real Vulkan indexed diagnostic quad using the built-in SPIR-V/graphics-pipeline path. Turning it off immediately returns to the GDI interaction view.
 
 ## Project / Asset database
 
@@ -172,10 +172,17 @@ Implemented:
 - Device-local buffer initialization through a synchronous staging buffer and vkCmdCopyBuffer.
 - CPU MeshData -> device-local GPU vertex/index buffers.
 - SPIR-V VkShaderModule creation/destruction contract.
+- Reusable single-color VulkanRenderPass resource.
+- Fixed MeshVertex graphics pipeline with:
+  - position/normal/uv vertex layout.
+  - dynamic viewport/scissor.
+  - 64-byte MVP vertex push constant.
+- Indexed mesh draw command recording with vkCmdDrawIndexed.
+- Built-in diagnostic GLSL sources + audited SPIR-V fixtures.
+- Headless CI graphics-pipeline creation using the diagnostic shaders.
+- Opt-in Win32 Scene View Vulkan Preview using the indexed diagnostic quad.
 
 Not yet implemented:
-- Graphics pipeline/layout creation.
-- Vertex input binding/drawIndexed command path.
 - Depth image/depth attachment.
 - GPU texture image/image-view/sampler resources.
 - Material resource/binding model.
@@ -198,11 +205,10 @@ The concrete Vulkan backend currently grows beneath this contract. The long-term
 
 ## Immediate next work
 
-1. Keep Windows + Ubuntu CI green after the buffer/mesh/render-pass changes.
-2. Add Vulkan graphics pipeline/layout creation from imported SPIR-V modules.
-3. Bind MeshVertex layout + VulkanMeshResource and issue the first indexed draw.
-4. Add depth target and per-frame camera uniform data.
-5. Add GPU texture resources and material binding.
-6. Replace GDI Scene presentation only after Vulkan can draw the existing diagnostic scene reliably.
-7. Add a shader compiler toolchain path rather than making glslang/DXC a hidden build dependency.
-8. Return to .NET hosting after the renderer/resource boundary is stable.
+1. Keep Windows + Ubuntu CI green with the VK Preview integration.
+2. Add depth target support and depth-tested 3D mesh rendering.
+3. Feed RenderSnapshot camera/object matrices into the draw path instead of the fixed diagnostic quad.
+4. Add GPU texture resources and material/descriptor binding.
+5. Replace GDI Scene presentation only after Vulkan can reproduce the existing interactive diagnostic scene reliably.
+6. Add a shader compiler toolchain path rather than making glslang/DXC a hidden build dependency.
+7. Return to .NET hosting after the renderer/resource boundary is stable.
