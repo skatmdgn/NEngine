@@ -26,6 +26,7 @@
 #include "nengine/render/vulkan_mesh.hpp"
 #include "nengine/render/vulkan_pipeline.hpp"
 #include "nengine/render/vulkan_presenter.hpp"
+#include "nengine/render/vulkan_render_pass.hpp"
 #include "nengine/render/vulkan_shader.hpp"
 
 namespace {
@@ -667,6 +668,35 @@ int main() {
                                 render::diagnostic_fragment_spirv()),
                             "built-in diagnostic fragment SPIR-V creates Vulkan shader module");
 
+                        render::VulkanRenderPass
+                            headless_render_pass;
+
+                        // VK_FORMAT_R8G8B8A8_UNORM. A standalone
+                        // render pass does not require a window or
+                        // framebuffer and lets CI validate pipeline
+                        // creation on a headless Vulkan device.
+                        check(
+                            headless_render_pass.create_color(
+                                device,
+                                37u),
+                            "headless Vulkan color render pass creates");
+
+                        render::VulkanGraphicsPipeline
+                            headless_pipeline;
+
+                        check(
+                            headless_render_pass.valid() &&
+                            diagnostic_vertex.valid() &&
+                            diagnostic_fragment.valid() &&
+                            headless_pipeline.create(
+                                device,
+                                headless_render_pass,
+                                diagnostic_vertex,
+                                diagnostic_fragment),
+                            "diagnostic SPIR-V creates real Vulkan graphics pipeline");
+
+                        headless_pipeline.destroy();
+                        headless_render_pass.destroy();
                         diagnostic_fragment.destroy();
                         diagnostic_vertex.destroy();
                         gpu_cube.destroy();
