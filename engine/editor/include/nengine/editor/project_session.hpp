@@ -31,6 +31,20 @@ struct AssetPollResult {
     AssetImportSummary imports{};
 };
 
+enum class AssetActivationKind : std::uint8_t {
+    None,
+    OpenScene,
+    OpenScript,
+    OpenExternal,
+};
+
+struct AssetActivation {
+    AssetActivationKind kind{
+        AssetActivationKind::None};
+    assets::AssetGuid guid{};
+    std::filesystem::path source_path{};
+};
+
 class ProjectSession {
 public:
     ProjectSession();
@@ -78,6 +92,9 @@ public:
         assets::AssetGuid guid);
 
     AssetImportSummary import_supported_assets();
+
+    AssetActivation activation_for(
+        assets::AssetGuid guid) const;
 
 private:
     void register_builtin_importers();
