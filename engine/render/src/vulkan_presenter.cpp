@@ -701,6 +701,17 @@ bool VulkanClearPresenter::present_clear(
         return false;
     }
 
+    auto fail_after_fence_reset =
+        [this](
+            std::string message) {
+
+            shutdown();
+            diagnostic_ =
+                std::move(message);
+            needs_resize_ = true;
+            return false;
+        };
+
     auto* command =
         command_buffers_[image_index];
 
@@ -710,11 +721,10 @@ bool VulkanClearPresenter::present_clear(
             0);
 
     if (status != VK_SUCCESS) {
-        diagnostic_ =
+        return fail_after_fence_reset(
             result_message(
                 "vkResetCommandBuffer",
-                status);
-        return false;
+                status));
     }
 
     const VkCommandBufferBeginInfo
@@ -731,11 +741,10 @@ bool VulkanClearPresenter::present_clear(
             &begin_info);
 
     if (status != VK_SUCCESS) {
-        diagnostic_ =
+        return fail_after_fence_reset(
             result_message(
                 "vkBeginCommandBuffer",
-                status);
-        return false;
+                status));
     }
 
     const VkImageSubresourceRange range{
@@ -825,11 +834,10 @@ bool VulkanClearPresenter::present_clear(
         end_command(command);
 
     if (status != VK_SUCCESS) {
-        diagnostic_ =
+        return fail_after_fence_reset(
             result_message(
                 "vkEndCommandBuffer",
-                status);
-        return false;
+                status));
     }
 
     void* wait_semaphore =
@@ -862,11 +870,10 @@ bool VulkanClearPresenter::present_clear(
             frame_fence_);
 
     if (status != VK_SUCCESS) {
-        diagnostic_ =
+        return fail_after_fence_reset(
             result_message(
                 "vkQueueSubmit",
-                status);
-        return false;
+                status));
     }
 
     void* swapchain =
