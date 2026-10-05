@@ -1,3 +1,4 @@
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
@@ -412,6 +413,111 @@ int main() {
             resolved->metadata.height == 96 &&
             resolved->source_path == source,
             "renderer resolves texture GUID from validated cache artifacts");
+
+        const auto shader_source =
+            root / "source.vert.spv";
+
+        const auto shader_descriptor =
+            root / "shader.nasset";
+
+        const std::array<
+            std::uint32_t,
+            5> shader_words{
+                0x07230203u,
+                0x00010000u,
+                0u,
+                1u,
+                0u
+            };
+
+        {
+            std::ofstream output(
+                shader_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output.write(
+                reinterpret_cast<
+                    const char*>(
+                        shader_words.data()),
+                static_cast<
+                    std::streamsize>(
+                        sizeof(shader_words)));
+        }
+
+        {
+            std::ofstream output(
+                shader_descriptor,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output
+                << "NENGINE_SHADER 1\n"
+                << "FORMAT \"spirv\"\n"
+                << "STAGE \"vertex\"\n"
+                << "WORDS 5\n"
+                << "SOURCE \"source.vert.spv\"\n"
+                << "END_SHADER\n";
+        }
+
+        assets::CachedArtifactSet
+            shader_cached;
+
+        shader_cached.importer_id =
+            "NEngine.Shader";
+
+        shader_cached.artifacts.push_back({
+            shader_source,
+            "source"
+        });
+
+        shader_cached.artifacts.push_back({
+            shader_descriptor,
+            "shader-descriptor"
+        });
+
+        const auto shader_guid =
+            assets::AssetGuid::generate();
+
+        const auto resolved_shader =
+            render::resolve_shader_asset(
+                shader_guid,
+                shader_cached,
+                &resolve_error);
+
+        check(
+            resolved_shader.has_value() &&
+            resolved_shader->guid ==
+                shader_guid &&
+            resolved_shader->metadata.stage ==
+                "vertex" &&
+            resolved_shader->spirv ==
+                std::vector<std::uint32_t>(
+                    shader_words.begin(),
+                    shader_words.end()),
+            "renderer resolves shader GUID into validated SPIR-V words");
+
+        {
+            std::ofstream output(
+                shader_descriptor,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output
+                << "NENGINE_SHADER 1\n"
+                << "FORMAT \"spirv\"\n"
+                << "STAGE \"vertex\"\n"
+                << "WORDS 6\n"
+                << "SOURCE \"source.vert.spv\"\n"
+                << "END_SHADER\n";
+        }
+
+        check(
+            !render::resolve_shader_asset(
+                shader_guid,
+                shader_cached,
+                &resolve_error).has_value(),
+            "renderer rejects shader descriptor/binary word-count mismatch");
 
         std::error_code cleanup_error;
         std::filesystem::remove_all(
