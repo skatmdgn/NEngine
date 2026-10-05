@@ -1,7 +1,7 @@
 # Current state
 
 Version: 0.3.0-dev
-Milestone: Asset database complete enough for renderer integration; Vulkan renderer foundation started.
+Milestone: Asset database is integrated with the first real Vulkan runtime/resource path.
 
 ## Verified baseline
 
@@ -14,7 +14,7 @@ The user previously verified the 0.2.6 Windows editor runtime:
 - Scene Save / Open round-trip works.
 - UTF-8 names including Korean display correctly.
 
-Newer 0.3 features are covered by Windows + Ubuntu CI, but still need another user-side Windows acceptance pass.
+Newer 0.3/0.4 work is continuously built and tested on Windows + Ubuntu CI. A fresh user-side Windows acceptance pass is still required after the Vulkan/editor changes.
 
 ## Core / Scene / Prefab
 
@@ -41,12 +41,12 @@ Implemented:
 - Hierarchy / Scene / Inspector / Assets / Console panes.
 - Resizable Hierarchy / Inspector / bottom splitters.
 - Persistent editor pane layout.
-- Structured Console model with severity, filtering model and duplicate collapse.
+- Structured Console model with severity and duplicate collapse.
 - Selection + command stack + Undo/Redo.
 - Undo-aware Scene dirty/savepoint tracking.
 - Dirty marker in editor title.
 - Play Mode cloned Runtime World.
-- Click selection in Scene View.
+- Scene View click selection.
 - X/Z translation gizmo drag committed as one command.
 - Generic reflection-driven Inspector presentation.
 - Generic property text editing for bool/int/uint/float/string/Vec3/Quaternion/EntityReference/AssetReference.
@@ -55,15 +55,17 @@ Implemented:
 - Project startup Scene load.
 - Asset double-click routing for Scene/script/external assets.
 - C# solution generation/open workflow.
+- Win32 Scene View attempts Vulkan window-context bootstrap.
+- Vulkan bootstrap success/failure is reported to Console without making Vulkan availability an editor-startup requirement.
 
-The Scene View still uses GDI as a diagnostic/editor surface. It is intentionally separate from the new render runtime contracts.
+The Scene View still uses GDI for its visible diagnostic object/gizmo drawing. Vulkan has a real swapchain/render-pass/present path underneath, but mesh drawing has not replaced the GDI presentation yet.
 
 ## Project / Asset database
 
 Implemented:
 - Persistent NEngine.nproject manifest.
-- Manifest validation including safe project-relative startup Scene path.
-- New-project bootstrap with Assets/Scenes, Assets/Scripts, ProjectSettings, Packages and Library/Cache.
+- Safe project-relative startup Scene validation.
+- Project bootstrap with Assets/Scenes, Assets/Scripts, ProjectSettings, Packages and Library/Cache.
 - Persistent startup Main.nscene.
 - Startup Scene contains native Camera and Light components.
 - GUID + .meta asset identity.
@@ -71,7 +73,7 @@ Implemented:
 - Polling file watcher.
 - Automatic rescan and reimport for changed files.
 - Import fingerprint/cache manifest.
-- Validated cache artifact lookup that rejects stale source/importer versions.
+- Validated cache artifact lookup rejecting stale source/importer versions.
 - Dependency graph forward/reverse edges.
 - Assets panel backed by AssetDatabase.
 - Scene/script/raw source staging.
@@ -80,11 +82,16 @@ Implemented:
 - Audio source staging + WAV metadata descriptor.
   - channels, sample rate, bits/sample, data bytes.
 - Model source staging + format/source-size descriptor.
+- SPIR-V shader import.
+  - .spv validation by size/magic.
+  - .vert.spv/.frag.spv stage hints.
+  - shader.nasset descriptor.
 - Automatic import feedback in Console.
 
 Not yet implemented:
-- Pixel decoding/transcoding and GPU texture upload.
+- Pixel decoding/transcoding.
 - Real mesh decoding/cooking (glTF/OBJ/FBX).
+- Shader source compilation (GLSL/HLSL -> SPIR-V).
 - Audio decode/stream runtime.
 - Dependency extraction from asset contents.
 
@@ -104,7 +111,9 @@ Not yet implemented:
 - managed component discovery.
 - debugger attach integration.
 
-## Renderer 0.4 foundation
+## Renderer 0.4
+
+### World/render data
 
 Implemented:
 - NEngineRender module.
@@ -114,31 +123,86 @@ Implemented:
 - Reflection metadata + Scene serialization codecs for render components.
 - Editor generic property accessors for render components.
 - RenderSnapshot extraction from active World objects.
-- RHI vocabulary/contracts for:
-  - backend selection
-  - opaque buffer/texture/pipeline handles
-  - buffer/texture/pipeline descriptors
-  - swapchain descriptor
-  - RenderDevice interface
-- Render component and Scene round-trip tests.
+- Hierarchy-resolved world matrices inside RenderSnapshot.
+- Column-major Mat4 math.
+- Affine inverse.
+- Perspective and orthographic Vulkan depth-range projections.
+- Camera world/view/projection/view-projection construction.
+- CPU MeshData contract.
+- Built-in unit Cube and Quad geometry with normals/UVs/bounds.
+
+### Imported render assets
+
+Implemented:
+- AssetGuid -> validated cached texture metadata resolution.
+- AssetGuid -> validated cached model metadata resolution.
+- AssetGuid -> shader descriptor + SPIR-V word resolution.
+- Descriptor/source consistency checks for shader word counts and SPIR-V magic.
+
+### Vulkan runtime bootstrap
+
+Implemented:
+- Vulkan dynamic loader.
+  - vulkan-1.dll on Windows.
+  - libvulkan.so.1 on POSIX.
+- Instance extension enumeration.
+- VkInstance creation/destruction.
+- Physical-device enumeration.
+- Graphics queue-family selection.
+- Optional presentation-surface support requirement.
+- Logical VkDevice + graphics queue creation/destruction.
+- Win32 VkSurfaceKHR creation/destruction.
+- Swapchain format/present-mode/extent selection.
+- VkSwapchainKHR creation and image enumeration.
+- Resize/recreate lifecycle through VulkanContext.
+- Swapchain image views.
+- Color-only render pass.
+- Per-swapchain-image framebuffers.
+- Command pool/buffers.
+- Acquire/semaphore/fence/submit/present frame synchronization.
+- Render-pass clear/present frame path.
+- Graceful diagnostic fallback when Vulkan/ICD/surface support is unavailable.
+
+### Vulkan GPU resources
+
+Implemented:
+- Vulkan buffer allocation/binding.
+- Physical-device memory-type selection.
+- Host-visible coherent buffer upload.
+- Device-local buffer initialization through a synchronous staging buffer and vkCmdCopyBuffer.
+- CPU MeshData -> device-local GPU vertex/index buffers.
+- SPIR-V VkShaderModule creation/destruction contract.
 
 Not yet implemented:
-- Vulkan instance/device/queues.
-- Windows Vulkan surface/swapchain.
-- command buffers/synchronization.
-- shader compilation/reflection.
-- GPU buffer/texture resource cache.
-- mesh/material binding.
-- camera matrices.
-- actual draw submission.
-- lighting/PBR/shadows/sprites.
+- Graphics pipeline/layout creation.
+- Vertex input binding/drawIndexed command path.
+- Depth image/depth attachment.
+- GPU texture image/image-view/sampler resources.
+- Material resource/binding model.
+- Shader source compiler and reflection.
+- Descriptor sets/uniform binding.
+- Actual mesh rendering in Scene/Game view.
+- PBR/lights/shadows/sprites.
 - Android Vulkan surface.
+
+## RHI boundary
+
+Implemented vocabulary/contracts:
+- backend selection.
+- opaque buffer/texture/pipeline handles.
+- buffer/texture/pipeline descriptors.
+- swapchain descriptor.
+- RenderDevice interface.
+
+The concrete Vulkan backend currently grows beneath this contract. The long-term public renderer should not expose raw Vulkan objects to gameplay/editor systems.
 
 ## Immediate next work
 
-1. Keep Windows + Ubuntu CI green for the 0.3/0.4 boundary.
-2. Add renderer-facing asset resolver from AssetGuid -> validated imported artifacts.
-3. Add CPU render resource models for imported texture/model descriptors.
-4. Implement Vulkan backend bootstrap and Windows surface/swapchain.
-5. Replace diagnostic Scene presentation progressively without coupling Editor interaction math to Vulkan.
-6. Return to .NET hosting only after the render/resource boundary is stable.
+1. Keep Windows + Ubuntu CI green after the buffer/mesh/render-pass changes.
+2. Add Vulkan graphics pipeline/layout creation from imported SPIR-V modules.
+3. Bind MeshVertex layout + VulkanMeshResource and issue the first indexed draw.
+4. Add depth target and per-frame camera uniform data.
+5. Add GPU texture resources and material binding.
+6. Replace GDI Scene presentation only after Vulkan can draw the existing diagnostic scene reliably.
+7. Add a shader compiler toolchain path rather than making glslang/DXC a hidden build dependency.
+8. Return to .NET hosting after the renderer/resource boundary is stable.
