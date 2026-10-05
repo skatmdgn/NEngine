@@ -91,11 +91,6 @@ using CreateDevice =
         const void*,
         void**);
 
-using GetDeviceProcAddr =
-    VulkanFunction (*)(
-        void*,
-        const char*);
-
 using GetDeviceQueue =
     void (*)(
         void*,
@@ -162,6 +157,10 @@ VulkanDevice::VulkanDevice(
           std::exchange(
               other.destroy_device_,
               nullptr)),
+      get_device_proc_addr_(
+          std::exchange(
+              other.get_device_proc_addr_,
+              nullptr)),
       diagnostic_(
           std::move(
               other.diagnostic_)) {}
@@ -198,6 +197,11 @@ VulkanDevice& VulkanDevice::operator=(
     destroy_device_ =
         std::exchange(
             other.destroy_device_,
+            nullptr);
+
+    get_device_proc_addr_ =
+        std::exchange(
+            other.get_device_proc_addr_,
             nullptr);
 
     diagnostic_ =
@@ -598,6 +602,9 @@ bool VulkanDevice::create(
             destroy_device_ =
                 destroy_device;
 
+            get_device_proc_addr_ =
+                get_device_proc_addr;
+
             diagnostic_ =
                 "Vulkan logical device created";
 
@@ -633,6 +640,23 @@ void VulkanDevice::destroy() noexcept {
     graphics_queue_family_ =
         0xFFFFFFFFu;
     destroy_device_ = nullptr;
+    get_device_proc_addr_ = nullptr;
+}
+
+VulkanLoader::Function
+VulkanDevice::get_proc_address(
+    const char* name) const noexcept {
+
+    if (!device_ ||
+        !get_device_proc_addr_ ||
+        !name ||
+        !*name) {
+        return nullptr;
+    }
+
+    return get_device_proc_addr_(
+        device_,
+        name);
 }
 
 } // namespace nengine::render
