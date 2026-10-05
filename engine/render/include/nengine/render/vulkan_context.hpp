@@ -7,6 +7,7 @@
 #include "nengine/render/vulkan_instance.hpp"
 #include "nengine/render/vulkan_loader.hpp"
 #include "nengine/render/vulkan_presenter.hpp"
+#include "nengine/render/vulkan_render_targets.hpp"
 #include "nengine/render/vulkan_surface.hpp"
 #include "nengine/render/vulkan_swapchain.hpp"
 
@@ -67,6 +68,10 @@ public:
         return swapchain_;
     }
 
+    const VulkanRenderTargets& render_targets() const noexcept {
+        return render_targets_;
+    }
+
     const std::string& diagnostic() const noexcept {
         return diagnostic_;
     }
@@ -77,6 +82,7 @@ private:
     VulkanSurface surface_{};
     VulkanDevice device_{};
     VulkanSwapchain swapchain_{};
+    VulkanRenderTargets render_targets_{};
     VulkanClearPresenter presenter_{};
     bool vsync_{true};
     std::string diagnostic_{};
