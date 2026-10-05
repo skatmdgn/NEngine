@@ -4,6 +4,8 @@
 
 #include "nengine/assets/builtin_processors.hpp"
 #include "nengine/core/scene.hpp"
+#include "nengine/render/components.hpp"
+#include "nengine/render/registration.hpp"
 #include <system_error>
 #include <utility>
 
@@ -215,6 +217,24 @@ bool ProjectSession::open(
             ->local_position =
             {0.0f, 4.0f, -8.0f};
 
+        default_world.add_component<
+            render::Camera>(
+                camera,
+                render::camera_type());
+
+        const auto light =
+            default_world.create(
+                "Directional Light");
+
+        default_world.transform(light)
+            ->local_rotation =
+            {0.35f, -0.2f, 0.0f, 0.91f};
+
+        default_world.add_component<
+            render::Light>(
+                light,
+                render::light_type());
+
         const auto cube =
             default_world.create(
                 "Cube");
@@ -231,12 +251,19 @@ bool ProjectSession::open(
             child,
             cube);
 
+        core::ComponentSerializationRegistry
+            bootstrap_serialization;
+
+        render::register_component_serializers(
+            bootstrap_serialization);
+
         const auto scene =
             core::SceneSerializer::capture(
                 default_world,
                 startup_scene
                     .stem()
-                    .string());
+                    .string(),
+                &bootstrap_serialization);
 
         if (!core::SceneSerializer::save_file(
                 scene,
