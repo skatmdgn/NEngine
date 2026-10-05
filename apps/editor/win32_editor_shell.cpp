@@ -233,6 +233,7 @@ struct Win32EditorShell::Impl {
     HWND parent{nullptr};
     HWND host{nullptr};
     bool controls_ready{false};
+    bool refreshing{false};
     int last_parent_width{-1};
     int last_parent_height{-1};
 
@@ -295,6 +296,9 @@ struct Win32EditorShell::Impl {
             return 0;
 
         case WM_COMMAND:
+            if (self->refreshing) {
+                return 0;
+            }
             if (self->controls_ready &&
                 self->on_command(LOWORD(wparam), HIWORD(wparam))) {
                 return 0;
@@ -809,15 +813,27 @@ struct Win32EditorShell::Impl {
     }
 
     void refresh() {
-        if (!controls_ready) return;
+        if (!controls_ready || refreshing) return;
 
+        refreshing = true;
+        shell_log("refresh begin");
+
+        shell_log("refresh toolbar");
         refresh_toolbar();
+
+        shell_log("refresh hierarchy");
         refresh_hierarchy();
+
+        shell_log("refresh inspector");
         refresh_inspector();
 
+        shell_log("refresh scene invalidate");
         if (scene) {
             InvalidateRect(scene, nullptr, TRUE);
         }
+
+        shell_log("refresh complete");
+        refreshing = false;
     }
 
     void refresh_toolbar() {
@@ -1038,64 +1054,67 @@ struct Win32EditorShell::Impl {
     }
 
     bool on_command(int id, int notification) {
+        bool handled = false;
+
         switch (id) {
         case IdOpen:
-            if (notification == BN_CLICKED) {
-                open_scene_file();
-            }
+            if (notification != BN_CLICKED) return false;
+            open_scene_file();
+            handled = true;
             break;
 
         case IdSave:
-            if (notification == BN_CLICKED) {
-                save_scene_file(false);
-            }
+            if (notification != BN_CLICKED) return false;
+            save_scene_file(false);
+            handled = true;
             break;
 
         case IdUndo:
-            if (notification == BN_CLICKED) {
-                editor.commands().undo(editor.world());
-            }
+            if (notification != BN_CLICKED) return false;
+            editor.commands().undo(editor.world());
+            handled = true;
             break;
 
         case IdRedo:
-            if (notification == BN_CLICKED) {
-                editor.commands().redo(editor.world());
-            }
+            if (notification != BN_CLICKED) return false;
+            editor.commands().redo(editor.world());
+            handled = true;
             break;
 
         case IdPlay:
-            if (notification == BN_CLICKED) {
-                editor.play_session().play(editor.world());
-            }
+            if (notification != BN_CLICKED) return false;
+            editor.play_session().play(editor.world());
+            handled = true;
             break;
 
         case IdStop:
-            if (notification == BN_CLICKED) {
-                editor.play_session().stop();
-            }
+            if (notification != BN_CLICKED) return false;
+            editor.play_session().stop();
+            handled = true;
             break;
 
         case IdPause:
-            if (notification == BN_CLICKED) {
-                if (editor.play_session().state() ==
-                    nengine::editor::PlayState::Playing) {
-                    editor.play_session().pause();
-                } else if (
-                    editor.play_session().state() ==
-                    nengine::editor::PlayState::Paused) {
-                    editor.play_session().resume();
-                }
+            if (notification != BN_CLICKED) return false;
+            if (editor.play_session().state() ==
+                nengine::editor::PlayState::Playing) {
+                editor.play_session().pause();
+            } else if (
+                editor.play_session().state() ==
+                nengine::editor::PlayState::Paused) {
+                editor.play_session().resume();
             }
+            handled = true;
             break;
 
         case IdStep:
-            if (notification == BN_CLICKED) {
-                editor.play_session().step();
-            }
+            if (notification != BN_CLICKED) return false;
+            editor.play_session().step();
+            handled = true;
             break;
 
         case IdHierarchy:
-            if (notification == LBN_SELCHANGE) {
+            if (notification != LBN_SELCHANGE) return false;
+            {
                 const int index =
                     static_cast<int>(
                         SendMessageW(
@@ -1113,12 +1132,12 @@ struct Win32EditorShell::Impl {
                             .entity);
                 }
             }
+            handled = true;
             break;
 
         case IdName:
-            if (notification == EN_KILLFOCUS &&
-                editor.can_edit()) {
-
+            if (notification != EN_KILLFOCUS) return false;
+            if (editor.can_edit()) {
                 const auto entity =
                     editor.selection().active();
 
@@ -1138,12 +1157,12 @@ struct Win32EditorShell::Impl {
                                     value));
                 }
             }
+            handled = true;
             break;
 
         case IdActive:
-            if (notification == BN_CLICKED &&
-                editor.can_edit()) {
-
+            if (notification != BN_CLICKED) return false;
+            if (editor.can_edit()) {
                 const auto entity =
                     editor.selection().active();
 
@@ -1162,15 +1181,20 @@ struct Win32EditorShell::Impl {
                                 entity,
                                 value));
             }
+            handled = true;
             break;
 
         case IdApplyTransform:
-            if (notification == BN_CLICKED) {
-                apply_transform_edit();
-            }
+            if (notification != BN_CLICKED) return false;
+            apply_transform_edit();
+            handled = true;
             break;
 
         default:
+            return false;
+        }
+
+        if (!handled) {
             return false;
         }
 
