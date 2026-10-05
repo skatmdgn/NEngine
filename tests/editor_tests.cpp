@@ -5,6 +5,7 @@
 
 #include "nengine/editor/editor_model.hpp"
 #include "nengine/editor/presentation.hpp"
+#include "nengine/editor/scene_interaction.hpp"
 
 namespace {
 int failures = 0;
@@ -47,6 +48,85 @@ int main() {
     moved.local_position = {4.0f, 5.0f, 6.0f};
     check(model.commands().execute(world, std::make_unique<editor::SetTransformCommand>(child, moved)), "transform command executes");
     check(world.transform(child)->local_position == core::Vec3{4.0f, 5.0f, 6.0f}, "transform command changes value");
+
+    const auto root_screen =
+        editor::scene_entity_to_screen(
+            world,
+            root,
+            800.0f,
+            600.0f);
+
+    check(
+        root_screen.x == 400.0f &&
+        root_screen.y == 300.0f,
+        "scene projection centers root at origin");
+
+    const auto child_screen =
+        editor::scene_entity_to_screen(
+            world,
+            child,
+            800.0f,
+            600.0f);
+
+    check(
+        child_screen.x == 500.0f &&
+        child_screen.y == 150.0f,
+        "scene projection includes parent and child positions");
+
+    check(
+        editor::pick_scene_entity(
+            world,
+            501.0f,
+            151.0f,
+            800.0f,
+            600.0f) == child,
+        "scene picking selects nearest projected entity");
+
+    check(
+        editor::hit_test_translate_gizmo(
+            world,
+            child,
+            child_screen.x + 30.0f,
+            child_screen.y,
+            800.0f,
+            600.0f) ==
+            editor::SceneGizmoAxis::X,
+        "scene gizmo detects X axis");
+
+    check(
+        editor::hit_test_translate_gizmo(
+            world,
+            child,
+            child_screen.x,
+            child_screen.y - 30.0f,
+            800.0f,
+            600.0f) ==
+            editor::SceneGizmoAxis::Z,
+        "scene gizmo detects Z axis");
+
+    const auto dragged_x =
+        editor::translated_local_position_from_drag(
+            world.transform(child)->local_position,
+            editor::SceneGizmoAxis::X,
+            50.0f,
+            0.0f);
+
+    check(
+        dragged_x ==
+            core::Vec3{6.0f, 5.0f, 6.0f},
+        "X gizmo drag converts screen delta to local position");
+
+    const auto dragged_z =
+        editor::translated_local_position_from_drag(
+            world.transform(child)->local_position,
+            editor::SceneGizmoAxis::Z,
+            0.0f,
+            -50.0f);
+
+    check(
+        dragged_z ==
+            core::Vec3{4.0f, 5.0f, 8.0f},
+        "Z gizmo drag converts upward screen motion to positive Z");
 
     const auto hierarchy = editor::build_hierarchy(model);
     check(hierarchy.size() == 2, "hierarchy view includes all world objects");
