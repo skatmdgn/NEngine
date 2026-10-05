@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -11,6 +12,7 @@
 #include "nengine/core/world.hpp"
 #include "nengine/render/asset_resources.hpp"
 #include "nengine/render/components.hpp"
+#include "nengine/render/matrix.hpp"
 #include "nengine/render/mesh_data.hpp"
 #include "nengine/render/registration.hpp"
 #include "nengine/render/render_snapshot.hpp"
@@ -471,6 +473,143 @@ int main() {
 
             (void)extensions;
         }
+    }
+
+    {
+        core::World matrix_world;
+
+        const auto parent =
+            matrix_world.create("Parent");
+
+        const auto child =
+            matrix_world.create("Child");
+
+        matrix_world.transform(parent)
+            ->local_position =
+            {10.0f, 0.0f, 0.0f};
+
+        matrix_world.transform(child)
+            ->local_position =
+            {2.0f, 3.0f, 4.0f};
+
+        matrix_world.set_parent(
+            child,
+            parent);
+
+        const auto child_world =
+            render::world_matrix(
+                matrix_world,
+                child);
+
+        const auto world_origin =
+            render::transform_point(
+                child_world,
+                {0.0f, 0.0f, 0.0f});
+
+        check(
+            world_origin ==
+                core::Vec3{
+                    12.0f,
+                    3.0f,
+                    4.0f},
+            "renderer world matrix composes parent and child transforms");
+
+        const auto inverse =
+            render::inverse_affine(
+                child_world);
+
+        check(
+            inverse.has_value(),
+            "renderer affine world matrix is invertible");
+
+        if (inverse) {
+            const auto local_origin =
+                render::transform_point(
+                    *inverse,
+                    world_origin);
+
+            check(
+                std::fabs(
+                    local_origin.x) <
+                        1.0e-5f &&
+                std::fabs(
+                    local_origin.y) <
+                        1.0e-5f &&
+                std::fabs(
+                    local_origin.z) <
+                        1.0e-5f,
+                "renderer affine inverse returns world point to local origin");
+        }
+
+        const auto camera_entity =
+            matrix_world.create(
+                "Matrix Camera");
+
+        matrix_world.transform(
+            camera_entity)
+            ->local_position =
+            {0.0f, 0.0f, -8.0f};
+
+        auto* matrix_camera =
+            matrix_world.add_component<
+                render::Camera>(
+                    camera_entity,
+                    render::camera_type());
+
+        check(
+            matrix_camera != nullptr,
+            "matrix test Camera attaches");
+
+        const auto matrices =
+            render::build_camera_matrices(
+                matrix_world,
+                camera_entity,
+                16.0f / 9.0f);
+
+        check(
+            matrices.has_value(),
+            "Camera view/projection matrices build");
+
+        if (matrices) {
+            const auto view_origin =
+                render::transform_point(
+                    matrices->view,
+                    {0.0f, 0.0f, 0.0f});
+
+            check(
+                std::fabs(
+                    view_origin.z -
+                    8.0f) <
+                    1.0e-5f,
+                "identity Camera at negative Z sees origin at positive view Z");
+        }
+
+        const auto projection =
+            render::perspective_lh_zo(
+                60.0f,
+                1.0f,
+                0.1f,
+                100.0f);
+
+        const auto near_point =
+            render::transform_point(
+                projection,
+                {0.0f, 0.0f, 0.1f});
+
+        const auto far_point =
+            render::transform_point(
+                projection,
+                {0.0f, 0.0f, 100.0f});
+
+        check(
+            std::fabs(
+                near_point.z) <
+                1.0e-4f &&
+            std::fabs(
+                far_point.z -
+                1.0f) <
+                1.0e-4f,
+            "Vulkan LH projection maps near/far depth to 0..1");
     }
 
     {
