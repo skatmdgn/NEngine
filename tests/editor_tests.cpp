@@ -75,6 +75,39 @@ int main() {
         model.project().manifest().target_android,
         "project manifest enables agreed Windows and Android targets");
 
+    model.layout().hierarchy_width = 310;
+    model.layout().inspector_width = 360;
+    model.layout().bottom_height = 190;
+
+    const auto layout_path =
+        project_root /
+        "ProjectSettings" /
+        "EditorLayout.layout";
+
+    std::string layout_error;
+
+    check(
+        editor::EditorLayoutSerializer::save(
+            model.layout(),
+            layout_path,
+            &layout_error),
+        "editor layout saves");
+
+    editor::EditorLayoutState loaded_layout;
+
+    check(
+        editor::EditorLayoutSerializer::load(
+            layout_path,
+            loaded_layout,
+            &layout_error),
+        "editor layout loads");
+
+    check(
+        loaded_layout.hierarchy_width == 310 &&
+        loaded_layout.inspector_width == 360 &&
+        loaded_layout.bottom_height == 190,
+        "editor layout roundtrip preserves pane sizes");
+
     {
         std::ofstream asset(
             project_root / "Assets" / "Scripts" / "Player.cs",
