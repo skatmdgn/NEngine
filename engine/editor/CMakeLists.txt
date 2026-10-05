@@ -3,6 +3,7 @@ add_library(NEngineEditorModel STATIC
   src/editor_model.cpp
   src/play_session.cpp
   src/presentation.cpp
+  src/scene_interaction.cpp
 )
 
 target_include_directories(NEngineEditorModel
