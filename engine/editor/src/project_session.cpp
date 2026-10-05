@@ -408,6 +408,27 @@ AssetImportSummary ProjectSession::import_supported_assets() {
     return summary;
 }
 
+std::optional<assets::CachedArtifactSet>
+ProjectSession::cached_artifacts(
+    assets::AssetGuid guid) const {
+
+    if (!open_) {
+        return std::nullopt;
+    }
+
+    const auto* record =
+        assets_.find(guid);
+
+    if (!record) {
+        return std::nullopt;
+    }
+
+    return import_pipeline_.cached_artifacts(
+        *record,
+        importers_,
+        root_ / "Library" / "Cache");
+}
+
 AssetActivation ProjectSession::activation_for(
     assets::AssetGuid guid) const {
 
