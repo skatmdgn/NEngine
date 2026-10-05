@@ -2,6 +2,7 @@
 
 #include <fstream>
 
+#include "nengine/assets/builtin_processors.hpp"
 #include "nengine/core/scene.hpp"
 #include <system_error>
 #include <utility>
@@ -21,15 +22,15 @@ ProjectSession::ProjectSession() {
 
     import_pipeline_.register_processor(
         "NEngine.Texture",
-        assets::copy_source_importer);
+        assets::texture_source_importer);
 
     import_pipeline_.register_processor(
         "NEngine.Model",
-        assets::copy_source_importer);
+        assets::model_source_importer);
 
     import_pipeline_.register_processor(
         "NEngine.Audio",
-        assets::copy_source_importer);
+        assets::audio_source_importer);
 
     import_pipeline_.register_processor(
         "NEngine.Raw",
