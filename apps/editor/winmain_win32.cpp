@@ -10,6 +10,7 @@
 #include <string_view>
 #include <thread>
 
+#include "nengine/core/scene.hpp"
 #include "nengine/editor/editor_model.hpp"
 #include "nengine/platform/window.hpp"
 #include "win32_editor_shell.hpp"
