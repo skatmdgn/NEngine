@@ -84,9 +84,20 @@ bool VulkanContext::initialize_for_window(
         return false;
     }
 
-    if (!presenter_.initialize(
+    if (!render_targets_.create(
             device_,
             swapchain_)) {
+
+        diagnostic_ =
+            render_targets_.diagnostic();
+        shutdown();
+        return false;
+    }
+
+    if (!presenter_.initialize(
+            device_,
+            swapchain_,
+            render_targets_)) {
 
         diagnostic_ =
             presenter_.diagnostic();
@@ -114,6 +125,7 @@ bool VulkanContext::resize(
     }
 
     presenter_.shutdown();
+    render_targets_.destroy();
 
     if (width == 0 ||
         height == 0) {
@@ -140,12 +152,24 @@ bool VulkanContext::resize(
         return false;
     }
 
-    if (!presenter_.initialize(
+    if (!render_targets_.create(
             device_,
             swapchain_)) {
 
         diagnostic_ =
+            render_targets_.diagnostic();
+        swapchain_.destroy();
+        return false;
+    }
+
+    if (!presenter_.initialize(
+            device_,
+            swapchain_,
+            render_targets_)) {
+
+        diagnostic_ =
             presenter_.diagnostic();
+        render_targets_.destroy();
         swapchain_.destroy();
         return false;
     }
@@ -186,6 +210,7 @@ bool VulkanContext::present_clear(
 
 void VulkanContext::shutdown() noexcept {
     presenter_.shutdown();
+    render_targets_.destroy();
     swapchain_.destroy();
     device_.destroy();
     surface_.destroy();
