@@ -17,6 +17,7 @@
 #include "nengine/render/registration.hpp"
 #include "nengine/render/render_snapshot.hpp"
 #include "nengine/render/rhi.hpp"
+#include "nengine/render/vulkan_buffer.hpp"
 #include "nengine/render/vulkan_loader.hpp"
 #include "nengine/render/vulkan_device.hpp"
 #include "nengine/render/vulkan_instance.hpp"
@@ -687,6 +688,22 @@ int main() {
                     0.5f,
                     0.0f},
             "built-in quad mesh topology and bounds are valid");
+    }
+
+    {
+        render::VulkanBufferResource buffer;
+
+        check(
+            !buffer.valid(),
+            "default Vulkan buffer resource is invalid");
+
+        check(
+            !buffer.upload(
+                "x",
+                1,
+                0) &&
+            !buffer.diagnostic().empty(),
+            "uninitialized Vulkan buffer upload fails diagnostically");
     }
 
     {
