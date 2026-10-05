@@ -7,6 +7,7 @@
 #include <sstream>
 #include <string>
 
+#include "nengine/core/scene.hpp"
 #include "nengine/editor/editor_model.hpp"
 #include "nengine/editor/presentation.hpp"
 #include "nengine/editor/property_command.hpp"
