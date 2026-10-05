@@ -338,4 +338,42 @@ AssetImportSummary ProjectSession::import_supported_assets() {
     return summary;
 }
 
+AssetActivation ProjectSession::activation_for(
+    assets::AssetGuid guid) const {
+
+    AssetActivation activation;
+    activation.guid = guid;
+
+    if (!open_) {
+        return activation;
+    }
+
+    const auto* record =
+        assets_.find(guid);
+
+    if (!record) {
+        return activation;
+    }
+
+    activation.source_path =
+        record->source_path;
+
+    if (record->importer_id ==
+        "NEngine.Scene") {
+        activation.kind =
+            AssetActivationKind::OpenScene;
+    } else if (
+        record->importer_id ==
+        "NEngine.Script") {
+        activation.kind =
+            AssetActivationKind::OpenScript;
+    } else {
+        activation.kind =
+            AssetActivationKind::OpenExternal;
+    }
+
+    return activation;
+}
+
+
 } // namespace nengine::editor
