@@ -77,6 +77,13 @@ using GetPhysicalDeviceQueueFamilyProperties =
         std::uint32_t*,
         VkQueueFamilyProperties*);
 
+using GetPhysicalDeviceSurfaceSupport =
+    VkResult (*)(
+        void*,
+        std::uint32_t,
+        void*,
+        std::uint32_t*);
+
 using CreateDevice =
     VkResult (*)(
         void*,
@@ -299,7 +306,8 @@ bool VulkanDevice::create(
     const VulkanLoader& loader,
     const VulkanInstance& instance,
     const std::vector<std::string>&
-        required_extensions) {
+        required_extensions,
+    void* presentation_surface) {
 
     destroy();
     diagnostic_.clear();
@@ -326,6 +334,15 @@ bool VulkanDevice::create(
                     instance.native_handle(),
                     "vkGetPhysicalDeviceQueueFamilyProperties"));
 
+    const auto surface_support =
+        presentation_surface
+            ? reinterpret_cast<
+                GetPhysicalDeviceSurfaceSupport>(
+                    loader.get_instance_proc_address(
+                        instance.native_handle(),
+                        "vkGetPhysicalDeviceSurfaceSupportKHR"))
+            : nullptr;
+
     const auto create_device =
         reinterpret_cast<CreateDevice>(
             loader.get_instance_proc_address(
@@ -341,7 +358,9 @@ bool VulkanDevice::create(
     if (!enumerate_devices ||
         !queue_properties ||
         !create_device ||
-        !get_device_proc_addr) {
+        !get_device_proc_addr ||
+        (presentation_surface &&
+         !surface_support)) {
 
         diagnostic_ =
             "required Vulkan device bootstrap functions are unavailable";
@@ -422,6 +441,22 @@ bool VulkanDevice::create(
                 (queues[family].queueFlags &
                  VK_QUEUE_GRAPHICS_BIT) == 0) {
                 continue;
+            }
+
+            if (presentation_surface) {
+                std::uint32_t supported = 0;
+
+                const auto surface_status =
+                    surface_support(
+                        candidate,
+                        family,
+                        presentation_surface,
+                        &supported);
+
+                if (surface_status != VK_SUCCESS ||
+                    supported == 0) {
+                    continue;
+                }
             }
 
             std::string extension_error;
@@ -570,10 +605,15 @@ bool VulkanDevice::create(
         }
     }
 
-    diagnostic_ =
-        required_extensions.empty()
-            ? "no physical device with a graphics queue could be created"
-            : "no physical device satisfies graphics queue and required extensions";
+    if (presentation_surface) {
+        diagnostic_ =
+            "no physical device satisfies graphics presentation and required extensions";
+    } else {
+        diagnostic_ =
+            required_extensions.empty()
+                ? "no physical device with a graphics queue could be created"
+                : "no physical device satisfies graphics queue and required extensions";
+    }
 
     return false;
 }
