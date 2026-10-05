@@ -8,6 +8,7 @@ add_library(NEngineRender STATIC
   src/vulkan_buffer.cpp
   src/vulkan_context.cpp
   src/vulkan_device.cpp
+  src/vulkan_diagnostic_scene.cpp
   src/vulkan_instance.cpp
   src/vulkan_mesh.cpp
   src/vulkan_pipeline.cpp
