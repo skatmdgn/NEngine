@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -37,6 +38,46 @@ public:
 private:
     std::vector<std::unique_ptr<EditorCommand>> history_{};
     std::size_t cursor_{0};
+};
+
+class CreateEntityCommand final : public EditorCommand {
+public:
+    explicit CreateEntityCommand(
+        std::string name = "GameObject",
+        core::Entity parent = core::Entity::invalid())
+        : object_name_(std::move(name)),
+          parent_(parent) {}
+
+    bool execute(core::World& world) override;
+    void undo(core::World& world) override;
+    std::string_view name() const noexcept override {
+        return "Create Entity";
+    }
+
+    core::Entity created_entity() const noexcept {
+        return created_;
+    }
+
+private:
+    std::string object_name_{};
+    core::Entity parent_{core::Entity::invalid()};
+    core::Entity created_{core::Entity::invalid()};
+};
+
+class DeleteEntityCommand final : public EditorCommand {
+public:
+    explicit DeleteEntityCommand(core::Entity entity)
+        : entity_(entity) {}
+
+    bool execute(core::World& world) override;
+    void undo(core::World& world) override;
+    std::string_view name() const noexcept override {
+        return "Delete Entity";
+    }
+
+private:
+    core::Entity entity_{core::Entity::invalid()};
+    std::optional<core::World> before_{};
 };
 
 class RenameEntityCommand final : public EditorCommand {
