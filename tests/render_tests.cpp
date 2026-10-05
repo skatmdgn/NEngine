@@ -33,6 +33,7 @@
 #include "nengine/render/vulkan_render_pass.hpp"
 #include "nengine/render/vulkan_shader.hpp"
 #include "nengine/render/vulkan_texture.hpp"
+#include "nengine/render/vulkan_texture_asset_cache.hpp"
 
 namespace {
 int failures = 0;
@@ -890,6 +891,62 @@ int main() {
                             gpu_texture.native_sampler() != nullptr,
                             "Vulkan RGBA8 texture stages pixels and creates sampled image/view/sampler");
 
+                        render::VulkanTextureAssetCache
+                            gpu_texture_cache;
+
+                        check(
+                            gpu_texture_cache.initialize(
+                                loader,
+                                instance,
+                                device),
+                            "Vulkan texture asset cache initializes for headless device");
+
+                        render::DecodedTextureData
+                            decoded_asset_texture;
+
+                        decoded_asset_texture.width = 2u;
+                        decoded_asset_texture.height = 2u;
+                        decoded_asset_texture.color_space =
+                            render::DecodedTextureColorSpace::Linear;
+                        decoded_asset_texture.rgba8.assign(
+                            std::begin(texture_pixels),
+                            std::end(texture_pixels));
+
+                        const auto gpu_asset_guid =
+                            assets::AssetGuid::generate();
+
+                        std::string gpu_asset_error;
+
+                        const auto* gpu_asset =
+                            gpu_texture_cache.upload(
+                                gpu_asset_guid,
+                                "gpu-v1",
+                                decoded_asset_texture,
+                                &gpu_asset_error);
+
+                        check(
+                            gpu_asset &&
+                            gpu_asset->valid() &&
+                            gpu_asset->texture.width() == 2u &&
+                            gpu_asset->texture.height() == 2u &&
+                            gpu_texture_cache.find(
+                                gpu_asset_guid) ==
+                                gpu_asset &&
+                            gpu_texture_cache.size() == 1u,
+                            "decoded AssetGuid texture uploads into per-device Vulkan texture/material cache");
+
+                        const auto* gpu_asset_again =
+                            gpu_texture_cache.upload(
+                                gpu_asset_guid,
+                                "gpu-v1",
+                                decoded_asset_texture,
+                                &gpu_asset_error);
+
+                        check(
+                            gpu_asset_again == gpu_asset &&
+                            gpu_texture_cache.size() == 1u,
+                            "Vulkan texture asset cache reuses matching fingerprint");
+
                         render::VulkanMaterialResource
                             gpu_material;
 
@@ -1054,6 +1111,7 @@ int main() {
                         diagnostic_vertex.destroy();
                         gpu_cube.destroy();
                         gpu_material.destroy();
+                        gpu_texture_cache.shutdown();
                         gpu_texture.destroy();
                         device_buffer.destroy();
                         host_buffer.destroy();
