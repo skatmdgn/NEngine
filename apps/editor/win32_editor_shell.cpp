@@ -887,6 +887,25 @@ struct Win32EditorShell::Impl {
                     }
                 }
 
+                if (result.imports.attempted != 0 ||
+                    result.imports.unsupported != 0) {
+                    editor.console().info(
+                        "Assets",
+                        "Auto-import: " +
+                            std::to_string(
+                                result.imports.imported) +
+                            " imported, " +
+                            std::to_string(
+                                result.imports.cache_hits) +
+                            " cache hit(s), " +
+                            std::to_string(
+                                result.imports.failed) +
+                            " failed, " +
+                            std::to_string(
+                                result.imports.unsupported) +
+                            " unsupported.");
+                }
+
                 refresh_assets_panel();
                 refresh_console();
             }
@@ -1892,6 +1911,49 @@ struct Win32EditorShell::Impl {
                     value));
     }
 
+    bool open_external_path(
+        const std::filesystem::path& path,
+        std::string_view source_label) {
+
+        const auto native =
+            path.wstring();
+
+        const HINSTANCE launched =
+            ShellExecuteW(
+                host,
+                L"open",
+                native.c_str(),
+                nullptr,
+                editor.project().is_open()
+                    ? editor.project().root()
+                        .wstring().c_str()
+                    : nullptr,
+                SW_SHOWNORMAL);
+
+        const auto result =
+            reinterpret_cast<INT_PTR>(
+                launched);
+
+        if (result <= 32) {
+            editor.console().warning(
+                std::string{source_label},
+                "Windows could not open: " +
+                    wide_to_utf8(
+                        path.wstring()));
+            refresh_console();
+            return false;
+        }
+
+        editor.console().info(
+            std::string{source_label},
+            "Opened " +
+                wide_to_utf8(
+                    path.wstring()));
+
+        refresh_console();
+        return true;
+    }
+
     bool generate_and_open_scripts() {
         if (!editor.project().is_open()) {
             editor.console().warning(
@@ -2075,6 +2137,10 @@ struct Win32EditorShell::Impl {
                 const auto scan =
                     editor.project().refresh_assets();
 
+                const auto imports =
+                    editor.project()
+                        .import_supported_assets();
+
                 editor.console().info(
                     "Assets",
                     "Asset refresh complete: " +
@@ -2082,7 +2148,16 @@ struct Win32EditorShell::Impl {
                             editor.project()
                                 .assets()
                                 .size()) +
-                        " asset(s).");
+                        " asset(s); " +
+                        std::to_string(
+                            imports.imported) +
+                        " imported, " +
+                        std::to_string(
+                            imports.cache_hits) +
+                        " cache hit(s), " +
+                        std::to_string(
+                            imports.failed) +
+                        " failed.");
 
                 for (const auto& message :
                      scan.messages) {
@@ -2211,20 +2286,40 @@ struct Win32EditorShell::Impl {
                             static_cast<std::size_t>(
                                 index)];
 
-                    if (asset.source_path.extension() ==
-                        ".nscene") {
+                    const auto activation =
+                        editor.project()
+                            .activation_for(
+                                asset.guid);
+
+                    switch (activation.kind) {
+                    case nengine::editor::
+                        AssetActivationKind::OpenScene:
                         load_scene_path(
-                            asset.source_path);
-                    } else {
-                        editor.console().info(
+                            activation.source_path);
+                        break;
+
+                    case nengine::editor::
+                        AssetActivationKind::OpenScript:
+                        if (!open_external_path(
+                                activation.source_path,
+                                "Scripting")) {
+                            generate_and_open_scripts();
+                        }
+                        break;
+
+                    case nengine::editor::
+                        AssetActivationKind::OpenExternal:
+                        open_external_path(
+                            activation.source_path,
+                            "Assets");
+                        break;
+
+                    case nengine::editor::
+                        AssetActivationKind::None:
+                        editor.console().warning(
                             "Assets",
-                            "Selected " +
-                                wide_to_utf8(
-                                    asset.relative_path
-                                        .wstring()) +
-                                " [" +
-                                asset.importer_id +
-                                "]");
+                            "Asset activation is unavailable.");
+                        break;
                     }
                 }
             }
