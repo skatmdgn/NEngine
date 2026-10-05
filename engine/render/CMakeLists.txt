@@ -20,6 +20,7 @@ add_library(NEngineRender STATIC
   src/vulkan_render_targets.cpp
   src/vulkan_shader.cpp
   src/vulkan_swapchain.cpp
+  src/vulkan_texture.cpp
 )
 
 if(WIN32)
