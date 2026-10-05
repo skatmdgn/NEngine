@@ -20,6 +20,7 @@
 #include "nengine/core/scene.hpp"
 #include "nengine/editor/command.hpp"
 #include "nengine/editor/presentation.hpp"
+#include "nengine/editor/scene_interaction.hpp"
 
 namespace nengine::app {
 namespace {
@@ -266,6 +267,15 @@ struct Win32EditorShell::Impl {
     std::vector<nengine::editor::HierarchyRow> hierarchy_rows{};
     std::filesystem::path current_scene_path{};
 
+    bool scene_dragging{false};
+    nengine::editor::SceneGizmoAxis scene_drag_axis{
+        nengine::editor::SceneGizmoAxis::None};
+    nengine::core::Entity scene_drag_entity{
+        nengine::core::Entity::invalid()};
+    nengine::core::Transform scene_drag_original{};
+    int scene_drag_start_x{0};
+    int scene_drag_start_y{0};
+
     static LRESULT CALLBACK host_proc(
         HWND hwnd,
         UINT message,
@@ -341,7 +351,39 @@ struct Win32EditorShell::Impl {
         switch (message) {
         case WM_LBUTTONDOWN:
             SetFocus(hwnd);
+            self->begin_scene_pointer(
+                hwnd,
+                static_cast<int>(
+                    static_cast<short>(LOWORD(lparam))),
+                static_cast<int>(
+                    static_cast<short>(HIWORD(lparam))));
             return 0;
+
+        case WM_MOUSEMOVE:
+            if (self->scene_dragging) {
+                self->update_scene_drag(
+                    static_cast<int>(
+                        static_cast<short>(LOWORD(lparam))),
+                    static_cast<int>(
+                        static_cast<short>(HIWORD(lparam))));
+                return 0;
+            }
+            break;
+
+        case WM_LBUTTONUP:
+            if (self->scene_dragging) {
+                self->end_scene_drag();
+                return 0;
+            }
+            break;
+
+        case WM_CAPTURECHANGED:
+            if (self->scene_dragging &&
+                reinterpret_cast<HWND>(lparam) != hwnd) {
+                self->cancel_scene_drag();
+                return 0;
+            }
+            break;
 
         case WM_PAINT: {
             PAINTSTRUCT paint{};
@@ -1203,6 +1245,187 @@ struct Win32EditorShell::Impl {
         return true;
     }
 
+    void begin_scene_pointer(
+        HWND hwnd,
+        int x,
+        int y) {
+
+        RECT rect{};
+        if (!GetClientRect(hwnd, &rect)) return;
+
+        const float width =
+            static_cast<float>(
+                rect.right - rect.left);
+
+        const float height =
+            static_cast<float>(
+                rect.bottom - rect.top);
+
+        const auto selected =
+            editor.selection().active();
+
+        if (editor.can_edit() &&
+            editor.world().is_alive(selected)) {
+
+            const auto axis =
+                nengine::editor::
+                    hit_test_translate_gizmo(
+                        editor.world(),
+                        selected,
+                        static_cast<float>(x),
+                        static_cast<float>(y),
+                        width,
+                        height);
+
+            if (axis !=
+                nengine::editor::
+                    SceneGizmoAxis::None) {
+
+                const auto* transform =
+                    editor.world().transform(
+                        selected);
+
+                if (transform) {
+                    scene_dragging = true;
+                    scene_drag_axis = axis;
+                    scene_drag_entity = selected;
+                    scene_drag_original =
+                        *transform;
+                    scene_drag_start_x = x;
+                    scene_drag_start_y = y;
+
+                    SetCapture(hwnd);
+                    return;
+                }
+            }
+        }
+
+        const auto picked =
+            nengine::editor::pick_scene_entity(
+                editor.presentation_world(),
+                static_cast<float>(x),
+                static_cast<float>(y),
+                width,
+                height);
+
+        if (picked.valid()) {
+            editor.selection().set(picked);
+        } else {
+            editor.selection().clear();
+        }
+
+        refresh();
+    }
+
+    void update_scene_drag(
+        int x,
+        int y) {
+
+        if (!scene_dragging ||
+            !editor.can_edit() ||
+            !editor.world().is_alive(
+                scene_drag_entity)) {
+            return;
+        }
+
+        auto* transform =
+            editor.world().transform(
+                scene_drag_entity);
+
+        if (!transform) return;
+
+        auto preview =
+            scene_drag_original;
+
+        preview.local_position =
+            nengine::editor::
+                translated_local_position_from_drag(
+                    scene_drag_original
+                        .local_position,
+                    scene_drag_axis,
+                    static_cast<float>(
+                        x - scene_drag_start_x),
+                    static_cast<float>(
+                        y - scene_drag_start_y));
+
+        *transform = preview;
+
+        if (!refreshing) {
+            refreshing = true;
+            refresh_inspector();
+            refreshing = false;
+        }
+
+        if (scene) {
+            InvalidateRect(
+                scene,
+                nullptr,
+                FALSE);
+        }
+    }
+
+    void end_scene_drag() {
+        if (!scene_dragging) return;
+
+        ReleaseCapture();
+
+        auto* transform =
+            editor.world().transform(
+                scene_drag_entity);
+
+        if (transform) {
+            const auto final_value =
+                *transform;
+
+            const bool changed =
+                final_value.local_position !=
+                scene_drag_original
+                    .local_position;
+
+            *transform =
+                scene_drag_original;
+
+            if (changed) {
+                editor.commands().execute(
+                    editor.world(),
+                    std::make_unique<
+                        nengine::editor::
+                            SetTransformCommand>(
+                                scene_drag_entity,
+                                final_value));
+            }
+        }
+
+        scene_dragging = false;
+        scene_drag_axis =
+            nengine::editor::
+                SceneGizmoAxis::None;
+        scene_drag_entity =
+            nengine::core::Entity::invalid();
+
+        refresh();
+    }
+
+    void cancel_scene_drag() {
+        if (!scene_dragging) return;
+
+        if (auto* transform =
+                editor.world().transform(
+                    scene_drag_entity)) {
+            *transform =
+                scene_drag_original;
+        }
+
+        scene_dragging = false;
+        scene_drag_axis =
+            nengine::editor::
+                SceneGizmoAxis::None;
+        scene_drag_entity =
+            nengine::core::Entity::invalid();
+
+        refresh();
+    }
+
     void paint_scene(HDC dc, HWND hwnd) {
         RECT rect{};
         GetClientRect(hwnd, &rect);
@@ -1262,17 +1485,23 @@ struct Win32EditorShell::Impl {
 
             if (!transform) continue;
 
+            const auto point =
+                nengine::editor::
+                    scene_entity_to_screen(
+                        world,
+                        entity,
+                        static_cast<float>(
+                            rect.right -
+                            rect.left),
+                        static_cast<float>(
+                            rect.bottom -
+                            rect.top));
+
             const int x =
-                cx +
-                static_cast<int>(
-                    transform->local_position.x *
-                    25.0f);
+                static_cast<int>(point.x);
 
             const int y =
-                cy -
-                static_cast<int>(
-                    transform->local_position.z *
-                    25.0f);
+                static_cast<int>(point.y);
 
             const bool is_selected =
                 entity == selected;
@@ -1308,6 +1537,82 @@ struct Win32EditorShell::Impl {
                 label.c_str(),
                 static_cast<int>(
                     label.size()));
+        }
+
+        if (world.is_alive(selected)) {
+            const auto origin =
+                nengine::editor::
+                    scene_entity_to_screen(
+                        world,
+                        selected,
+                        static_cast<float>(
+                            rect.right -
+                            rect.left),
+                        static_cast<float>(
+                            rect.bottom -
+                            rect.top));
+
+            const int ox =
+                static_cast<int>(origin.x);
+
+            const int oy =
+                static_cast<int>(origin.y);
+
+            HPEN x_pen =
+                CreatePen(
+                    PS_SOLID,
+                    3,
+                    RGB(230, 90, 90));
+
+            HPEN previous =
+                static_cast<HPEN>(
+                    SelectObject(dc, x_pen));
+
+            MoveToEx(dc, ox, oy, nullptr);
+            LineTo(dc, ox + 54, oy);
+
+            SelectObject(dc, previous);
+            DeleteObject(x_pen);
+
+            HPEN z_pen =
+                CreatePen(
+                    PS_SOLID,
+                    3,
+                    RGB(90, 170, 255));
+
+            previous =
+                static_cast<HPEN>(
+                    SelectObject(dc, z_pen));
+
+            MoveToEx(dc, ox, oy, nullptr);
+            LineTo(dc, ox, oy - 54);
+
+            SelectObject(dc, previous);
+            DeleteObject(z_pen);
+
+            SetBkMode(dc, TRANSPARENT);
+
+            SetTextColor(
+                dc,
+                RGB(230, 90, 90));
+
+            TextOutW(
+                dc,
+                ox + 58,
+                oy - 7,
+                L"X",
+                1);
+
+            SetTextColor(
+                dc,
+                RGB(90, 170, 255));
+
+            TextOutW(
+                dc,
+                ox - 5,
+                oy - 69,
+                L"Z",
+                1);
         }
 
         SetBkMode(dc, TRANSPARENT);
