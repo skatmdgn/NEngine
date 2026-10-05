@@ -13,6 +13,7 @@
 #include "nengine/core/world.hpp"
 #include "nengine/render/asset_resources.hpp"
 #include "nengine/render/components.hpp"
+#include "nengine/render/diagnostic_shaders.hpp"
 #include "nengine/render/matrix.hpp"
 #include "nengine/render/mesh_data.hpp"
 #include "nengine/render/registration.hpp"
@@ -646,6 +647,28 @@ int main() {
                             gpu_cube.index_count() == 36,
                             "Vulkan mesh resource uploads built-in cube vertex and index buffers");
 
+                        render::VulkanShaderModule
+                            diagnostic_vertex;
+
+                        render::VulkanShaderModule
+                            diagnostic_fragment;
+
+                        check(
+                            diagnostic_vertex.create(
+                                device,
+                                render::VulkanShaderStage::Vertex,
+                                render::diagnostic_vertex_spirv()),
+                            "built-in diagnostic vertex SPIR-V creates Vulkan shader module");
+
+                        check(
+                            diagnostic_fragment.create(
+                                device,
+                                render::VulkanShaderStage::Fragment,
+                                render::diagnostic_fragment_spirv()),
+                            "built-in diagnostic fragment SPIR-V creates Vulkan shader module");
+
+                        diagnostic_fragment.destroy();
+                        diagnostic_vertex.destroy();
                         gpu_cube.destroy();
                         device_buffer.destroy();
                         host_buffer.destroy();
