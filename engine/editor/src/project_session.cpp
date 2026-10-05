@@ -18,6 +18,18 @@ ProjectSession::ProjectSession() {
         assets::copy_source_importer);
 
     import_pipeline_.register_processor(
+        "NEngine.Texture",
+        assets::copy_source_importer);
+
+    import_pipeline_.register_processor(
+        "NEngine.Model",
+        assets::copy_source_importer);
+
+    import_pipeline_.register_processor(
+        "NEngine.Audio",
+        assets::copy_source_importer);
+
+    import_pipeline_.register_processor(
         "NEngine.Raw",
         assets::copy_source_importer);
 }
@@ -197,15 +209,74 @@ AssetPollResult ProjectSession::poll_assets() {
     if (!open_) return result;
 
     result.changes = watcher_.poll();
-    if (!result.changes.empty()) {
-        result.scan = assets_.scan(true);
+    if (result.changes.empty()) {
+        return result;
+    }
+
+    std::vector<assets::AssetGuid> removed_guids;
+    removed_guids.reserve(result.changes.size());
+
+    for (const auto& change : result.changes) {
+        if (change.kind !=
+            assets::FileChangeKind::Removed) {
+            continue;
+        }
+
+        if (const auto* record =
+                assets_.find_relative(
+                    change.relative_path
+                        .generic_string())) {
+            removed_guids.push_back(
+                record->guid);
+        }
+    }
+
+    result.scan = assets_.scan(true);
+
+    for (const auto guid : removed_guids) {
+        dependency_graph_.remove(guid);
+    }
+
+    for (const auto& change : result.changes) {
+        if (change.kind ==
+            assets::FileChangeKind::Removed) {
+            continue;
+        }
+
+        const auto* record =
+            assets_.find_relative(
+                change.relative_path
+                    .generic_string());
+
+        if (!record) {
+            continue;
+        }
+
+        if (!import_pipeline_.has_processor(
+                record->importer_id)) {
+            ++result.imports.unsupported;
+            continue;
+        }
+
+        ++result.imports.attempted;
+
+        const auto imported =
+            import_asset(record->guid);
+
+        if (!imported.success) {
+            ++result.imports.failed;
+        } else if (imported.cache_hit) {
+            ++result.imports.cache_hits;
+        } else {
+            ++result.imports.imported;
+        }
     }
 
     return result;
 }
 
 assets::ImportResult ProjectSession::import_asset(
-    assets::AssetGuid guid) const {
+    assets::AssetGuid guid) {
 
     if (!open_) {
         assets::ImportResult result;
@@ -222,13 +293,22 @@ assets::ImportResult ProjectSession::import_asset(
         return result;
     }
 
-    return import_pipeline_.import(
-        *record,
-        importers_,
-        root_ / "Library" / "Cache");
+    auto result =
+        import_pipeline_.import(
+            *record,
+            importers_,
+            root_ / "Library" / "Cache");
+
+    if (result.success) {
+        dependency_graph_.set_dependencies(
+            guid,
+            result.dependencies);
+    }
+
+    return result;
 }
 
-AssetImportSummary ProjectSession::import_supported_assets() const {
+AssetImportSummary ProjectSession::import_supported_assets() {
     AssetImportSummary summary;
     if (!open_) return summary;
 
