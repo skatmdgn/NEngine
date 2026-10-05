@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -12,6 +13,12 @@
 #include "nengine/render/vulkan_swapchain.hpp"
 
 namespace nengine::render {
+
+struct VulkanMeshDraw {
+    const VulkanGraphicsPipeline* pipeline{nullptr};
+    const VulkanMeshResource* mesh{nullptr};
+    Mat4 mvp{};
+};
 
 class VulkanClearPresenter {
 public:
@@ -44,6 +51,13 @@ public:
         float clear_blue = 0.11f,
         float clear_alpha = 1.0f);
 
+    bool present_meshes(
+        std::span<const VulkanMeshDraw> draws,
+        float clear_red = 0.08f,
+        float clear_green = 0.09f,
+        float clear_blue = 0.11f,
+        float clear_alpha = 1.0f);
+
     void shutdown() noexcept;
 
     bool ready() const noexcept {
@@ -66,9 +80,7 @@ public:
 
 private:
     bool present_frame(
-        const VulkanGraphicsPipeline* pipeline,
-        const VulkanMeshResource* mesh,
-        const Mat4* mvp,
+        std::span<const VulkanMeshDraw> draws,
         float red,
         float green,
         float blue,
