@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -96,6 +97,10 @@ public:
         assets::AssetGuid guid);
 
     AssetImportSummary import_supported_assets();
+
+    std::optional<assets::CachedArtifactSet>
+    cached_artifacts(
+        assets::AssetGuid guid) const;
 
     AssetActivation activation_for(
         assets::AssetGuid guid) const;
