@@ -4,6 +4,17 @@ add_library(NEngineRender STATIC
   src/render_snapshot.cpp
 )
 
+if(WIN32)
+  target_sources(NEngineRender PRIVATE
+    src/vulkan_loader_win32.cpp
+  )
+else()
+  target_sources(NEngineRender PRIVATE
+    src/vulkan_loader_posix.cpp
+  )
+  target_link_libraries(NEngineRender PUBLIC dl)
+endif()
+
 target_include_directories(NEngineRender
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
