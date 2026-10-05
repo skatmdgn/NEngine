@@ -57,6 +57,9 @@ public:
         return graphics_queue_;
     }
 
+    VulkanLoader::Function get_proc_address(
+        const char* name) const noexcept;
+
     std::uint32_t graphics_queue_family() const noexcept {
         return graphics_queue_family_;
     }
@@ -76,12 +79,18 @@ private:
     using DestroyDevice =
         void (*)(void*, const void*);
 
+    using GetDeviceProcAddr =
+        VulkanLoader::Function (*)(
+            void*,
+            const char*);
+
     void* physical_device_{nullptr};
     void* device_{nullptr};
     void* graphics_queue_{nullptr};
     std::uint32_t graphics_queue_family_{
         0xFFFFFFFFu};
     DestroyDevice destroy_device_{nullptr};
+    GetDeviceProcAddr get_device_proc_addr_{nullptr};
     std::string diagnostic_{};
 };
 
