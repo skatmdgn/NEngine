@@ -81,6 +81,7 @@ int main() {
     ImporterRegistry importers;
     check(importers.register_importer({"Texture", 1, {".png", ".jpg"}, false}), "register texture importer");
     check(importers.register_importer({"Audio", 1, {".wav"}, false}), "register audio importer");
+    check(importers.register_importer({"Shader", 1, {".spv"}, false}), "register shader importer");
     check(importers.register_importer({"Scene", 1, {".nscene"}, false}), "register scene importer");
     check(importers.register_importer({"Raw", 1, {}, true}), "register fallback importer");
     check(importers.find_for_path("image.PNG")->id == "Texture", "extension matching is case-insensitive");
@@ -97,6 +98,7 @@ int main() {
 
     const auto image = root / "Textures" / "hero.png";
     const auto audio = root / "Audio" / "tone.wav";
+    const auto shader = root / "Shaders" / "basic.vert.spv";
     const auto scene = root / "Scenes" / "Main.nscene";
 
     // Minimal PNG signature + IHDR header. CRC/data are not
@@ -132,14 +134,27 @@ int main() {
             0,0,0,0
         });
 
+    // Minimal SPIR-V module header (5 words). The importer
+    // validates binary identity/stage hint; semantic shader
+    // validation belongs to Vulkan shader-module creation/tooling.
+    write_bytes(
+        shader,
+        {
+            0x03, 0x02, 0x23, 0x07,
+            0x00, 0x00, 0x01, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00
+        });
+
     write_file(scene, "scene-data");
 
     AssetDatabase database(root);
     database.set_importers(&importers);
 
     const auto first_scan = database.scan(true);
-    check(database.size() == 3, "database scans asset files");
-    check(first_scan.meta_created == 3, "missing meta files are created");
+    check(database.size() == 4, "database scans asset files");
+    check(first_scan.meta_created == 4, "missing meta files are created");
 
     const auto* image_record = database.find_relative("Textures/hero.png");
     check(image_record != nullptr, "asset lookup by relative path");
@@ -198,6 +213,12 @@ int main() {
             "Audio",
             audio_source_importer),
         "audio metadata processor registers");
+
+    check(
+        pipeline.register_processor(
+            "Shader",
+            shader_source_importer),
+        "SPIR-V shader processor registers");
 
     check(
         pipeline.register_processor(
@@ -315,6 +336,52 @@ int main() {
         audio_text.find("BITS_PER_SAMPLE 16") !=
             std::string::npos,
         "audio descriptor records WAV metadata");
+
+    const auto* shader_record =
+        database.find_relative(
+            "Shaders/basic.vert.spv");
+
+    check(
+        shader_record != nullptr &&
+        shader_record->importer_id ==
+            "Shader",
+        "SPIR-V file resolves to shader importer");
+
+    const auto shader_result =
+        pipeline.import(
+            *shader_record,
+            importers,
+            cache_root);
+
+    check(
+        shader_result.success &&
+        shader_result.artifacts.size() == 2,
+        "SPIR-V shader importer produces source and descriptor");
+
+    std::filesystem::path shader_descriptor;
+
+    for (const auto& artifact :
+         shader_result.artifacts) {
+
+        if (artifact.role ==
+            "shader-descriptor") {
+            shader_descriptor =
+                artifact.path;
+        }
+    }
+
+    const auto shader_text =
+        read_all(
+            shader_descriptor);
+
+    check(
+        shader_text.find(
+            "STAGE \"vertex\"") !=
+            std::string::npos &&
+        shader_text.find(
+            "WORDS 5") !=
+            std::string::npos,
+        "shader descriptor records stage hint and word count");
 
     const auto raw_record =
         AssetRecord{
