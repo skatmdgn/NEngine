@@ -735,8 +735,10 @@ int main() {
                                 device,
                                 headless_render_pass,
                                 diagnostic_vertex,
-                                diagnostic_fragment),
-                            "diagnostic SPIR-V creates real Vulkan graphics pipeline");
+                                diagnostic_fragment) &&
+                            !headless_pipeline
+                                .supports_material_descriptors(),
+                            "diagnostic SPIR-V creates real Vulkan graphics pipeline without material descriptors");
 
                         render::VulkanGraphicsPipeline
                             textured_pipeline;
@@ -749,8 +751,10 @@ int main() {
                                 headless_render_pass,
                                 diagnostic_vertex,
                                 diagnostic_fragment,
-                                gpu_material),
-                            "Vulkan graphics pipeline layout accepts textured material descriptor set layout");
+                                gpu_material) &&
+                            textured_pipeline
+                                .supports_material_descriptors(),
+                            "Vulkan graphics pipeline layout accepts and tracks textured material descriptor set layout");
 
                         render::VulkanDepthTarget
                             headless_depth;
