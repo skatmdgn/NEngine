@@ -20,6 +20,7 @@
 #include "nengine/render/vulkan_loader.hpp"
 #include "nengine/render/vulkan_device.hpp"
 #include "nengine/render/vulkan_instance.hpp"
+#include "nengine/render/vulkan_presenter.hpp"
 
 namespace {
 int failures = 0;
@@ -686,6 +687,23 @@ int main() {
                     0.5f,
                     0.0f},
             "built-in quad mesh topology and bounds are valid");
+    }
+
+    {
+        render::VulkanClearPresenter presenter;
+
+        check(
+            !presenter.ready(),
+            "default Vulkan presenter is not ready");
+
+        check(
+            !presenter.present_clear(
+                0.1f,
+                0.2f,
+                0.3f,
+                1.0f) &&
+            !presenter.diagnostic().empty(),
+            "uninitialized Vulkan presenter fails diagnostically");
     }
 
     render::BufferHandle invalid_buffer;
