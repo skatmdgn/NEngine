@@ -10,6 +10,7 @@ add_library(NEngineRender STATIC
   src/vulkan_instance.cpp
   src/vulkan_mesh.cpp
   src/vulkan_presenter.cpp
+  src/vulkan_shader.cpp
   src/vulkan_swapchain.cpp
 )
 
