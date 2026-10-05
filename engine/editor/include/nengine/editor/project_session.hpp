@@ -68,6 +68,10 @@ public:
         return manifest_path_;
     }
 
+    std::filesystem::path startup_scene_path() const {
+        return root_ / manifest_.startup_scene;
+    }
+
     ProjectManifest& manifest() noexcept { return manifest_; }
     const ProjectManifest& manifest() const noexcept { return manifest_; }
 
