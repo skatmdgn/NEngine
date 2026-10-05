@@ -85,6 +85,8 @@ bool VulkanContext::initialize_for_window(
     }
 
     if (!render_targets_.create(
+            loader_,
+            instance_,
             device_,
             swapchain_)) {
 
@@ -153,6 +155,8 @@ bool VulkanContext::resize(
     }
 
     if (!render_targets_.create(
+            loader_,
+            instance_,
             device_,
             swapchain_)) {
 
