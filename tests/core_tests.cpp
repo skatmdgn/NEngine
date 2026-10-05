@@ -71,6 +71,38 @@ int main() {
 
     SceneData loaded;
     check(SceneSerializer::read(stream, loaded, &error), "scene deserializes from stream");
+
+    std::stringstream legacy_stream;
+    legacy_stream
+        << "NENGINE_SCENE 1\n"
+        << "NAME \"Legacy\"\n"
+        << "OBJECTS 1\n"
+        << "OBJECT 0 -1 1 \"LegacyObject\"\n"
+        << "POS 1 2 3\n"
+        << "ROT 0 0 0 1\n"
+        << "SCALE 1 1 1\n"
+        << "END_OBJECT\n"
+        << "END_SCENE\n";
+
+    SceneData legacy_scene;
+    check(
+        SceneSerializer::read(
+            legacy_stream,
+            legacy_scene,
+            &error),
+        "Scene v2 reader accepts legacy v1 scene");
+
+    World legacy_world;
+    check(
+        SceneSerializer::instantiate(
+            legacy_scene,
+            legacy_world,
+            &error),
+        "legacy v1 scene instantiates");
+
+    check(
+        legacy_world.size() == 1,
+        "legacy v1 scene preserves object count");
     check(loaded.name == "CoreTest", "scene name roundtrip");
     check(loaded.objects.size() == 2, "scene object count roundtrip");
 
