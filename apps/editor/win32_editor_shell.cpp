@@ -27,6 +27,7 @@
 #include "nengine/editor/scene_interaction.hpp"
 #include "nengine/scripting/managed_project.hpp"
 #include "nengine/render/vulkan_context.hpp"
+#include "nengine/render/vulkan_diagnostic_scene.hpp"
 
 namespace nengine::app {
 namespace {
@@ -314,6 +315,10 @@ struct Win32EditorShell::Impl {
     std::unique_ptr<
         nengine::render::VulkanContext>
         vulkan_context{};
+
+    std::unique_ptr<
+        nengine::render::VulkanDiagnosticScene>
+        vulkan_diagnostic_scene{};
 
     int vulkan_scene_width{-1};
     int vulkan_scene_height{-1};
@@ -933,6 +938,11 @@ struct Win32EditorShell::Impl {
                 nengine::render::
                     VulkanContext>();
 
+        std::unique_ptr<
+            nengine::render::
+                VulkanDiagnosticScene>
+            diagnostic_scene;
+
         if (context->initialize_for_window(
                 GetModuleHandleW(nullptr),
                 scene,
@@ -960,7 +970,27 @@ struct Win32EditorShell::Impl {
                             ->swapchain()
                             .images()
                             .size()) +
-                    " swapchain image(s). GDI Scene View presentation remains active for now.");
+                    " swapchain image(s).");
+
+            diagnostic_scene =
+                std::make_unique<
+                    nengine::render::
+                        VulkanDiagnosticScene>();
+
+            if (diagnostic_scene->initialize(
+                    *context)) {
+
+                editor.console().info(
+                    "Renderer",
+                    "Vulkan diagnostic SPIR-V, GPU mesh and indexed graphics pipeline are ready. GDI Scene View presentation remains active for interaction.");
+
+            } else {
+                editor.console().warning(
+                    "Renderer",
+                    "Vulkan window context is ready, but diagnostic draw resources failed: " +
+                        diagnostic_scene
+                            ->diagnostic());
+            }
         } else {
             editor.console().info(
                 "Renderer",
@@ -970,11 +1000,20 @@ struct Win32EditorShell::Impl {
 
         vulkan_context =
             std::move(context);
+
+        vulkan_diagnostic_scene =
+            std::move(
+                diagnostic_scene);
     }
 
     void poll_vulkan_scene_resize() {
         if (!vulkan_context ||
-            !vulkan_context->ready() ||
+            !vulkan_context
+                ->instance()
+                .valid() ||
+            !vulkan_context
+                ->device()
+                .valid() ||
             !scene ||
             !IsWindow(scene)) {
             return;
@@ -1009,6 +1048,11 @@ struct Win32EditorShell::Impl {
         vulkan_scene_height =
             height;
 
+        if (vulkan_diagnostic_scene) {
+            vulkan_diagnostic_scene
+                ->shutdown();
+        }
+
         if (!vulkan_context->resize(
                 static_cast<std::uint32_t>(
                     std::max(0, width)),
@@ -1019,6 +1063,23 @@ struct Win32EditorShell::Impl {
                 "Renderer",
                 "Vulkan swapchain resize failed: " +
                     vulkan_context
+                        ->diagnostic());
+
+            refresh_console();
+            return;
+        }
+
+        if (width > 0 &&
+            height > 0 &&
+            vulkan_diagnostic_scene &&
+            !vulkan_diagnostic_scene
+                ->initialize(
+                    *vulkan_context)) {
+
+            editor.console().warning(
+                "Renderer",
+                "Vulkan diagnostic resources failed after resize: " +
+                    vulkan_diagnostic_scene
                         ->diagnostic());
 
             refresh_console();
