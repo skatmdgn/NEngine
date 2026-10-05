@@ -708,6 +708,8 @@ bool VulkanGraphicsPipeline::create_internal(
         device.native_device();
     layout_ = layout;
     pipeline_ = pipeline;
+    material_descriptor_layout_ =
+        descriptor_set_layout != nullptr;
 
     diagnostic_ =
         descriptor_set_layout
@@ -754,6 +756,7 @@ void VulkanGraphicsPipeline::destroy() noexcept {
     device_ = nullptr;
     layout_ = nullptr;
     pipeline_ = nullptr;
+    material_descriptor_layout_ = false;
 }
 
 } // namespace nengine::render
