@@ -13,6 +13,7 @@
 #include "nengine/editor/property_command.hpp"
 #include "nengine/editor/property_text.hpp"
 #include "nengine/editor/scene_interaction.hpp"
+#include "nengine/render/components.hpp"
 
 namespace {
 
@@ -345,6 +346,81 @@ int main() {
         "texture asset routes to external preview fallback");
 
     auto& world = model.world();
+
+    const auto render_entity =
+        world.create("Render Camera");
+
+    auto* render_camera =
+        world.add_component<
+            render::Camera>(
+                render_entity,
+                render::camera_type());
+
+    check(
+        render_camera != nullptr,
+        "EditorModel accepts registered Camera component");
+
+    model.selection().set(
+        render_entity);
+
+    const auto render_inspector =
+        editor::build_inspector(
+            model);
+
+    bool saw_camera_component = false;
+
+    for (const auto& component :
+         render_inspector.components) {
+
+        if (component.type !=
+            render::camera_type()) {
+            continue;
+        }
+
+        saw_camera_component = true;
+
+        check(
+            component.fields.size() == 6,
+            "generic Inspector exposes Camera properties");
+    }
+
+    check(
+        saw_camera_component,
+        "generic Inspector includes Camera component");
+
+    check(
+        model.commands().execute(
+            world,
+            std::make_unique<
+                editor::SetPropertyCommand>(
+                    &model.property_access(),
+                    render_entity,
+                    render::camera_type(),
+                    "Vertical FOV",
+                    core::PropertyValue{
+                        80.0
+                    })),
+        "generic property command edits Camera FOV");
+
+    check(
+        render_camera &&
+        render_camera->vertical_fov_degrees ==
+            80.0f,
+        "Camera FOV edit reaches native render component");
+
+    check(
+        model.commands().undo(
+            world),
+        "Camera property edit supports undo");
+
+    check(
+        render_camera &&
+        render_camera->vertical_fov_degrees ==
+            60.0f,
+        "Camera FOV undo restores prior value");
+
+    model.commands().clear();
+
     const auto root = world.create("Root");
     const auto child = world.create("Child");
     world.set_parent(child, root);
