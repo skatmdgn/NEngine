@@ -66,8 +66,10 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] SPIR-V shader module resource
 - [x] Graphics pipeline/layout
 - [x] Indexed mesh draw command path
-- [x] Opt-in Win32 diagnostic Vulkan Preview
-- [ ] Depth buffer
+- [x] Opt-in Win32 Vulkan Preview
+- [x] Depth buffer and depth-tested pipeline
+- [x] Built-in mesh AssetGuid resolver and GPU mesh cache
+- [x] Multi-draw World Camera/MeshRenderer Vulkan preview
 - [ ] GPU texture/sampler resource
 - [ ] Material/descriptor binding
 - [ ] Scene View Vulkan presentation replacement
