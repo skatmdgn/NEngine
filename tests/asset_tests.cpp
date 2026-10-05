@@ -107,9 +107,15 @@ int main() {
     AssetImportPipeline pipeline;
     check(
         pipeline.register_processor(
+            "Scene",
+            copy_source_importer),
+        "scene copy-source processor registers");
+
+    check(
+        pipeline.register_processor(
             "Raw",
             copy_source_importer),
-        "copy-source importer processor registers");
+        "raw copy-source processor registers");
 
     const auto* scene_record =
         database.find_relative("Scenes/Main.nscene");
