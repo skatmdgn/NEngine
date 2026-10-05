@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "nengine/render/vulkan_device.hpp"
+#include "nengine/render/vulkan_render_pass.hpp"
 #include "nengine/render/vulkan_swapchain.hpp"
 
 namespace nengine::render {
@@ -27,13 +28,18 @@ public:
     void destroy() noexcept;
 
     bool valid() const noexcept {
-        return render_pass_ != nullptr &&
+        return render_pass_.valid() &&
             !image_views_.empty() &&
             framebuffers_.size() ==
                 image_views_.size();
     }
 
     void* render_pass() const noexcept {
+        return render_pass_.native_handle();
+    }
+
+    const VulkanRenderPass&
+    render_pass_resource() const noexcept {
         return render_pass_;
     }
 
@@ -55,7 +61,7 @@ public:
 private:
     const VulkanDevice* device_api_{nullptr};
     void* device_{nullptr};
-    void* render_pass_{nullptr};
+    VulkanRenderPass render_pass_{};
     std::vector<void*> image_views_{};
     std::vector<void*> framebuffers_{};
     std::string diagnostic_{};
