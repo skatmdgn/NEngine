@@ -9,10 +9,12 @@ add_library(NEngineRender STATIC
 if(WIN32)
   target_sources(NEngineRender PRIVATE
     src/vulkan_loader_win32.cpp
+    src/vulkan_surface_win32.cpp
   )
 else()
   target_sources(NEngineRender PRIVATE
     src/vulkan_loader_posix.cpp
+    src/vulkan_surface_stub.cpp
   )
   target_link_libraries(NEngineRender PUBLIC dl)
 endif()
