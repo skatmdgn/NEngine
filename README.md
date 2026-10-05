@@ -38,6 +38,8 @@ The repository currently includes:
 - SPIR-V shader-module resources
 - MeshVertex graphics pipeline with MVP push constants and depth testing
 - multi-draw indexed submission
+- GPU RGBA8 texture upload, sampler and material descriptor binding
+- texture-sampling diagnostic shaders exercised by VK Preview
 - opt-in VK Preview that renders the actual presentation World Camera + supported built-in MeshRenderer items
 - Windows + Ubuntu CI tests
 
@@ -57,4 +59,4 @@ ctest --test-dir build -C Release --output-on-failure
 
 On single-config generators such as Ninja/Unix Makefiles, the `-C Release` argument to `ctest` is optional.
 
-See `docs/CURRENT_STATE.md` before doing project work.
+Start with `docs/MASTER_PLAN.md` for the product goal and full development plan, then read `docs/CURRENT_STATE.md` and `docs/ROADMAP.md` before doing project work.
