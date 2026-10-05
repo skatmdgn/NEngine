@@ -259,6 +259,17 @@ using CmdBindPipeline =
         std::uint32_t,
         void*);
 
+using CmdBindDescriptorSets =
+    void (*)(
+        void*,
+        std::uint32_t,
+        void*,
+        std::uint32_t,
+        std::uint32_t,
+        void* const*,
+        std::uint32_t,
+        const std::uint32_t*);
+
 using CmdSetViewport =
     void (*)(
         void*,
@@ -669,6 +680,8 @@ bool VulkanClearPresenter::present_frame(
     const bool draw_mesh =
         !draws.empty();
 
+    bool bind_materials = false;
+
     for (const auto& draw :
          draws) {
 
@@ -680,6 +693,16 @@ bool VulkanClearPresenter::present_frame(
             diagnostic_ =
                 "all Vulkan mesh draws require valid pipeline mesh and MVP";
             return false;
+        }
+
+        if (draw.material) {
+            if (!draw.material->valid()) {
+                diagnostic_ =
+                    "Vulkan mesh draw material must be valid when provided";
+                return false;
+            }
+
+            bind_materials = true;
         }
     }
 
@@ -730,6 +753,13 @@ bool VulkanClearPresenter::present_frame(
             ? load_proc<CmdBindPipeline>(
                 *device_api_,
                 "vkCmdBindPipeline")
+            : nullptr;
+
+    const auto bind_descriptor_sets =
+        bind_materials
+            ? load_proc<CmdBindDescriptorSets>(
+                *device_api_,
+                "vkCmdBindDescriptorSets")
             : nullptr;
 
     const auto set_viewport =
@@ -796,6 +826,8 @@ bool VulkanClearPresenter::present_frame(
         !queue_present ||
         (draw_mesh &&
          (!bind_pipeline ||
+          (bind_materials &&
+           !bind_descriptor_sets) ||
           !set_viewport ||
           !set_scissor ||
           !bind_vertex_buffers ||
@@ -1025,6 +1057,23 @@ bool VulkanClearPresenter::present_frame(
                 VK_PIPELINE_BIND_POINT_GRAPHICS,
                 draw.pipeline
                     ->native_pipeline());
+
+            if (draw.material) {
+                void* descriptor_set =
+                    draw.material
+                        ->native_descriptor_set();
+
+                bind_descriptor_sets(
+                    command,
+                    VK_PIPELINE_BIND_POINT_GRAPHICS,
+                    draw.pipeline
+                        ->native_layout(),
+                    0,
+                    1,
+                    &descriptor_set,
+                    0,
+                    nullptr);
+            }
 
             void* vertex_buffer =
                 draw.mesh
