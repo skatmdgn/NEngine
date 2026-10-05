@@ -84,6 +84,16 @@ bool VulkanContext::initialize_for_window(
         return false;
     }
 
+    if (!presenter_.initialize(
+            device_,
+            swapchain_)) {
+
+        diagnostic_ =
+            presenter_.diagnostic();
+        shutdown();
+        return false;
+    }
+
     diagnostic_ =
         "Vulkan window context ready";
 
@@ -102,6 +112,8 @@ bool VulkanContext::resize(
             "Vulkan context is not initialized";
         return false;
     }
+
+    presenter_.shutdown();
 
     if (width == 0 ||
         height == 0) {
@@ -128,13 +140,52 @@ bool VulkanContext::resize(
         return false;
     }
 
+    if (!presenter_.initialize(
+            device_,
+            swapchain_)) {
+
+        diagnostic_ =
+            presenter_.diagnostic();
+        swapchain_.destroy();
+        return false;
+    }
+
     diagnostic_ =
         "Vulkan swapchain resized";
 
     return true;
 }
 
+bool VulkanContext::present_clear(
+    float red,
+    float green,
+    float blue,
+    float alpha) {
+
+    if (!ready()) {
+        diagnostic_ =
+            "Vulkan context is not ready to present";
+        return false;
+    }
+
+    if (!presenter_.present_clear(
+            red,
+            green,
+            blue,
+            alpha)) {
+
+        diagnostic_ =
+            presenter_.diagnostic();
+        return false;
+    }
+
+    diagnostic_ =
+        presenter_.diagnostic();
+    return true;
+}
+
 void VulkanContext::shutdown() noexcept {
+    presenter_.shutdown();
     swapchain_.destroy();
     device_.destroy();
     surface_.destroy();
