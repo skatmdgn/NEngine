@@ -75,6 +75,8 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Graphics pipeline layout accepts material descriptor set layout
 - [x] Bind material descriptor set during indexed draw
 - [x] Textured fragment shader/sample path
+- [x] AssetGuid decoded RGBA8 texture cache (BMP/TGA foundation)
+- [x] Per-device Vulkan texture/material AssetGuid cache
 - [ ] Scene View Vulkan presentation replacement
 - [ ] Android Vulkan surface
 - [ ] PBR/lights/shadows/sprites
