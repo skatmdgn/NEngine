@@ -98,6 +98,22 @@ VulkanLoader::get_proc_address(
         name);
 }
 
+VulkanLoader::Function
+VulkanLoader::get_instance_proc_address(
+    void* instance,
+    const char* name) const noexcept {
+
+    if (!loaded() ||
+        !name ||
+        !*name) {
+        return nullptr;
+    }
+
+    return get_instance_proc_addr_(
+        instance,
+        name);
+}
+
 void VulkanLoader::close() noexcept {
     if (library_) {
         FreeLibrary(
