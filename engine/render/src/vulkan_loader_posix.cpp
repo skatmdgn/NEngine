@@ -81,7 +81,8 @@ VulkanLoader& VulkanLoader::operator=(
     return *this;
 }
 
-void* VulkanLoader::get_proc_address(
+VulkanLoader::Function
+VulkanLoader::get_proc_address(
     const char* name) const noexcept {
 
     if (!loaded() ||
