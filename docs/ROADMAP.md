@@ -39,20 +39,38 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Texture metadata importer
 - [x] WAV metadata importer
 - [x] Model source descriptor importer
+- [x] SPIR-V binary shader importer
+- [x] Renderer cache resolver for texture/model/shader artifacts
 - [ ] Real texture decode/transcode
 - [ ] glTF mesh/material decode and cooking
+- [ ] GLSL/HLSL shader compile toolchain
 
 ## 0.4 — Vulkan renderer
 - [x] RHI contract
 - [x] Camera/Light/MeshRenderer native components
 - [x] RenderSnapshot extraction
+- [x] Hierarchy-resolved render world matrices
 - [x] Render component Inspector + Scene integration
-- [ ] Render asset resolver/resource cache
-- [ ] Vulkan instance/device/queues
-- [ ] Windows Vulkan surface/swapchain
+- [x] Camera view/projection matrix math
+- [x] CPU Cube/Quad MeshData
+- [x] Vulkan loader/instance
+- [x] Physical/logical device and graphics queue
+- [x] Windows Vulkan surface
+- [x] Swapchain creation/recreation
+- [x] Swapchain image views/render pass/framebuffers
+- [x] Acquire/submit/present synchronization
+- [x] Render-pass clear frame
+- [x] Vulkan host-visible/device-local buffers
+- [x] Staging copy into device-local buffers
+- [x] GPU vertex/index mesh resource
+- [x] SPIR-V shader module resource
+- [ ] Graphics pipeline/layout
+- [ ] Indexed mesh draw
+- [ ] Depth buffer
+- [ ] GPU texture/sampler resource
+- [ ] Material/descriptor binding
+- [ ] Scene View Vulkan presentation replacement
 - [ ] Android Vulkan surface
-- [ ] GPU mesh/material/texture resources
-- [ ] Camera matrices and draw submission
 - [ ] PBR/lights/shadows/sprites
 
 ## 0.5 — C# scripting + IDE
