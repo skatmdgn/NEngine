@@ -5,6 +5,7 @@
 #include "nengine/core/world.hpp"
 #include "nengine/editor/command.hpp"
 #include "nengine/editor/console_model.hpp"
+#include "nengine/editor/editor_layout.hpp"
 #include "nengine/editor/play_session.hpp"
 #include "nengine/editor/project_session.hpp"
 #include "nengine/editor/property_access.hpp"
@@ -59,6 +60,9 @@ public:
     ConsoleModel& console() noexcept { return console_; }
     const ConsoleModel& console() const noexcept { return console_; }
 
+    EditorLayoutState& layout() noexcept { return layout_; }
+    const EditorLayoutState& layout() const noexcept { return layout_; }
+
     ProjectSession& project() noexcept { return project_; }
     const ProjectSession& project() const noexcept { return project_; }
 
@@ -81,6 +85,7 @@ private:
     CommandStack commands_{};
     PlaySession play_session_{};
     ConsoleModel console_{};
+    EditorLayoutState layout_{};
     ProjectSession project_{};
     PropertyAccessRegistry property_access_{};
 };
