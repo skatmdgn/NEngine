@@ -33,6 +33,11 @@ int main() {
 
     editor::EditorModel model;
 
+    model.mark_scene_saved();
+    check(
+        !model.scene_dirty(),
+        "fresh editor savepoint is clean");
+
     model.console().info("Test", "hello");
     model.console().info("Test", "hello");
     model.console().warning("Test", "warning");
@@ -437,15 +442,20 @@ int main() {
         "custom component serialization codec registers");
 
     check(model.selection().active() == child, "selection tracks active entity");
+    model.mark_scene_saved();
+
     check(model.commands().execute(world, std::make_unique<editor::RenameEntityCommand>(child, "Renamed")), "rename command executes");
     check(world.name(child) == "Renamed", "rename command changes world");
+    check(model.scene_dirty(), "command after savepoint marks scene dirty");
 
     auto toolbar = editor::build_toolbar(model);
     check(toolbar.can_undo && toolbar.undo_label == "Undo Rename Entity", "toolbar reflects undo history");
 
     check(model.commands().undo(world), "undo succeeds");
     check(world.name(child) == "Child", "undo restores previous name");
+    check(!model.scene_dirty(), "undo back to savepoint clears dirty state");
     check(model.commands().redo(world), "redo succeeds");
+    check(model.scene_dirty(), "redo away from savepoint restores dirty state");
     check(world.name(child) == "Renamed", "redo reapplies name");
 
     check(model.commands().execute(world, std::make_unique<editor::SetActiveCommand>(child, false)), "active command executes");
