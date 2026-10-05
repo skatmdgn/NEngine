@@ -138,10 +138,40 @@ int run_editor() {
     if (editor.project().open(
             project_root,
             &project_error)) {
+
         editor.console().info(
             "Project",
             "Opened project: " +
                 project_root.generic_string());
+
+        const auto layout_path =
+            project_root /
+            "ProjectSettings" /
+            "EditorLayout.layout";
+
+        std::string layout_error;
+
+        if (std::filesystem::exists(
+                layout_path)) {
+
+            if (!nengine::editor::
+                    EditorLayoutSerializer::load(
+                        layout_path,
+                        editor.layout(),
+                        &layout_error)) {
+
+                editor.console().warning(
+                    "Layout",
+                    "Could not load editor layout: " +
+                        layout_error);
+            }
+        } else {
+            nengine::editor::
+                EditorLayoutSerializer::save(
+                    editor.layout(),
+                    layout_path,
+                    nullptr);
+        }
     } else {
         editor.console().error(
             "Project",
