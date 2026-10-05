@@ -22,9 +22,12 @@ void set_error(
 }
 
 bool write_property_value(
-    const PropertyValue& value,
+    const SerializedPropertyData& property,
+    std::uint32_t scene_version,
     std::ostream& output,
     std::string* error) {
+
+    const auto& value = property.value;
 
     if (std::holds_alternative<std::monostate>(value)) {
         output << "NIL";
@@ -78,10 +81,35 @@ bool write_property_value(
         return true;
     }
 
+    if (property.kind == PropertyKind::EntityReference) {
+        if (scene_version < 3) {
+            set_error(
+                error,
+                "EntityReference component properties require Scene v3");
+            return false;
+        }
+
+        if (const auto* local = std::get_if<std::uint64_t>(&value)) {
+            output << "ENTITY_LOCAL " << *local;
+            return true;
+        }
+
+        if (const auto* null_ref = std::get_if<std::int64_t>(&value);
+            null_ref && *null_ref < 0) {
+            output << "ENTITY_LOCAL -1";
+            return true;
+        }
+
+        set_error(
+            error,
+            "EntityReference property was not remapped to a scene-local id");
+        return false;
+    }
+
     if (std::holds_alternative<Entity>(value)) {
         set_error(
             error,
-            "EntityReference component properties require scene-local remapping and are not supported by Scene v2");
+            "runtime Entity leaked into serialized property data");
         return false;
     }
 
@@ -93,8 +121,10 @@ bool write_property_value(
 
 bool read_property_value(
     std::istream& input,
-    PropertyValue& value,
+    SerializedPropertyData& property,
     std::string* error) {
+
+    auto& value = property.value;
 
     std::string tag;
     if (!(input >> tag)) {
@@ -115,6 +145,7 @@ bool read_property_value(
             set_error(error, "malformed BOOL property");
             return false;
         }
+        property.kind = PropertyKind::Boolean;
         value = raw != 0;
         return true;
     }
@@ -125,6 +156,7 @@ bool read_property_value(
             set_error(error, "malformed I64 property");
             return false;
         }
+        property.kind = PropertyKind::Integer;
         value = raw;
         return true;
     }
@@ -135,6 +167,7 @@ bool read_property_value(
             set_error(error, "malformed U64 property");
             return false;
         }
+        property.kind = PropertyKind::UnsignedInteger;
         value = raw;
         return true;
     }
@@ -145,6 +178,7 @@ bool read_property_value(
             set_error(error, "malformed F64 property");
             return false;
         }
+        property.kind = PropertyKind::Float;
         value = raw;
         return true;
     }
@@ -155,6 +189,7 @@ bool read_property_value(
             set_error(error, "malformed STRING property");
             return false;
         }
+        property.kind = PropertyKind::String;
         value = std::move(raw);
         return true;
     }
@@ -165,6 +200,7 @@ bool read_property_value(
             set_error(error, "malformed VEC3 property");
             return false;
         }
+        property.kind = PropertyKind::Vec3;
         value = raw;
         return true;
     }
@@ -175,7 +211,25 @@ bool read_property_value(
             set_error(error, "malformed QUAT property");
             return false;
         }
+        property.kind = PropertyKind::Quaternion;
         value = raw;
+        return true;
+    }
+
+    if (tag == "ENTITY_LOCAL") {
+        std::int64_t local = -1;
+        if (!(input >> local)) {
+            set_error(error, "malformed ENTITY_LOCAL property");
+            return false;
+        }
+
+        property.kind = PropertyKind::EntityReference;
+
+        if (local < 0) {
+            value = std::int64_t{-1};
+        } else {
+            value = static_cast<std::uint64_t>(local);
+        }
         return true;
     }
 
@@ -188,6 +242,7 @@ bool read_property_value(
 
 bool write_component(
     const SerializedComponentData& component,
+    std::uint32_t scene_version,
     std::ostream& output,
     std::string* error) {
 
@@ -208,7 +263,8 @@ bool write_component(
             << ' ';
 
         if (!write_property_value(
-                property.value,
+                property,
+                scene_version,
                 output,
                 error)) {
             return false;
@@ -264,7 +320,7 @@ bool read_component(
 
         if (!read_property_value(
                 input,
-                property.value,
+                property,
                 error)) {
             return false;
         }
@@ -374,6 +430,37 @@ SceneData SceneSerializer::capture(
                             world,
                             entity,
                             type)) {
+
+                    for (auto& property :
+                         data->properties) {
+
+                        if (auto* reference =
+                                std::get_if<Entity>(
+                                    &property.value)) {
+
+                            property.kind =
+                                PropertyKind::EntityReference;
+
+                            if (!reference->valid()) {
+                                property.value =
+                                    std::int64_t{-1};
+                                continue;
+                            }
+
+                            const auto local =
+                                local_ids.find(
+                                    reference->value);
+
+                            if (local ==
+                                local_ids.end()) {
+                                property.value =
+                                    std::int64_t{-1};
+                            } else {
+                                property.value =
+                                    local->second;
+                            }
+                        }
+                    }
 
                     object.components.push_back(
                         std::move(*data));
@@ -514,10 +601,56 @@ bool SceneSerializer::instantiate(
         for (const auto& component :
              object.components) {
 
+            auto remapped = component;
+
+            for (auto& property :
+                 remapped.properties) {
+
+                if (property.kind !=
+                    PropertyKind::EntityReference) {
+                    continue;
+                }
+
+                if (const auto* local =
+                        std::get_if<std::uint64_t>(
+                            &property.value)) {
+
+                    const auto target =
+                        local_to_entity.find(*local);
+
+                    if (target ==
+                        local_to_entity.end()) {
+                        set_error(
+                            error,
+                            "EntityReference points to a missing scene-local object");
+                        return false;
+                    }
+
+                    property.value =
+                        target->second;
+                    continue;
+                }
+
+                if (const auto* null_ref =
+                        std::get_if<std::int64_t>(
+                            &property.value);
+                    null_ref && *null_ref < 0) {
+
+                    property.value =
+                        Entity::invalid();
+                    continue;
+                }
+
+                set_error(
+                    error,
+                    "malformed EntityReference property");
+                return false;
+            }
+
             if (!components->restore(
                     staged,
                     entity_it->second,
-                    component,
+                    remapped,
                     error)) {
                 return false;
             }
@@ -598,6 +731,7 @@ bool SceneSerializer::write(
 
                 if (!write_component(
                         component,
+                        scene.version,
                         output,
                         error)) {
                     return false;
