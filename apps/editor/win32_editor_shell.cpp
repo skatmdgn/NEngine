@@ -37,6 +37,7 @@ constexpr int kPadding = 8;
 enum ControlId : int {
     IdOpen = 1001,
     IdSave,
+    IdRefreshAssets,
     IdUndo,
     IdRedo,
     IdPlay,
@@ -57,6 +58,7 @@ enum ControlId : int {
     IdScaleY,
     IdScaleZ,
     IdApplyTransform,
+    IdAssets,
     IdConsole,
 };
 
@@ -240,6 +242,7 @@ struct Win32EditorShell::Impl {
 
     HWND open_scene{nullptr};
     HWND save_scene{nullptr};
+    HWND refresh_assets{nullptr};
     HWND undo{nullptr};
     HWND redo{nullptr};
     HWND play{nullptr};
@@ -263,9 +266,12 @@ struct Win32EditorShell::Impl {
     std::array<HWND, 3> scale{};
     HWND apply_transform{nullptr};
 
+    HWND assets_list{nullptr};
     HWND console{nullptr};
     std::vector<nengine::editor::HierarchyRow> hierarchy_rows{};
+    std::vector<nengine::assets::AssetRecord> asset_rows{};
     std::filesystem::path current_scene_path{};
+    ULONGLONG next_asset_poll_tick{0};
 
     bool scene_dragging{false};
     nengine::editor::SceneGizmoAxis scene_drag_axis{
@@ -470,6 +476,7 @@ struct Win32EditorShell::Impl {
         shell_log("creating toolbar controls");
         open_scene = create_control(host, L"BUTTON", L"Open", BS_PUSHBUTTON, IdOpen);
         save_scene = create_control(host, L"BUTTON", L"Save", BS_PUSHBUTTON, IdSave);
+        refresh_assets = create_control(host, L"BUTTON", L"Assets", BS_PUSHBUTTON, IdRefreshAssets);
         undo = create_control(host, L"BUTTON", L"Undo", BS_PUSHBUTTON, IdUndo);
         redo = create_control(host, L"BUTTON", L"Redo", BS_PUSHBUTTON, IdRedo);
         play = create_control(host, L"BUTTON", L"Play", BS_PUSHBUTTON, IdPlay);
@@ -477,7 +484,7 @@ struct Win32EditorShell::Impl {
         step = create_control(host, L"BUTTON", L"Step", BS_PUSHBUTTON, IdStep);
         stop = create_control(host, L"BUTTON", L"Stop", BS_PUSHBUTTON, IdStop);
 
-        if (!open_scene || !save_scene || !undo || !redo ||
+        if (!open_scene || !save_scene || !refresh_assets || !undo || !redo ||
             !play || !pause || !step || !stop) {
             shell_log("attach failed: toolbar control creation");
             return false;
@@ -556,16 +563,24 @@ struct Win32EditorShell::Impl {
             return false;
         }
 
-        shell_log("creating console control");
+        shell_log("creating Assets and Console controls");
+
+        assets_list = create_control(
+            host,
+            L"LISTBOX",
+            L"",
+            LBS_NOTIFY | WS_BORDER | WS_VSCROLL | WS_HSCROLL,
+            IdAssets);
+
         console = create_control(
             host,
             L"LISTBOX",
             L"",
-            WS_BORDER | WS_VSCROLL,
+            LBS_NOTIFY | WS_BORDER | WS_VSCROLL | WS_HSCROLL,
             IdConsole);
 
-        if (!console) {
-            shell_log("attach failed: console control creation");
+        if (!assets_list || !console) {
+            shell_log("attach failed: bottom panel control creation");
             return false;
         }
 
@@ -582,8 +597,12 @@ struct Win32EditorShell::Impl {
             host_client.right - host_client.left,
             host_client.bottom - host_client.top);
 
-        log_line(L"NEngine Console");
-        log_line(L"Editor host attached.");
+        editor.console().info(
+            "Editor",
+            "Editor host attached.");
+
+        refresh_assets_panel();
+        refresh_console();
 
         shell_log("attach complete");
         return true;
@@ -607,6 +626,49 @@ struct Win32EditorShell::Impl {
             last_parent_height = height;
             MoveWindow(host, 0, 0, width, height, TRUE);
         }
+
+        const ULONGLONG now = GetTickCount64();
+        if (now >= next_asset_poll_tick) {
+            next_asset_poll_tick = now + 1000ull;
+
+            const auto result =
+                editor.project().poll_assets();
+
+            if (!result.changes.empty()) {
+                editor.console().info(
+                    "Assets",
+                    "Detected " +
+                        std::to_string(result.changes.size()) +
+                        " filesystem change(s).");
+
+                for (const auto& message : result.scan.messages) {
+                    const auto path =
+                        wide_to_utf8(
+                            message.path.wstring());
+
+                    switch (message.severity) {
+                    case nengine::assets::AssetMessageSeverity::Info:
+                        editor.console().info(
+                            "Assets",
+                            path + ": " + message.message);
+                        break;
+                    case nengine::assets::AssetMessageSeverity::Warning:
+                        editor.console().warning(
+                            "Assets",
+                            path + ": " + message.message);
+                        break;
+                    case nengine::assets::AssetMessageSeverity::Error:
+                        editor.console().error(
+                            "Assets",
+                            path + ": " + message.message);
+                        break;
+                    }
+                }
+
+                refresh_assets_panel();
+                refresh_console();
+            }
+        }
     }
 
     void layout(int width, int height) {
@@ -622,6 +684,8 @@ struct Win32EditorShell::Impl {
         MoveWindow(open_scene, x, 6, button_width, button_height, TRUE);
         x += button_width + 4;
         MoveWindow(save_scene, x, 6, button_width, button_height, TRUE);
+        x += button_width + 4;
+        MoveWindow(refresh_assets, x, 6, button_width, button_height, TRUE);
         x += button_width + 16;
 
         MoveWindow(undo, x, 6, button_width, button_height, TRUE);
@@ -719,32 +783,149 @@ struct Win32EditorShell::Impl {
 
         MoveWindow(apply_transform, ix, iy, iw, 27, TRUE);
 
+        const int bottom_y =
+            bottom_top + kPadding;
+
+        const int bottom_h =
+            kBottomHeight - 2 * kPadding;
+
+        const int assets_w =
+            (width - 3 * kPadding) * 2 / 5;
+
+        const int console_x =
+            kPadding + assets_w + kPadding;
+
+        MoveWindow(
+            assets_list,
+            kPadding,
+            bottom_y,
+            assets_w,
+            bottom_h,
+            TRUE);
+
         MoveWindow(
             console,
-            kPadding,
-            bottom_top + kPadding,
-            width - 2 * kPadding,
-            kBottomHeight - 2 * kPadding,
+            console_x,
+            bottom_y,
+            width - console_x - kPadding,
+            bottom_h,
             TRUE);
     }
 
     void log_line(std::wstring_view message) {
+        editor.console().info(
+            "Editor",
+            wide_to_utf8(message));
+
+        if (controls_ready) {
+            refresh_console();
+        }
+    }
+
+    void refresh_console() {
         if (!console) return;
 
-        const std::wstring owned{message};
         SendMessageW(
             console,
-            LB_ADDSTRING,
+            LB_RESETCONTENT,
             0,
-            reinterpret_cast<LPARAM>(owned.c_str()));
+            0);
 
-        const auto count = SendMessageW(console, LB_GETCOUNT, 0, 0);
+        for (const auto& entry :
+             editor.console().entries()) {
+
+            std::string severity;
+            switch (entry.severity) {
+            case nengine::editor::LogSeverity::Trace:
+                severity = "TRACE";
+                break;
+            case nengine::editor::LogSeverity::Info:
+                severity = "INFO";
+                break;
+            case nengine::editor::LogSeverity::Warning:
+                severity = "WARN";
+                break;
+            case nengine::editor::LogSeverity::Error:
+                severity = "ERROR";
+                break;
+            }
+
+            std::string line =
+                "[" + severity + "] ";
+
+            if (!entry.source.empty()) {
+                line += entry.source + ": ";
+            }
+
+            line += entry.message;
+
+            if (entry.repeat_count > 1) {
+                line += " (x" +
+                    std::to_string(
+                        entry.repeat_count) +
+                    ")";
+            }
+
+            const auto wide =
+                utf8_to_wide(line);
+
+            SendMessageW(
+                console,
+                LB_ADDSTRING,
+                0,
+                reinterpret_cast<LPARAM>(
+                    wide.c_str()));
+        }
+
+        const auto count =
+            SendMessageW(
+                console,
+                LB_GETCOUNT,
+                0,
+                0);
+
         if (count > 0) {
             SendMessageW(
                 console,
                 LB_SETTOPINDEX,
-                static_cast<WPARAM>(count - 1),
+                static_cast<WPARAM>(
+                    count - 1),
                 0);
+        }
+    }
+
+    void refresh_assets_panel() {
+        if (!assets_list) return;
+
+        asset_rows =
+            editor.project().assets().records();
+
+        SendMessageW(
+            assets_list,
+            LB_RESETCONTENT,
+            0,
+            0);
+
+        for (const auto& asset :
+             asset_rows) {
+
+            const auto relative =
+                wide_to_utf8(
+                    asset.relative_path.wstring());
+
+            std::string line =
+                "[" + asset.importer_id + "] " +
+                relative;
+
+            const auto wide =
+                utf8_to_wide(line);
+
+            SendMessageW(
+                assets_list,
+                LB_ADDSTRING,
+                0,
+                reinterpret_cast<LPARAM>(
+                    wide.c_str()));
         }
     }
 
@@ -787,11 +968,10 @@ struct Win32EditorShell::Impl {
         return true;
     }
 
-    bool open_scene_file() {
-        if (!editor.can_edit()) return false;
+    bool load_scene_path(
+        const std::filesystem::path& path) {
 
-        std::filesystem::path path = current_scene_path;
-        if (!choose_scene_path(false, path)) return false;
+        if (!editor.can_edit()) return false;
 
         nengine::core::SceneData data;
         std::string error;
@@ -812,12 +992,33 @@ struct Win32EditorShell::Impl {
             return false;
         }
 
-        current_scene_path = std::move(path);
+        current_scene_path = path;
         editor.selection().clear();
         editor.commands().clear();
 
-        log_line(L"Scene loaded.");
+        editor.console().info(
+            "Scene",
+            "Loaded " +
+                wide_to_utf8(
+                    path.wstring()));
+
+        refresh_console();
         return true;
+    }
+
+    bool open_scene_file() {
+        if (!editor.can_edit()) return false;
+
+        std::filesystem::path path =
+            current_scene_path;
+
+        if (!choose_scene_path(
+                false,
+                path)) {
+            return false;
+        }
+
+        return load_scene_path(path);
     }
 
     bool save_scene_file(bool save_as = false) {
@@ -850,7 +1051,16 @@ struct Win32EditorShell::Impl {
         }
 
         current_scene_path = std::move(path);
-        log_line(L"Scene saved.");
+
+        editor.console().info(
+            "Scene",
+            "Saved " +
+                wide_to_utf8(
+                    current_scene_path.wstring()));
+
+        editor.project().refresh_assets();
+        refresh_assets_panel();
+        refresh_console();
         return true;
     }
 
@@ -869,6 +1079,9 @@ struct Win32EditorShell::Impl {
         shell_log("refresh inspector");
         refresh_inspector();
 
+        refresh_assets_panel();
+        refresh_console();
+
         shell_log("refresh scene invalidate");
         if (scene) {
             InvalidateRect(scene, nullptr, TRUE);
@@ -884,6 +1097,7 @@ struct Win32EditorShell::Impl {
 
         EnableWindow(open_scene, editor.can_edit());
         EnableWindow(save_scene, editor.can_edit());
+        EnableWindow(refresh_assets, editor.project().is_open());
         EnableWindow(undo, state.can_undo);
         EnableWindow(redo, state.can_redo);
         EnableWindow(play, state.can_play);
@@ -1111,6 +1325,56 @@ struct Win32EditorShell::Impl {
             handled = true;
             break;
 
+        case IdRefreshAssets:
+            if (notification != BN_CLICKED) return false;
+            {
+                const auto scan =
+                    editor.project().refresh_assets();
+
+                editor.console().info(
+                    "Assets",
+                    "Asset refresh complete: " +
+                        std::to_string(
+                            editor.project()
+                                .assets()
+                                .size()) +
+                        " asset(s).");
+
+                for (const auto& message :
+                     scan.messages) {
+
+                    const auto path =
+                        wide_to_utf8(
+                            message.path.wstring());
+
+                    if (message.severity ==
+                        nengine::assets::
+                            AssetMessageSeverity::
+                                Error) {
+                        editor.console().error(
+                            "Assets",
+                            path + ": " +
+                                message.message);
+                    } else if (
+                        message.severity ==
+                        nengine::assets::
+                            AssetMessageSeverity::
+                                Warning) {
+                        editor.console().warning(
+                            "Assets",
+                            path + ": " +
+                                message.message);
+                    } else {
+                        editor.console().info(
+                            "Assets",
+                            path + ": " +
+                                message.message);
+                    }
+                }
+            }
+            handled = true;
+            break;
+
         case IdUndo:
             if (notification != BN_CLICKED) return false;
             editor.commands().undo(editor.world());
@@ -1172,6 +1436,46 @@ struct Win32EditorShell::Impl {
                         hierarchy_rows[
                             static_cast<std::size_t>(index)]
                             .entity);
+                }
+            }
+            handled = true;
+            break;
+
+        case IdAssets:
+            if (notification != LBN_DBLCLK) return false;
+            {
+                const int index =
+                    static_cast<int>(
+                        SendMessageW(
+                            assets_list,
+                            LB_GETCURSEL,
+                            0,
+                            0));
+
+                if (index >= 0 &&
+                    static_cast<std::size_t>(index) <
+                        asset_rows.size()) {
+
+                    const auto& asset =
+                        asset_rows[
+                            static_cast<std::size_t>(
+                                index)];
+
+                    if (asset.source_path.extension() ==
+                        ".nscene") {
+                        load_scene_path(
+                            asset.source_path);
+                    } else {
+                        editor.console().info(
+                            "Assets",
+                            "Selected " +
+                                wide_to_utf8(
+                                    asset.relative_path
+                                        .wstring()) +
+                                " [" +
+                                asset.importer_id +
+                                "]");
+                    }
                 }
             }
             handled = true;
