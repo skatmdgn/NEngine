@@ -208,6 +208,40 @@ bool VulkanContext::present_clear(
     return true;
 }
 
+bool VulkanContext::present_mesh(
+    const VulkanGraphicsPipeline& pipeline,
+    const VulkanMeshResource& mesh,
+    const Mat4& mvp,
+    float clear_red,
+    float clear_green,
+    float clear_blue,
+    float clear_alpha) {
+
+    if (!ready()) {
+        diagnostic_ =
+            "Vulkan context is not ready to present";
+        return false;
+    }
+
+    if (!presenter_.present_mesh(
+            pipeline,
+            mesh,
+            mvp,
+            clear_red,
+            clear_green,
+            clear_blue,
+            clear_alpha)) {
+
+        diagnostic_ =
+            presenter_.diagnostic();
+        return false;
+    }
+
+    diagnostic_ =
+        presenter_.diagnostic();
+    return true;
+}
+
 void VulkanContext::shutdown() noexcept {
     presenter_.shutdown();
     render_targets_.destroy();
