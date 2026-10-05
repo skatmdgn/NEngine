@@ -30,15 +30,18 @@ The repository currently includes:
 - generated C# solution/project and NuGet manifest foundation
 - Camera/Light/MeshRenderer components
 - RenderSnapshot with resolved world matrices
-- camera matrix math and built-in Cube/Quad CPU meshes
+- camera matrix math and stable built-in Cube/Quad mesh AssetGuids
 - dynamic Vulkan loader, instance, device, Win32 surface and swapchain
-- swapchain image views, render pass, framebuffers and acquire/submit/present synchronization
+- swapchain image views, shared depth target, color+depth render pass, framebuffers and acquire/submit/present synchronization
 - host-visible and staged device-local Vulkan buffers
-- GPU vertex/index mesh resources
+- per-device built-in GPU mesh cache
 - SPIR-V shader-module resources
+- MeshVertex graphics pipeline with MVP push constants and depth testing
+- multi-draw indexed submission
+- opt-in VK Preview that renders the actual presentation World Camera + supported built-in MeshRenderer items
 - Windows + Ubuntu CI tests
 
-The Win32 Scene View still uses GDI for visible diagnostic object/gizmo drawing. Vulkan now has a real window context and render-pass clear/present path, but the graphics-pipeline/indexed-draw path is still in progress.
+The Win32 Scene View still uses GDI by default for interactive object/gizmo editing. The opt-in VK Preview now uses the real Vulkan graphics path for depth-tested indexed World rendering, while the GDI view remains the safe editing fallback.
 
 C# project generation exists, but the embedded .NET runtime/compile/reload path is **not implemented yet**.
 
