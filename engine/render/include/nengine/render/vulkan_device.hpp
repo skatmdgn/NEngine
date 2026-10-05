@@ -36,7 +36,8 @@ public:
         const VulkanLoader& loader,
         const VulkanInstance& instance,
         const std::vector<std::string>&
-            required_extensions = {});
+            required_extensions = {},
+        void* presentation_surface = nullptr);
 
     void destroy() noexcept;
 
