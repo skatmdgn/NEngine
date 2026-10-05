@@ -312,11 +312,24 @@ bool VulkanGraphicsPipeline::create(
     const VulkanShaderModule& vertex_shader,
     const VulkanShaderModule& fragment_shader) {
 
+    return create(
+        device,
+        targets.render_pass_resource(),
+        vertex_shader,
+        fragment_shader);
+}
+
+bool VulkanGraphicsPipeline::create(
+    const VulkanDevice& device,
+    const VulkanRenderPass& render_pass,
+    const VulkanShaderModule& vertex_shader,
+    const VulkanShaderModule& fragment_shader) {
+
     destroy();
     diagnostic_.clear();
 
     if (!device.valid() ||
-        !targets.valid() ||
+        !render_pass.valid() ||
         !vertex_shader.valid() ||
         !fragment_shader.valid() ||
         vertex_shader.stage() !=
@@ -325,7 +338,7 @@ bool VulkanGraphicsPipeline::create(
             VulkanShaderStage::Fragment) {
 
         diagnostic_ =
-            "valid Vulkan device render targets and vertex/fragment shader modules are required";
+            "valid Vulkan device render pass and vertex/fragment shader modules are required";
         return false;
     }
 
@@ -558,7 +571,7 @@ bool VulkanGraphicsPipeline::create(
         &color_blend,
         &dynamic_state,
         layout,
-        targets.render_pass(),
+        render_pass.native_handle(),
         0,
         nullptr,
         -1
