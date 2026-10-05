@@ -35,6 +35,9 @@ constexpr std::uint32_t
 VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO = 24;
 
 constexpr std::uint32_t
+VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO = 25;
+
+constexpr std::uint32_t
 VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO = 26;
 
 constexpr std::uint32_t
@@ -75,6 +78,9 @@ VK_FRONT_FACE_COUNTER_CLOCKWISE = 0;
 
 constexpr std::uint32_t
 VK_SAMPLE_COUNT_1_BIT = 0x00000001u;
+
+constexpr std::uint32_t
+VK_COMPARE_OP_LESS = 1u;
 
 constexpr std::uint32_t
 VK_COLOR_COMPONENT_R_BIT = 0x00000001u;
@@ -173,6 +179,31 @@ struct VkPipelineMultisampleStateCreateInfo {
     const std::uint32_t* pSampleMask;
     VkBool32 alphaToCoverageEnable;
     VkBool32 alphaToOneEnable;
+};
+
+struct VkStencilOpState {
+    std::uint32_t failOp;
+    std::uint32_t passOp;
+    std::uint32_t depthFailOp;
+    std::uint32_t compareOp;
+    std::uint32_t compareMask;
+    std::uint32_t writeMask;
+    std::uint32_t reference;
+};
+
+struct VkPipelineDepthStencilStateCreateInfo {
+    std::uint32_t sType;
+    const void* pNext;
+    std::uint32_t flags;
+    VkBool32 depthTestEnable;
+    VkBool32 depthWriteEnable;
+    std::uint32_t depthCompareOp;
+    VkBool32 depthBoundsTestEnable;
+    VkBool32 stencilTestEnable;
+    VkStencilOpState front;
+    VkStencilOpState back;
+    float minDepthBounds;
+    float maxDepthBounds;
 };
 
 struct VkPipelineColorBlendAttachmentState {
@@ -516,6 +547,26 @@ bool VulkanGraphicsPipeline::create(
         0
     };
 
+    const VkPipelineDepthStencilStateCreateInfo
+        depth_stencil{
+            VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+            nullptr,
+            0,
+            render_pass.has_depth()
+                ? 1u
+                : 0u,
+            render_pass.has_depth()
+                ? 1u
+                : 0u,
+            VK_COMPARE_OP_LESS,
+            0,
+            0,
+            {},
+            {},
+            0.0f,
+            1.0f
+        };
+
     const VkPipelineColorBlendAttachmentState
         color_attachment{
             0,
@@ -567,7 +618,9 @@ bool VulkanGraphicsPipeline::create(
         &viewport_state,
         &rasterization,
         &multisample,
-        nullptr,
+        render_pass.has_depth()
+            ? &depth_stencil
+            : nullptr,
         &color_blend,
         &dynamic_state,
         layout,
