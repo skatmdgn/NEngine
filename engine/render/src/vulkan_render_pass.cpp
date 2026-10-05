@@ -1,5 +1,6 @@
 #include "nengine/render/vulkan_render_pass.hpp"
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -35,6 +36,9 @@ VK_IMAGE_LAYOUT_UNDEFINED = 0;
 
 constexpr std::uint32_t
 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL = 2;
+
+constexpr std::uint32_t
+VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL = 3;
 
 constexpr std::uint32_t
 VK_IMAGE_LAYOUT_PRESENT_SRC_KHR = 1000001002u;
@@ -147,6 +151,10 @@ VulkanRenderPass::VulkanRenderPass(
           std::exchange(
               other.color_format_,
               0)),
+      depth_format_(
+          std::exchange(
+              other.depth_format_,
+              0)),
       diagnostic_(
           std::move(
               other.diagnostic_)) {}
@@ -181,6 +189,11 @@ VulkanRenderPass::operator=(
             other.color_format_,
             0);
 
+    depth_format_ =
+        std::exchange(
+            other.depth_format_,
+            0);
+
     diagnostic_ =
         std::move(
             other.diagnostic_);
@@ -191,6 +204,17 @@ VulkanRenderPass::operator=(
 bool VulkanRenderPass::create_color(
     const VulkanDevice& device,
     std::uint32_t color_format) {
+
+    return create_color_depth(
+        device,
+        color_format,
+        0);
+}
+
+bool VulkanRenderPass::create_color_depth(
+    const VulkanDevice& device,
+    std::uint32_t color_format,
+    std::uint32_t depth_format) {
 
     destroy();
     diagnostic_.clear();
@@ -214,7 +238,11 @@ bool VulkanRenderPass::create_color(
         return false;
     }
 
-    const VkAttachmentDescription color_attachment{
+    std::array<
+        VkAttachmentDescription,
+        2> attachments{};
+
+    attachments[0] = {
         0,
         color_format,
         VK_SAMPLE_COUNT_1_BIT,
@@ -226,10 +254,35 @@ bool VulkanRenderPass::create_color(
         VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
     };
 
-    const VkAttachmentReference color_reference{
-        0,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-    };
+    const VkAttachmentReference
+        color_reference{
+            0,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+        };
+
+    VkAttachmentReference
+        depth_reference{
+            1,
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+        };
+
+    std::uint32_t attachment_count = 1;
+
+    if (depth_format != 0) {
+        attachments[1] = {
+            0,
+            depth_format,
+            VK_SAMPLE_COUNT_1_BIT,
+            VK_ATTACHMENT_LOAD_OP_CLEAR,
+            VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+        };
+
+        attachment_count = 2;
+    }
 
     const VkSubpassDescription subpass{
         0,
@@ -239,7 +292,9 @@ bool VulkanRenderPass::create_color(
         1,
         &color_reference,
         nullptr,
-        nullptr,
+        depth_format != 0
+            ? &depth_reference
+            : nullptr,
         0,
         nullptr
     };
@@ -248,8 +303,8 @@ bool VulkanRenderPass::create_color(
         VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
         nullptr,
         0,
-        1,
-        &color_attachment,
+        attachment_count,
+        attachments.data(),
         1,
         &subpass,
         0,
@@ -282,9 +337,13 @@ bool VulkanRenderPass::create_color(
         render_pass;
     color_format_ =
         color_format;
+    depth_format_ =
+        depth_format;
 
     diagnostic_ =
-        "Vulkan single-color render pass created";
+        depth_format_ != 0
+            ? "Vulkan color+depth render pass created"
+            : "Vulkan single-color render pass created";
 
     return true;
 }
@@ -311,6 +370,7 @@ void VulkanRenderPass::destroy() noexcept {
     device_ = nullptr;
     render_pass_ = nullptr;
     color_format_ = 0;
+    depth_format_ = 0;
 }
 
 } // namespace nengine::render
