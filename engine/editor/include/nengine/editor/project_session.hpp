@@ -9,6 +9,7 @@
 #include "nengine/assets/dependency_graph.hpp"
 #include "nengine/assets/file_watcher.hpp"
 #include "nengine/assets/import_pipeline.hpp"
+#include "nengine/editor/project_manifest.hpp"
 
 namespace nengine::editor {
 
@@ -44,6 +45,13 @@ public:
         return assets_path_;
     }
 
+    const std::filesystem::path& manifest_path() const noexcept {
+        return manifest_path_;
+    }
+
+    ProjectManifest& manifest() noexcept { return manifest_; }
+    const ProjectManifest& manifest() const noexcept { return manifest_; }
+
     assets::AssetDatabase& assets() noexcept { return assets_; }
     const assets::AssetDatabase& assets() const noexcept { return assets_; }
 
@@ -72,6 +80,8 @@ private:
     bool open_{false};
     std::filesystem::path root_{};
     std::filesystem::path assets_path_{};
+    std::filesystem::path manifest_path_{};
+    ProjectManifest manifest_{};
 
     assets::ImporterRegistry importers_{};
     assets::AssetDatabase assets_{};
