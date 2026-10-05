@@ -200,10 +200,10 @@ Implemented:
   - descriptor pool + descriptor set allocation.
   - image view/sampler descriptor update.
 - Graphics pipeline layouts can optionally include the material descriptor-set layout.
+- Indexed Vulkan mesh draws can carry an optional material resource and bind set 0 through vkCmdBindDescriptorSets.
 - Headless Vulkan CI validates texture upload, sampler creation, material descriptors and textured-compatible pipeline layout creation.
 
 Not yet implemented:
-- Binding the material descriptor set in indexed draw commands.
 - A fragment shader that actually samples the bound texture.
 - Material AssetGuid/serialization model and imported material cache.
 - Shader source compiler and reflection.
@@ -225,10 +225,9 @@ The concrete Vulkan backend currently grows beneath this contract. The long-term
 
 ## Immediate next work
 
-1. Bind the material descriptor set during Vulkan indexed draws.
-2. Add a diagnostic textured fragment shader and verify sampled pixels through the VK Preview path.
-3. Add a small decoded-pixel texture cache keyed by AssetGuid.
-4. Decode/cook a first real model format (glTF) into MeshData and reuse the existing GPU mesh upload path.
-5. Make VK Preview cover imported mesh/material assets before replacing the GDI interaction view.
-6. Add a shader compiler toolchain path rather than making glslang/DXC a hidden build dependency.
-7. Return to .NET hosting after the renderer/resource boundary is stable.
+1. Add a diagnostic textured fragment shader and verify sampled pixels through the VK Preview path.
+2. Add a small decoded-pixel texture cache keyed by AssetGuid.
+3. Decode/cook a first real model format (glTF) into MeshData and reuse the existing GPU mesh upload path.
+4. Make VK Preview cover imported mesh/material assets before replacing the GDI interaction view.
+5. Add a shader compiler toolchain path rather than making glslang/DXC a hidden build dependency.
+6. Return to .NET hosting after the renderer/resource boundary is stable.
