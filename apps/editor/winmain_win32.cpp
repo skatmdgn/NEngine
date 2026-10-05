@@ -117,7 +117,7 @@ int run_editor() {
     reset_log();
 
     write_log(
-        "START: NEngine Editor 0.2.5-dev");
+        "START: NEngine Editor 0.2.6-dev");
 
     write_log(
         "STEP: constructing EditorModel");
@@ -129,7 +129,7 @@ int run_editor() {
         "STEP: creating native Win32 window");
 
     nengine::platform::Window window({
-        "NEngine Editor 0.2.5-dev",
+        "NEngine Editor 0.2.6-dev",
         1440,
         900,
         true});
@@ -203,7 +203,13 @@ int run_editor() {
             L"NEngine Editor - UI Error",
             MB_OK | MB_ICONERROR);
     } else {
+        write_log(
+            "STEP: initial editor refresh");
+
         shell.refresh();
+
+        write_log(
+            "OK: initial editor refresh completed");
 
         write_log(
             "OK: editor shell attached");
