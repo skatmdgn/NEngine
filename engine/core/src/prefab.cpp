@@ -46,12 +46,77 @@ bool PrefabModel::validate(const PrefabData& prefab, std::string* error) {
         return false;
     }
 
+    // Prefab structural validation must not depend on all
+    // runtime component codecs being loaded. Validate hierarchy
+    // with component payloads removed, then validate scene-local
+    // EntityReference values against the prefab object set.
+    SceneData structural_scene =
+        prefab.template_scene;
+
+    for (auto& object :
+         structural_scene.objects) {
+        object.components.clear();
+    }
+
     World validation_world;
     std::string scene_error;
-    if (!SceneSerializer::instantiate(prefab.template_scene, validation_world, &scene_error)) {
-        set_error(error, "invalid prefab scene: " + scene_error);
+
+    if (!SceneSerializer::instantiate(
+            structural_scene,
+            validation_world,
+            &scene_error)) {
+
+        set_error(
+            error,
+            "invalid prefab scene: " +
+                scene_error);
         return false;
     }
+
+    for (const auto& object :
+         prefab.template_scene.objects) {
+
+        for (const auto& component :
+             object.components) {
+
+            for (const auto& property :
+                 component.properties) {
+
+                if (property.kind !=
+                    PropertyKind::EntityReference) {
+                    continue;
+                }
+
+                if (const auto* local =
+                        std::get_if<std::uint64_t>(
+                            &property.value)) {
+
+                    if (!ids.contains(*local)) {
+                        set_error(
+                            error,
+                            "prefab EntityReference targets a missing local object");
+                        return false;
+                    }
+
+                    continue;
+                }
+
+                if (const auto* null_reference =
+                        std::get_if<std::int64_t>(
+                            &property.value);
+                    null_reference &&
+                    *null_reference < 0) {
+                    continue;
+                }
+
+                set_error(
+                    error,
+                    "prefab contains a malformed EntityReference");
+                return false;
+            }
+        }
+    }
+
     return true;
 }
 
