@@ -70,8 +70,11 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Depth buffer and depth-tested pipeline
 - [x] Built-in mesh AssetGuid resolver and GPU mesh cache
 - [x] Multi-draw World Camera/MeshRenderer Vulkan preview
-- [ ] GPU texture/sampler resource
-- [ ] Material/descriptor binding
+- [x] GPU texture/sampler resource
+- [x] Combined-image-sampler material descriptor resource
+- [x] Graphics pipeline layout accepts material descriptor set layout
+- [ ] Bind material descriptor set during indexed draw
+- [ ] Textured fragment shader/sample path
 - [ ] Scene View Vulkan presentation replacement
 - [ ] Android Vulkan surface
 - [ ] PBR/lights/shadows/sprites
