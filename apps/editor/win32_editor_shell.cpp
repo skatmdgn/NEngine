@@ -1139,8 +1139,9 @@ struct Win32EditorShell::Impl {
             vulkan_diagnostic_scene->ready()) {
 
             if (!vulkan_diagnostic_scene
-                    ->present(
-                        *vulkan_context)) {
+                    ->present_world(
+                        *vulkan_context,
+                        editor.presentation_world())) {
 
                 vulkan_preview_enabled =
                     false;
@@ -2918,7 +2919,7 @@ struct Win32EditorShell::Impl {
                     editor.console().info(
                         "Renderer",
                         requested
-                            ? "Vulkan Preview enabled: indexed diagnostic quad presentation is active."
+                            ? "Vulkan Preview enabled: presentation World Camera/MeshRenderer rendering is active."
                             : "Vulkan Preview disabled: returned to GDI Scene View.");
 
                     if (scene) {
