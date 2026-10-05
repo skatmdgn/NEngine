@@ -697,6 +697,12 @@ int main() {
                         render::VulkanShaderModule
                             diagnostic_fragment;
 
+                        render::VulkanShaderModule
+                            diagnostic_textured_vertex;
+
+                        render::VulkanShaderModule
+                            diagnostic_textured_fragment;
+
                         check(
                             diagnostic_vertex.create(
                                 device,
@@ -710,6 +716,20 @@ int main() {
                                 render::VulkanShaderStage::Fragment,
                                 render::diagnostic_fragment_spirv()),
                             "built-in diagnostic fragment SPIR-V creates Vulkan shader module");
+
+                        check(
+                            diagnostic_textured_vertex.create(
+                                device,
+                                render::VulkanShaderStage::Vertex,
+                                render::diagnostic_textured_vertex_spirv()),
+                            "diagnostic textured vertex SPIR-V creates Vulkan shader module");
+
+                        check(
+                            diagnostic_textured_fragment.create(
+                                device,
+                                render::VulkanShaderStage::Fragment,
+                                render::diagnostic_textured_fragment_spirv()),
+                            "diagnostic textured fragment SPIR-V creates Vulkan shader module");
 
                         render::VulkanRenderPass
                             headless_render_pass;
@@ -746,15 +766,17 @@ int main() {
                         check(
                             headless_render_pass.valid() &&
                             gpu_material.valid() &&
+                            diagnostic_textured_vertex.valid() &&
+                            diagnostic_textured_fragment.valid() &&
                             textured_pipeline.create(
                                 device,
                                 headless_render_pass,
-                                diagnostic_vertex,
-                                diagnostic_fragment,
+                                diagnostic_textured_vertex,
+                                diagnostic_textured_fragment,
                                 gpu_material) &&
                             textured_pipeline
                                 .supports_material_descriptors(),
-                            "Vulkan graphics pipeline layout accepts and tracks textured material descriptor set layout");
+                            "texture-sampling SPIR-V creates a material-compatible Vulkan graphics pipeline");
 
                         render::VulkanDepthTarget
                             headless_depth;
@@ -799,6 +821,8 @@ int main() {
                         textured_pipeline.destroy();
                         headless_pipeline.destroy();
                         headless_render_pass.destroy();
+                        diagnostic_textured_fragment.destroy();
+                        diagnostic_textured_vertex.destroy();
                         diagnostic_fragment.destroy();
                         diagnostic_vertex.destroy();
                         gpu_cube.destroy();
