@@ -2,8 +2,9 @@
 
 #include <string>
 
+#include "nengine/core/world.hpp"
+#include "nengine/render/vulkan_builtin_mesh_cache.hpp"
 #include "nengine/render/vulkan_context.hpp"
-#include "nengine/render/vulkan_mesh.hpp"
 #include "nengine/render/vulkan_pipeline.hpp"
 #include "nengine/render/vulkan_shader.hpp"
 
@@ -23,15 +24,21 @@ public:
     bool initialize(
         VulkanContext& context);
 
+    // Fixed diagnostic quad fallback.
     bool present(
         VulkanContext& context);
+
+    // Render supported MeshRenderer items from an actual World.
+    bool present_world(
+        VulkanContext& context,
+        const core::World& world);
 
     void shutdown() noexcept;
 
     bool ready() const noexcept {
         return vertex_shader_.valid() &&
             fragment_shader_.valid() &&
-            mesh_.valid() &&
+            mesh_cache_.ready() &&
             pipeline_.valid();
     }
 
@@ -42,7 +49,7 @@ public:
 private:
     VulkanShaderModule vertex_shader_{};
     VulkanShaderModule fragment_shader_{};
-    VulkanMeshResource mesh_{};
+    VulkanBuiltinMeshCache mesh_cache_{};
     VulkanGraphicsPipeline pipeline_{};
     std::string diagnostic_{};
 };
