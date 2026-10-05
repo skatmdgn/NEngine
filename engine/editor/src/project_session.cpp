@@ -7,6 +7,18 @@ namespace nengine::editor {
 
 ProjectSession::ProjectSession() {
     register_builtin_importers();
+
+    import_pipeline_.register_processor(
+        "NEngine.Scene",
+        assets::copy_source_importer);
+
+    import_pipeline_.register_processor(
+        "NEngine.Script",
+        assets::copy_source_importer);
+
+    import_pipeline_.register_processor(
+        "NEngine.Raw",
+        assets::copy_source_importer);
 }
 
 void ProjectSession::register_builtin_importers() {
@@ -112,6 +124,60 @@ AssetPollResult ProjectSession::poll_assets() {
     }
 
     return result;
+}
+
+assets::ImportResult ProjectSession::import_asset(
+    assets::AssetGuid guid) const {
+
+    if (!open_) {
+        assets::ImportResult result;
+        result.message = "project is not open";
+        return result;
+    }
+
+    const auto* record =
+        assets_.find(guid);
+
+    if (!record) {
+        assets::ImportResult result;
+        result.message = "asset not found";
+        return result;
+    }
+
+    return import_pipeline_.import(
+        *record,
+        importers_,
+        root_ / "Library" / "Cache");
+}
+
+AssetImportSummary ProjectSession::import_supported_assets() const {
+    AssetImportSummary summary;
+    if (!open_) return summary;
+
+    for (const auto& record :
+         assets_.records()) {
+
+        if (!import_pipeline_.has_processor(
+                record.importer_id)) {
+            ++summary.unsupported;
+            continue;
+        }
+
+        ++summary.attempted;
+
+        const auto result =
+            import_asset(record.guid);
+
+        if (!result.success) {
+            ++summary.failed;
+        } else if (result.cache_hit) {
+            ++summary.cache_hits;
+        } else {
+            ++summary.imported;
+        }
+    }
+
+    return summary;
 }
 
 } // namespace nengine::editor
