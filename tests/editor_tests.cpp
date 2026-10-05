@@ -59,6 +59,22 @@ int main() {
         std::filesystem::exists(project_root / "Library" / "Cache"),
         "project creates Library/Cache");
 
+    check(
+        std::filesystem::exists(
+            project_root / "NEngine.nproject"),
+        "project creates persistent manifest");
+
+    check(
+        model.project().manifest().startup_scene ==
+            std::filesystem::path{
+                "Assets/Scenes/Main.nscene"},
+        "project manifest provides default startup scene");
+
+    check(
+        model.project().manifest().target_windows &&
+        model.project().manifest().target_android,
+        "project manifest enables agreed Windows and Android targets");
+
     {
         std::ofstream asset(
             project_root / "Assets" / "Scripts" / "Player.cs",
