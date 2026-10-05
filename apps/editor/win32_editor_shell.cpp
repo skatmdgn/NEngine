@@ -987,7 +987,8 @@ struct Win32EditorShell::Impl {
         if (!nengine::core::SceneSerializer::instantiate(
                 data,
                 editor.world(),
-                &error)) {
+                &error,
+                &editor.component_serialization())) {
             log_line(L"Scene instantiate failed.");
             return false;
         }
@@ -1039,7 +1040,8 @@ struct Win32EditorShell::Impl {
         const auto data =
             nengine::core::SceneSerializer::capture(
                 editor.world(),
-                scene_name);
+                scene_name,
+                &editor.component_serialization());
 
         std::string error;
         if (!nengine::core::SceneSerializer::save_file(
