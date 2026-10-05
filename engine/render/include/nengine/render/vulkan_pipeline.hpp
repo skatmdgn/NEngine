@@ -3,6 +3,7 @@
 #include <string>
 
 #include "nengine/render/vulkan_device.hpp"
+#include "nengine/render/vulkan_material.hpp"
 #include "nengine/render/vulkan_render_pass.hpp"
 #include "nengine/render/vulkan_render_targets.hpp"
 #include "nengine/render/vulkan_shader.hpp"
@@ -32,6 +33,13 @@ public:
         const VulkanShaderModule& vertex_shader,
         const VulkanShaderModule& fragment_shader);
 
+    bool create(
+        const VulkanDevice& device,
+        const VulkanRenderPass& render_pass,
+        const VulkanShaderModule& vertex_shader,
+        const VulkanShaderModule& fragment_shader,
+        const VulkanMaterialResource& material);
+
     void destroy() noexcept;
 
     bool valid() const noexcept {
@@ -52,6 +60,13 @@ public:
     }
 
 private:
+    bool create_internal(
+        const VulkanDevice& device,
+        const VulkanRenderPass& render_pass,
+        const VulkanShaderModule& vertex_shader,
+        const VulkanShaderModule& fragment_shader,
+        void* descriptor_set_layout);
+
     const VulkanDevice* device_api_{nullptr};
     void* device_{nullptr};
     void* layout_{nullptr};
