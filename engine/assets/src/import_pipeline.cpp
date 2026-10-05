@@ -200,6 +200,70 @@ std::string AssetImportPipeline::fingerprint(
     return stream.str();
 }
 
+std::optional<CachedArtifactSet>
+AssetImportPipeline::cached_artifacts(
+    const AssetRecord& asset,
+    const ImporterRegistry& registry,
+    const std::filesystem::path& cache_root) const {
+
+    const auto* importer =
+        registry.find(asset.importer_id);
+
+    if (!importer) {
+        return std::nullopt;
+    }
+
+    const auto cache_directory =
+        cache_root /
+        asset.guid.to_string();
+
+    CachedManifest cached;
+
+    if (!read_manifest(
+            manifest_path(cache_directory),
+            cached)) {
+        return std::nullopt;
+    }
+
+    if (cached.fingerprint !=
+            fingerprint(asset, *importer) ||
+        cached.importer_id !=
+            importer->id ||
+        cached.importer_version !=
+            importer->version ||
+        !artifacts_exist(
+            cache_directory,
+            cached)) {
+        return std::nullopt;
+    }
+
+    CachedArtifactSet result;
+    result.fingerprint =
+        cached.fingerprint;
+    result.importer_id =
+        cached.importer_id;
+    result.importer_version =
+        cached.importer_version;
+
+    result.artifacts.reserve(
+        cached.artifacts.size());
+
+    for (auto artifact :
+         cached.artifacts) {
+
+        if (artifact.path.is_relative()) {
+            artifact.path =
+                cache_directory /
+                artifact.path;
+        }
+
+        result.artifacts.push_back(
+            std::move(artifact));
+    }
+
+    return result;
+}
+
 ImportResult AssetImportPipeline::import(
     const AssetRecord& asset,
     const ImporterRegistry& registry,
