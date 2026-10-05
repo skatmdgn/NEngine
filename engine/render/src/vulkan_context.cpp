@@ -246,6 +246,36 @@ bool VulkanContext::present_mesh(
     return true;
 }
 
+bool VulkanContext::present_meshes(
+    std::span<const VulkanMeshDraw> draws,
+    float clear_red,
+    float clear_green,
+    float clear_blue,
+    float clear_alpha) {
+
+    if (!ready()) {
+        diagnostic_ =
+            "Vulkan context is not ready to present";
+        return false;
+    }
+
+    if (!presenter_.present_meshes(
+            draws,
+            clear_red,
+            clear_green,
+            clear_blue,
+            clear_alpha)) {
+
+        diagnostic_ =
+            presenter_.diagnostic();
+        return false;
+    }
+
+    diagnostic_ =
+        presenter_.diagnostic();
+    return true;
+}
+
 void VulkanContext::shutdown() noexcept {
     presenter_.shutdown();
     render_targets_.destroy();
