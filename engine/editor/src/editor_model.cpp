@@ -1,4 +1,5 @@
 #include "nengine/editor/editor_model.hpp"
+#include "nengine/editor/render_integration.hpp"
 
 namespace nengine::editor {
 
@@ -95,6 +96,16 @@ EditorModel::EditorModel() {
             transform->local_scale = *typed;
             return true;
         });
+
+    if (!register_render_integration(
+            component_registry_,
+            component_serialization_,
+            property_access_)) {
+
+        console_.warning(
+            "Editor",
+            "Render component integration was only partially registered.");
+    }
 
     console_.info(
         "Editor",
