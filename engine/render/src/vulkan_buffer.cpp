@@ -158,6 +158,113 @@ using UnmapMemory =
         void*,
         void*);
 
+
+constexpr std::uint32_t
+VK_STRUCTURE_TYPE_SUBMIT_INFO = 4;
+
+constexpr std::uint32_t
+VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO = 39;
+
+constexpr std::uint32_t
+VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO = 40;
+
+constexpr std::uint32_t
+VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO = 42;
+
+constexpr std::uint32_t
+VK_COMMAND_POOL_CREATE_TRANSIENT_BIT = 0x00000001u;
+
+constexpr std::uint32_t
+VK_COMMAND_BUFFER_LEVEL_PRIMARY = 0u;
+
+constexpr std::uint32_t
+VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT = 0x00000001u;
+
+struct VkCommandPoolCreateInfo {
+    std::uint32_t sType;
+    const void* pNext;
+    std::uint32_t flags;
+    std::uint32_t queueFamilyIndex;
+};
+
+struct VkCommandBufferAllocateInfo {
+    std::uint32_t sType;
+    const void* pNext;
+    void* commandPool;
+    std::uint32_t level;
+    std::uint32_t commandBufferCount;
+};
+
+struct VkCommandBufferBeginInfo {
+    std::uint32_t sType;
+    const void* pNext;
+    std::uint32_t flags;
+    const void* pInheritanceInfo;
+};
+
+struct VkBufferCopy {
+    VkDeviceSize srcOffset;
+    VkDeviceSize dstOffset;
+    VkDeviceSize size;
+};
+
+struct VkSubmitInfo {
+    std::uint32_t sType;
+    const void* pNext;
+    std::uint32_t waitSemaphoreCount;
+    void* const* pWaitSemaphores;
+    const std::uint32_t* pWaitDstStageMask;
+    std::uint32_t commandBufferCount;
+    void* const* pCommandBuffers;
+    std::uint32_t signalSemaphoreCount;
+    void* const* pSignalSemaphores;
+};
+
+using CreateCommandPool =
+    VkResult (*)(
+        void*,
+        const VkCommandPoolCreateInfo*,
+        const void*,
+        void**);
+
+using DestroyCommandPool =
+    void (*)(
+        void*,
+        void*,
+        const void*);
+
+using AllocateCommandBuffers =
+    VkResult (*)(
+        void*,
+        const VkCommandBufferAllocateInfo*,
+        void**);
+
+using BeginCommandBuffer =
+    VkResult (*)(
+        void*,
+        const VkCommandBufferBeginInfo*);
+
+using EndCommandBuffer =
+    VkResult (*)(void*);
+
+using CmdCopyBuffer =
+    void (*)(
+        void*,
+        void*,
+        void*,
+        std::uint32_t,
+        const VkBufferCopy*);
+
+using QueueSubmit =
+    VkResult (*)(
+        void*,
+        std::uint32_t,
+        const VkSubmitInfo*,
+        void*);
+
+using QueueWaitIdle =
+    VkResult (*)(void*);
+
 std::string result_message(
     std::string_view operation,
     VkResult result) {
@@ -257,6 +364,223 @@ T load_device_proc(
 
     return reinterpret_cast<T>(
         device.get_proc_address(name));
+}
+
+bool copy_buffer_sync(
+    const VulkanDevice& device,
+    void* source,
+    void* destination,
+    std::size_t size_bytes,
+    std::string& diagnostic) {
+
+    const auto create_pool =
+        load_device_proc<CreateCommandPool>(
+            device,
+            "vkCreateCommandPool");
+
+    const auto destroy_pool =
+        load_device_proc<DestroyCommandPool>(
+            device,
+            "vkDestroyCommandPool");
+
+    const auto allocate_commands =
+        load_device_proc<AllocateCommandBuffers>(
+            device,
+            "vkAllocateCommandBuffers");
+
+    const auto begin_command =
+        load_device_proc<BeginCommandBuffer>(
+            device,
+            "vkBeginCommandBuffer");
+
+    const auto end_command =
+        load_device_proc<EndCommandBuffer>(
+            device,
+            "vkEndCommandBuffer");
+
+    const auto copy_buffer =
+        load_device_proc<CmdCopyBuffer>(
+            device,
+            "vkCmdCopyBuffer");
+
+    const auto queue_submit =
+        load_device_proc<QueueSubmit>(
+            device,
+            "vkQueueSubmit");
+
+    const auto queue_wait_idle =
+        load_device_proc<QueueWaitIdle>(
+            device,
+            "vkQueueWaitIdle");
+
+    if (!create_pool ||
+        !destroy_pool ||
+        !allocate_commands ||
+        !begin_command ||
+        !end_command ||
+        !copy_buffer ||
+        !queue_submit ||
+        !queue_wait_idle) {
+
+        diagnostic =
+            "required Vulkan staging-copy functions are unavailable";
+        return false;
+    }
+
+    const VkCommandPoolCreateInfo pool_info{
+        VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        nullptr,
+        VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
+        device.graphics_queue_family()
+    };
+
+    void* pool = nullptr;
+
+    auto status =
+        create_pool(
+            device.native_device(),
+            &pool_info,
+            nullptr,
+            &pool);
+
+    if (status != VK_SUCCESS ||
+        !pool) {
+
+        diagnostic =
+            result_message(
+                "vkCreateCommandPool",
+                status);
+        return false;
+    }
+
+    void* command = nullptr;
+
+    const VkCommandBufferAllocateInfo allocate_info{
+        VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        nullptr,
+        pool,
+        VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        1
+    };
+
+    status =
+        allocate_commands(
+            device.native_device(),
+            &allocate_info,
+            &command);
+
+    if (status != VK_SUCCESS ||
+        !command) {
+
+        destroy_pool(
+            device.native_device(),
+            pool,
+            nullptr);
+
+        diagnostic =
+            result_message(
+                "vkAllocateCommandBuffers",
+                status);
+        return false;
+    }
+
+    const VkCommandBufferBeginInfo begin_info{
+        VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        nullptr,
+        VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+        nullptr
+    };
+
+    status =
+        begin_command(
+            command,
+            &begin_info);
+
+    if (status != VK_SUCCESS) {
+        destroy_pool(
+            device.native_device(),
+            pool,
+            nullptr);
+
+        diagnostic =
+            result_message(
+                "vkBeginCommandBuffer",
+                status);
+        return false;
+    }
+
+    const VkBufferCopy region{
+        0,
+        0,
+        static_cast<VkDeviceSize>(
+            size_bytes)
+    };
+
+    copy_buffer(
+        command,
+        source,
+        destination,
+        1,
+        &region);
+
+    status =
+        end_command(command);
+
+    if (status != VK_SUCCESS) {
+        destroy_pool(
+            device.native_device(),
+            pool,
+            nullptr);
+
+        diagnostic =
+            result_message(
+                "vkEndCommandBuffer",
+                status);
+        return false;
+    }
+
+    const VkSubmitInfo submit{
+        VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        nullptr,
+        0,
+        nullptr,
+        nullptr,
+        1,
+        &command,
+        0,
+        nullptr
+    };
+
+    status =
+        queue_submit(
+            device.graphics_queue(),
+            1,
+            &submit,
+            nullptr);
+
+    if (status == VK_SUCCESS) {
+        status =
+            queue_wait_idle(
+                device.graphics_queue());
+    }
+
+    destroy_pool(
+        device.native_device(),
+        pool,
+        nullptr);
+
+    if (status != VK_SUCCESS) {
+        diagnostic =
+            result_message(
+                "Vulkan staging buffer copy",
+                status);
+        return false;
+    }
+
+    diagnostic =
+        "Vulkan staging buffer copy complete";
+
+    return true;
 }
 
 } // namespace
@@ -565,25 +889,71 @@ bool VulkanBufferResource::create(
         memory ==
         VulkanMemoryPreference::HostVisible;
 
-    if (initial_data &&
-        !upload(
-            initial_data,
-            size_bytes,
-            0)) {
+    if (initial_data) {
+        if (host_visible_) {
+            if (!upload(
+                    initial_data,
+                    size_bytes,
+                    0)) {
 
-        const auto upload_error =
-            diagnostic_;
+                const auto upload_error =
+                    diagnostic_;
 
-        destroy();
+                destroy();
 
-        diagnostic_ =
-            upload_error;
+                diagnostic_ =
+                    upload_error;
 
-        return false;
+                return false;
+            }
+        } else {
+            VulkanBufferResource staging;
+
+            if (!staging.create(
+                    loader,
+                    instance,
+                    device,
+                    size_bytes,
+                    VulkanBufferUsage::TransferSource,
+                    VulkanMemoryPreference::HostVisible,
+                    initial_data)) {
+
+                const auto staging_error =
+                    staging.diagnostic();
+
+                destroy();
+
+                diagnostic_ =
+                    "device-local staging allocation failed: " +
+                    staging_error;
+
+                return false;
+            }
+
+            if (!copy_buffer_sync(
+                    device,
+                    staging.native_buffer(),
+                    buffer_,
+                    size_bytes,
+                    diagnostic_)) {
+
+                const auto copy_error =
+                    diagnostic_;
+
+                destroy();
+
+                diagnostic_ =
+                    copy_error;
+
+                return false;
+            }
+        }
     }
 
     diagnostic_ =
-        "Vulkan buffer created";
+        host_visible_
+            ? "host-visible Vulkan buffer created"
+            : "device-local Vulkan buffer created";
 
     return true;
 }
