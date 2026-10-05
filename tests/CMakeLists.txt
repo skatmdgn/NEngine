@@ -17,3 +17,8 @@ add_executable(NEngineScriptingTests scripting_tests.cpp)
 target_link_libraries(NEngineScriptingTests PRIVATE NEngineScripting)
 target_compile_features(NEngineScriptingTests PRIVATE cxx_std_20)
 add_test(NAME NEngineScriptingTests COMMAND NEngineScriptingTests)
+
+add_executable(NEngineRenderTests render_tests.cpp)
+target_link_libraries(NEngineRenderTests PRIVATE NEngineRender)
+target_compile_features(NEngineRenderTests PRIVATE cxx_std_20)
+add_test(NAME NEngineRenderTests COMMAND NEngineRenderTests)
