@@ -64,8 +64,9 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Staging copy into device-local buffers
 - [x] GPU vertex/index mesh resource
 - [x] SPIR-V shader module resource
-- [ ] Graphics pipeline/layout
-- [ ] Indexed mesh draw
+- [x] Graphics pipeline/layout
+- [x] Indexed mesh draw command path
+- [x] Opt-in Win32 diagnostic Vulkan Preview
 - [ ] Depth buffer
 - [ ] GPU texture/sampler resource
 - [ ] Material/descriptor binding
