@@ -605,9 +605,7 @@ bool VulkanClearPresenter::present_clear(
     float alpha) {
 
     return present_frame(
-        nullptr,
-        nullptr,
-        nullptr,
+        {},
         red,
         green,
         blue,
@@ -623,10 +621,32 @@ bool VulkanClearPresenter::present_mesh(
     float clear_blue,
     float clear_alpha) {
 
-    return present_frame(
+    const VulkanMeshDraw draw{
         &pipeline,
         &mesh,
-        &mvp,
+        mvp
+    };
+
+    return present_frame(
+        std::span<
+            const VulkanMeshDraw>{
+                &draw,
+                1},
+        clear_red,
+        clear_green,
+        clear_blue,
+        clear_alpha);
+}
+
+bool VulkanClearPresenter::present_meshes(
+    std::span<const VulkanMeshDraw> draws,
+    float clear_red,
+    float clear_green,
+    float clear_blue,
+    float clear_alpha) {
+
+    return present_frame(
+        draws,
         clear_red,
         clear_green,
         clear_blue,
@@ -634,9 +654,7 @@ bool VulkanClearPresenter::present_mesh(
 }
 
 bool VulkanClearPresenter::present_frame(
-    const VulkanGraphicsPipeline* pipeline,
-    const VulkanMeshResource* mesh,
-    const Mat4* mvp,
+    std::span<const VulkanMeshDraw> draws,
     float red,
     float green,
     float blue,
@@ -649,20 +667,20 @@ bool VulkanClearPresenter::present_frame(
     }
 
     const bool draw_mesh =
-        pipeline ||
-        mesh ||
-        mvp;
+        !draws.empty();
 
-    if (draw_mesh &&
-        (!pipeline ||
-         !mesh ||
-         !mvp ||
-         !pipeline->valid() ||
-         !mesh->valid())) {
+    for (const auto& draw :
+         draws) {
 
-        diagnostic_ =
-            "valid pipeline mesh and MVP are required for indexed draw";
-        return false;
+        if (!draw.pipeline ||
+            !draw.mesh ||
+            !draw.pipeline->valid() ||
+            !draw.mesh->valid()) {
+
+            diagnostic_ =
+                "all Vulkan mesh draws require valid pipeline mesh and MVP";
+            return false;
+        }
     }
 
     needs_resize_ = false;
@@ -984,11 +1002,6 @@ bool VulkanClearPresenter::present_frame(
             {width_, height_}
         };
 
-        bind_pipeline(
-            command,
-            VK_PIPELINE_BIND_POINT_GRAPHICS,
-            pipeline->native_pipeline());
-
         set_viewport(
             command,
             0,
@@ -1001,45 +1014,59 @@ bool VulkanClearPresenter::present_frame(
             1,
             &scissor);
 
-        void* vertex_buffer =
-            mesh
-                ->vertex_buffer()
-                .native_buffer();
-
         constexpr std::uint64_t
             vertex_offset = 0;
 
-        bind_vertex_buffers(
-            command,
-            0,
-            1,
-            &vertex_buffer,
-            &vertex_offset);
+        for (const auto& draw :
+             draws) {
 
-        bind_index_buffer(
-            command,
-            mesh
-                ->index_buffer()
-                .native_buffer(),
-            0,
-            VK_INDEX_TYPE_UINT32);
+            bind_pipeline(
+                command,
+                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                draw.pipeline
+                    ->native_pipeline());
 
-        push_constants(
-            command,
-            pipeline->native_layout(),
-            VK_SHADER_STAGE_VERTEX_BIT,
-            0,
-            static_cast<std::uint32_t>(
-                sizeof(Mat4)),
-            mvp->value.data());
+            void* vertex_buffer =
+                draw.mesh
+                    ->vertex_buffer()
+                    .native_buffer();
 
-        draw_indexed(
-            command,
-            mesh->index_count(),
-            1,
-            0,
-            0,
-            0);
+            bind_vertex_buffers(
+                command,
+                0,
+                1,
+                &vertex_buffer,
+                &vertex_offset);
+
+            bind_index_buffer(
+                command,
+                draw.mesh
+                    ->index_buffer()
+                    .native_buffer(),
+                0,
+                VK_INDEX_TYPE_UINT32);
+
+            push_constants(
+                command,
+                draw.pipeline
+                    ->native_layout(),
+                VK_SHADER_STAGE_VERTEX_BIT,
+                0,
+                static_cast<std::uint32_t>(
+                    sizeof(Mat4)),
+                draw.mvp
+                    .value
+                    .data());
+
+            draw_indexed(
+                command,
+                draw.mesh
+                    ->index_count(),
+                1,
+                0,
+                0,
+                0);
+        }
     }
 
     end_render_pass(command);
@@ -1133,10 +1160,16 @@ bool VulkanClearPresenter::present_frame(
         return false;
     }
 
-    diagnostic_ =
-        draw_mesh
-            ? "Vulkan indexed mesh frame presented"
-            : "Vulkan render-pass clear frame presented";
+    if (draw_mesh) {
+        diagnostic_ =
+            "Vulkan indexed mesh frame presented (" +
+            std::to_string(
+                draws.size()) +
+            " draw(s))";
+    } else {
+        diagnostic_ =
+            "Vulkan render-pass clear frame presented";
+    }
 
     return true;
 }
