@@ -75,6 +75,17 @@ public:
     }
 
     bool can_edit() const noexcept { return !play_session_.is_playing(); }
+
+    void mark_scene_saved() noexcept {
+        saved_scene_state_id_ =
+            commands_.state_id();
+    }
+
+    bool scene_dirty() const noexcept {
+        return commands_.state_id() !=
+            saved_scene_state_id_;
+    }
+
     void sanitize_selection() { selection_.sanitize(presentation_world()); }
 
 private:
@@ -88,6 +99,7 @@ private:
     EditorLayoutState layout_{};
     ProjectSession project_{};
     PropertyAccessRegistry property_access_{};
+    std::uint64_t saved_scene_state_id_{0};
 };
 
 } // namespace nengine::editor
