@@ -10,6 +10,7 @@ add_library(NEngineEditorModel STATIC
   src/project_manifest.cpp
   src/project_session.cpp
   src/presentation.cpp
+  src/render_integration.cpp
   src/scene_interaction.cpp
 )
 
