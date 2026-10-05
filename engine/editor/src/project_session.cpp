@@ -65,6 +65,7 @@ bool ProjectSession::open(
         .lexically_normal();
 
     assets_path_ = root_ / "Assets";
+    manifest_path_ = root_ / "NEngine.nproject";
 
     const std::filesystem::path directories[] = {
         assets_path_,
@@ -89,6 +90,33 @@ bool ProjectSession::open(
         }
     }
 
+    ec.clear();
+
+    if (std::filesystem::exists(
+            manifest_path_,
+            ec) &&
+        !ec) {
+
+        if (!ProjectManifestSerializer::load(
+                manifest_path_,
+                manifest_,
+                error)) {
+            close();
+            return false;
+        }
+    } else {
+        ec.clear();
+        manifest_ = ProjectManifest{};
+
+        if (!ProjectManifestSerializer::save(
+                manifest_,
+                manifest_path_,
+                error)) {
+            close();
+            return false;
+        }
+    }
+
     assets_.set_root(assets_path_);
     assets_.set_importers(&importers_);
     watcher_.set_root(assets_path_);
@@ -104,6 +132,8 @@ void ProjectSession::close() {
     open_ = false;
     root_.clear();
     assets_path_.clear();
+    manifest_path_.clear();
+    manifest_ = ProjectManifest{};
     assets_.clear();
     watcher_.set_root({});
     dependency_graph_.clear();
