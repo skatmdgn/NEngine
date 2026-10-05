@@ -10,6 +10,7 @@
 
 namespace {
 struct TestHealth { int value{100}; };
+struct TestLink { nengine::core::Entity target{nengine::core::Entity::invalid()}; };
 int failures = 0;
 
 void check(bool condition, const char* message) {
@@ -49,9 +50,105 @@ int main() {
     check(transform_type && !registry.register_property(transform_type->id, {"Local Position", PropertyKind::Vec3}), "duplicate property metadata rejected");
 
     const auto health_type = ComponentRegistry::stable_id("Tests.Health");
+    const auto link_type = ComponentRegistry::stable_id("Tests.Link");
+
+    ComponentSerializationRegistry component_serialization;
+
+    check(
+        component_serialization.register_codec({
+            link_type,
+            1,
+            "Tests.Link",
+            [link_type](
+                const World& source,
+                Entity owner)
+                -> std::optional<SerializedComponentData> {
+
+                const auto* link =
+                    source.get_component<TestLink>(
+                        owner,
+                        link_type);
+
+                if (!link) return std::nullopt;
+
+                SerializedComponentData data;
+                data.type = link_type;
+                data.version = 1;
+                data.type_name = "Tests.Link";
+                data.properties.push_back({
+                    "Target",
+                    PropertyKind::EntityReference,
+                    PropertyValue{link->target}
+                });
+                return data;
+            },
+            [link_type](
+                World& destination,
+                Entity owner,
+                const SerializedComponentData& data,
+                std::string* restore_error) {
+
+                Entity target =
+                    Entity::invalid();
+
+                for (const auto& property :
+                     data.properties) {
+
+                    if (property.name != "Target") {
+                        continue;
+                    }
+
+                    const auto* reference =
+                        std::get_if<Entity>(
+                            &property.value);
+
+                    if (!reference) {
+                        if (restore_error) {
+                            *restore_error =
+                                "Tests.Link Target is not an Entity";
+                        }
+                        return false;
+                    }
+
+                    target = *reference;
+                }
+
+                auto* link =
+                    destination.add_component<TestLink>(
+                        owner,
+                        link_type);
+
+                if (!link) {
+                    if (restore_error) {
+                        *restore_error =
+                            "could not add Tests.Link";
+                    }
+                    return false;
+                }
+
+                link->target = target;
+                return true;
+            }
+        }),
+        "component serialization codec registers");
+
     auto* health = world.add_component<TestHealth>(child, health_type);
     check(health != nullptr && health->value == 100, "typed component can be added");
     health->value = 42;
+
+    auto* link =
+        world.add_component<TestLink>(
+            child,
+            link_type);
+
+    check(
+        link != nullptr,
+        "entity-reference test component added");
+
+    if (link) {
+        link->target = parent;
+    }
+
     check(world.has_component(child, health_type), "component presence query succeeds");
     check(world.get_component<TestHealth>(child, health_type)->value == 42, "typed component can be retrieved");
 
@@ -62,7 +159,11 @@ int main() {
     cloned.get_component<TestHealth>(child, health_type)->value = 7;
     check(world.get_component<TestHealth>(child, health_type)->value == 42, "world clone does not alias component storage");
 
-    const auto captured = SceneSerializer::capture(world, "CoreTest");
+    const auto captured =
+        SceneSerializer::capture(
+            world,
+            "CoreTest",
+            &component_serialization);
     check(captured.objects.size() == 2, "scene captures all objects");
 
     std::stringstream stream;
@@ -107,7 +208,13 @@ int main() {
     check(loaded.objects.size() == 2, "scene object count roundtrip");
 
     World restored;
-    check(SceneSerializer::instantiate(loaded, restored, &error), "scene instantiates into world");
+    check(
+        SceneSerializer::instantiate(
+            loaded,
+            restored,
+            &error,
+            &component_serialization),
+        "scene instantiates into world");
     check(restored.size() == 2, "restored world has expected object count");
 
     Entity restored_parent = Entity::invalid();
@@ -120,6 +227,21 @@ int main() {
     check(restored.transform(restored_child)->parent == restored_parent, "scene hierarchy roundtrip");
     check(restored.transform(restored_parent)->local_position == Vec3{10.0f, 20.0f, 30.0f}, "parent transform roundtrip");
     check(restored.transform(restored_child)->local_position == Vec3{1.0f, 2.0f, 3.0f}, "child transform roundtrip");
+
+    const auto* restored_link =
+        restored.get_component<TestLink>(
+            restored_child,
+            link_type);
+
+    check(
+        restored_link != nullptr,
+        "serialized custom component restored");
+
+    check(
+        restored_link &&
+        restored_link->target ==
+            restored_parent,
+        "Scene v3 remaps EntityReference to restored scene entity");
 
     SceneData invalid_scene = loaded;
     invalid_scene.objects[0].parent_local_id = static_cast<std::int64_t>(invalid_scene.objects[1].local_id);
