@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -32,12 +33,17 @@ public:
     bool can_redo() const noexcept { return cursor_ < history_.size(); }
     std::size_t size() const noexcept { return history_.size(); }
     std::size_t cursor() const noexcept { return cursor_; }
+    std::uint64_t state_id() const noexcept {
+        return state_ids_[cursor_];
+    }
     std::string_view undo_name() const noexcept;
     std::string_view redo_name() const noexcept;
 
 private:
     std::vector<std::unique_ptr<EditorCommand>> history_{};
+    std::vector<std::uint64_t> state_ids_{0};
     std::size_t cursor_{0};
+    std::uint64_t next_state_id_{1};
 };
 
 class CreateEntityCommand final : public EditorCommand {
