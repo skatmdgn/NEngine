@@ -4,7 +4,10 @@
 #include <string>
 #include <vector>
 
+#include "nengine/render/vulkan_depth_target.hpp"
 #include "nengine/render/vulkan_device.hpp"
+#include "nengine/render/vulkan_instance.hpp"
+#include "nengine/render/vulkan_loader.hpp"
 #include "nengine/render/vulkan_render_pass.hpp"
 #include "nengine/render/vulkan_swapchain.hpp"
 
@@ -22,6 +25,8 @@ public:
         const VulkanRenderTargets&) = delete;
 
     bool create(
+        const VulkanLoader& loader,
+        const VulkanInstance& instance,
         const VulkanDevice& device,
         const VulkanSwapchain& swapchain);
 
@@ -43,6 +48,11 @@ public:
         return render_pass_;
     }
 
+    const VulkanDepthTarget&
+    depth_target() const noexcept {
+        return depth_target_;
+    }
+
     void* framebuffer(
         std::size_t index) const noexcept {
         return index < framebuffers_.size()
@@ -61,6 +71,7 @@ public:
 private:
     const VulkanDevice* device_api_{nullptr};
     void* device_{nullptr};
+    VulkanDepthTarget depth_target_{};
     VulkanRenderPass render_pass_{};
     std::vector<void*> image_views_{};
     std::vector<void*> framebuffers_{};
