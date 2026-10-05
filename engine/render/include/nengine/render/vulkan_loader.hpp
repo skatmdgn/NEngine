@@ -32,6 +32,10 @@ public:
     Function get_proc_address(
         const char* name) const noexcept;
 
+    Function get_instance_proc_address(
+        void* instance,
+        const char* name) const noexcept;
+
     const std::string& diagnostic() const noexcept {
         return diagnostic_;
     }
