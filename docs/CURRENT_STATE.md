@@ -1,62 +1,144 @@
 # Current state
 
-Version: 0.2.7-dev
-Milestone: Windows editor foundation
+Version: 0.3.0-dev
+Milestone: Asset database complete enough for renderer integration; Vulkan renderer foundation started.
 
-## Windows runtime verified
-The user has now verified the 0.2.6 editor on Windows:
-- [x] Editor window remains open normally.
-- [x] Hierarchy shows Main Camera / Cube / Child Cube.
-- [x] Hierarchy selection updates Inspector.
-- [x] Name editing works.
-- [x] Position editing + Apply Transform works.
-- [x] Undo / Redo work.
-- [x] Play / Pause / Step / Stop work.
-- [x] .nscene Save / Open round-trip works.
-- [x] Korean object names such as 플레이어 display correctly.
+## Verified baseline
 
-This closes the 0.2.6 startup/runtime-stability checkpoint.
+The user previously verified the 0.2.6 Windows editor runtime:
+- Editor opens and remains stable.
+- Hierarchy / selection / Inspector work.
+- Name and Transform editing work.
+- Undo / Redo work.
+- Play / Pause / Step / Stop work.
+- Scene Save / Open round-trip works.
+- UTF-8 names including Korean display correctly.
 
-## 0.2.7 Scene View interaction
+Newer 0.3 features are covered by Windows + Ubuntu CI, but still need another user-side Windows acceptance pass.
+
+## Core / Scene / Prefab
+
 Implemented:
-- [x] Platform-independent Scene View projection module.
-- [x] Parent-aware diagnostic world-position calculation.
-- [x] Scene View object picking.
-- [x] X/Z translation gizmo hit-testing.
-- [x] Screen drag delta -> local Transform conversion.
-- [x] Win32 Scene View click-to-select.
-- [x] Selected object draws X and Z translation axes.
-- [x] Dragging an axis previews the Transform live.
-- [x] Mouse release commits exactly one SetTransformCommand.
-- [x] Undo / Redo therefore treat one drag as one edit.
-- [x] Lost mouse capture restores the pre-drag Transform.
-- [x] Scene interaction math has cross-platform unit coverage.
+- Generational Entity handles and World lifetime.
+- Parent/child Transform hierarchy with cycle prevention.
+- Type-erased native component pools.
+- Stable component type IDs and reflection metadata.
+- World clone/snapshot for Play Mode.
+- Scene v3 serialization.
+- Generic native component serialization codecs.
+- Scene-local EntityReference remapping across save/load.
+- AssetReference serialization as GUID strings.
+- Transactional Scene instantiate.
+- Legacy Scene v1 read compatibility.
+- Prefab model/override representation.
+- Prefab structural validation independent of loaded runtime component codecs.
+- Prefab EntityReference validation.
 
-## Existing foundations
-- Generational Entity / World lifetime.
-- Parent/child Transform hierarchy safety.
-- Type-erased native Component pools.
-- Reflection metadata foundation.
-- Scene and Prefab foundations.
-- Selection and CommandStack.
+## Windows Editor
+
+Implemented:
+- Native Win32 editor shell.
+- Hierarchy / Scene / Inspector / Assets / Console panes.
+- Resizable Hierarchy / Inspector / bottom splitters.
+- Persistent editor pane layout.
+- Structured Console model with severity, filtering model and duplicate collapse.
+- Selection + command stack + Undo/Redo.
+- Undo-aware Scene dirty/savepoint tracking.
+- Dirty marker in editor title.
 - Play Mode cloned Runtime World.
-- Reflection-driven Inspector presentation.
-- Dedicated Win32 EditorHost child window.
-- UTF-8 engine strings <-> UTF-16 Win32 UI.
-- Native Scene Open / Save.
-- Windows CI artifacts.
+- Click selection in Scene View.
+- X/Z translation gizmo drag committed as one command.
+- Generic reflection-driven Inspector presentation.
+- Generic property text editing for bool/int/uint/float/string/Vec3/Quaternion/EntityReference/AssetReference.
+- Generic SetPropertyCommand path for arbitrary registered components.
+- Scene Open / Save.
+- Project startup Scene load.
+- Asset double-click routing for Scene/script/external assets.
+- C# solution generation/open workflow.
 
-## Rendering boundary
-The current Scene View still uses GDI as a diagnostic/editor presentation surface.
-Projection, picking and gizmo interaction are platform-independent Editor code so the behavior survives the future Vulkan viewport replacement.
+The Scene View still uses GDI as a diagnostic/editor surface. It is intentionally separate from the new render runtime contracts.
 
-## Serialization boundary
-Scene serialization currently persists object metadata, hierarchy and Transform.
-Generic native/C# Component property serialization adapters remain pending.
+## Project / Asset database
 
-## 0.2 remaining
-- [ ] User-side Windows runtime verification of click-selection and X/Z gizmo dragging.
-- [ ] Structured Console/log model.
-- [ ] Asset Database + Assets panel.
-- [ ] Generic reflection-to-command property editing beyond Transform.
-- [ ] Docking/layout persistence.
+Implemented:
+- Persistent NEngine.nproject manifest.
+- Manifest validation including safe project-relative startup Scene path.
+- New-project bootstrap with Assets/Scenes, Assets/Scripts, ProjectSettings, Packages and Library/Cache.
+- Persistent startup Main.nscene.
+- Startup Scene contains native Camera and Light components.
+- GUID + .meta asset identity.
+- Extension importer registry.
+- Polling file watcher.
+- Automatic rescan and reimport for changed files.
+- Import fingerprint/cache manifest.
+- Validated cache artifact lookup that rejects stale source/importer versions.
+- Dependency graph forward/reverse edges.
+- Assets panel backed by AssetDatabase.
+- Scene/script/raw source staging.
+- Texture source staging + metadata descriptor.
+  - PNG/BMP/TGA/JPEG dimension probing where supported.
+- Audio source staging + WAV metadata descriptor.
+  - channels, sample rate, bits/sample, data bytes.
+- Model source staging + format/source-size descriptor.
+- Automatic import feedback in Console.
+
+Not yet implemented:
+- Pixel decoding/transcoding and GPU texture upload.
+- Real mesh decoding/cooking (glTF/OBJ/FBX).
+- Audio decode/stream runtime.
+- Dependency extraction from asset contents.
+
+## C# / IDE foundation
+
+Implemented:
+- Managed project generator.
+- .sln / .csproj generation.
+- Assets/Scripts source inclusion.
+- managed-packages.txt NuGet reference manifest.
+- Visual Studio/Rider/default .sln association open path.
+
+Not yet implemented:
+- .NET host/runtime embedding.
+- Gameplay assembly compile/load.
+- hot reload.
+- managed component discovery.
+- debugger attach integration.
+
+## Renderer 0.4 foundation
+
+Implemented:
+- NEngineRender module.
+- Native Camera component.
+- Native Light component.
+- Native MeshRenderer component using AssetGuid mesh/material references.
+- Reflection metadata + Scene serialization codecs for render components.
+- Editor generic property accessors for render components.
+- RenderSnapshot extraction from active World objects.
+- RHI vocabulary/contracts for:
+  - backend selection
+  - opaque buffer/texture/pipeline handles
+  - buffer/texture/pipeline descriptors
+  - swapchain descriptor
+  - RenderDevice interface
+- Render component and Scene round-trip tests.
+
+Not yet implemented:
+- Vulkan instance/device/queues.
+- Windows Vulkan surface/swapchain.
+- command buffers/synchronization.
+- shader compilation/reflection.
+- GPU buffer/texture resource cache.
+- mesh/material binding.
+- camera matrices.
+- actual draw submission.
+- lighting/PBR/shadows/sprites.
+- Android Vulkan surface.
+
+## Immediate next work
+
+1. Keep Windows + Ubuntu CI green for the 0.3/0.4 boundary.
+2. Add renderer-facing asset resolver from AssetGuid -> validated imported artifacts.
+3. Add CPU render resource models for imported texture/model descriptors.
+4. Implement Vulkan backend bootstrap and Windows surface/swapchain.
+5. Replace diagnostic Scene presentation progressively without coupling Editor interaction math to Vulkan.
+6. Return to .NET hosting only after the render/resource boundary is stable.
