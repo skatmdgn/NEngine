@@ -15,6 +15,7 @@ public:
     Win32EditorShell& operator=(const Win32EditorShell&) = delete;
 
     bool attach(void* native_window);
+    void tick();
     void refresh();
 
 private:
