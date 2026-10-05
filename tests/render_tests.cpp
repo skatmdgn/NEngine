@@ -15,6 +15,7 @@
 #include "nengine/render/render_snapshot.hpp"
 #include "nengine/render/rhi.hpp"
 #include "nengine/render/vulkan_loader.hpp"
+#include "nengine/render/vulkan_device.hpp"
 #include "nengine/render/vulkan_instance.hpp"
 
 namespace {
@@ -430,6 +431,31 @@ int main() {
                 check(
                     instance.valid(),
                     "Vulkan instance is valid after successful creation");
+
+                render::VulkanDevice device;
+
+                if (device.create(
+                        loader,
+                        instance)) {
+
+                    check(
+                        device.valid() &&
+                        device.physical_device() != nullptr &&
+                        device.graphics_queue() != nullptr &&
+                        device.graphics_queue_family() !=
+                            0xFFFFFFFFu,
+                        "Vulkan logical device exposes graphics queue state");
+
+                    device.destroy();
+
+                    check(
+                        !device.valid(),
+                        "Vulkan device destroy clears native handle");
+                } else {
+                    check(
+                        !device.diagnostic().empty(),
+                        "Vulkan device bootstrap failure is diagnostic rather than fatal");
+                }
 
                 instance.destroy();
 
