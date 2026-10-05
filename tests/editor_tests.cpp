@@ -270,6 +270,7 @@ int main() {
                 data.type_name = "Tests.Health";
                 data.properties.push_back({
                     "Value",
+                    core::PropertyKind::Integer,
                     core::PropertyValue{
                         component->value
                     }
