@@ -135,6 +135,8 @@ int run_editor() {
 
     project_root /= L"NEngineProject";
 
+    bool loaded_startup_scene = false;
+
     if (editor.project().open(
             project_root,
             &project_error)) {
@@ -143,6 +145,35 @@ int run_editor() {
             "Project",
             "Opened project: " +
                 project_root.generic_string());
+
+        nengine::core::SceneData startup_scene;
+        std::string scene_error;
+
+        if (nengine::core::SceneSerializer::load_file(
+                editor.project().startup_scene_path(),
+                startup_scene,
+                &scene_error) &&
+            nengine::core::SceneSerializer::instantiate(
+                startup_scene,
+                editor.world(),
+                &scene_error,
+                &editor.component_serialization())) {
+
+            loaded_startup_scene = true;
+
+            editor.console().info(
+                "Scene",
+                "Loaded startup scene: " +
+                    editor.project()
+                        .manifest()
+                        .startup_scene
+                        .generic_string());
+        } else {
+            editor.console().warning(
+                "Scene",
+                "Could not load startup scene; using fallback demo world: " +
+                    scene_error);
+        }
 
         const auto layout_path =
             project_root /
@@ -179,7 +210,9 @@ int run_editor() {
                 project_error);
     }
 
-    initialize_demo_world(editor);
+    if (!loaded_startup_scene) {
+        initialize_demo_world(editor);
+    }
 
     write_log(
         "STEP: creating native Win32 window");
