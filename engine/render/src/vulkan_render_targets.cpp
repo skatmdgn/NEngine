@@ -1,6 +1,7 @@
 #include "nengine/render/vulkan_render_targets.hpp"
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 namespace nengine::render {
