@@ -30,6 +30,9 @@ RenderSnapshot build_render_snapshot(
             result.cameras.push_back({
                 entity,
                 *transform,
+                world_matrix(
+                    world,
+                    entity),
                 *camera
             });
         }
@@ -43,6 +46,9 @@ RenderSnapshot build_render_snapshot(
             result.lights.push_back({
                 entity,
                 *transform,
+                world_matrix(
+                    world,
+                    entity),
                 *light
             });
         }
@@ -56,6 +62,9 @@ RenderSnapshot build_render_snapshot(
             result.meshes.push_back({
                 entity,
                 *transform,
+                world_matrix(
+                    world,
+                    entity),
                 *renderer
             });
         }
