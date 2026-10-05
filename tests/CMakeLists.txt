@@ -12,3 +12,8 @@ add_executable(NEngineAssetTests asset_tests.cpp)
 target_link_libraries(NEngineAssetTests PRIVATE NEngineAssets)
 target_compile_features(NEngineAssetTests PRIVATE cxx_std_20)
 add_test(NAME NEngineAssetTests COMMAND NEngineAssetTests)
+
+add_executable(NEngineScriptingTests scripting_tests.cpp)
+target_link_libraries(NEngineScriptingTests PRIVATE NEngineScripting)
+target_compile_features(NEngineScriptingTests PRIVATE cxx_std_20)
+add_test(NAME NEngineScriptingTests COMMAND NEngineScriptingTests)
