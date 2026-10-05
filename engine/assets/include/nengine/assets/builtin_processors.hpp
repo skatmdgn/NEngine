@@ -13,4 +13,7 @@ ImportResult model_source_importer(
 ImportResult audio_source_importer(
     const ImportContext& context);
 
+ImportResult shader_source_importer(
+    const ImportContext& context);
+
 } // namespace nengine::assets
