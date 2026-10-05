@@ -89,7 +89,7 @@ Implemented:
 - Automatic import feedback in Console.
 
 Not yet implemented:
-- Pixel decoding/transcoding.
+- PNG/JPEG/WebP pixel decoding and production texture transcoding/mipmap/compression path.
 - Real mesh decoding/cooking (glTF/OBJ/FBX).
 - Shader source compilation (GLSL/HLSL -> SPIR-V).
 - Audio decode/stream runtime.
@@ -135,6 +135,10 @@ Implemented:
 
 Implemented:
 - AssetGuid -> validated cached texture metadata resolution.
+- AssetGuid + import-fingerprint decoded texture cache.
+- BMP 24/32-bit uncompressed true-color -> normalized top-left RGBA8 decoding.
+- TGA 24/32-bit uncompressed true-color -> normalized top-left RGBA8 decoding.
+- Per-device AssetGuid Vulkan texture/material cache that uploads decoded RGBA8 pixels and reuses matching fingerprints.
 - AssetGuid -> validated cached model metadata resolution.
 - AssetGuid -> shader descriptor + SPIR-V word resolution.
 - Descriptor/source consistency checks for shader word counts and SPIR-V magic.
@@ -228,8 +232,8 @@ The concrete Vulkan backend currently grows beneath this contract. The long-term
 
 ## Immediate next work
 
-1. Add a small decoded-pixel texture cache keyed by AssetGuid.
-2. Decode/cook a first real model format (glTF) into MeshData and reuse the existing GPU mesh upload path.
-3. Make VK Preview cover imported mesh/material assets before replacing the GDI interaction view.
+1. Decode/cook a first real model format (glTF) into MeshData and reuse the existing GPU mesh upload path.
+2. Make VK Preview cover imported mesh/material assets before replacing the GDI interaction view.
+3. Add PNG/JPEG/WebP production image decoding/transcoding behind the decoded-texture cache contract.
 4. Add a shader compiler toolchain path rather than making glslang/DXC a hidden build dependency.
 5. Return to .NET hosting after the renderer/resource boundary is stable.
