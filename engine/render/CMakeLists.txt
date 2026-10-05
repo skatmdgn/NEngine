@@ -1,5 +1,6 @@
 add_library(NEngineRender STATIC
   src/asset_resources.cpp
+  src/matrix.cpp
   src/mesh_data.cpp
   src/registration.cpp
   src/render_snapshot.cpp
