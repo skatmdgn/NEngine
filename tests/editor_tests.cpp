@@ -1,4 +1,7 @@
+#include <chrono>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -21,6 +24,56 @@ int main() {
     using namespace nengine;
 
     editor::EditorModel model;
+
+    model.console().info("Test", "hello");
+    model.console().info("Test", "hello");
+    model.console().warning("Test", "warning");
+    check(model.console().size() == 3, "console keeps non-consecutive startup/test entries");
+    check(model.console().entries()[1].repeat_count == 2, "console collapses consecutive identical entries");
+    check(model.console().count(editor::LogSeverity::Warning) == 1, "console counts severity");
+
+    const auto project_stamp =
+        std::chrono::high_resolution_clock::now()
+            .time_since_epoch().count();
+
+    const auto project_root =
+        std::filesystem::temp_directory_path() /
+        ("nengine_editor_project_" +
+         std::to_string(project_stamp));
+
+    std::string project_error;
+    check(
+        model.project().open(project_root, &project_error),
+        "project session opens");
+    check(
+        std::filesystem::exists(project_root / "Assets" / "Scenes"),
+        "project creates Assets/Scenes");
+    check(
+        std::filesystem::exists(project_root / "Library" / "Cache"),
+        "project creates Library/Cache");
+
+    {
+        std::ofstream asset(
+            project_root / "Assets" / "Scripts" / "Player.cs",
+            std::ios::binary | std::ios::trunc);
+        asset << "class Player {}";
+    }
+
+    const auto project_scan =
+        model.project().refresh_assets();
+
+    check(
+        model.project().assets().find_relative("Scripts/Player.cs") != nullptr,
+        "project asset database sees created script");
+
+    const auto* script_asset =
+        model.project().assets().find_relative("Scripts/Player.cs");
+
+    check(
+        script_asset &&
+        script_asset->importer_id == "NEngine.Script",
+        "project chooses script importer");
+
     auto& world = model.world();
     const auto root = world.create("Root");
     const auto child = world.create("Child");
@@ -169,6 +222,12 @@ int main() {
     world.destroy(child);
     model.sanitize_selection();
     check(model.selection().empty(), "selection drops destroyed entities");
+
+    model.project().close();
+    std::error_code cleanup_error;
+    std::filesystem::remove_all(
+        project_root,
+        cleanup_error);
 
     if (failures == 0) {
         std::cout << "NEngineEditorTests: PASS\n";
