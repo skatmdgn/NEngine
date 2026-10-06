@@ -357,12 +357,16 @@ Implemented foundation includes:
 - real combined-image-sampler texture sampling in VK Preview.
 - AssetGuid + fingerprint decoded RGBA8 cache with BMP/TGA decoding foundation.
 - per-device Vulkan texture/material AssetGuid cache.
+- glTF/GLB geometry decode into MeshData with handedness conversion.
+- AssetGuid + fingerprint CPU/GPU mesh caches.
+- imported glTF/GLB MeshRenderer geometry resolution in VK Preview.
 
 Immediate implementation order:
-1. First real glTF MeshData/material cooking path.
-2. Imported mesh/material rendering in VK Preview.
-3. Production PNG/JPEG/WebP image decoding/transcoding.
-4. Shader compiler toolchain.
+1. Production PNG/JPEG/WebP image decoding/transcoding.
+2. glTF material/image dependency cooking and Material AssetGuid representation.
+3. Imported material/texture binding in VK Preview.
+4. External .gltf sidecar dependency staging.
+5. Shader compiler toolchain.
 5. Replace remaining GDI presentation where appropriate.
 6. Vulkan Game View.
 7. PBR/lights/shadows/sprites.
@@ -435,7 +439,7 @@ The active development line is currently Renderer 0.4.
 
 The immediate sequence is:
 
-`glTF mesh/material cooking -> imported asset VK Preview -> production image decode/transcode -> shader toolchain`
+`production image decode/transcode -> glTF material/image cooking -> imported material VK Preview -> shader toolchain`
 
 After the renderer/resource boundary is proven with real assets, development returns to the .NET gameplay runtime.
 
