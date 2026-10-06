@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -541,6 +542,79 @@ int main() {
     check(
         saw_camera_component,
         "generic Inspector includes Camera component");
+
+    // Regression: the Win32 property list must retain the selected
+    // (component type, property path) after a full Inspector rebuild,
+    // even when the same property name occurs on different components.
+    auto property_snapshot =
+        render_inspector;
+
+    editor::InspectorComponent mesh_component;
+    mesh_component.type =
+        render::mesh_renderer_type();
+    mesh_component.name =
+        "NEngine.MeshRenderer";
+    mesh_component.fields.push_back({
+        "Enabled",
+        "Enabled",
+        core::PropertyKind::Bool,
+        core::PropertyValue{true},
+        true
+    });
+    property_snapshot.components.insert(
+        property_snapshot.components.begin(),
+        mesh_component);
+
+    const auto enabled_row =
+        editor::find_inspector_property_row(
+            property_snapshot,
+            render::mesh_renderer_type(),
+            "Enabled");
+
+    const auto fov_row =
+        editor::find_inspector_property_row(
+            property_snapshot,
+            render::camera_type(),
+            "Vertical FOV");
+
+    check(
+        enabled_row.has_value() &&
+        *enabled_row == 0u &&
+        fov_row.has_value() &&
+        *fov_row != *enabled_row,
+        "Reflection Properties distinguishes a selected field from first MeshRenderer.Enabled row");
+
+    auto reordered_snapshot =
+        property_snapshot;
+
+    for (auto& component :
+         reordered_snapshot.components) {
+        if (component.type ==
+            render::camera_type()) {
+            std::reverse(
+                component.fields.begin(),
+                component.fields.end());
+        }
+    }
+
+    const auto reordered_fov_row =
+        editor::find_inspector_property_row(
+            reordered_snapshot,
+            render::camera_type(),
+            "Vertical FOV");
+
+    check(
+        fov_row.has_value() &&
+        reordered_fov_row.has_value() &&
+        *fov_row != *reordered_fov_row,
+        "Reflection Properties restores selection by field identity after row reorder");
+
+    check(
+        !editor::find_inspector_property_row(
+            property_snapshot,
+            render::camera_type(),
+            "Unknown Field").has_value(),
+        "Reflection Properties detects removed fields instead of selecting a stale row");
 
     check(
         model.commands().execute(
