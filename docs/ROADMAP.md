@@ -46,6 +46,8 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [ ] WebP decode + mipmap/compression/transcoding
 - [x] .nmat importer + texture dependency graph
 - [x] glTF/GLB geometry decode into MeshData
+- [x] First glTF PBR base-color image decode (PNG/JPEG GLB bufferView/data URI/external file)
+- [x] Reject unsafe external glTF resource URIs
 - [x] AssetGuid decoded/GPU mesh caches
 - [ ] glTF material/image dependency cooking
 - [ ] External .gltf sidecar dependency staging
@@ -86,6 +88,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Per-device Vulkan texture/material AssetGuid cache
 - [x] Imported glTF/GLB mesh AssetGuid resolution in VK Preview
 - [x] .nmat Material AssetGuid -> imported texture Vulkan binding
+- [x] GLB/glTF first-primitive base-color texture automatic Vulkan preview fallback
 - [ ] Automatic glTF material/image -> NEngine material cooking
 - [ ] Scene View Vulkan presentation replacement
 - [ ] Android Vulkan surface

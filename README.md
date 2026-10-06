@@ -43,7 +43,7 @@ The repository currently includes:
 - .nmat Material AssetGuid assets with texture dependency tracking and Vulkan descriptor caching
 - texture-sampling diagnostic shaders exercised by VK Preview
 - glTF/GLB geometry decode into MeshData with AssetGuid CPU/GPU mesh caches
-- opt-in VK Preview that renders the actual presentation World Camera + built-in/imported glTF geometry and .nmat imported textures
+- opt-in VK Preview that renders the actual presentation World Camera + built-in/imported glTF geometry, explicit .nmat textures, and auto-sampled glTF first-primitive PBR base-color PNG/JPEG when MeshRenderer.material is unset
 - Windows + Ubuntu CI tests
 
 The Win32 Scene View still uses GDI by default for interactive object/gizmo editing. The opt-in VK Preview now uses the real Vulkan graphics path for depth-tested indexed World rendering, while the GDI view remains the safe editing fallback.

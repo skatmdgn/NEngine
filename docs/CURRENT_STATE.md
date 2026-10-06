@@ -58,7 +58,7 @@ Implemented:
 - Win32 Scene View attempts Vulkan window-context bootstrap.
 - Vulkan bootstrap success/failure is reported to Console without making Vulkan availability an editor-startup requirement.
 
-The Scene View still uses GDI by default for interactive diagnostic object/gizmo drawing. An opt-in **VK Preview** toolbar toggle now renders the actual presentation World through Vulkan when supported: it reads the active Camera plus MeshRenderer items from RenderSnapshot, resolves built-in Cube/Quad AssetGuids and supported imported glTF/GLB AssetGuids to cached GPU meshes, computes per-object MVP matrices, and submits multiple indexed draws in one render pass. Imported geometry currently uses the diagnostic textured material until the material-asset path is implemented. Turning the toggle off immediately returns to the GDI interaction view.
+The Scene View still uses GDI by default for interactive diagnostic object/gizmo drawing. An opt-in **VK Preview** toolbar toggle now renders the actual presentation World through Vulkan when supported: it reads the active Camera plus MeshRenderer items from RenderSnapshot, resolves built-in Cube/Quad AssetGuids and supported imported glTF/GLB AssetGuids to cached GPU meshes, computes per-object MVP matrices, and submits multiple indexed draws in one render pass. Imported geometry uses an explicitly assigned .nmat texture when available; if material is unset, supported glTF/GLB first-primitive PBR base-color PNG/JPEG is decoded and sampled automatically. Otherwise the renderer retains its diagnostic textured fallback. Turning the toggle off immediately returns to the GDI interaction view.
 
 ## Project / Asset database
 
@@ -86,13 +86,14 @@ Implemented:
 - First glTF 2.0 geometry decode path:
   - .glb 2.0 JSON/BIN chunks.
   - .gltf base64 data-URI buffers.
-  - external buffers when available beside the resolved source.
+  - external buffers when available beside the resolved source (external .gltf sidecar cache staging remains incomplete).
   - TRIANGLES primitives.
   - float POSITION/NORMAL/TEXCOORD_0.
   - unsigned byte/short/int indices.
   - interleaved byteStride support.
   - multiple mesh primitives concatenated into MeshData.
   - right-handed glTF -> NEngine left-handed Z reflection + winding conversion.
+  - glTF external buffer/image path traversal and unsupported URI forms rejected.
 - SPIR-V shader import.
   - .spv validation by size/magic.
   - .vert.spv/.frag.spv stage hints.
@@ -101,7 +102,7 @@ Implemented:
 
 Not yet implemented:
 - WebP pixel decoding and production texture transcoding/mipmap/compression path.
-- glTF material/image dependency cooking, node transforms, skins, morphs, sparse/quantized accessors and current import-cache staging for external .gltf sidecar buffers.
+- Full glTF multi-primitive/multi-material cooking into independent NEngine material/texture AssetGuids, material factors, node transforms, skins, morphs, sparse/quantized accessors and import-cache staging for external .gltf sidecar buffers/images.
 - OBJ/FBX mesh decoding/cooking.
 - Shader source compilation (GLSL/HLSL -> SPIR-V).
 - Audio decode/stream runtime.
@@ -159,6 +160,8 @@ Implemented:
 - Per-device AssetGuid Vulkan mesh cache reusing uploaded vertex/index buffers.
 - VK Preview can resolve imported glTF/GLB MeshRenderer.mesh GUIDs through the project cache.
 - MeshRenderer.material can resolve a .nmat AssetGuid to a real imported PNG/JPEG/BMP/TGA texture and Vulkan descriptor, with diagnostic material fallback on failure.
+- When no explicit material is assigned, GLB/glTF first-primitive PBR baseColorTexture may automatically decode a PNG/JPEG bufferView, base64 data URI or local external image into RGBA8 and upload it as a sampled Vulkan material.
+- Explicit .nmat overrides the automatic glTF texture; a missing/unsupported auto texture falls back to diagnostic material without repeated parsing every frame.
 - Imported mesh/material GPU caches are invalidated after asset filesystem changes.
 - AssetGuid -> shader descriptor + SPIR-V word resolution.
 - Descriptor/source consistency checks for shader word counts and SPIR-V magic.
@@ -228,8 +231,8 @@ Implemented:
 - Diagnostic textured vertex/fragment GLSL sources with audited SPIR-V fixtures.
 - Textured vertex path forwards MeshVertex UVs to the fragment stage.
 - Diagnostic fragment shader samples set 0 / binding 0 sampler2D.
-- VK Preview uses a 2x2 diagnostic RGBA8 texture/material as the fallback material, while valid .nmat MeshRenderer.material GUIDs bind imported texture descriptors.
-- Headless Vulkan CI validates texture upload, sampler creation, material descriptors, textured shader modules, a real texture-sampling graphics pipeline, and .nmat -> texture artifacts -> Vulkan sampled descriptor creation.
+- VK Preview uses a 2x2 diagnostic RGBA8 texture/material as the fallback material; .nmat MeshRenderer.material binds explicitly imported texture descriptors and an unset material can sample the first glTF PBR base-color texture.
+- Headless Vulkan CI validates texture upload, sampler creation, material descriptors, textured shader modules, a real texture-sampling graphics pipeline, .nmat -> texture descriptors and glTF auto-texture upload. CPU tests cover GLB JSON/BIN geometry plus PNG bufferView, glTF PNG data URIs, and unsafe external resource rejection.
 
 Not yet implemented:
 - Automatic glTF material/texture dependency cooking into NEngine material assets.
@@ -252,7 +255,7 @@ The concrete Vulkan backend currently grows beneath this contract. The long-term
 
 ## Immediate next work
 
-1. Extract glTF material/image relationships and map them into the .nmat/Texture AssetGuid model automatically.
+1. Extend the first glTF PBR base-color preview path to proper multi-material/image extraction and persistent .nmat/Texture AssetGuid cooking.
 2. Stage/track external .gltf sidecar buffers and image dependencies through the asset import pipeline.
 3. Add WebP decoding plus mipmap/compression/transcoding policy behind the decoded-texture cache.
 4. Add node-transform-aware glTF scene/mesh cooking plus quantized/sparse accessor support where needed.
