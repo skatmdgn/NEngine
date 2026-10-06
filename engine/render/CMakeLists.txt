@@ -3,6 +3,7 @@ add_library(NEngineRender STATIC
   src/builtin_assets.cpp
   src/decoded_texture.cpp
   src/diagnostic_shaders.cpp
+  src/gltf_mesh.cpp
   src/matrix.cpp
   src/mesh_data.cpp
   src/registration.cpp
