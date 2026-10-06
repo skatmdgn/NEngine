@@ -67,6 +67,19 @@ bool VulkanDiagnosticScene::initialize(
         return false;
     }
 
+    if (!imported_mesh_cache_.initialize(
+            context.loader(),
+            context.instance(),
+            context.device())) {
+
+        diagnostic_ =
+            "imported Vulkan mesh cache failed: " +
+            imported_mesh_cache_.diagnostic();
+
+        shutdown();
+        return false;
+    }
+
     const std::uint8_t pixels[] = {
         255u,  48u,  48u, 255u,
          48u, 255u,  96u, 255u,
@@ -207,7 +220,9 @@ bool VulkanDiagnosticScene::present(
 
 bool VulkanDiagnosticScene::present_world(
     VulkanContext& context,
-    const core::World& world) {
+    const core::World& world,
+    const CachedArtifactResolver&
+        asset_resolver) {
 
     if (!ready() ||
         !context.ready()) {
@@ -259,15 +274,63 @@ bool VulkanDiagnosticScene::present_world(
     draws.reserve(
         snapshot.meshes.size());
 
+    std::size_t imported_draws = 0;
+    std::size_t unresolved_draws = 0;
+    std::string last_asset_error;
+
     for (const auto& item :
          snapshot.meshes) {
 
-        const auto* mesh =
+        const VulkanMeshResource* mesh =
             mesh_cache_.find(
                 item.renderer.mesh);
 
+        bool imported = false;
+
         if (!mesh) {
+            mesh =
+                imported_mesh_cache_.find(
+                    item.renderer.mesh);
+
+            imported =
+                mesh != nullptr;
+        }
+
+        if (!mesh &&
+            asset_resolver) {
+
+            const auto artifacts =
+                asset_resolver(
+                    item.renderer.mesh);
+
+            if (artifacts) {
+                std::string asset_error;
+
+                mesh =
+                    imported_mesh_cache_.load(
+                        item.renderer.mesh,
+                        *artifacts,
+                        &asset_error);
+
+                imported =
+                    mesh != nullptr;
+
+                if (!mesh &&
+                    !asset_error.empty()) {
+                    last_asset_error =
+                        std::move(
+                            asset_error);
+                }
+            }
+        }
+
+        if (!mesh) {
+            ++unresolved_draws;
             continue;
+        }
+
+        if (imported) {
+            ++imported_draws;
         }
 
         draws.push_back({
@@ -293,7 +356,15 @@ bool VulkanDiagnosticScene::present_world(
         }
 
         diagnostic_ =
-            "Vulkan World preview cleared; no supported built-in MeshRenderer items found";
+            "Vulkan World preview cleared; no resolvable MeshRenderer items found";
+
+        if (unresolved_draws != 0u &&
+            !last_asset_error.empty()) {
+            diagnostic_ +=
+                ": " +
+                last_asset_error;
+        }
+
         return true;
     }
 
@@ -309,7 +380,18 @@ bool VulkanDiagnosticScene::present_world(
         "Vulkan World preview presented " +
         std::to_string(
             draws.size()) +
-        " draw(s)";
+        " draw(s), " +
+        std::to_string(
+            imported_draws) +
+        " imported";
+
+    if (unresolved_draws != 0u) {
+        diagnostic_ +=
+            ", " +
+            std::to_string(
+                unresolved_draws) +
+            " unresolved";
+    }
 
     return true;
 }
@@ -318,6 +400,7 @@ void VulkanDiagnosticScene::shutdown() noexcept {
     pipeline_.destroy();
     material_.destroy();
     texture_.destroy();
+    imported_mesh_cache_.shutdown();
     mesh_cache_.shutdown();
     fragment_shader_.destroy();
     vertex_shader_.destroy();
