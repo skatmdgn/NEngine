@@ -134,6 +134,9 @@ int main() {
         std::filesystem::exists(project_root / "Assets" / "Scenes"),
         "project creates Assets/Scenes");
     check(
+        std::filesystem::exists(project_root / "Assets" / "Materials"),
+        "project creates Assets/Materials");
+    check(
         std::filesystem::exists(project_root / "Library" / "Cache"),
         "project creates Library/Cache");
 
@@ -436,6 +439,65 @@ int main() {
             texture_asset->guid).kind ==
             editor::AssetActivationKind::OpenExternal,
         "texture asset routes to external preview fallback");
+
+    const auto texture_guid =
+        texture_asset
+            ? texture_asset->guid
+            : assets::AssetGuid{};
+
+    const auto material_path =
+        project_root /
+        "Assets" /
+        "Materials" /
+        "Checker.nmat";
+
+    {
+        std::ofstream material(
+            material_path,
+            std::ios::binary |
+                std::ios::trunc);
+
+        material
+            << "NENGINE_MATERIAL 1\n"
+            << "BASE_COLOR_TEXTURE \""
+            << texture_guid.to_string()
+            << "\"\n"
+            << "END_MATERIAL\n";
+    }
+
+    const auto material_poll =
+        model.project().poll_assets();
+
+    check(
+        material_poll.changes.size() == 1 &&
+        material_poll.imports.attempted == 1 &&
+        material_poll.imports.imported == 1 &&
+        material_poll.imports.failed == 0,
+        "new nmat material is detected and automatically imported");
+
+    const auto* material_asset =
+        model.project().assets().find_relative(
+            "Materials/Checker.nmat");
+
+    check(
+        material_asset &&
+        material_asset->importer_id ==
+            "NEngine.Material",
+        "nmat asset selects material importer");
+
+    if (material_asset) {
+        const auto dependencies =
+            model.project()
+                .dependency_graph()
+                .dependencies(
+                    material_asset->guid);
+
+        check(
+            dependencies.size() == 1u &&
+            dependencies[0] ==
+                texture_guid,
+            "material importer records base-color texture dependency");
+    }
 
     auto& world = model.world();
 
