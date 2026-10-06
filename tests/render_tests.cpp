@@ -1513,6 +1513,72 @@ int main() {
                             gpu_material_asset_cache.size() == 1u,
                             "nmat resolves texture artifacts into a real Vulkan sampled material descriptor");
 
+                        // Full automatic model material path: model cache
+                        // metadata -> glTF PBR image URI -> PNG decode ->
+                        // Vulkan sampled texture and descriptor.
+                        const auto gltf_auto_source =
+                            material_gpu_root / "auto_textured.gltf";
+                        const auto gltf_auto_descriptor =
+                            material_gpu_root / "auto_model.nasset";
+                        const auto gltf_auto_guid =
+                            assets::AssetGuid::generate();
+
+                        {
+                            std::ofstream output(
+                                gltf_auto_source,
+                                std::ios::binary | std::ios::trunc);
+                            output
+                                << R"json({"asset":{"version":"2.0"},"meshes":[{"primitives":[{"material":0}]}],"materials":[{"pbrMetallicRoughness":{"baseColorTexture":{"index":0}}}],"textures":[{"source":0}],"images":[{"uri":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAEUlEQVR42mP4z8Dwn+E/w38AEPgD/Tyf5vYAAAAASUVORK5CYII="}]})json";
+                        }
+
+                        {
+                            std::ofstream output(
+                                gltf_auto_descriptor,
+                                std::ios::binary | std::ios::trunc);
+                            output
+                                << "NENGINE_MODEL 1\n"
+                                << "FORMAT \".gltf\"\n"
+                                << "SOURCE \"auto_textured.gltf\"\n"
+                                << "SOURCE_BYTES "
+                                << std::filesystem::file_size(
+                                    gltf_auto_source)
+                                << "\n"
+                                << "END_MODEL\n";
+                        }
+
+                        assets::CachedArtifactSet gltf_auto_cached;
+                        gltf_auto_cached.importer_id = "NEngine.Model";
+                        gltf_auto_cached.fingerprint = "gltf-auto-v1";
+                        gltf_auto_cached.artifacts.push_back({
+                            gltf_auto_source, "source"
+                        });
+                        gltf_auto_cached.artifacts.push_back({
+                            gltf_auto_descriptor, "model-descriptor"
+                        });
+
+                        const auto* auto_gpu_material =
+                            gpu_material_asset_cache.load_gltf_base_color(
+                                gltf_auto_guid,
+                                gltf_auto_cached,
+                                &material_asset_error);
+
+                        check(
+                            auto_gpu_material &&
+                            auto_gpu_material->valid() &&
+                            gpu_material_asset_cache.find_gltf_base_color(
+                                gltf_auto_guid) == auto_gpu_material,
+                            "GLB/glTF auto material uploads first PBR base-color image as Vulkan descriptor");
+
+                        gpu_material_asset_cache.clear();
+
+                        check(
+                            gpu_material_asset_cache.find_gltf_base_color(
+                                gltf_auto_guid) == nullptr &&
+                            gpu_material_asset_cache.find(
+                                imported_material_guid) == nullptr,
+                            "automatic glTF and explicit nmat GPU materials invalidate together");
+
+
                         render::VulkanMaterialResource
                             gpu_material;
 
