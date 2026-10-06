@@ -500,6 +500,161 @@ int main() {
             "material importer records base-color texture dependency");
     }
 
+    // External glTF sources should stage .bin/images as ordinary asset
+    // dependencies. A sidecar edit invalidates the parent model import
+    // even though the .gltf text and size are unchanged.
+    const auto models_root =
+        project_root / "Assets" / "Models";
+    const auto sidecar_root =
+        models_root / "SidecarTest";
+    const auto geometry_path =
+        sidecar_root / "geometry" / "mesh.bin";
+    const auto image_path =
+        sidecar_root / "images" / "albedo.png";
+    const auto gltf_path =
+        sidecar_root / "scene.gltf";
+
+    std::filesystem::create_directories(geometry_path.parent_path());
+    std::filesystem::create_directories(image_path.parent_path());
+
+    {
+        std::ofstream output(
+            geometry_path, std::ios::binary | std::ios::trunc);
+        output << "12345678";
+    }
+    {
+        std::ofstream output(
+            image_path, std::ios::binary | std::ios::trunc);
+        output << "\x89PNG\r\n\x1A\n";
+    }
+    {
+        std::ofstream output(
+            gltf_path, std::ios::binary | std::ios::trunc);
+        output
+            << R"json({"asset":{"version":"2.0"},"buffers":[{"uri":"geometry/mesh.bin","byteLength":8}],"images":[{"uri":"images/albedo.png"}]})json";
+    }
+
+    const auto model_poll =
+        model.project().poll_assets();
+    const auto* imported_gltf =
+        model.project().assets().find_relative(
+            "Models/SidecarTest/scene.gltf");
+    const auto* imported_bin =
+        model.project().assets().find_relative(
+            "Models/SidecarTest/geometry/mesh.bin");
+    const auto* imported_image =
+        model.project().assets().find_relative(
+            "Models/SidecarTest/images/albedo.png");
+
+    check(
+        model_poll.imports.failed == 0 &&
+        imported_gltf && imported_bin && imported_image,
+        "project imports glTF alongside external bin/image sidecars");
+
+    const auto model_guid =
+        imported_gltf ? imported_gltf->guid : assets::AssetGuid{};
+    const auto bin_guid =
+        imported_bin ? imported_bin->guid : assets::AssetGuid{};
+    const auto image_guid =
+        imported_image ? imported_image->guid : assets::AssetGuid{};
+
+    if (model_guid.valid()) {
+        const auto dependencies =
+            model.project().dependency_graph().dependencies(model_guid);
+
+        check(
+            dependencies.size() == 2u &&
+            std::find(dependencies.begin(), dependencies.end(), bin_guid) !=
+                dependencies.end() &&
+            std::find(dependencies.begin(), dependencies.end(), image_guid) !=
+                dependencies.end(),
+            "glTF import records sidecar AssetGuid dependencies");
+    }
+
+    const auto staged_model =
+        model.project().cached_artifacts(model_guid);
+    std::string original_model_fingerprint;
+    std::size_t sidecar_artifacts = 0;
+
+    if (staged_model) {
+        original_model_fingerprint = staged_model->fingerprint;
+        for (const auto& artifact : staged_model->artifacts) {
+            if (artifact.role == "model-sidecar" &&
+                std::filesystem::is_regular_file(artifact.path)) {
+                ++sidecar_artifacts;
+            }
+        }
+    }
+
+    check(
+        staged_model.has_value() &&
+        sidecar_artifacts == 2u &&
+        std::filesystem::exists(
+            project_root / "Library" / "Cache" /
+            model_guid.to_string() / "geometry" / "mesh.bin") &&
+        std::filesystem::exists(
+            project_root / "Library" / "Cache" /
+            model_guid.to_string() / "images" / "albedo.png"),
+        "glTF importer stages relative binary and image paths for renderer");
+
+    {
+        std::ofstream output(
+            geometry_path, std::ios::binary | std::ios::trunc);
+        output << "87654321";
+    }
+    std::error_code sidecar_time_error;
+    const auto old_time = std::filesystem::last_write_time(
+        geometry_path, sidecar_time_error);
+    if (!sidecar_time_error) {
+        std::filesystem::last_write_time(
+            geometry_path, old_time + std::chrono::seconds(2),
+            sidecar_time_error);
+    }
+
+    check(
+        !model.project().cached_artifacts(model_guid).has_value(),
+        "edited glTF sidecar invalidates cached model fingerprint");
+
+    const auto changed_sidecar_poll =
+        model.project().poll_assets();
+
+    const auto restaged_model =
+        model.project().cached_artifacts(model_guid);
+
+    check(
+        changed_sidecar_poll.imports.attempted >= 2u &&
+        changed_sidecar_poll.imports.failed == 0 &&
+        restaged_model.has_value() &&
+        restaged_model->fingerprint != original_model_fingerprint,
+        "sidecar file watcher reimports dependent glTF model");
+
+    {
+        std::ifstream input(
+            project_root / "Library" / "Cache" /
+            model_guid.to_string() / "geometry" / "mesh.bin",
+            std::ios::binary);
+        std::string copied(8, '\0');
+        input.read(copied.data(), 8);
+        check(
+            input.good() && copied == "87654321",
+            "updated glTF sidecar payload is restaged into model cache");
+    }
+
+    // Cache hits must retain a separate .nmat's texture dependency.
+    if (material_asset) {
+        const auto cached_material =
+            model.project().import_asset(material_asset->guid);
+        const auto dependencies =
+            model.project().dependency_graph().dependencies(
+                material_asset->guid);
+
+        check(
+            cached_material.success && cached_material.cache_hit &&
+            dependencies.size() == 1u &&
+            dependencies.front() == texture_guid,
+            "material dependency survives import cache hit");
+    }
+
     auto& world = model.world();
 
     const auto render_entity =
