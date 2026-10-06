@@ -2497,6 +2497,45 @@ bool decode_gltf_base_color_texture(
         materials->array[*material_index],
         "pbrMetallicRoughness");
 
+    // glTF baseColorFactor values are linear. Vulkan SRGB textures
+    // convert to linear on sampling, so bake the tint in linear space
+    // and encode it back to SRGB for the existing sampler path.
+    std::array<double, 4> factor{1.0, 1.0, 1.0, 1.0};
+    if (const auto* json_factor = pbr
+            ? member(*pbr, "baseColorFactor")
+            : nullptr) {
+        if (json_factor->kind != JsonValue::Kind::Array ||
+            json_factor->array.size() != 4u) {
+            set_error(error, "glTF baseColorFactor must contain four values");
+            return false;
+        }
+        for (std::size_t i = 0; i < 4u; ++i) {
+            const auto& value = json_factor->array[i];
+            if (value.kind != JsonValue::Kind::Number ||
+                !std::isfinite(value.number) ||
+                value.number < 0.0 || value.number > 1.0) {
+                set_error(error, "glTF baseColorFactor component is invalid");
+                return false;
+            }
+            factor[i] = value.number;
+        }
+    }
+
+    const auto encode_srgb = [](double linear) {
+        linear = std::clamp(linear, 0.0, 1.0);
+        const double encoded = linear <= 0.0031308
+            ? 12.92 * linear
+            : 1.055 * std::pow(linear, 1.0 / 2.4) - 0.055;
+        return static_cast<std::uint8_t>(
+            std::lround(std::clamp(encoded, 0.0, 1.0) * 255.0));
+    };
+
+    const auto decode_srgb = [](double encoded) {
+        return encoded <= 0.04045
+            ? encoded / 12.92
+            : std::pow((encoded + 0.055) / 1.055, 2.4);
+    };
+
     const auto* base_color = pbr
         ? member(*pbr, "baseColorTexture")
         : nullptr;
@@ -2504,6 +2543,22 @@ bool decode_gltf_base_color_texture(
     const auto texture_index = base_color
         ? index_value(member(*base_color, "index"))
         : std::nullopt;
+
+    if (!base_color) {
+        // A color-only PBR material (no image) still has a visible
+        // base color. Synthesize a 1x1 texture without shader changes.
+        texture.width = 1u;
+        texture.height = 1u;
+        texture.color_space = DecodedTextureColorSpace::SRgb;
+        texture.rgba8 = {
+            encode_srgb(factor[0]),
+            encode_srgb(factor[1]),
+            encode_srgb(factor[2]),
+            static_cast<std::uint8_t>(
+                std::lround(factor[3] * 255.0))
+        };
+        return true;
+    }
 
     const auto* textures = member(root, "textures");
 
@@ -2642,6 +2697,20 @@ bool decode_gltf_base_color_texture(
             static_cast<std::size_t>(height) * 4u);
 
     stbi_image_free(pixels);
+
+    for (std::size_t pixel = 0u;
+         pixel < texture.rgba8.size(); pixel += 4u) {
+        for (std::size_t channel = 0u; channel < 3u; ++channel) {
+            const double encoded =
+                static_cast<double>(texture.rgba8[pixel + channel]) / 255.0;
+            texture.rgba8[pixel + channel] = encode_srgb(
+                decode_srgb(encoded) * factor[channel]);
+        }
+        texture.rgba8[pixel + 3u] =
+            static_cast<std::uint8_t>(std::lround(
+                static_cast<double>(texture.rgba8[pixel + 3u]) *
+                factor[3]));
+    }
     return true;
 }
 
