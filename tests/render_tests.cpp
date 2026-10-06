@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <string>
 
@@ -27,6 +28,7 @@
 #include "nengine/render/vulkan_buffer.hpp"
 #include "nengine/render/vulkan_loader.hpp"
 #include "nengine/render/vulkan_material.hpp"
+#include "nengine/render/vulkan_material_asset_cache.hpp"
 #include "nengine/render/vulkan_depth_target.hpp"
 #include "nengine/render/vulkan_device.hpp"
 #include "nengine/render/vulkan_instance.hpp"
@@ -1203,6 +1205,172 @@ int main() {
                             gpu_texture_cache.size() == 1u,
                             "Vulkan texture asset cache reuses matching fingerprint");
 
+                        const auto material_gpu_root =
+                            std::filesystem::temp_directory_path() /
+                            ("nengine_gpu_material_" +
+                             std::to_string(
+                                 std::chrono::
+                                     high_resolution_clock::
+                                     now()
+                                     .time_since_epoch()
+                                     .count()));
+
+                        std::filesystem::create_directories(
+                            material_gpu_root);
+
+                        const auto material_texture_source =
+                            material_gpu_root /
+                            "source.bmp";
+
+                        const auto material_texture_descriptor =
+                            material_gpu_root /
+                            "texture.nasset";
+
+                        const auto material_source =
+                            material_gpu_root /
+                            "source.nmat";
+
+                        std::array<std::uint8_t, 58>
+                            material_bmp{};
+
+                        material_bmp[0] = 'B';
+                        material_bmp[1] = 'M';
+                        material_bmp[2] = 58u;
+                        material_bmp[10] = 54u;
+                        material_bmp[14] = 40u;
+                        material_bmp[18] = 1u;
+                        material_bmp[22] = 1u;
+                        material_bmp[26] = 1u;
+                        material_bmp[28] = 24u;
+                        material_bmp[34] = 4u;
+
+                        // One red BGR pixel + row padding.
+                        material_bmp[54] = 0u;
+                        material_bmp[55] = 0u;
+                        material_bmp[56] = 255u;
+                        material_bmp[57] = 0u;
+
+                        {
+                            std::ofstream output(
+                                material_texture_source,
+                                std::ios::binary |
+                                    std::ios::trunc);
+
+                            output.write(
+                                reinterpret_cast<const char*>(
+                                    material_bmp.data()),
+                                static_cast<std::streamsize>(
+                                    material_bmp.size()));
+                        }
+
+                        {
+                            std::ofstream output(
+                                material_texture_descriptor,
+                                std::ios::binary |
+                                    std::ios::trunc);
+
+                            output
+                                << "NENGINE_TEXTURE 1\n"
+                                << "FORMAT \"bmp\"\n"
+                                << "WIDTH 1\n"
+                                << "HEIGHT 1\n"
+                                << "COLOR_SPACE \"sRGB\"\n"
+                                << "SOURCE \"source.bmp\"\n"
+                                << "END_TEXTURE\n";
+                        }
+
+                        const auto material_texture_guid =
+                            assets::AssetGuid::generate();
+
+                        const auto imported_material_guid =
+                            assets::AssetGuid::generate();
+
+                        {
+                            std::ofstream output(
+                                material_source,
+                                std::ios::binary |
+                                    std::ios::trunc);
+
+                            output
+                                << "NENGINE_MATERIAL 1\n"
+                                << "BASE_COLOR_TEXTURE \""
+                                << material_texture_guid
+                                    .to_string()
+                                << "\"\n"
+                                << "END_MATERIAL\n";
+                        }
+
+                        assets::CachedArtifactSet
+                            material_texture_cached;
+
+                        material_texture_cached.fingerprint =
+                            "material-texture-v1";
+                        material_texture_cached.importer_id =
+                            "NEngine.Texture";
+                        material_texture_cached.artifacts.push_back({
+                            material_texture_source,
+                            "source"
+                        });
+                        material_texture_cached.artifacts.push_back({
+                            material_texture_descriptor,
+                            "texture-descriptor"
+                        });
+
+                        assets::CachedArtifactSet
+                            imported_material_cached;
+
+                        imported_material_cached.fingerprint =
+                            "material-v1";
+                        imported_material_cached.importer_id =
+                            "NEngine.Material";
+                        imported_material_cached.artifacts.push_back({
+                            material_source,
+                            "source"
+                        });
+
+                        render::VulkanMaterialAssetCache
+                            gpu_material_asset_cache;
+
+                        check(
+                            gpu_material_asset_cache.initialize(
+                                loader,
+                                instance,
+                                device),
+                            "Vulkan Material AssetGuid cache initializes for headless device");
+
+                        const auto dependency_resolver =
+                            [&](
+                                assets::AssetGuid guid)
+                                -> std::optional<
+                                    assets::CachedArtifactSet> {
+
+                                if (guid ==
+                                    material_texture_guid) {
+                                    return
+                                        material_texture_cached;
+                                }
+
+                                return std::nullopt;
+                            };
+
+                        std::string material_asset_error;
+
+                        const auto* imported_gpu_material =
+                            gpu_material_asset_cache.load(
+                                imported_material_guid,
+                                imported_material_cached,
+                                dependency_resolver,
+                                &material_asset_error);
+
+                        check(
+                            imported_gpu_material &&
+                            imported_gpu_material->valid() &&
+                            gpu_material_asset_cache.find(
+                                imported_material_guid) ==
+                                imported_gpu_material &&
+                            gpu_material_asset_cache.size() == 1u,
+                            "nmat resolves texture artifacts into a real Vulkan sampled material descriptor");
+
                         render::VulkanMaterialResource
                             gpu_material;
 
@@ -1428,6 +1596,13 @@ int main() {
                         gpu_gltf.destroy();
                         gpu_cube.destroy();
                         gpu_material.destroy();
+                        gpu_material_asset_cache.shutdown();
+
+                        std::error_code material_cleanup_error;
+                        std::filesystem::remove_all(
+                            material_gpu_root,
+                            material_cleanup_error);
+
                         gpu_texture_cache.shutdown();
                         gpu_texture.destroy();
                         device_buffer.destroy();
