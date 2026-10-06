@@ -40,7 +40,8 @@ The repository currently includes:
 - multi-draw indexed submission
 - GPU RGBA8 texture upload, sampler and material descriptor binding
 - texture-sampling diagnostic shaders exercised by VK Preview
-- opt-in VK Preview that renders the actual presentation World Camera + supported built-in MeshRenderer items
+- glTF/GLB geometry decode into MeshData with AssetGuid CPU/GPU mesh caches
+- opt-in VK Preview that renders the actual presentation World Camera + built-in or supported imported glTF/GLB MeshRenderer geometry
 - Windows + Ubuntu CI tests
 
 The Win32 Scene View still uses GDI by default for interactive object/gizmo editing. The opt-in VK Preview now uses the real Vulkan graphics path for depth-tested indexed World rendering, while the GDI view remains the safe editing fallback.
