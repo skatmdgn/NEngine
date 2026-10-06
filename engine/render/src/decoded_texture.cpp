@@ -3,11 +3,14 @@
 #include <array>
 #include <cctype>
 #include <cstdint>
+#include <climits>
 #include <fstream>
 #include <limits>
 #include <string>
 #include <utility>
 #include <vector>
+
+#include "stb_image.h"
 
 namespace nengine::render {
 namespace {
@@ -300,6 +303,123 @@ bool decode_bmp(
     return true;
 }
 
+bool decode_stb_image(
+    const std::filesystem::path& path,
+    DecodedTextureData& output,
+    std::string* error) {
+
+    std::ifstream input(
+        path,
+        std::ios::binary |
+            std::ios::ate);
+
+    if (!input) {
+        set_error(
+            error,
+            "could not open PNG/JPEG texture source");
+        return false;
+    }
+
+    const auto end =
+        input.tellg();
+
+    if (end <= 0 ||
+        end >
+            static_cast<std::streamoff>(
+                INT_MAX)) {
+
+        set_error(
+            error,
+            "PNG/JPEG source size is invalid or too large");
+        return false;
+    }
+
+    std::vector<std::uint8_t> bytes(
+        static_cast<std::size_t>(
+            end));
+
+    input.seekg(0);
+    input.read(
+        reinterpret_cast<char*>(
+            bytes.data()),
+        static_cast<std::streamsize>(
+            bytes.size()));
+
+    if (!input) {
+        set_error(
+            error,
+            "could not read PNG/JPEG texture source");
+        return false;
+    }
+
+    int width = 0;
+    int height = 0;
+    int source_channels = 0;
+
+    stbi_uc* pixels =
+        stbi_load_from_memory(
+            bytes.data(),
+            static_cast<int>(
+                bytes.size()),
+            &width,
+            &height,
+            &source_channels,
+            4);
+
+    if (!pixels ||
+        width <= 0 ||
+        height <= 0) {
+
+        const char* reason =
+            stbi_failure_reason();
+
+        set_error(
+            error,
+            std::string{
+                "stb_image decode failed"} +
+                (reason
+                    ? ": " +
+                        std::string{reason}
+                    : std::string{}));
+
+        if (pixels) {
+            stbi_image_free(
+                pixels);
+        }
+
+        return false;
+    }
+
+    DecodedTextureData decoded;
+
+    if (!allocate_rgba(
+            static_cast<std::uint32_t>(
+                width),
+            static_cast<std::uint32_t>(
+                height),
+            decoded,
+            error)) {
+
+        stbi_image_free(
+            pixels);
+        return false;
+    }
+
+    std::copy(
+        pixels,
+        pixels +
+            decoded.rgba8.size(),
+        decoded.rgba8.begin());
+
+    stbi_image_free(
+        pixels);
+
+    output =
+        std::move(decoded);
+
+    return true;
+}
+
 bool decode_tga(
     const std::filesystem::path& path,
     DecodedTextureData& output,
@@ -504,7 +624,18 @@ bool decode_texture_rgba8(
 
     bool decoded = false;
 
-    if (format == "bmp") {
+    if (format == "png" ||
+        format == "jpeg" ||
+        format == "jpg") {
+
+        decoded =
+            decode_stb_image(
+                asset.source_path,
+                output,
+                error);
+    } else if (
+        format == "bmp") {
+
         decoded =
             decode_bmp(
                 asset.source_path,
