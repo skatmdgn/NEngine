@@ -643,6 +643,43 @@ int main() {
             "updated glTF sidecar payload is restaged into model cache");
     }
 
+
+    std::error_code removed_sidecar_error;
+    std::filesystem::remove(geometry_path, removed_sidecar_error);
+    const auto missing_sidecar_poll = model.project().poll_assets();
+
+    const auto waiting_dependents =
+        model.project().dependency_graph().dependents(bin_guid);
+
+    check(
+        !removed_sidecar_error &&
+        missing_sidecar_poll.imports.failed >= 1u &&
+        !model.project().cached_artifacts(model_guid).has_value() &&
+        std::find(
+            waiting_dependents.begin(),
+            waiting_dependents.end(),
+            model_guid) != waiting_dependents.end(),
+        "deleted glTF sidecar invalidates model but keeps its reverse dependency");
+
+    {
+        std::ofstream output(
+            geometry_path, std::ios::binary | std::ios::trunc);
+        output << "RESTORED";
+    }
+
+    const auto restored_sidecar_poll =
+        model.project().poll_assets();
+    const auto* restored_bin =
+        model.project().assets().find_relative(
+            "Models/SidecarTest/geometry/mesh.bin");
+
+    check(
+        restored_sidecar_poll.imports.failed == 0u &&
+        restored_sidecar_poll.imports.attempted >= 2u &&
+        restored_bin && restored_bin->guid == bin_guid &&
+        model.project().cached_artifacts(model_guid).has_value(),
+        "restoring glTF sidecar with preserved .meta automatically reimports parent model");
+
     // Cache hits must retain a separate .nmat's texture dependency.
     if (persistent_material_guid.valid()) {
         const auto cached_material =
