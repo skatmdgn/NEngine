@@ -18,6 +18,7 @@
 #include "nengine/render/decoded_texture.hpp"
 #include "nengine/render/diagnostic_shaders.hpp"
 #include "nengine/render/gltf_mesh.hpp"
+#include "nengine/render/material_asset.hpp"
 #include "nengine/render/matrix.hpp"
 #include "nengine/render/mesh_data.hpp"
 #include "nengine/render/registration.hpp"
@@ -718,6 +719,53 @@ int main() {
             decoded_png.rgba8[6] == 0u &&
             decoded_png.rgba8[7] == 255u,
             "pinned stb_image decodes PNG source into RGBA8 pixels");
+
+        const auto material_source =
+            root / "checker.nmat";
+
+        const auto material_guid =
+            assets::AssetGuid::generate();
+
+        {
+            std::ofstream output(
+                material_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output
+                << "NENGINE_MATERIAL 1\n"
+                << "BASE_COLOR_TEXTURE \""
+                << resolved_png.guid.to_string()
+                << "\"\n"
+                << "END_MATERIAL\n";
+        }
+
+        assets::CachedArtifactSet
+            material_cached;
+
+        material_cached.fingerprint =
+            "nmat-v1";
+        material_cached.importer_id =
+            "NEngine.Material";
+        material_cached.artifacts.push_back({
+            material_source,
+            "source"
+        });
+
+        const auto resolved_material =
+            render::resolve_material_asset(
+                material_guid,
+                material_cached,
+                &resolve_error);
+
+        check(
+            resolved_material.has_value() &&
+            resolved_material->guid ==
+                material_guid &&
+            resolved_material->material
+                .base_color_texture ==
+                resolved_png.guid,
+            "renderer resolves nmat Material AssetGuid to base-color texture GUID");
 
         const auto gltf_source =
             root / "triangle.gltf";
