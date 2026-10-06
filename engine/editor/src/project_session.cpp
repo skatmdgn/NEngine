@@ -409,7 +409,11 @@ AssetPollResult ProjectSession::poll_assets() {
     }
 
     for (const auto guid : removed_guids) {
-        dependency_graph_.remove(guid);
+        // Keep incoming edges to a temporarily missing AssetGuid so
+        // restoring the file with its persistent .meta automatically
+        // reimports any model/material that referenced it. Its own
+        // outgoing dependencies are no longer meaningful.
+        dependency_graph_.set_dependencies(guid, {});
     }
 
     std::unordered_set<assets::AssetGuid, assets::AssetGuidHash>
