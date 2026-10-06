@@ -14,6 +14,7 @@
 #include <fstream>
 #include <iterator>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -302,6 +303,8 @@ struct Win32EditorShell::Impl {
     HWND apply_property{nullptr};
     std::vector<GenericPropertyBinding>
         generic_property_rows{};
+    nengine::core::Entity generic_property_entity{
+        nengine::core::Entity::invalid()};
 
     HWND assets_list{nullptr};
     HWND console{nullptr};
@@ -2192,6 +2195,31 @@ struct Win32EditorShell::Impl {
     void refresh_generic_property_editor(
         const nengine::editor::InspectorSnapshot& snapshot) {
 
+        // Full Inspector refreshes also happen after Undo/Redo and edits.
+        // Preserve the selected property by identity, not by the old row
+        // index, which can move when component fields are rebuilt.
+        std::optional<GenericPropertyBinding> previous_selection;
+
+        if (generic_properties &&
+            generic_property_entity == snapshot.entity) {
+
+            const int old_index = static_cast<int>(
+                SendMessageW(
+                    generic_properties,
+                    LB_GETCURSEL,
+                    0,
+                    0));
+
+            if (old_index >= 0 &&
+                static_cast<std::size_t>(old_index) <
+                    generic_property_rows.size()) {
+
+                previous_selection = generic_property_rows[
+                    static_cast<std::size_t>(old_index)];
+            }
+        }
+
+        generic_property_entity = snapshot.entity;
         generic_property_rows.clear();
 
         if (!generic_properties) {
@@ -2271,10 +2299,25 @@ struct Win32EditorShell::Impl {
             return;
         }
 
+        std::size_t selected_index = 0;
+
+        if (previous_selection) {
+            const auto retained =
+                nengine::editor::find_inspector_property_row(
+                    snapshot,
+                    previous_selection->component,
+                    previous_selection->property);
+
+            if (retained &&
+                *retained < generic_property_rows.size()) {
+                selected_index = *retained;
+            }
+        }
+
         SendMessageW(
             generic_properties,
             LB_SETCURSEL,
-            0,
+            static_cast<WPARAM>(selected_index),
             0);
 
         refresh_generic_property_value();
@@ -2450,6 +2493,8 @@ struct Win32EditorShell::Impl {
                 0);
 
             generic_property_rows.clear();
+            generic_property_entity =
+                nengine::core::Entity::invalid();
 
             set_text(
                 generic_value,
@@ -3051,9 +3096,11 @@ struct Win32EditorShell::Impl {
                 return false;
             }
 
+            // A selection change only needs to refresh the value edit.
+            // Calling refresh() here would rebuild this list and reset
+            // the click/keyboard selection to its first item.
             refresh_generic_property_value();
-            handled = true;
-            break;
+            return true;
 
         case IdApplyProperty:
             if (notification != BN_CLICKED) {
