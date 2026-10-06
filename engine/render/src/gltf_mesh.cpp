@@ -3,6 +3,7 @@
 #include "stb_image.h"
 
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <cctype>
 #include <climits>
