@@ -16,6 +16,7 @@
 #include "nengine/render/components.hpp"
 #include "nengine/render/decoded_texture.hpp"
 #include "nengine/render/diagnostic_shaders.hpp"
+#include "nengine/render/gltf_mesh.hpp"
 #include "nengine/render/matrix.hpp"
 #include "nengine/render/mesh_data.hpp"
 #include "nengine/render/registration.hpp"
@@ -54,6 +55,8 @@ void check(
 
 int main() {
     using namespace nengine;
+
+    render::MeshData decoded_gltf_fixture;
 
     core::ComponentRegistry metadata;
     core::ComponentSerializationRegistry serialization;
@@ -649,6 +652,75 @@ int main() {
             decoded_tga.rgba8[6] == 255u,
             "TGA decoder produces normalized top-left RGBA8 pixels");
 
+        const auto gltf_source =
+            root / "triangle.gltf";
+
+        {
+            std::ofstream output(
+                gltf_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output
+                << R"json({
+  "asset":{"version":"2.0"},
+  "buffers":[{
+    "byteLength":102,
+    "uri":"data:application/octet-stream;base64,AAAAvwAAAL8AAAAAAAAAPwAAAL8AAAAAAAAAAAAAAD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAD8AAIA/AAABAAIA"
+  }],
+  "bufferViews":[
+    {"buffer":0,"byteOffset":0,"byteLength":36},
+    {"buffer":0,"byteOffset":36,"byteLength":36},
+    {"buffer":0,"byteOffset":72,"byteLength":24},
+    {"buffer":0,"byteOffset":96,"byteLength":6}
+  ],
+  "accessors":[
+    {"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"},
+    {"bufferView":1,"componentType":5126,"count":3,"type":"VEC3"},
+    {"bufferView":2,"componentType":5126,"count":3,"type":"VEC2"},
+    {"bufferView":3,"componentType":5123,"count":3,"type":"SCALAR"}
+  ],
+  "meshes":[{
+    "primitives":[{
+      "attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2},
+      "indices":3
+    }]
+  }]
+})json";
+        }
+
+        render::ResolvedModelAsset
+            gltf_asset;
+
+        gltf_asset.guid =
+            assets::AssetGuid::generate();
+        gltf_asset.metadata.format =
+            ".gltf";
+        gltf_asset.source_path =
+            gltf_source;
+
+        check(
+            render::decode_gltf_mesh(
+                gltf_asset,
+                decoded_gltf_fixture,
+                &resolve_error) &&
+            decoded_gltf_fixture.valid() &&
+            decoded_gltf_fixture.vertices.size() == 3u &&
+            decoded_gltf_fixture.indices ==
+                std::vector<std::uint32_t>{
+                    0u, 1u, 2u} &&
+            decoded_gltf_fixture.vertices[0]
+                .position.x == -0.5f &&
+            decoded_gltf_fixture.vertices[1]
+                .uv.x == 1.0f &&
+            decoded_gltf_fixture.vertices[2]
+                .normal.z == 1.0f &&
+            decoded_gltf_fixture.bounds.center.x == 0.0f &&
+            decoded_gltf_fixture.bounds.center.y == 0.0f &&
+            decoded_gltf_fixture.bounds.extents.x == 0.5f &&
+            decoded_gltf_fixture.bounds.extents.y == 0.5f,
+            "glTF 2.0 embedded-buffer triangle decodes into MeshData");
+
         const auto shader_source =
             root / "source.vert.spv";
 
@@ -975,6 +1047,20 @@ int main() {
                             gpu_cube.index_count() == 36,
                             "Vulkan mesh resource uploads built-in cube vertex and index buffers");
 
+                        render::VulkanMeshResource
+                            gpu_gltf;
+
+                        check(
+                            decoded_gltf_fixture.valid() &&
+                            gpu_gltf.create(
+                                loader,
+                                instance,
+                                device,
+                                decoded_gltf_fixture) &&
+                            gpu_gltf.valid() &&
+                            gpu_gltf.index_count() == 3u,
+                            "decoded glTF MeshData uploads through existing Vulkan mesh path");
+
                         render::VulkanShaderModule
                             diagnostic_vertex;
 
@@ -1109,6 +1195,7 @@ int main() {
                         diagnostic_textured_vertex.destroy();
                         diagnostic_fragment.destroy();
                         diagnostic_vertex.destroy();
+                        gpu_gltf.destroy();
                         gpu_cube.destroy();
                         gpu_material.destroy();
                         gpu_texture_cache.shutdown();
