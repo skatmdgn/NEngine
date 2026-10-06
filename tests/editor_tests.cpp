@@ -500,6 +500,9 @@ int main() {
             "material importer records base-color texture dependency");
     }
 
+    const auto persistent_material_guid =
+        material_asset ? material_asset->guid : assets::AssetGuid{};
+
     // External glTF sources should stage .bin/images as ordinary asset
     // dependencies. A sidecar edit invalidates the parent model import
     // even though the .gltf text and size are unchanged.
@@ -641,12 +644,12 @@ int main() {
     }
 
     // Cache hits must retain a separate .nmat's texture dependency.
-    if (material_asset) {
+    if (persistent_material_guid.valid()) {
         const auto cached_material =
-            model.project().import_asset(material_asset->guid);
+            model.project().import_asset(persistent_material_guid);
         const auto dependencies =
             model.project().dependency_graph().dependencies(
-                material_asset->guid);
+                persistent_material_guid);
 
         check(
             cached_material.success && cached_material.cache_hit &&
