@@ -1,8 +1,11 @@
 #include "nengine/render/gltf_mesh.hpp"
 
+#include "stb_image.h"
+
 #include <algorithm>
 #include <bit>
 #include <cctype>
+#include <climits>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -2386,6 +2389,241 @@ bool decode_gltf_mesh(
     mesh =
         std::move(decoded);
 
+    return true;
+}
+
+bool decode_gltf_base_color_texture(
+    const ResolvedModelAsset& asset,
+    DecodedTextureData& texture,
+    std::string* error) {
+
+    texture = {};
+
+    if (!asset.guid.valid()) {
+        set_error(error, "glTF texture model AssetGuid is invalid");
+        return false;
+    }
+
+    GltfSource source;
+    if (!load_gltf_source(asset, source, error)) {
+        return false;
+    }
+
+    JsonValue root;
+    std::string json_error;
+    JsonParser parser{source.json};
+
+    if (!parser.parse(root, json_error) ||
+        root.kind != JsonValue::Kind::Object) {
+        set_error(error, "glTF texture JSON parse failed: " + json_error);
+        return false;
+    }
+
+    const auto* asset_info = member(root, "asset");
+    const auto version = asset_info
+        ? string_value(member(*asset_info, "version"))
+        : std::nullopt;
+
+    if (!version || version->rfind("2.", 0) != 0u) {
+        set_error(error, "glTF texture requires glTF 2.x");
+        return false;
+    }
+
+    // Our first mesh path merges the primitives into one draw. For now
+    // only the first primitive's base-color map is used for that draw.
+    const auto* meshes = member(root, "meshes");
+
+    if (!meshes || meshes->kind != JsonValue::Kind::Array ||
+        meshes->array.empty()) {
+        set_error(error, "glTF texture has no mesh");
+        return false;
+    }
+
+    const auto* primitives = member(meshes->array.front(), "primitives");
+
+    if (!primitives ||
+        primitives->kind != JsonValue::Kind::Array ||
+        primitives->array.empty()) {
+        set_error(error, "glTF texture has no mesh primitive");
+        return false;
+    }
+
+    const auto material_index =
+        index_value(member(primitives->array.front(), "material"));
+    const auto* materials = member(root, "materials");
+
+    if (!material_index || !materials ||
+        materials->kind != JsonValue::Kind::Array ||
+        *material_index >= materials->array.size()) {
+        set_error(error, "glTF mesh has no base-color material");
+        return false;
+    }
+
+    const auto* pbr = member(
+        materials->array[*material_index],
+        "pbrMetallicRoughness");
+
+    const auto* base_color = pbr
+        ? member(*pbr, "baseColorTexture")
+        : nullptr;
+
+    const auto texture_index = base_color
+        ? index_value(member(*base_color, "index"))
+        : std::nullopt;
+
+    const auto* textures = member(root, "textures");
+
+    if (!texture_index || !textures ||
+        textures->kind != JsonValue::Kind::Array ||
+        *texture_index >= textures->array.size()) {
+        set_error(error, "glTF mesh material has no base-color texture");
+        return false;
+    }
+
+    const auto image_index = index_value(
+        member(textures->array[*texture_index], "source"));
+    const auto* images = member(root, "images");
+
+    if (!image_index || !images ||
+        images->kind != JsonValue::Kind::Array ||
+        *image_index >= images->array.size()) {
+        set_error(error, "glTF base-color image source is unavailable");
+        return false;
+    }
+
+    const auto& image = images->array[*image_index];
+    const auto mime = string_value(member(image, "mimeType"));
+
+    if (mime && *mime != "image/png" && *mime != "image/jpeg") {
+        set_error(error, "glTF base-color image must be PNG or JPEG");
+        return false;
+    }
+
+    std::vector<std::uint8_t> image_bytes;
+    const auto image_view = index_value(member(image, "bufferView"));
+    const auto image_uri = string_value(member(image, "uri"));
+
+    if (image_view) {
+        if (!mime) {
+            set_error(error, "glTF bufferView image requires mimeType");
+            return false;
+        }
+
+        std::vector<BufferView> views;
+        std::vector<std::vector<std::uint8_t>> buffers;
+
+        if (!parse_buffer_views(root, views, error) ||
+            !load_buffers(root, source, asset.source_path, buffers, error)) {
+            return false;
+        }
+
+        if (*image_view >= views.size()) {
+            set_error(error, "glTF image bufferView index is invalid");
+            return false;
+        }
+
+        const auto& view = views[*image_view];
+
+        if (view.buffer >= buffers.size() ||
+            view.offset > buffers[view.buffer].size() ||
+            view.length > buffers[view.buffer].size() - view.offset) {
+            set_error(error, "glTF image bufferView is outside its buffer");
+            return false;
+        }
+
+        const auto& bytes = buffers[view.buffer];
+        image_bytes.assign(
+            bytes.begin() + static_cast<std::ptrdiff_t>(view.offset),
+            bytes.begin() + static_cast<std::ptrdiff_t>(
+                view.offset + view.length));
+    } else if (image_uri) {
+        if (image_uri->rfind("data:", 0) == 0u) {
+            const auto comma = image_uri->find(',');
+
+            if (comma == std::string::npos ||
+                image_uri->substr(0, comma).find(";base64") ==
+                    std::string::npos) {
+                set_error(error, "glTF image data URI must be base64");
+                return false;
+            }
+
+            if (!decode_base64(
+                    std::string_view{*image_uri}.substr(comma + 1u),
+                    image_bytes,
+                    error)) {
+                return false;
+            }
+        } else {
+            const std::filesystem::path relative{*image_uri};
+
+            // External sidecars must stay beneath the model directory.
+            if (relative.empty() || relative.is_absolute() ||
+                relative.has_root_path() ||
+                image_uri->find(':') != std::string::npos ||
+                image_uri->find('\\') != std::string::npos ||
+                image_uri->find('%') != std::string::npos ||
+                image_uri->find('?') != std::string::npos ||
+                image_uri->find('#') != std::string::npos) {
+                set_error(error, "unsafe glTF image URI");
+                return false;
+            }
+
+            for (const auto& segment : relative) {
+                if (segment == ".." || segment == ".") {
+                    set_error(error, "unsafe glTF image URI traversal");
+                    return false;
+                }
+            }
+
+            if (!read_binary_file(
+                    asset.source_path.parent_path() / relative,
+                    image_bytes,
+                    error)) {
+                return false;
+            }
+        }
+    } else {
+        set_error(error, "glTF image has neither bufferView nor URI");
+        return false;
+    }
+
+    if (image_bytes.empty() || image_bytes.size() > INT_MAX) {
+        set_error(error, "glTF base-color image payload is invalid");
+        return false;
+    }
+
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+
+    stbi_uc* pixels = stbi_load_from_memory(
+        image_bytes.data(),
+        static_cast<int>(image_bytes.size()),
+        &width,
+        &height,
+        &channels,
+        4);
+
+    if (!pixels || width <= 0 || height <= 0 ||
+        static_cast<std::uint64_t>(width) *
+            static_cast<std::uint64_t>(height) >
+            std::numeric_limits<std::size_t>::max() / 4u) {
+        if (pixels) {
+            stbi_image_free(pixels);
+        }
+        set_error(error, "glTF PNG/JPEG base-color decode failed");
+        return false;
+    }
+
+    texture.width = static_cast<std::uint32_t>(width);
+    texture.height = static_cast<std::uint32_t>(height);
+    texture.color_space = DecodedTextureColorSpace::SRgb;
+    texture.rgba8.assign(
+        pixels,
+        pixels + static_cast<std::size_t>(width) *
+            static_cast<std::size_t>(height) * 4u);
+
+    stbi_image_free(pixels);
     return true;
 }
 
