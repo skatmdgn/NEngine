@@ -58,7 +58,7 @@ Implemented:
 - Win32 Scene View attempts Vulkan window-context bootstrap.
 - Vulkan bootstrap success/failure is reported to Console without making Vulkan availability an editor-startup requirement.
 
-The Scene View still uses GDI by default for interactive diagnostic object/gizmo drawing. An opt-in **VK Preview** toolbar toggle now renders the actual presentation World through Vulkan when supported: it reads the active Camera plus MeshRenderer items from RenderSnapshot, resolves built-in Cube/Quad AssetGuids and supported imported glTF/GLB AssetGuids to cached GPU meshes, computes per-object MVP matrices, and submits multiple indexed draws in one render pass. Imported geometry uses an explicitly assigned .nmat texture when available; if material is unset, supported glTF/GLB first-primitive PBR base-color PNG/JPEG is decoded and sampled automatically. Otherwise the renderer retains its diagnostic textured fallback. Turning the toggle off immediately returns to the GDI interaction view.
+The Scene View still uses GDI by default for interactive diagnostic object/gizmo drawing. An opt-in **VK Preview** toolbar toggle now renders the actual presentation World through Vulkan when supported: it reads the active Camera plus MeshRenderer items from RenderSnapshot, resolves built-in Cube/Quad AssetGuids and supported imported glTF/GLB AssetGuids to cached GPU meshes, computes per-object MVP matrices, and submits multiple indexed draws in one render pass. Imported geometry uses an explicitly assigned .nmat texture when available; if material is unset, supported glTF/GLB first-primitive PBR base-color PNG/JPEG or linear baseColorFactor is decoded/baked and sampled automatically. Otherwise the renderer retains its diagnostic textured fallback. Turning the toggle off immediately returns to the GDI interaction view.
 
 ## Project / Asset database
 
@@ -74,7 +74,7 @@ Implemented:
 - Automatic rescan and reimport for changed files.
 - Import fingerprint/cache manifest.
 - Validated cache artifact lookup rejecting stale source/importer versions.
-- Dependency graph forward/reverse edges.
+- Dependency graph forward/reverse edges, plus reimport of transitive dependents after file changes.
 - Assets panel backed by AssetDatabase.
 - Scene/script/raw source staging.
 - Texture source staging + metadata descriptor.
@@ -83,10 +83,11 @@ Implemented:
 - Audio source staging + WAV metadata descriptor.
   - channels, sample rate, bits/sample, data bytes.
 - Model source staging + format/source-size descriptor.
+- External .gltf sidecar BIN/image staging, AssetGuid dependency graph edges, size/timestamp import fingerprints, and watcher-triggered parent reimport; deleting/restoring a sidecar with persistent .meta triggers recovery.
 - First glTF 2.0 geometry decode path:
   - .glb 2.0 JSON/BIN chunks.
   - .gltf base64 data-URI buffers.
-  - external buffers when available beside the resolved source (external .gltf sidecar cache staging remains incomplete).
+  - external .gltf buffer/image sidecars copied into matching nested paths in the import cache, with sandboxed relative-URI checks.
   - TRIANGLES primitives.
   - float POSITION/NORMAL/TEXCOORD_0.
   - unsigned byte/short/int indices.
@@ -102,7 +103,8 @@ Implemented:
 
 Not yet implemented:
 - WebP pixel decoding and production texture transcoding/mipmap/compression path.
-- Full glTF multi-primitive/multi-material cooking into independent NEngine material/texture AssetGuids, material factors, node transforms, skins, morphs, sparse/quantized accessors and import-cache staging for external .gltf sidecar buffers/images.
+- Full glTF multi-primitive/multi-material cooking into independent NEngine material/texture AssetGuids, advanced PBR factors/maps, node transforms, skins, morphs, sparse/quantized accessors.
+- Sidecar change detection by content hash (currently size/write timestamp), restoration without a preserved .meta GUID, encoded/remote glTF URIs and sidecars outside the glTF source directory.
 - OBJ/FBX mesh decoding/cooking.
 - Shader source compilation (GLSL/HLSL -> SPIR-V).
 - Audio decode/stream runtime.
@@ -160,7 +162,8 @@ Implemented:
 - Per-device AssetGuid Vulkan mesh cache reusing uploaded vertex/index buffers.
 - VK Preview can resolve imported glTF/GLB MeshRenderer.mesh GUIDs through the project cache.
 - MeshRenderer.material can resolve a .nmat AssetGuid to a real imported PNG/JPEG/BMP/TGA texture and Vulkan descriptor, with diagnostic material fallback on failure.
-- When no explicit material is assigned, GLB/glTF first-primitive PBR baseColorTexture may automatically decode a PNG/JPEG bufferView, base64 data URI or local external image into RGBA8 and upload it as a sampled Vulkan material.
+- When no explicit material is assigned, GLB/glTF first-primitive PBR baseColorTexture automatically decodes a PNG/JPEG bufferView, base64 data URI or staged local external image into RGBA8 and uploads it as a sampled Vulkan material.
+- glTF PBR baseColorFactor: synthesizes a 1x1 sRGB texture for image-free color materials, or multiplies the image in linear space then encodes to sRGB; alpha channel is multiplied linearly.
 - Explicit .nmat overrides the automatic glTF texture; a missing/unsupported auto texture falls back to diagnostic material without repeated parsing every frame.
 - Imported mesh/material GPU caches are invalidated after asset filesystem changes.
 - AssetGuid -> shader descriptor + SPIR-V word resolution.
@@ -232,7 +235,7 @@ Implemented:
 - Textured vertex path forwards MeshVertex UVs to the fragment stage.
 - Diagnostic fragment shader samples set 0 / binding 0 sampler2D.
 - VK Preview uses a 2x2 diagnostic RGBA8 texture/material as the fallback material; .nmat MeshRenderer.material binds explicitly imported texture descriptors and an unset material can sample the first glTF PBR base-color texture.
-- Headless Vulkan CI validates texture upload, sampler creation, material descriptors, textured shader modules, a real texture-sampling graphics pipeline, .nmat -> texture descriptors and glTF auto-texture upload. CPU tests cover GLB JSON/BIN geometry plus PNG bufferView, glTF PNG data URIs, and unsafe external resource rejection.
+- Headless Vulkan CI validates texture upload, sampler creation, material descriptors, textured shader modules, a real texture-sampling graphics pipeline, .nmat -> texture descriptors and glTF auto-texture upload. CPU tests cover GLB JSON/BIN geometry plus PNG bufferView, glTF PNG data URIs, baseColorFactor and sRGB tinting, staged external .gltf BIN/PNG rendering resources, sidecar watcher invalidation/recovery and unsafe URI rejection.
 
 Not yet implemented:
 - Automatic glTF material/texture dependency cooking into NEngine material assets.
@@ -256,7 +259,7 @@ The concrete Vulkan backend currently grows beneath this contract. The long-term
 ## Immediate next work
 
 1. Extend the first glTF PBR base-color preview path to proper multi-material/image extraction and persistent .nmat/Texture AssetGuid cooking.
-2. Stage/track external .gltf sidecar buffers and image dependencies through the asset import pipeline.
+2. Extend external glTF sidecar support to encoded URIs, outside-directory policies and stable recovery without .meta (basic same-directory staging/tracking completed).
 3. Add WebP decoding plus mipmap/compression/transcoding policy behind the decoded-texture cache.
 4. Add node-transform-aware glTF scene/mesh cooking plus quantized/sparse accessor support where needed.
 5. Add a shader compiler toolchain path rather than making glslang/DXC a hidden build dependency.

@@ -47,10 +47,13 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] .nmat importer + texture dependency graph
 - [x] glTF/GLB geometry decode into MeshData
 - [x] First glTF PBR base-color image decode (PNG/JPEG GLB bufferView/data URI/external file)
+- [x] glTF baseColorFactor 1x1 color material and linear-space image tint
 - [x] Reject unsafe external glTF resource URIs
 - [x] AssetGuid decoded/GPU mesh caches
 - [ ] glTF material/image dependency cooking
-- [ ] External .gltf sidecar dependency staging
+- [x] External .gltf BIN/image sidecar dependency staging with fingerprint + watcher reimport
+- [x] Sidecar removal/restoration recovery with persistent .meta GUID
+- [ ] Sidecar encoded URI, nonlocal path policy and recovery without .meta
 - [ ] OBJ/FBX mesh decoding/cooking
 - [ ] GLSL/HLSL shader compile toolchain
 
@@ -89,6 +92,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Imported glTF/GLB mesh AssetGuid resolution in VK Preview
 - [x] .nmat Material AssetGuid -> imported texture Vulkan binding
 - [x] GLB/glTF first-primitive base-color texture automatic Vulkan preview fallback
+- [x] GLB/glTF first-primitive baseColorFactor image-free color auto preview
 - [ ] Automatic glTF material/image -> NEngine material cooking
 - [ ] Scene View Vulkan presentation replacement
 - [ ] Android Vulkan surface
