@@ -11,7 +11,7 @@ namespace nengine::render {
 //
 // Supported foundation:
 // - .gltf JSON with data-URI buffers.
-// - .gltf JSON with external buffers when they are available beside the staged source.
+// - .gltf JSON with external buffers when they are available beside the source.
 // - .glb 2.0 JSON + BIN chunks.
 // - triangle primitives.
 // - float POSITION/NORMAL/TEXCOORD_0 attributes.
