@@ -360,12 +360,15 @@ Implemented foundation includes:
 - glTF/GLB geometry decode into MeshData with handedness conversion.
 - AssetGuid + fingerprint CPU/GPU mesh caches.
 - imported glTF/GLB MeshRenderer geometry resolution in VK Preview.
+- pinned stb_image PNG/JPEG RGBA8 decoding.
+- .nmat Material AssetGuid format with texture dependency tracking.
+- .nmat -> imported Texture AssetGuid -> Vulkan descriptor binding in VK Preview.
 
 Immediate implementation order:
-1. Production PNG/JPEG/WebP image decoding/transcoding.
-2. glTF material/image dependency cooking and Material AssetGuid representation.
-3. Imported material/texture binding in VK Preview.
-4. External .gltf sidecar dependency staging.
+1. Automatic glTF material/image dependency cooking into NEngine material/texture assets.
+2. External .gltf sidecar dependency staging.
+3. WebP decoding plus mipmap/compression/transcoding policy.
+4. Node-transform-aware/quantized glTF cooking expansion.
 5. Shader compiler toolchain.
 5. Replace remaining GDI presentation where appropriate.
 6. Vulkan Game View.
@@ -439,7 +442,7 @@ The active development line is currently Renderer 0.4.
 
 The immediate sequence is:
 
-`production image decode/transcode -> glTF material/image cooking -> imported material VK Preview -> shader toolchain`
+`glTF material/image auto-cooking -> external glTF dependency staging -> texture production pipeline -> shader toolchain`
 
 After the renderer/resource boundary is proven with real assets, development returns to the .NET gameplay runtime.
 
