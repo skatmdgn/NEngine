@@ -9,6 +9,7 @@ add_library(NEngineRender STATIC
   src/mesh_data.cpp
   src/registration.cpp
   src/render_snapshot.cpp
+  src/stb_image_impl.cpp
   src/vulkan_buffer.cpp
   src/vulkan_builtin_mesh_cache.cpp
   src/vulkan_context.cpp
@@ -45,6 +46,8 @@ endif()
 target_include_directories(NEngineRender
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+  PRIVATE
+    ${CMAKE_SOURCE_DIR}/third_party/stb
 )
 
 target_link_libraries(NEngineRender
