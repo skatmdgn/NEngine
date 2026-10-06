@@ -812,6 +812,39 @@ bool read_binary_file(
     return true;
 }
 
+std::optional<std::filesystem::path> gltf_sidecar_path(
+    const std::filesystem::path& model_path,
+    std::string_view uri,
+    std::string* error) {
+
+    // The current importer supports only literal relative file paths.
+    // Block traversal and URI schemes, even on a non-Windows build.
+    const std::filesystem::path relative{
+        std::string{uri}};
+
+    if (relative.empty() ||
+        relative.is_absolute() ||
+        relative.has_root_path() ||
+        uri.find(':') != std::string_view::npos ||
+        uri.find('\\') != std::string_view::npos ||
+        uri.find('%') != std::string_view::npos ||
+        uri.find('?') != std::string_view::npos ||
+        uri.find('#') != std::string_view::npos) {
+
+        set_error(error, "unsafe or unsupported external glTF URI");
+        return std::nullopt;
+    }
+
+    for (const auto& segment : relative) {
+        if (segment == ".." || segment == ".") {
+            set_error(error, "glTF URI must remain below model directory");
+            return std::nullopt;
+        }
+    }
+
+    return model_path.parent_path() / relative;
+}
+
 int base64_value(
     unsigned char ch) noexcept {
 
@@ -1405,13 +1438,14 @@ bool load_buffers(
                 return false;
             }
         } else {
-            const auto path =
-                model_path.parent_path() /
-                std::filesystem::path{
-                    *uri};
+            const auto path = gltf_sidecar_path(
+                model_path,
+                *uri,
+                error);
 
-            if (!read_binary_file(
-                    path,
+            if (!path ||
+                !read_binary_file(
+                    *path,
                     bytes,
                     error)) {
                 return false;
@@ -2554,29 +2588,13 @@ bool decode_gltf_base_color_texture(
                 return false;
             }
         } else {
-            const std::filesystem::path relative{*image_uri};
+            const auto path = gltf_sidecar_path(
+                asset.source_path,
+                *image_uri,
+                error);
 
-            // External sidecars must stay beneath the model directory.
-            if (relative.empty() || relative.is_absolute() ||
-                relative.has_root_path() ||
-                image_uri->find(':') != std::string::npos ||
-                image_uri->find('\\') != std::string::npos ||
-                image_uri->find('%') != std::string::npos ||
-                image_uri->find('?') != std::string::npos ||
-                image_uri->find('#') != std::string::npos) {
-                set_error(error, "unsafe glTF image URI");
-                return false;
-            }
-
-            for (const auto& segment : relative) {
-                if (segment == ".." || segment == ".") {
-                    set_error(error, "unsafe glTF image URI traversal");
-                    return false;
-                }
-            }
-
-            if (!read_binary_file(
-                    asset.source_path.parent_path() / relative,
+            if (!path || !read_binary_file(
+                    *path,
                     image_bytes,
                     error)) {
                 return false;
