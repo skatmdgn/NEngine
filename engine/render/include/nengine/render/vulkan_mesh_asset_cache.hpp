@@ -47,6 +47,10 @@ public:
     bool erase(
         assets::AssetGuid guid) noexcept;
 
+    // Drop imported GPU/CPU mesh entries while keeping the cache
+    // attached to its current Vulkan device.
+    void clear() noexcept;
+
     void shutdown() noexcept;
 
     bool ready() const noexcept {
