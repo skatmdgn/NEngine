@@ -41,8 +41,12 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Model source descriptor importer
 - [x] SPIR-V binary shader importer
 - [x] Renderer cache resolver for texture/model/shader artifacts
-- [ ] Real texture decode/transcode
-- [ ] glTF mesh/material decode and cooking
+- [ ] Production PNG/JPEG/WebP texture decode/transcode
+- [x] glTF/GLB geometry decode into MeshData
+- [x] AssetGuid decoded/GPU mesh caches
+- [ ] glTF material/image dependency cooking
+- [ ] External .gltf sidecar dependency staging
+- [ ] OBJ/FBX mesh decoding/cooking
 - [ ] GLSL/HLSL shader compile toolchain
 
 ## 0.4 — Vulkan renderer
@@ -77,6 +81,8 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Textured fragment shader/sample path
 - [x] AssetGuid decoded RGBA8 texture cache (BMP/TGA foundation)
 - [x] Per-device Vulkan texture/material AssetGuid cache
+- [x] Imported glTF/GLB mesh AssetGuid resolution in VK Preview
+- [ ] Imported material/texture AssetGuid binding
 - [ ] Scene View Vulkan presentation replacement
 - [ ] Android Vulkan surface
 - [ ] PBR/lights/shadows/sprites
