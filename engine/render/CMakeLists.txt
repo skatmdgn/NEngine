@@ -5,6 +5,7 @@ add_library(NEngineRender STATIC
   src/decoded_texture.cpp
   src/diagnostic_shaders.cpp
   src/gltf_mesh.cpp
+  src/material_asset.cpp
   src/matrix.cpp
   src/mesh_data.cpp
   src/registration.cpp
@@ -18,6 +19,7 @@ add_library(NEngineRender STATIC
   src/vulkan_diagnostic_scene.cpp
   src/vulkan_instance.cpp
   src/vulkan_material.cpp
+  src/vulkan_material_asset_cache.cpp
   src/vulkan_mesh.cpp
   src/vulkan_mesh_asset_cache.cpp
   src/vulkan_pipeline.cpp
