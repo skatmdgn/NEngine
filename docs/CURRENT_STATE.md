@@ -58,7 +58,7 @@ Implemented:
 - Win32 Scene View attempts Vulkan window-context bootstrap.
 - Vulkan bootstrap success/failure is reported to Console without making Vulkan availability an editor-startup requirement.
 
-The Scene View still uses GDI by default for interactive diagnostic object/gizmo drawing. An opt-in **VK Preview** toolbar toggle now renders the actual presentation World through Vulkan when supported: it reads the active Camera plus MeshRenderer items from RenderSnapshot, resolves built-in Cube/Quad AssetGuids to cached GPU meshes, computes per-object MVP matrices, and submits multiple indexed draws in one render pass. Turning the toggle off immediately returns to the GDI interaction view.
+The Scene View still uses GDI by default for interactive diagnostic object/gizmo drawing. An opt-in **VK Preview** toolbar toggle now renders the actual presentation World through Vulkan when supported: it reads the active Camera plus MeshRenderer items from RenderSnapshot, resolves built-in Cube/Quad AssetGuids and supported imported glTF/GLB AssetGuids to cached GPU meshes, computes per-object MVP matrices, and submits multiple indexed draws in one render pass. Imported geometry currently uses the diagnostic textured material until the material-asset path is implemented. Turning the toggle off immediately returns to the GDI interaction view.
 
 ## Project / Asset database
 
@@ -82,6 +82,16 @@ Implemented:
 - Audio source staging + WAV metadata descriptor.
   - channels, sample rate, bits/sample, data bytes.
 - Model source staging + format/source-size descriptor.
+- First glTF 2.0 geometry decode path:
+  - .glb 2.0 JSON/BIN chunks.
+  - .gltf base64 data-URI buffers.
+  - external buffers when available beside the resolved source.
+  - TRIANGLES primitives.
+  - float POSITION/NORMAL/TEXCOORD_0.
+  - unsigned byte/short/int indices.
+  - interleaved byteStride support.
+  - multiple mesh primitives concatenated into MeshData.
+  - right-handed glTF -> NEngine left-handed Z reflection + winding conversion.
 - SPIR-V shader import.
   - .spv validation by size/magic.
   - .vert.spv/.frag.spv stage hints.
@@ -90,7 +100,8 @@ Implemented:
 
 Not yet implemented:
 - PNG/JPEG/WebP pixel decoding and production texture transcoding/mipmap/compression path.
-- Real mesh decoding/cooking (glTF/OBJ/FBX).
+- glTF material/image dependency cooking, node transforms, skins, morphs, sparse/quantized accessors and current import-cache staging for external .gltf sidecar buffers.
+- OBJ/FBX mesh decoding/cooking.
 - Shader source compilation (GLSL/HLSL -> SPIR-V).
 - Audio decode/stream runtime.
 - Dependency extraction from asset contents.
@@ -140,6 +151,9 @@ Implemented:
 - TGA 24/32-bit uncompressed true-color -> normalized top-left RGBA8 decoding.
 - Per-device AssetGuid Vulkan texture/material cache that uploads decoded RGBA8 pixels and reuses matching fingerprints.
 - AssetGuid -> validated cached model metadata resolution.
+- AssetGuid + import-fingerprint decoded MeshData cache for glTF/GLB geometry.
+- Per-device AssetGuid Vulkan mesh cache reusing uploaded vertex/index buffers.
+- VK Preview can resolve imported glTF/GLB MeshRenderer.mesh GUIDs through the project cache and automatically invalidates imported GPU mesh entries after asset filesystem changes.
 - AssetGuid -> shader descriptor + SPIR-V word resolution.
 - Descriptor/source consistency checks for shader word counts and SPIR-V magic.
 
@@ -213,9 +227,10 @@ Implemented:
 
 Not yet implemented:
 - Material AssetGuid/serialization model and imported material cache.
+- glTF material/texture dependency cooking.
 - Shader source compiler and reflection.
 - General descriptor/uniform binding beyond the first texture slot.
-- Imported mesh rendering and a Vulkan Game View.
+- Vulkan Game View.
 - PBR/lights/shadows/sprites.
 - Android Vulkan surface.
 
@@ -232,8 +247,9 @@ The concrete Vulkan backend currently grows beneath this contract. The long-term
 
 ## Immediate next work
 
-1. Decode/cook a first real model format (glTF) into MeshData and reuse the existing GPU mesh upload path.
-2. Make VK Preview cover imported mesh/material assets before replacing the GDI interaction view.
-3. Add PNG/JPEG/WebP production image decoding/transcoding behind the decoded-texture cache contract.
-4. Add a shader compiler toolchain path rather than making glslang/DXC a hidden build dependency.
-5. Return to .NET hosting after the renderer/resource boundary is stable.
+1. Add production PNG/JPEG/WebP image decoding behind the decoded-texture cache contract so common glTF textures can become GPU resources.
+2. Add glTF material/image dependency extraction and the first Material AssetGuid/cache representation.
+3. Bind imported material/texture resources to imported glTF MeshRenderer draws in VK Preview.
+4. Stage/track external .gltf sidecar buffers and image dependencies through the asset import pipeline.
+5. Add a shader compiler toolchain path rather than making glslang/DXC a hidden build dependency.
+6. Return to .NET hosting after the renderer/resource boundary is stable.
