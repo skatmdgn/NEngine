@@ -1,12 +1,16 @@
 #include "nengine/editor/project_session.hpp"
 
+#include <deque>
 #include <fstream>
+#include <unordered_set>
 
 #include "nengine/assets/builtin_processors.hpp"
+#include "nengine/assets/gltf_sidecars.hpp"
 #include "nengine/core/scene.hpp"
 #include "nengine/render/builtin_assets.hpp"
 #include "nengine/render/components.hpp"
 #include "nengine/render/registration.hpp"
+#include "nengine/render/material_asset.hpp"
 #include <system_error>
 #include <utility>
 
@@ -374,9 +378,42 @@ AssetPollResult ProjectSession::poll_assets() {
 
     result.scan = assets_.scan(true);
 
+    // Determine dependent assets before removal clears reverse graph edges.
+    // A touched texture should invalidate its .nmat users, and a touched
+    // external .bin/PNG should automatically reimport its referencing glTF.
+    std::unordered_set<assets::AssetGuid, assets::AssetGuidHash>
+        changed_assets{removed_guids.begin(), removed_guids.end()};
+
+    for (const auto& change : result.changes) {
+        if (change.kind == assets::FileChangeKind::Removed) continue;
+        if (const auto* record = assets_.find_relative(
+                change.relative_path.generic_string())) {
+            changed_assets.insert(record->guid);
+        }
+    }
+
+    std::deque<assets::AssetGuid> pending;
+    for (const auto guid : changed_assets) pending.push_back(guid);
+
+    std::unordered_set<assets::AssetGuid, assets::AssetGuidHash>
+        all_affected = changed_assets;
+
+    while (!pending.empty()) {
+        const auto guid = pending.front();
+        pending.pop_front();
+        for (const auto dependent : dependency_graph_.dependents(guid)) {
+            if (all_affected.insert(dependent).second) {
+                pending.push_back(dependent);
+            }
+        }
+    }
+
     for (const auto guid : removed_guids) {
         dependency_graph_.remove(guid);
     }
+
+    std::unordered_set<assets::AssetGuid, assets::AssetGuidHash>
+        imported_assets;
 
     for (const auto& change : result.changes) {
         if (change.kind ==
@@ -399,6 +436,7 @@ AssetPollResult ProjectSession::poll_assets() {
             continue;
         }
 
+        if (!imported_assets.insert(record->guid).second) continue;
         ++result.imports.attempted;
 
         const auto imported =
@@ -410,6 +448,23 @@ AssetPollResult ProjectSession::poll_assets() {
             ++result.imports.cache_hits;
         } else {
             ++result.imports.imported;
+        }
+    }
+
+    // A sidecar may change without its parent .gltf changing. Reimport
+    // transitive dependents exactly once, after directly changed assets.
+    for (const auto guid : all_affected) {
+        if (imported_assets.contains(guid)) continue;
+        if (const auto* record = assets_.find(guid)) {
+            if (!import_pipeline_.has_processor(record->importer_id)) {
+                ++result.imports.unsupported;
+                continue;
+            }
+            ++result.imports.attempted;
+            const auto imported = import_asset(guid);
+            if (!imported.success) ++result.imports.failed;
+            else if (imported.cache_hit) ++result.imports.cache_hits;
+            else ++result.imports.imported;
         }
     }
 
@@ -441,9 +496,38 @@ assets::ImportResult ProjectSession::import_asset(
             root_ / "Library" / "Cache");
 
     if (result.success) {
-        dependency_graph_.set_dependencies(
-            guid,
-            result.dependencies);
+        if (record->importer_id == "NEngine.Model" &&
+            record->source_path.extension() == ".gltf") {
+
+            std::vector<assets::GltfSidecar> sidecars;
+            if (assets::collect_gltf_sidecars(
+                    record->source_path, sidecars)) {
+                for (const auto& sidecar : sidecars) {
+                    const auto relative =
+                        (record->relative_path.parent_path() /
+                            sidecar.relative_path).lexically_normal();
+
+                    if (const auto* dependency =
+                            assets_.find_relative(relative.generic_string())) {
+                        result.dependencies.push_back(dependency->guid);
+                    }
+                }
+            }
+        }
+
+        // V1 import manifests did not persist dependency GUIDs; recover
+        // a cached .nmat dependency without mutating its legacy source.
+        if (result.cache_hit &&
+            record->importer_id == "NEngine.Material" &&
+            result.dependencies.empty()) {
+            std::ifstream source(record->source_path, std::ios::binary);
+            render::MaterialAssetData material;
+            if (source && render::read_material_asset(source, material)) {
+                result.dependencies.push_back(material.base_color_texture);
+            }
+        }
+
+        dependency_graph_.set_dependencies(guid, result.dependencies);
     }
 
     return result;
