@@ -4,6 +4,7 @@ add_library(NEngineAssets STATIC
   src/asset_database.cpp
   src/builtin_processors.cpp
   src/file_watcher.cpp
+  src/gltf_sidecars.cpp
   src/import_pipeline.cpp
   src/dependency_graph.cpp
 )
