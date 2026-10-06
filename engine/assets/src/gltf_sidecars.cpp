@@ -226,7 +226,8 @@ private:
                     if (field == "uri") {
                         std::string uri;
                         if (!string(uri)) return false;
-                        if (uri.size() > 8192u) return false;
+                        // Data URIs can be as large as the bounded JSON source;
+                        // external paths are size-limited during URI validation.
                         uris.push_back(std::move(uri));
                         if (uris.size() > 2048u) return false;
                     } else if (!skip_value(0)) {
