@@ -979,6 +979,50 @@ int main() {
             glb_decoded_base_color.rgba8 == decoded_png.rgba8,
             "GLB PNG bufferView decodes first PBR base-color image");
 
+        const auto unsafe_model_path =
+            root / "unsafe_resources.gltf";
+
+        {
+            std::ofstream output(
+                unsafe_model_path,
+                std::ios::binary | std::ios::trunc);
+            output
+                << R"json({"asset":{"version":"2.0"},"buffers":[{"byteLength":1,"uri":"../secret.bin"}],"meshes":[{"primitives":[{}]}]})json";
+        }
+
+        auto unsafe_asset = gltf_asset;
+        unsafe_asset.source_path = unsafe_model_path;
+        render::MeshData unsafe_mesh;
+        std::string unsafe_error;
+
+        check(
+            !render::decode_gltf_mesh(
+                unsafe_asset,
+                unsafe_mesh,
+                &unsafe_error) &&
+            unsafe_error.find("URI") != std::string::npos,
+            "glTF loader rejects external buffer path traversal");
+
+        {
+            std::ofstream output(
+                unsafe_model_path,
+                std::ios::binary | std::ios::trunc);
+            output
+                << R"json({"asset":{"version":"2.0"},"meshes":[{"primitives":[{"material":0}]}],"materials":[{"pbrMetallicRoughness":{"baseColorTexture":{"index":0}}}],"textures":[{"source":0}],"images":[{"uri":"../secret.png"}]})json";
+        }
+
+        render::DecodedTextureData unsafe_texture;
+        unsafe_error.clear();
+
+        check(
+            !render::decode_gltf_base_color_texture(
+                unsafe_asset,
+                unsafe_texture,
+                &unsafe_error) &&
+            unsafe_error.find("URI") != std::string::npos,
+            "glTF loader rejects external image path traversal");
+
+
 
         const auto model_descriptor =
             root / "model.nasset";
