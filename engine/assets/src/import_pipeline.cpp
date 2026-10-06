@@ -1,4 +1,7 @@
 #include "nengine/assets/import_pipeline.hpp"
+#include "nengine/assets/gltf_sidecars.hpp"
+
+#include <cctype>
 
 #include <fstream>
 #include <iomanip>
@@ -14,6 +17,7 @@ struct CachedManifest {
     std::string importer_id{};
     std::uint32_t importer_version{0};
     std::vector<ImportArtifact> artifacts{};
+    std::vector<AssetGuid> dependencies{};
 };
 
 std::filesystem::path manifest_path(
@@ -34,7 +38,7 @@ bool read_manifest(
 
     if (!(input >> token >> version) ||
         token != "NENGINE_IMPORT" ||
-        version != 1) {
+        (version != 1 && version != 2)) {
         return false;
     }
 
@@ -86,6 +90,29 @@ bool read_manifest(
             std::move(artifact));
     }
 
+    manifest.dependencies.clear();
+    if (version >= 2u) {
+        std::size_t dependency_count = 0;
+        if (!(input >> token) ||
+            token != "DEPENDENCIES" ||
+            !(input >> dependency_count) ||
+            dependency_count > 8192u) {
+            return false;
+        }
+
+        for (std::size_t i = 0; i < dependency_count; ++i) {
+            std::string guid_text;
+            if (!(input >> token) ||
+                token != "DEPENDENCY" ||
+                !(input >> std::quoted(guid_text))) {
+                return false;
+            }
+            const auto guid = AssetGuid::parse(guid_text);
+            if (!guid || !guid->valid()) return false;
+            manifest.dependencies.push_back(*guid);
+        }
+    }
+
     return (input >> token) &&
         token == "END_IMPORT";
 }
@@ -100,7 +127,7 @@ bool write_manifest(
 
     if (!output) return false;
 
-    output << "NENGINE_IMPORT 1\n";
+    output << "NENGINE_IMPORT 2\n";
     output << "FINGERPRINT "
            << std::quoted(manifest.fingerprint)
            << "\n";
@@ -121,6 +148,15 @@ bool write_manifest(
                << " "
                << std::quoted(
                     artifact.path.generic_string())
+               << "\n";
+    }
+
+    output << "DEPENDENCIES "
+           << manifest.dependencies.size()
+           << "\n";
+    for (const auto guid : manifest.dependencies) {
+        output << "DEPENDENCY "
+               << std::quoted(guid.to_string())
                << "\n";
     }
 
@@ -196,6 +232,17 @@ std::string AssetImportPipeline::fingerprint(
         << asset.file_size
         << ":"
         << asset.write_stamp;
+
+    if (asset.importer_id == "NEngine.Model") {
+        auto extension = asset.source_path.extension().string();
+        for (char& ch : extension) {
+            ch = static_cast<char>(
+                std::tolower(static_cast<unsigned char>(ch)));
+        }
+        if (extension == ".gltf") {
+            stream << gltf_sidecar_fingerprint(asset.source_path);
+        }
+    }
 
     return stream.str();
 }
@@ -326,6 +373,7 @@ ImportResult AssetImportPipeline::import(
         result.success = true;
         result.cache_hit = true;
         result.message = "cache hit";
+        result.dependencies = cached.dependencies;
 
         for (auto artifact :
              cached.artifacts) {
@@ -363,6 +411,7 @@ ImportResult AssetImportPipeline::import(
         importer->id;
     manifest.importer_version =
         importer->version;
+    manifest.dependencies = result.dependencies;
 
     for (const auto& artifact :
          result.artifacts) {
