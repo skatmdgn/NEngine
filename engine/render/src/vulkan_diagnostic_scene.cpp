@@ -81,6 +81,19 @@ bool VulkanDiagnosticScene::initialize(
         return false;
     }
 
+    if (!imported_material_cache_.initialize(
+            context.loader(),
+            context.instance(),
+            context.device())) {
+
+        diagnostic_ =
+            "imported Vulkan material cache failed: " +
+            imported_material_cache_.diagnostic();
+
+        shutdown();
+        return false;
+    }
+
     const std::uint8_t pixels[] = {
         255u,  48u,  48u, 255u,
          48u, 255u,  96u, 255u,
@@ -276,7 +289,9 @@ bool VulkanDiagnosticScene::present_world(
         snapshot.meshes.size());
 
     std::size_t imported_draws = 0;
+    std::size_t imported_materials = 0;
     std::size_t unresolved_draws = 0;
+    std::size_t unresolved_materials = 0;
     std::string last_asset_error;
 
     for (const auto& item :
@@ -334,13 +349,57 @@ bool VulkanDiagnosticScene::present_world(
             ++imported_draws;
         }
 
+        const VulkanMaterialResource*
+            draw_material =
+                &material_;
+
+        if (item.renderer.material.valid()) {
+            draw_material =
+                imported_material_cache_.find(
+                    item.renderer.material);
+
+            if (!draw_material &&
+                asset_resolver) {
+
+                const auto material_artifacts =
+                    asset_resolver(
+                        item.renderer.material);
+
+                if (material_artifacts) {
+                    std::string material_error;
+
+                    draw_material =
+                        imported_material_cache_.load(
+                            item.renderer.material,
+                            *material_artifacts,
+                            asset_resolver,
+                            &material_error);
+
+                    if (!draw_material &&
+                        !material_error.empty()) {
+                        last_asset_error =
+                            std::move(
+                                material_error);
+                    }
+                }
+            }
+
+            if (draw_material) {
+                ++imported_materials;
+            } else {
+                ++unresolved_materials;
+                draw_material =
+                    &material_;
+            }
+        }
+
         draws.push_back({
             &pipeline_,
             mesh,
             multiply(
                 matrices->view_projection,
                 item.world),
-            &material_
+            draw_material
         });
     }
 
@@ -384,14 +443,25 @@ bool VulkanDiagnosticScene::present_world(
         " draw(s), " +
         std::to_string(
             imported_draws) +
-        " imported";
+        " imported mesh, " +
+        std::to_string(
+            imported_materials) +
+        " imported material";
 
     if (unresolved_draws != 0u) {
         diagnostic_ +=
             ", " +
             std::to_string(
                 unresolved_draws) +
-            " unresolved";
+            " unresolved mesh";
+    }
+
+    if (unresolved_materials != 0u) {
+        diagnostic_ +=
+            ", " +
+            std::to_string(
+                unresolved_materials) +
+            " unresolved material";
     }
 
     return true;
@@ -401,6 +471,7 @@ void VulkanDiagnosticScene::shutdown() noexcept {
     pipeline_.destroy();
     material_.destroy();
     texture_.destroy();
+    imported_material_cache_.shutdown();
     imported_mesh_cache_.shutdown();
     mesh_cache_.shutdown();
     fragment_shader_.destroy();
