@@ -28,6 +28,10 @@ ProjectSession::ProjectSession() {
         assets::texture_source_importer);
 
     import_pipeline_.register_processor(
+        "NEngine.Material",
+        assets::material_source_importer);
+
+    import_pipeline_.register_processor(
         "NEngine.Model",
         assets::model_source_importer);
 
@@ -56,6 +60,12 @@ void ProjectSession::register_builtin_importers() {
     importers_.register_importer({
         "NEngine.Texture", 1,
         {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tga"},
+        false
+    });
+
+    importers_.register_importer({
+        "NEngine.Material", 1,
+        {".nmat"},
         false
     });
 
@@ -100,6 +110,7 @@ bool ProjectSession::open(
         assets_path_,
         assets_path_ / "Scenes",
         assets_path_ / "Scripts",
+        assets_path_ / "Materials",
         root_ / "ProjectSettings",
         root_ / "Packages",
         root_ / "Library",
