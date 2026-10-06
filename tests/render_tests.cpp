@@ -654,6 +654,71 @@ int main() {
             decoded_tga.rgba8[6] == 255u,
             "TGA decoder produces normalized top-left RGBA8 pixels");
 
+        const auto png_source =
+            root / "decoded.png";
+
+        const std::array<std::uint8_t, 74>
+            png_bytes{
+                0x89u, 0x50u, 0x4Eu, 0x47u, 0x0Du, 0x0Au, 0x1Au, 0x0Au,
+                0x00u, 0x00u, 0x00u, 0x0Du, 0x49u, 0x48u, 0x44u, 0x52u,
+                0x00u, 0x00u, 0x00u, 0x02u, 0x00u, 0x00u, 0x00u, 0x01u,
+                0x08u, 0x06u, 0x00u, 0x00u, 0x00u, 0xF4u, 0x22u, 0x7Fu,
+                0x8Au, 0x00u, 0x00u, 0x00u, 0x11u, 0x49u, 0x44u, 0x41u,
+                0x54u, 0x78u, 0xDAu, 0x63u, 0xF8u, 0xCFu, 0xC0u, 0xF0u,
+                0x9Fu, 0xE1u, 0x3Fu, 0xC3u, 0x7Fu, 0x00u, 0x10u, 0xF8u,
+                0x03u, 0xFDu, 0x3Cu, 0x9Fu, 0xE6u, 0xF6u, 0x00u, 0x00u,
+                0x00u, 0x00u, 0x49u, 0x45u, 0x4Eu, 0x44u, 0xAEu, 0x42u,
+                0x60u, 0x82u
+            };
+
+        {
+            std::ofstream output(
+                png_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output.write(
+                reinterpret_cast<const char*>(
+                    png_bytes.data()),
+                static_cast<std::streamsize>(
+                    png_bytes.size()));
+        }
+
+        render::ResolvedTextureAsset
+            resolved_png;
+
+        resolved_png.guid =
+            assets::AssetGuid::generate();
+        resolved_png.metadata.format =
+            "png";
+        resolved_png.metadata.width = 2u;
+        resolved_png.metadata.height = 1u;
+        resolved_png.metadata.color_space =
+            "sRGB";
+        resolved_png.source_path =
+            png_source;
+
+        render::DecodedTextureData
+            decoded_png;
+
+        check(
+            render::decode_texture_rgba8(
+                resolved_png,
+                decoded_png,
+                &resolve_error) &&
+            decoded_png.valid() &&
+            decoded_png.width == 2u &&
+            decoded_png.height == 1u &&
+            decoded_png.rgba8[0] == 255u &&
+            decoded_png.rgba8[1] == 0u &&
+            decoded_png.rgba8[2] == 0u &&
+            decoded_png.rgba8[3] == 255u &&
+            decoded_png.rgba8[4] == 0u &&
+            decoded_png.rgba8[5] == 255u &&
+            decoded_png.rgba8[6] == 0u &&
+            decoded_png.rgba8[7] == 255u,
+            "pinned stb_image decodes PNG source into RGBA8 pixels");
+
         const auto gltf_source =
             root / "triangle.gltf";
 
