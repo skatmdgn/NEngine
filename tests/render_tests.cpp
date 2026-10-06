@@ -800,9 +800,13 @@ int main() {
   "meshes":[{
     "primitives":[{
       "attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2},
-      "indices":3
+      "indices":3,
+      "material":0
     }]
-  }]
+  }],
+  "materials":[{"pbrMetallicRoughness":{"baseColorTexture":{"index":0}}}],
+  "textures":[{"source":0}],
+  "images":[{"uri":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAEUlEQVR42mP4z8Dwn+E/w38AEPgD/Tyf5vYAAAAASUVORK5CYII="}]
 })json";
         }
 
@@ -837,6 +841,21 @@ int main() {
             decoded_gltf_fixture.bounds.extents.x == 0.5f &&
             decoded_gltf_fixture.bounds.extents.y == 0.5f,
             "glTF 2.0 embedded-buffer triangle decodes into MeshData");
+
+        render::DecodedTextureData gltf_embedded_base_color;
+
+        check(
+            render::decode_gltf_base_color_texture(
+                gltf_asset,
+                gltf_embedded_base_color,
+                &resolve_error) &&
+            gltf_embedded_base_color.valid() &&
+            gltf_embedded_base_color.width == 2u &&
+            gltf_embedded_base_color.height == 1u &&
+            gltf_embedded_base_color.color_space ==
+                render::DecodedTextureColorSpace::SRgb &&
+            gltf_embedded_base_color.rgba8 == decoded_png.rgba8,
+            "glTF first primitive PBR baseColorTexture data URI decodes into RGBA8");
 
         const auto model_descriptor =
             root / "model.nasset";
