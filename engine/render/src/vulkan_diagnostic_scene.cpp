@@ -290,6 +290,7 @@ bool VulkanDiagnosticScene::present_world(
 
     std::size_t imported_draws = 0;
     std::size_t imported_materials = 0;
+    std::size_t gltf_auto_materials = 0;
     std::size_t unresolved_draws = 0;
     std::size_t unresolved_materials = 0;
     std::string last_asset_error;
@@ -391,6 +392,27 @@ bool VulkanDiagnosticScene::present_world(
                 draw_material =
                     &material_;
             }
+        } else if (imported) {
+            // A GLB with a base-color image should look textured even
+            // without a manually authored .nmat Material GUID.
+            const VulkanMaterialResource* automatic =
+                imported_material_cache_.find_gltf_base_color(
+                    item.renderer.mesh);
+
+            if (!automatic && asset_resolver) {
+                if (const auto model_artifacts =
+                        asset_resolver(item.renderer.mesh)) {
+                    automatic =
+                        imported_material_cache_.load_gltf_base_color(
+                            item.renderer.mesh,
+                            *model_artifacts);
+                }
+            }
+
+            if (automatic) {
+                draw_material = automatic;
+                ++gltf_auto_materials;
+            }
         }
 
         draws.push_back({
@@ -446,7 +468,9 @@ bool VulkanDiagnosticScene::present_world(
         " imported mesh, " +
         std::to_string(
             imported_materials) +
-        " imported material";
+        " imported material, " +
+        std::to_string(gltf_auto_materials) +
+        " automatic glTF texture";
 
     if (unresolved_draws != 0u) {
         diagnostic_ +=
