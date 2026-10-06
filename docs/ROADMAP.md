@@ -41,7 +41,10 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Model source descriptor importer
 - [x] SPIR-V binary shader importer
 - [x] Renderer cache resolver for texture/model/shader artifacts
-- [ ] Production PNG/JPEG/WebP texture decode/transcode
+- [x] PNG/JPEG RGBA8 decode with pinned stb_image
+- [x] BMP/TGA RGBA8 decode foundation
+- [ ] WebP decode + mipmap/compression/transcoding
+- [x] .nmat importer + texture dependency graph
 - [x] glTF/GLB geometry decode into MeshData
 - [x] AssetGuid decoded/GPU mesh caches
 - [ ] glTF material/image dependency cooking
@@ -82,7 +85,8 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] AssetGuid decoded RGBA8 texture cache (BMP/TGA foundation)
 - [x] Per-device Vulkan texture/material AssetGuid cache
 - [x] Imported glTF/GLB mesh AssetGuid resolution in VK Preview
-- [ ] Imported material/texture AssetGuid binding
+- [x] .nmat Material AssetGuid -> imported texture Vulkan binding
+- [ ] Automatic glTF material/image -> NEngine material cooking
 - [ ] Scene View Vulkan presentation replacement
 - [ ] Android Vulkan surface
 - [ ] PBR/lights/shadows/sprites
