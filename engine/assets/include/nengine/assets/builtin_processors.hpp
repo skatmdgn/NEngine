@@ -7,6 +7,9 @@ namespace nengine::assets {
 ImportResult texture_source_importer(
     const ImportContext& context);
 
+ImportResult material_source_importer(
+    const ImportContext& context);
+
 ImportResult model_source_importer(
     const ImportContext& context);
 
