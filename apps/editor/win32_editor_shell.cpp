@@ -1141,7 +1141,13 @@ struct Win32EditorShell::Impl {
             if (!vulkan_diagnostic_scene
                     ->present_world(
                         *vulkan_context,
-                        editor.presentation_world())) {
+                        editor.presentation_world(),
+                        [this](
+                            nengine::assets::AssetGuid guid) {
+                            return editor.project()
+                                .cached_artifacts(
+                                    guid);
+                        })) {
 
                 vulkan_preview_enabled =
                     false;
@@ -1179,6 +1185,11 @@ struct Win32EditorShell::Impl {
                 editor.project().poll_assets();
 
             if (!result.changes.empty()) {
+                if (vulkan_diagnostic_scene) {
+                    vulkan_diagnostic_scene
+                        ->invalidate_imported_assets();
+                }
+
                 editor.console().info(
                     "Assets",
                     "Detected " +
