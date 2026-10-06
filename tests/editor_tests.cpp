@@ -557,7 +557,7 @@ int main() {
     mesh_component.fields.push_back({
         "Enabled",
         "Enabled",
-        core::PropertyKind::Bool,
+        core::PropertyKind::Boolean,
         core::PropertyValue{true},
         true
     });
