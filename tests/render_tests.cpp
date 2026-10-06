@@ -14,6 +14,7 @@
 #include "nengine/render/asset_resources.hpp"
 #include "nengine/render/builtin_assets.hpp"
 #include "nengine/render/components.hpp"
+#include "nengine/render/decoded_mesh.hpp"
 #include "nengine/render/decoded_texture.hpp"
 #include "nengine/render/diagnostic_shaders.hpp"
 #include "nengine/render/gltf_mesh.hpp"
@@ -29,6 +30,7 @@
 #include "nengine/render/vulkan_device.hpp"
 #include "nengine/render/vulkan_instance.hpp"
 #include "nengine/render/vulkan_mesh.hpp"
+#include "nengine/render/vulkan_mesh_asset_cache.hpp"
 #include "nengine/render/vulkan_pipeline.hpp"
 #include "nengine/render/vulkan_presenter.hpp"
 #include "nengine/render/vulkan_render_pass.hpp"
@@ -721,6 +723,75 @@ int main() {
             decoded_gltf_fixture.bounds.extents.y == 0.5f,
             "glTF 2.0 embedded-buffer triangle decodes into MeshData");
 
+        const auto model_descriptor =
+            root / "model.nasset";
+
+        {
+            std::ofstream output(
+                model_descriptor,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output
+                << "NENGINE_MODEL 1\n"
+                << "FORMAT \".gltf\"\n"
+                << "SOURCE \"triangle.gltf\"\n"
+                << "SOURCE_BYTES "
+                << std::filesystem::file_size(
+                    gltf_source)
+                << "\n"
+                << "END_MODEL\n";
+        }
+
+        assets::CachedArtifactSet
+            model_cached;
+
+        model_cached.fingerprint =
+            "gltf-v1";
+        model_cached.importer_id =
+            "NEngine.Model";
+
+        model_cached.artifacts.push_back({
+            gltf_source,
+            "source"
+        });
+
+        model_cached.artifacts.push_back({
+            model_descriptor,
+            "model-descriptor"
+        });
+
+        render::DecodedMeshCache
+            decoded_mesh_cache;
+
+        const auto* cached_mesh =
+            decoded_mesh_cache.load(
+                gltf_asset.guid,
+                model_cached,
+                &resolve_error);
+
+        check(
+            cached_mesh &&
+            cached_mesh->valid() &&
+            cached_mesh->vertices.size() == 3u &&
+            cached_mesh->indices.size() == 3u &&
+            decoded_mesh_cache.size() == 1u &&
+            decoded_mesh_cache.find(
+                gltf_asset.guid) ==
+                cached_mesh,
+            "AssetGuid decoded mesh cache resolves imported glTF artifacts");
+
+        const auto* cached_mesh_again =
+            decoded_mesh_cache.load(
+                gltf_asset.guid,
+                model_cached,
+                &resolve_error);
+
+        check(
+            cached_mesh_again == cached_mesh &&
+            decoded_mesh_cache.size() == 1u,
+            "decoded mesh cache reuses matching import fingerprint");
+
         const auto shader_source =
             root / "source.vert.spv";
 
@@ -1061,6 +1132,51 @@ int main() {
                             gpu_gltf.index_count() == 3u,
                             "decoded glTF MeshData uploads through existing Vulkan mesh path");
 
+                        render::VulkanMeshAssetCache
+                            gpu_mesh_asset_cache;
+
+                        check(
+                            gpu_mesh_asset_cache.initialize(
+                                loader,
+                                instance,
+                                device),
+                            "Vulkan mesh AssetGuid cache initializes for headless device");
+
+                        const auto gpu_mesh_guid =
+                            assets::AssetGuid::generate();
+
+                        std::string gpu_mesh_error;
+
+                        const auto* cached_gpu_mesh =
+                            gpu_mesh_asset_cache.upload(
+                                gpu_mesh_guid,
+                                "mesh-v1",
+                                decoded_gltf_fixture,
+                                &gpu_mesh_error);
+
+                        check(
+                            cached_gpu_mesh &&
+                            cached_gpu_mesh->valid() &&
+                            cached_gpu_mesh->index_count() == 3u &&
+                            gpu_mesh_asset_cache.find(
+                                gpu_mesh_guid) ==
+                                cached_gpu_mesh &&
+                            gpu_mesh_asset_cache.size() == 1u,
+                            "decoded AssetGuid mesh uploads into per-device Vulkan mesh cache");
+
+                        const auto* cached_gpu_mesh_again =
+                            gpu_mesh_asset_cache.upload(
+                                gpu_mesh_guid,
+                                "mesh-v1",
+                                decoded_gltf_fixture,
+                                &gpu_mesh_error);
+
+                        check(
+                            cached_gpu_mesh_again ==
+                                cached_gpu_mesh &&
+                            gpu_mesh_asset_cache.size() == 1u,
+                            "Vulkan mesh AssetGuid cache reuses matching fingerprint");
+
                         render::VulkanShaderModule
                             diagnostic_vertex;
 
@@ -1195,6 +1311,7 @@ int main() {
                         diagnostic_textured_vertex.destroy();
                         diagnostic_fragment.destroy();
                         diagnostic_vertex.destroy();
+                        gpu_mesh_asset_cache.shutdown();
                         gpu_gltf.destroy();
                         gpu_cube.destroy();
                         gpu_material.destroy();
