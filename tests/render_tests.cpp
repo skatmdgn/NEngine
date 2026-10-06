@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <array>
+#include <cstdint>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
@@ -8,6 +10,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "nengine/assets/asset_guid.hpp"
 #include "nengine/core/scene.hpp"
@@ -856,6 +859,126 @@ int main() {
                 render::DecodedTextureColorSpace::SRgb &&
             gltf_embedded_base_color.rgba8 == decoded_png.rgba8,
             "glTF first primitive PBR baseColorTexture data URI decodes into RGBA8");
+
+        // Real GLB 2.0 JSON + BIN chunks, with mesh accessors and an
+        // image/png bufferView in the same BIN payload.
+        const std::array<std::uint8_t, 102> glb_geometry{
+                0x00u, 0x00u, 0x00u, 0xbfu, 0x00u, 0x00u, 0x00u, 0xbfu, 0x00u, 0x00u,
+                0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x3fu, 0x00u, 0x00u, 0x00u, 0xbfu,
+                0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
+                0x00u, 0x3fu, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
+                0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x80u, 0x3fu, 0x00u, 0x00u,
+                0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x80u, 0x3fu,
+                0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
+                0x80u, 0x3fu, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
+                0x00u, 0x00u, 0x80u, 0x3fu, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
+                0x00u, 0x3fu, 0x00u, 0x00u, 0x80u, 0x3fu, 0x00u, 0x00u, 0x01u, 0x00u,
+                0x02u, 0x00u
+        };
+
+        std::vector<std::uint8_t> glb_bin(180u, 0u);
+        std::copy(
+            glb_geometry.begin(),
+            glb_geometry.end(),
+            glb_bin.begin());
+        std::copy(
+            png_bytes.begin(),
+            png_bytes.end(),
+            glb_bin.begin() + 104);
+
+        std::string glb_json = R"json({
+  "asset":{"version":"2.0"},
+  "buffers":[{"byteLength":178}],
+  "bufferViews":[
+    {"buffer":0,"byteOffset":0,"byteLength":36},
+    {"buffer":0,"byteOffset":36,"byteLength":36},
+    {"buffer":0,"byteOffset":72,"byteLength":24},
+    {"buffer":0,"byteOffset":96,"byteLength":6},
+    {"buffer":0,"byteOffset":104,"byteLength":74}
+  ],
+  "accessors":[
+    {"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"},
+    {"bufferView":1,"componentType":5126,"count":3,"type":"VEC3"},
+    {"bufferView":2,"componentType":5126,"count":3,"type":"VEC2"},
+    {"bufferView":3,"componentType":5123,"count":3,"type":"SCALAR"}
+  ],
+  "meshes":[{"primitives":[{
+    "attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2},
+    "indices":3,
+    "material":0
+  }]}],
+  "materials":[{"pbrMetallicRoughness":{"baseColorTexture":{"index":0}}}],
+  "textures":[{"source":0}],
+  "images":[{"bufferView":4,"mimeType":"image/png"}]
+})json";
+
+        while ((glb_json.size() % 4u) != 0u) {
+            glb_json.push_back(' ');
+        }
+
+        const auto glb_source =
+            root / "textured_triangle.glb";
+
+        {
+            std::ofstream output(
+                glb_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            const auto write_u32 =
+                [&](std::uint32_t value) {
+                    const std::array<char, 4> encoded{
+                        static_cast<char>(value & 0xFFu),
+                        static_cast<char>((value >> 8u) & 0xFFu),
+                        static_cast<char>((value >> 16u) & 0xFFu),
+                        static_cast<char>((value >> 24u) & 0xFFu)
+                    };
+                    output.write(encoded.data(), 4);
+                };
+
+            write_u32(0x46546C67u);
+            write_u32(2u);
+            write_u32(static_cast<std::uint32_t>(
+                12u + 8u + glb_json.size() + 8u + glb_bin.size()));
+            write_u32(static_cast<std::uint32_t>(glb_json.size()));
+            write_u32(0x4E4F534Au);
+            output.write(
+                glb_json.data(),
+                static_cast<std::streamsize>(glb_json.size()));
+            write_u32(static_cast<std::uint32_t>(glb_bin.size()));
+            write_u32(0x004E4942u);
+            output.write(
+                reinterpret_cast<const char*>(glb_bin.data()),
+                static_cast<std::streamsize>(glb_bin.size()));
+        }
+
+        auto glb_asset = gltf_asset;
+        glb_asset.metadata.format = ".glb";
+        glb_asset.source_path = glb_source;
+
+        render::MeshData glb_decoded_mesh;
+        render::DecodedTextureData glb_decoded_base_color;
+
+        check(
+            render::decode_gltf_mesh(
+                glb_asset,
+                glb_decoded_mesh,
+                &resolve_error) &&
+            glb_decoded_mesh.valid() &&
+            glb_decoded_mesh.vertices.size() == 3u &&
+            glb_decoded_mesh.indices ==
+                std::vector<std::uint32_t>{0u, 2u, 1u},
+            "GLB JSON and BIN chunks decode a real triangle mesh");
+
+        check(
+            render::decode_gltf_base_color_texture(
+                glb_asset,
+                glb_decoded_base_color,
+                &resolve_error) &&
+            glb_decoded_base_color.valid() &&
+            glb_decoded_base_color.rgba8 == decoded_png.rgba8,
+            "GLB PNG bufferView decodes first PBR base-color image");
+
 
         const auto model_descriptor =
             root / "model.nasset";
