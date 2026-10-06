@@ -59,6 +59,10 @@ public:
     bool erase(
         assets::AssetGuid guid) noexcept;
 
+    // Drop imported texture/material entries while retaining the
+    // current Vulkan device attachment.
+    void clear() noexcept;
+
     void shutdown() noexcept;
 
     bool ready() const noexcept {
