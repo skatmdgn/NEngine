@@ -200,9 +200,13 @@ bool VulkanMeshAssetCache::erase(
     return entries_.erase(guid) != 0u;
 }
 
-void VulkanMeshAssetCache::shutdown() noexcept {
+void VulkanMeshAssetCache::clear() noexcept {
     entries_.clear();
     decoded_cache_.clear();
+}
+
+void VulkanMeshAssetCache::shutdown() noexcept {
+    clear();
 
     loader_ = nullptr;
     instance_ = nullptr;
