@@ -7,12 +7,15 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <vector>
 
 #include "nengine/assets/asset_guid.hpp"
+#include "nengine/assets/builtin_processors.hpp"
+#include "nengine/assets/import_pipeline.hpp"
 #include "nengine/core/scene.hpp"
 #include "nengine/core/world.hpp"
 #include "nengine/render/asset_resources.hpp"
@@ -1057,6 +1060,119 @@ int main() {
             glb_decoded_base_color.valid() &&
             glb_decoded_base_color.rgba8 == decoded_png.rgba8,
             "GLB PNG bufferView decodes first PBR base-color image");
+
+        // A real multi-file .gltf must resolve the staged copies, not
+        // the original sidecars in the model's source directory.
+        const auto external_source_dir = root / "external_source";
+        const auto external_gltf = external_source_dir / "triangle.gltf";
+        const auto external_bin =
+            external_source_dir / "geometry" / "triangle.bin";
+        const auto external_png =
+            external_source_dir / "images" / "albedo.png";
+
+        std::filesystem::create_directories(
+            external_bin.parent_path());
+        std::filesystem::create_directories(
+            external_png.parent_path());
+
+        {
+            std::ofstream output(
+                external_bin, std::ios::binary | std::ios::trunc);
+            output.write(
+                reinterpret_cast<const char*>(glb_geometry.data()),
+                static_cast<std::streamsize>(glb_geometry.size()));
+        }
+        {
+            std::ofstream output(
+                external_png, std::ios::binary | std::ios::trunc);
+            output.write(
+                reinterpret_cast<const char*>(png_bytes.data()),
+                static_cast<std::streamsize>(png_bytes.size()));
+        }
+        {
+            std::ofstream output(
+                external_gltf, std::ios::binary | std::ios::trunc);
+            output << R"json({
+ "asset":{"version":"2.0"},
+ "buffers":[{"uri":"geometry/triangle.bin","byteLength":102}],
+ "bufferViews":[
+    {"buffer":0,"byteOffset":0,"byteLength":36},
+    {"buffer":0,"byteOffset":36,"byteLength":36},
+    {"buffer":0,"byteOffset":72,"byteLength":24},
+    {"buffer":0,"byteOffset":96,"byteLength":6}
+ ],
+ "accessors":[
+    {"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"},
+    {"bufferView":1,"componentType":5126,"count":3,"type":"VEC3"},
+    {"bufferView":2,"componentType":5126,"count":3,"type":"VEC2"},
+    {"bufferView":3,"componentType":5123,"count":3,"type":"SCALAR"}
+ ],
+ "meshes":[{"primitives":[{
+    "attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2},
+    "indices":3,"material":0
+ }]}],
+ "materials":[{"pbrMetallicRoughness":{"baseColorTexture":{"index":0}}}],
+ "textures":[{"source":0}],
+ "images":[{"uri":"images/albedo.png"}]
+})json";
+        }
+
+        assets::AssetRecord external_record;
+        external_record.guid = assets::AssetGuid::generate();
+        external_record.source_path = external_gltf;
+        external_record.importer_id = "NEngine.Model";
+        external_record.file_size =
+            std::filesystem::file_size(external_gltf);
+        external_record.write_stamp = 1;
+
+        assets::ImporterRegistry external_registry;
+        external_registry.register_importer({
+            "NEngine.Model", 1, {".gltf"}, false
+        });
+
+        assets::AssetImportPipeline external_pipeline;
+        external_pipeline.register_processor(
+            "NEngine.Model", assets::model_source_importer);
+
+        const auto external_cache_root = root / "external_cache";
+        const auto external_import = external_pipeline.import(
+            external_record, external_registry, external_cache_root);
+        const auto external_artifacts =
+            external_pipeline.cached_artifacts(
+                external_record, external_registry, external_cache_root);
+
+        check(
+            external_import.success &&
+            external_artifacts.has_value() &&
+            external_artifacts->artifacts.size() == 4u,
+            "multi-file glTF importer caches source descriptor bin and PNG sidecars");
+
+        if (external_artifacts) {
+            const auto resolved =
+                render::resolve_model_asset(
+                    external_record.guid, *external_artifacts, &resolve_error);
+
+            render::MeshData external_mesh;
+            render::DecodedTextureData external_base_color;
+
+            check(
+                resolved.has_value() &&
+                render::decode_gltf_mesh(
+                    *resolved, external_mesh, &resolve_error) &&
+                external_mesh.valid() &&
+                external_mesh.vertices.size() == 3u &&
+                external_mesh.indices.size() == 3u,
+                "staged external glTF geometry bin resolves into native MeshData");
+
+            check(
+                resolved.has_value() &&
+                render::decode_gltf_base_color_texture(
+                    *resolved, external_base_color, &resolve_error) &&
+                external_base_color.valid() &&
+                external_base_color.rgba8 == decoded_png.rgba8,
+                "staged external glTF PNG auto material decodes exact source pixels");
+        }
+
 
         const auto unsafe_model_path =
             root / "unsafe_resources.gltf";
