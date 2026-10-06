@@ -221,9 +221,13 @@ bool VulkanTextureAssetCache::erase(
     return entries_.erase(guid) != 0u;
 }
 
-void VulkanTextureAssetCache::shutdown() noexcept {
+void VulkanTextureAssetCache::clear() noexcept {
     entries_.clear();
     decoded_cache_.clear();
+}
+
+void VulkanTextureAssetCache::shutdown() noexcept {
+    clear();
 
     loader_ = nullptr;
     instance_ = nullptr;
