@@ -182,6 +182,35 @@ InspectorSnapshot build_inspector(
     return snapshot;
 }
 
+std::optional<std::size_t> find_inspector_property_row(
+    const InspectorSnapshot& snapshot,
+    core::ComponentTypeId component,
+    std::string_view property_path) {
+
+    if (!snapshot.valid) {
+        return std::nullopt;
+    }
+
+    std::size_t row = 0;
+
+    for (const auto& entry : snapshot.components) {
+        // The Win32 Reflection Properties list excludes Transform.
+        if (entry.type == core::World::transform_type) {
+            continue;
+        }
+
+        for (const auto& field : entry.fields) {
+            if (entry.type == component &&
+                field.property_path == property_path) {
+                return row;
+            }
+            ++row;
+        }
+    }
+
+    return std::nullopt;
+}
+
 ToolbarState build_toolbar(
     const EditorModel& editor) {
 
