@@ -860,6 +860,85 @@ int main() {
             gltf_embedded_base_color.rgba8 == decoded_png.rgba8,
             "glTF first primitive PBR baseColorTexture data URI decodes into RGBA8");
 
+        // glTF baseColorFactor is linear, even for a texture uploaded as
+        // Vulkan SRGB. Color-only materials must become visible too.
+        const auto factor_only_path =
+            root / "factor_only.gltf";
+
+        {
+            std::ofstream output(
+                factor_only_path, std::ios::binary | std::ios::trunc);
+            output << R"json({"asset":{"version":"2.0"},"meshes":[{"primitives":[{"material":0}]}],"materials":[{"pbrMetallicRoughness":{"baseColorFactor":[0.5,0.0,0.0,0.25]}}]})json";
+        }
+
+        auto factor_asset = gltf_asset;
+        factor_asset.source_path = factor_only_path;
+        render::DecodedTextureData factor_pixels;
+
+        check(
+            render::decode_gltf_base_color_texture(
+                factor_asset, factor_pixels, &resolve_error) &&
+            factor_pixels.valid() &&
+            factor_pixels.width == 1u &&
+            factor_pixels.height == 1u &&
+            factor_pixels.rgba8 ==
+                std::vector<std::uint8_t>{188u, 0u, 0u, 64u},
+            "glTF color-only baseColorFactor generates correctly encoded 1x1 sRGB texture");
+
+        const auto tinted_source = root / "tinted_triangle.gltf";
+
+        {
+            std::ifstream input(gltf_source, std::ios::binary);
+            std::string original(
+                std::istreambuf_iterator<char>{input},
+                std::istreambuf_iterator<char>{});
+
+            const std::string before =
+                "\"baseColorTexture\":{\"index\":0}";
+            const std::string after =
+                "\"baseColorFactor\":[0.5,1.0,1.0,0.5],"
+                "\"baseColorTexture\":{\"index\":0}";
+            const auto index = original.find(before);
+            if (index != std::string::npos) {
+                original.replace(index, before.size(), after);
+            }
+
+            std::ofstream output(
+                tinted_source, std::ios::binary | std::ios::trunc);
+            output << original;
+        }
+
+        factor_asset.source_path = tinted_source;
+        render::DecodedTextureData tinted_pixels;
+
+        check(
+            render::decode_gltf_base_color_texture(
+                factor_asset, tinted_pixels, &resolve_error) &&
+            tinted_pixels.valid() &&
+            tinted_pixels.width == 2u &&
+            tinted_pixels.height == 1u &&
+            tinted_pixels.rgba8 ==
+                std::vector<std::uint8_t>{
+                    188u, 0u, 0u, 128u,
+                    0u, 255u, 0u, 128u},
+            "glTF texture image pixels tint by baseColorFactor in linear color space");
+
+        {
+            std::ofstream output(
+                factor_only_path, std::ios::binary | std::ios::trunc);
+            output << R"json({"asset":{"version":"2.0"},"meshes":[{"primitives":[{"material":0}]}],"materials":[{"pbrMetallicRoughness":{"baseColorFactor":[2,0,0,1]}}]})json";
+        }
+
+        factor_asset.source_path = factor_only_path;
+        std::string invalid_factor_error;
+        check(
+            !render::decode_gltf_base_color_texture(
+                factor_asset, factor_pixels, &invalid_factor_error) &&
+            invalid_factor_error.find("baseColorFactor") !=
+                std::string::npos,
+            "glTF rejects out-of-range baseColorFactor input");
+
+
         // Real GLB 2.0 JSON + BIN chunks, with mesh accessors and an
         // image/png bufferView in the same BIN payload.
         const std::array<std::uint8_t, 102> glb_geometry{
