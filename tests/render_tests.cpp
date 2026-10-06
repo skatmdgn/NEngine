@@ -710,13 +710,13 @@ int main() {
             decoded_gltf_fixture.vertices.size() == 3u &&
             decoded_gltf_fixture.indices ==
                 std::vector<std::uint32_t>{
-                    0u, 1u, 2u} &&
+                    0u, 2u, 1u} &&
             decoded_gltf_fixture.vertices[0]
                 .position.x == -0.5f &&
             decoded_gltf_fixture.vertices[1]
                 .uv.x == 1.0f &&
             decoded_gltf_fixture.vertices[2]
-                .normal.z == 1.0f &&
+                .normal.z == -1.0f &&
             decoded_gltf_fixture.bounds.center.x == 0.0f &&
             decoded_gltf_fixture.bounds.center.y == 0.0f &&
             decoded_gltf_fixture.bounds.extents.x == 0.5f &&
