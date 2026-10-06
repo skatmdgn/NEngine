@@ -48,6 +48,16 @@ public:
     const VulkanMaterialResource* find(
         assets::AssetGuid material_guid) const noexcept;
 
+    // Preview fallback for a glTF/GLB mesh without an explicit .nmat.
+    // Uses the first primitive's embedded or referenced PBR base-color map.
+    const VulkanMaterialResource* load_gltf_base_color(
+        assets::AssetGuid mesh_guid,
+        const assets::CachedArtifactSet& mesh_artifacts,
+        std::string* error = nullptr);
+
+    const VulkanMaterialResource* find_gltf_base_color(
+        assets::AssetGuid mesh_guid) const noexcept;
+
     bool erase(
         assets::AssetGuid material_guid) noexcept;
 
@@ -78,6 +88,13 @@ private:
         assets::AssetGuid,
         Entry,
         assets::AssetGuidHash> entries_{};
+
+    // A model without an embedded base-color map is normal. Avoid
+    // reparsing that model every frame until its import fingerprint changes.
+    std::unordered_map<
+        assets::AssetGuid,
+        std::string,
+        assets::AssetGuidHash> gltf_without_base_color_{};
 
     std::string diagnostic_{};
 };
