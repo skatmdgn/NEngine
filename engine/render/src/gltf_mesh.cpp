@@ -2014,14 +2014,31 @@ bool append_primitive(
          i < positions.size();
          ++i) {
 
-        mesh.vertices.push_back({
-            positions[i],
+        auto position =
+            positions[i];
+
+        // glTF uses a right-handed coordinate system while NEngine's
+        // current renderer/camera convention is left-handed. Reflect Z
+        // here so imported geometry enters the engine in native space.
+        position.z =
+            -position.z;
+
+        auto normal =
             i < normals.size()
                 ? normals[i]
                 : core::Vec3{
                     0.0f,
                     0.0f,
-                    1.0f},
+                    1.0f};
+
+        if (i < normals.size()) {
+            normal.z =
+                -normal.z;
+        }
+
+        mesh.vertices.push_back({
+            position,
+            normal,
             i < uvs.size()
                 ? uvs[i]
                 : core::Vec2{}
@@ -2085,9 +2102,23 @@ bool append_primitive(
                 "glTF primitive index references missing vertex");
             return false;
         }
+    }
+
+    // Reflecting one axis changes handedness and reverses winding.
+    // Reverse each triangle so the existing Vulkan back-face culling
+    // remains correct after the Z reflection.
+    for (std::size_t i = 0;
+         i < indices.size();
+         i += 3u) {
 
         mesh.indices.push_back(
-            base + index);
+            base + indices[i + 0u]);
+
+        mesh.indices.push_back(
+            base + indices[i + 2u]);
+
+        mesh.indices.push_back(
+            base + indices[i + 1u]);
     }
 
     return true;
