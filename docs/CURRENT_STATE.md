@@ -65,7 +65,7 @@ The Scene View still uses GDI by default for interactive diagnostic object/gizmo
 Implemented:
 - Persistent NEngine.nproject manifest.
 - Safe project-relative startup Scene validation.
-- Project bootstrap with Assets/Scenes, Assets/Scripts, ProjectSettings, Packages and Library/Cache.
+- Project bootstrap with Assets/Scenes, Assets/Scripts, Assets/Materials, ProjectSettings, Packages and Library/Cache.
 - Persistent startup Main.nscene.
 - Startup Scene contains native Camera and Light components.
 - GUID + .meta asset identity.
@@ -79,6 +79,7 @@ Implemented:
 - Scene/script/raw source staging.
 - Texture source staging + metadata descriptor.
   - PNG/BMP/TGA/JPEG dimension probing where supported.
+- .nmat material importer with base-color Texture AssetGuid dependency extraction into the dependency graph.
 - Audio source staging + WAV metadata descriptor.
   - channels, sample rate, bits/sample, data bytes.
 - Model source staging + format/source-size descriptor.
@@ -99,7 +100,7 @@ Implemented:
 - Automatic import feedback in Console.
 
 Not yet implemented:
-- PNG/JPEG/WebP pixel decoding and production texture transcoding/mipmap/compression path.
+- WebP pixel decoding and production texture transcoding/mipmap/compression path.
 - glTF material/image dependency cooking, node transforms, skins, morphs, sparse/quantized accessors and current import-cache staging for external .gltf sidecar buffers.
 - OBJ/FBX mesh decoding/cooking.
 - Shader source compilation (GLSL/HLSL -> SPIR-V).
@@ -147,13 +148,18 @@ Implemented:
 Implemented:
 - AssetGuid -> validated cached texture metadata resolution.
 - AssetGuid + import-fingerprint decoded texture cache.
+- PNG/JPEG -> RGBA8 decoding through pinned vendored stb_image.
 - BMP 24/32-bit uncompressed true-color -> normalized top-left RGBA8 decoding.
 - TGA 24/32-bit uncompressed true-color -> normalized top-left RGBA8 decoding.
 - Per-device AssetGuid Vulkan texture/material cache that uploads decoded RGBA8 pixels and reuses matching fingerprints.
+- First .nmat Material AssetGuid format containing a base-color Texture AssetGuid.
+- Per-device Vulkan Material AssetGuid cache resolving .nmat -> texture cache -> combined-image-sampler descriptor.
 - AssetGuid -> validated cached model metadata resolution.
 - AssetGuid + import-fingerprint decoded MeshData cache for glTF/GLB geometry.
 - Per-device AssetGuid Vulkan mesh cache reusing uploaded vertex/index buffers.
-- VK Preview can resolve imported glTF/GLB MeshRenderer.mesh GUIDs through the project cache and automatically invalidates imported GPU mesh entries after asset filesystem changes.
+- VK Preview can resolve imported glTF/GLB MeshRenderer.mesh GUIDs through the project cache.
+- MeshRenderer.material can resolve a .nmat AssetGuid to a real imported PNG/JPEG/BMP/TGA texture and Vulkan descriptor, with diagnostic material fallback on failure.
+- Imported mesh/material GPU caches are invalidated after asset filesystem changes.
 - AssetGuid -> shader descriptor + SPIR-V word resolution.
 - Descriptor/source consistency checks for shader word counts and SPIR-V magic.
 
@@ -222,12 +228,11 @@ Implemented:
 - Diagnostic textured vertex/fragment GLSL sources with audited SPIR-V fixtures.
 - Textured vertex path forwards MeshVertex UVs to the fragment stage.
 - Diagnostic fragment shader samples set 0 / binding 0 sampler2D.
-- VK Preview uses a 2x2 diagnostic RGBA8 texture/material on supported built-in MeshRenderer draws, exercising real descriptor binding and texture sampling.
-- Headless Vulkan CI validates texture upload, sampler creation, material descriptors, textured shader modules and a real texture-sampling graphics pipeline.
+- VK Preview uses a 2x2 diagnostic RGBA8 texture/material as the fallback material, while valid .nmat MeshRenderer.material GUIDs bind imported texture descriptors.
+- Headless Vulkan CI validates texture upload, sampler creation, material descriptors, textured shader modules, a real texture-sampling graphics pipeline, and .nmat -> texture artifacts -> Vulkan sampled descriptor creation.
 
 Not yet implemented:
-- Material AssetGuid/serialization model and imported material cache.
-- glTF material/texture dependency cooking.
+- Automatic glTF material/texture dependency cooking into NEngine material assets.
 - Shader source compiler and reflection.
 - General descriptor/uniform binding beyond the first texture slot.
 - Vulkan Game View.
@@ -247,9 +252,9 @@ The concrete Vulkan backend currently grows beneath this contract. The long-term
 
 ## Immediate next work
 
-1. Add production PNG/JPEG/WebP image decoding behind the decoded-texture cache contract so common glTF textures can become GPU resources.
-2. Add glTF material/image dependency extraction and the first Material AssetGuid/cache representation.
-3. Bind imported material/texture resources to imported glTF MeshRenderer draws in VK Preview.
-4. Stage/track external .gltf sidecar buffers and image dependencies through the asset import pipeline.
+1. Extract glTF material/image relationships and map them into the .nmat/Texture AssetGuid model automatically.
+2. Stage/track external .gltf sidecar buffers and image dependencies through the asset import pipeline.
+3. Add WebP decoding plus mipmap/compression/transcoding policy behind the decoded-texture cache.
+4. Add node-transform-aware glTF scene/mesh cooking plus quantized/sparse accessor support where needed.
 5. Add a shader compiler toolchain path rather than making glslang/DXC a hidden build dependency.
 6. Return to .NET hosting after the renderer/resource boundary is stable.
