@@ -1,7 +1,10 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "nengine/core/component_registry.hpp"
@@ -54,6 +57,14 @@ struct ToolbarState {
 
 std::vector<HierarchyRow> build_hierarchy(const EditorModel& editor);
 InspectorSnapshot build_inspector(const EditorModel& editor);
+
+// Returns the flattened non-Transform property-list index for a stable
+// (component type, property path) key, even if field order changes.
+std::optional<std::size_t> find_inspector_property_row(
+    const InspectorSnapshot& snapshot,
+    core::ComponentTypeId component,
+    std::string_view property_path);
+
 ToolbarState build_toolbar(const EditorModel& editor);
 
 } // namespace nengine::editor
