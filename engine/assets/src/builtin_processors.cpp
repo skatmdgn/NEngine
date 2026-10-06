@@ -676,6 +676,83 @@ ImportResult texture_source_importer(
     return result;
 }
 
+ImportResult material_source_importer(
+    const ImportContext& context) {
+
+    ImportResult result;
+    std::filesystem::path source;
+
+    if (!stage_source(
+            context,
+            result,
+            source)) {
+        return result;
+    }
+
+    std::ifstream input(
+        context.asset->source_path,
+        std::ios::binary);
+
+    if (!input) {
+        result.message =
+            "could not open material source";
+        return result;
+    }
+
+    std::string token;
+    std::uint32_t version = 0;
+
+    if (!(input >> token >> version) ||
+        token != "NENGINE_MATERIAL" ||
+        version != 1u) {
+
+        result.message =
+            "invalid material header";
+        return result;
+    }
+
+    std::string texture_guid;
+
+    if (!(input >> token) ||
+        token != "BASE_COLOR_TEXTURE" ||
+        !(input >> std::quoted(
+            texture_guid))) {
+
+        result.message =
+            "material BASE_COLOR_TEXTURE is missing";
+        return result;
+    }
+
+    const auto dependency =
+        AssetGuid::parse(
+            texture_guid);
+
+    if (!dependency ||
+        !dependency->valid()) {
+
+        result.message =
+            "material BASE_COLOR_TEXTURE GUID is invalid";
+        return result;
+    }
+
+    if (!(input >> token) ||
+        token != "END_MATERIAL") {
+
+        result.message =
+            "material terminator is missing";
+        return result;
+    }
+
+    result.dependencies.push_back(
+        *dependency);
+
+    result.success = true;
+    result.message =
+        "material staged with base-color texture dependency";
+
+    return result;
+}
+
 ImportResult model_source_importer(
     const ImportContext& context) {
 
