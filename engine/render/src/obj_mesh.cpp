@@ -459,6 +459,137 @@ void calculate_bounds(
 
 } // namespace
 
+bool discover_obj_material_slots(
+    const ResolvedModelAsset& asset,
+    std::vector<ObjMaterialSlot>& materials,
+    std::string* error) {
+
+    materials.clear();
+
+    if (!asset.guid.valid()) {
+        set_error(
+            error,
+            "OBJ model AssetGuid is invalid");
+        return false;
+    }
+
+    std::error_code filesystem_error;
+
+    const auto file_bytes =
+        std::filesystem::file_size(
+            asset.source_path,
+            filesystem_error);
+
+    if (filesystem_error ||
+        file_bytes == 0u ||
+        file_bytes > kMaxObjBytes) {
+
+        set_error(
+            error,
+            "OBJ source is unavailable, empty or exceeds 256 MiB");
+        return false;
+    }
+
+    std::ifstream input(
+        asset.source_path,
+        std::ios::binary);
+
+    if (!input) {
+        set_error(
+            error,
+            "could not open OBJ source");
+        return false;
+    }
+
+    std::unordered_map<
+        std::string,
+        std::uint32_t>
+        slots;
+
+    std::string line;
+    std::size_t line_number = 0u;
+
+    while (std::getline(
+               input,
+               line)) {
+
+        ++line_number;
+
+        const auto view =
+            trim(line);
+
+        if (view.empty() ||
+            view.front() == '#') {
+            continue;
+        }
+
+        const auto fields =
+            tokens(view);
+
+        if (fields.empty() ||
+            fields.front() !=
+                "usemtl") {
+            continue;
+        }
+
+        const auto material_name =
+            trim(
+                view.substr(
+                    fields.front()
+                        .size()));
+
+        if (material_name.empty()) {
+            set_error(
+                error,
+                "OBJ usemtl name is missing at line " +
+                    std::to_string(
+                        line_number));
+            return false;
+        }
+
+        const std::string key{
+            material_name};
+
+        if (slots.contains(
+                key)) {
+            continue;
+        }
+
+        if (slots.size() >=
+            kMeshMaterialUnassigned) {
+
+            set_error(
+                error,
+                "OBJ material slot range exceeds NEngine limit");
+            return false;
+        }
+
+        const auto slot =
+            static_cast<std::uint32_t>(
+                slots.size());
+
+        slots.emplace(
+            key,
+            slot);
+
+        materials.push_back({
+            slot,
+            key
+        });
+    }
+
+    if (!input.eof() &&
+        input.fail()) {
+
+        set_error(
+            error,
+            "OBJ source read failed during material discovery");
+        return false;
+    }
+
+    return true;
+}
+
 bool decode_obj_mesh(
     const ResolvedModelAsset& asset,
     MeshData& mesh,
@@ -511,10 +642,31 @@ bool decode_obj_mesh(
     std::vector<core::Vec3>
         normals;
 
+    std::vector<ObjMaterialSlot>
+        discovered_materials;
+
+    if (!discover_obj_material_slots(
+            asset,
+            discovered_materials,
+            error)) {
+        return false;
+    }
+
     std::unordered_map<
         std::string,
         std::uint32_t>
         material_slots;
+
+    material_slots.reserve(
+        discovered_materials.size());
+
+    for (const auto& material :
+         discovered_materials) {
+
+        material_slots.emplace(
+            material.name,
+            material.slot);
+    }
 
     std::uint32_t
         current_material_slot =
@@ -697,33 +849,17 @@ bool decode_obj_mesh(
                     std::string{
                         material_name});
 
-            if (existing !=
+            if (existing ==
                 material_slots.end()) {
 
-                current_material_slot =
-                    existing->second;
-            } else {
-                if (material_slots.size() >=
-                    kMeshMaterialUnassigned) {
-
-                    set_error(
-                        error,
-                        "OBJ material slot range exceeds NEngine limit");
-                    return false;
-                }
-
-                const auto slot =
-                    static_cast<std::uint32_t>(
-                        material_slots.size());
-
-                material_slots.emplace(
-                    std::string{
-                        material_name},
-                    slot);
-
-                current_material_slot =
-                    slot;
+                set_error(
+                    error,
+                    "OBJ usemtl discovery/decoder slot mismatch");
+                return false;
             }
+
+            current_material_slot =
+                existing->second;
 
             continue;
         }
