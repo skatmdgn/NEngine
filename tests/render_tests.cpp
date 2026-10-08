@@ -2167,6 +2167,7 @@ int main() {
                             gpu_texture.valid() &&
                             gpu_texture.width() == 2u &&
                             gpu_texture.height() == 2u &&
+                            gpu_texture.mip_levels() == 2u &&
                             gpu_texture.native_view() != nullptr &&
                             gpu_texture.native_sampler() != nullptr,
                             "Vulkan RGBA8 texture stages pixels and creates sampled image/view/sampler");
@@ -2209,6 +2210,7 @@ int main() {
                             gpu_asset->valid() &&
                             gpu_asset->texture.width() == 2u &&
                             gpu_asset->texture.height() == 2u &&
+                            gpu_asset->texture.mip_levels() == 2u &&
                             gpu_texture_cache.find(
                                 gpu_asset_guid) ==
                                 gpu_asset &&
