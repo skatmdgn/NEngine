@@ -1,5 +1,6 @@
 #include "nengine/editor/project_session.hpp"
 
+#include <algorithm>
 #include <deque>
 #include <fstream>
 #include <unordered_set>
@@ -389,6 +390,81 @@ AssetPollResult ProjectSession::poll_assets() {
         if (const auto* record = assets_.find_relative(
                 change.relative_path.generic_string())) {
             changed_assets.insert(record->guid);
+        }
+    }
+
+    // If an external glTF sidecar was deleted together with its .meta,
+    // restoring the file creates a new GUID and the old reverse dependency
+    // cannot identify its parent. For newly added files, match canonical
+    // sidecar paths against all glTF sources and mark those parents affected.
+    for (const auto& change :
+         result.changes) {
+
+        if (change.kind !=
+            assets::FileChangeKind::Added) {
+            continue;
+        }
+
+        const auto* added =
+            assets_.find_relative(
+                change.relative_path
+                    .generic_string());
+
+        if (!added) {
+            continue;
+        }
+
+        std::error_code ec;
+
+        const auto added_path =
+            std::filesystem::canonical(
+                added->source_path,
+                ec);
+
+        if (ec) {
+            continue;
+        }
+
+        for (const auto& candidate :
+             assets_.records()) {
+
+            if (candidate.guid ==
+                    added->guid ||
+                candidate.importer_id !=
+                    "NEngine.Model" ||
+                candidate.source_path
+                    .extension() !=
+                    ".gltf") {
+                continue;
+            }
+
+            std::vector<
+                assets::GltfSidecar>
+                sidecars;
+
+            if (!assets::
+                    collect_gltf_sidecars(
+                        candidate.source_path,
+                        sidecars)) {
+                continue;
+            }
+
+            const auto referenced =
+                std::find_if(
+                    sidecars.begin(),
+                    sidecars.end(),
+                    [&](const auto& sidecar) {
+                        return
+                            sidecar.source_path ==
+                            added_path;
+                    });
+
+            if (referenced !=
+                sidecars.end()) {
+
+                changed_assets.insert(
+                    candidate.guid);
+            }
         }
     }
 

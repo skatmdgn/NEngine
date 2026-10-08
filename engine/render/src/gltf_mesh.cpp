@@ -1,5 +1,7 @@
 #include "nengine/render/gltf_mesh.hpp"
 
+#include "nengine/assets/gltf_sidecars.hpp"
+
 #include "stb_image.h"
 
 #include <algorithm>
@@ -820,32 +822,17 @@ std::optional<std::filesystem::path> gltf_sidecar_path(
     std::string_view uri,
     std::string* error) {
 
-    // The current importer supports only literal relative file paths.
-    // Block traversal and URI schemes, even on a non-Windows build.
-    const std::filesystem::path relative{
-        std::string{uri}};
+    const auto resolved =
+        assets::resolve_gltf_sidecar(
+            model_path,
+            uri,
+            error);
 
-    if (relative.empty() ||
-        relative.is_absolute() ||
-        relative.has_root_path() ||
-        uri.find(':') != std::string_view::npos ||
-        uri.find('\\') != std::string_view::npos ||
-        uri.find('%') != std::string_view::npos ||
-        uri.find('?') != std::string_view::npos ||
-        uri.find('#') != std::string_view::npos) {
-
-        set_error(error, "unsafe or unsupported external glTF URI");
-        return std::nullopt;
-    }
-
-    for (const auto& segment : relative) {
-        if (segment == ".." || segment == ".") {
-            set_error(error, "glTF URI must remain below model directory");
-            return std::nullopt;
-        }
-    }
-
-    return model_path.parent_path() / relative;
+    return resolved
+        ? std::optional<
+            std::filesystem::path>{
+                resolved->source_path}
+        : std::nullopt;
 }
 
 int base64_value(
