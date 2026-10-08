@@ -49,8 +49,9 @@ public:
     const VulkanMaterialResource* find(
         assets::AssetGuid material_guid) const noexcept;
 
-    // Preview fallback for a glTF/GLB mesh without an explicit .nmat.
-    // Uses the first primitive's embedded or referenced PBR base-color map.
+    // Compatibility fallback for glTF/GLB assets that predate or cannot use
+    // import-time cooked material subassets. Uses the first primitive's PBR
+    // base-color input.
     const VulkanMaterialResource* load_gltf_base_color(
         assets::AssetGuid mesh_guid,
         const assets::CachedArtifactSet& mesh_artifacts,
