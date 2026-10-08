@@ -1155,12 +1155,27 @@ struct BufferView {
     std::size_t stride{0};
 };
 
+inline constexpr std::size_t
+    kNoAccessorView =
+        std::numeric_limits<std::size_t>::max();
+
+struct SparseAccessor {
+    bool present{false};
+    std::size_t count{0};
+    std::size_t indices_view{kNoAccessorView};
+    std::size_t indices_offset{0};
+    std::uint32_t indices_component_type{0};
+    std::size_t values_view{kNoAccessorView};
+    std::size_t values_offset{0};
+};
+
 struct Accessor {
-    std::size_t view{0};
+    std::size_t view{kNoAccessorView};
     std::size_t offset{0};
     std::size_t count{0};
     std::uint32_t component_type{0};
     std::string type{};
+    SparseAccessor sparse{};
 };
 
 bool parse_buffer_views(
@@ -1269,16 +1284,6 @@ bool parse_accessors(
     for (const auto& item :
          json_accessors->array) {
 
-        if (member(
-                item,
-                "sparse")) {
-
-            set_error(
-                error,
-                "sparse glTF accessors are not supported yet");
-            return false;
-        }
-
         const auto view =
             index_value(
                 member(
@@ -1299,8 +1304,7 @@ bool parse_accessors(
                     item,
                     "type"));
 
-        if (!view ||
-            !count ||
+        if (!count ||
             !unsigned_value(
                 member(
                     item,
@@ -1318,12 +1322,15 @@ bool parse_accessors(
         }
 
         Accessor accessor;
-        accessor.view = *view;
         accessor.count = *count;
         accessor.component_type =
             static_cast<std::uint32_t>(
                 component);
         accessor.type = *type;
+
+        if (view) {
+            accessor.view = *view;
+        }
 
         if (const auto offset =
                 index_value(
@@ -1332,6 +1339,125 @@ bool parse_accessors(
                         "byteOffset"))) {
             accessor.offset =
                 *offset;
+        }
+
+        if (const auto* sparse =
+                member(
+                    item,
+                    "sparse")) {
+
+            if (sparse->kind !=
+                JsonValue::Kind::Object) {
+
+                set_error(
+                    error,
+                    "glTF sparse accessor must be an object");
+                return false;
+            }
+
+            const auto sparse_count =
+                index_value(
+                    member(
+                        *sparse,
+                        "count"));
+
+            const auto* indices =
+                member(
+                    *sparse,
+                    "indices");
+
+            const auto* values =
+                member(
+                    *sparse,
+                    "values");
+
+            if (!sparse_count ||
+                *sparse_count == 0u ||
+                *sparse_count >
+                    accessor.count ||
+                !indices ||
+                indices->kind !=
+                    JsonValue::Kind::Object ||
+                !values ||
+                values->kind !=
+                    JsonValue::Kind::Object) {
+
+                set_error(
+                    error,
+                    "glTF sparse accessor count/indices/values are invalid");
+                return false;
+            }
+
+            const auto indices_view =
+                index_value(
+                    member(
+                        *indices,
+                        "bufferView"));
+
+            std::uint64_t
+                indices_component = 0;
+
+            const auto values_view =
+                index_value(
+                    member(
+                        *values,
+                        "bufferView"));
+
+            if (!indices_view ||
+                !values_view ||
+                !unsigned_value(
+                    member(
+                        *indices,
+                        "componentType"),
+                    indices_component) ||
+                (indices_component != 5121u &&
+                 indices_component != 5123u &&
+                 indices_component != 5125u)) {
+
+                set_error(
+                    error,
+                    "glTF sparse accessor buffer views or index componentType are invalid");
+                return false;
+            }
+
+            accessor.sparse.present = true;
+            accessor.sparse.count =
+                *sparse_count;
+            accessor.sparse.indices_view =
+                *indices_view;
+            accessor.sparse.indices_component_type =
+                static_cast<std::uint32_t>(
+                    indices_component);
+            accessor.sparse.values_view =
+                *values_view;
+
+            if (const auto offset =
+                    index_value(
+                        member(
+                            *indices,
+                            "byteOffset"))) {
+                accessor.sparse.indices_offset =
+                    *offset;
+            }
+
+            if (const auto offset =
+                    index_value(
+                        member(
+                            *values,
+                            "byteOffset"))) {
+                accessor.sparse.values_offset =
+                    *offset;
+            }
+        }
+
+        if (accessor.view ==
+                kNoAccessorView &&
+            !accessor.sparse.present) {
+
+            set_error(
+                error,
+                "glTF accessor requires bufferView or sparse data");
+            return false;
         }
 
         accessors.push_back(
@@ -1619,6 +1745,240 @@ bool accessor_span(
     return true;
 }
 
+bool sparse_indices(
+    const Accessor& accessor,
+    const std::vector<BufferView>& views,
+    const std::vector<
+        std::vector<std::uint8_t>>& buffers,
+    std::vector<std::size_t>& indices,
+    std::string* error) {
+
+    indices.clear();
+
+    if (!accessor.sparse.present) {
+        return true;
+    }
+
+    const auto& sparse =
+        accessor.sparse;
+
+    if (sparse.indices_view >=
+            views.size()) {
+
+        set_error(
+            error,
+            "glTF sparse indices reference invalid bufferView");
+        return false;
+    }
+
+    const auto& view =
+        views[sparse.indices_view];
+
+    if (view.buffer >=
+            buffers.size() ||
+        view.stride != 0u) {
+
+        set_error(
+            error,
+            "glTF sparse indices bufferView is invalid");
+        return false;
+    }
+
+    const auto element_size =
+        component_size(
+            sparse.indices_component_type);
+
+    if (element_size == 0u) {
+        set_error(
+            error,
+            "glTF sparse index componentType is unsupported");
+        return false;
+    }
+
+    const auto& buffer =
+        buffers[view.buffer];
+
+    if (view.offset >
+            buffer.size() ||
+        view.length >
+            buffer.size() -
+                view.offset ||
+        sparse.indices_offset >
+            view.length) {
+
+        set_error(
+            error,
+            "glTF sparse indices range is invalid");
+        return false;
+    }
+
+    const auto required =
+        static_cast<std::uint64_t>(
+            sparse.count) *
+        element_size;
+
+    if (required >
+            view.length -
+                sparse.indices_offset ||
+        required >
+            buffer.size() -
+                (view.offset +
+                 sparse.indices_offset)) {
+
+        set_error(
+            error,
+            "glTF sparse indices payload is truncated");
+        return false;
+    }
+
+    indices.reserve(
+        sparse.count);
+
+    const auto* data =
+        buffer.data() +
+        view.offset +
+        sparse.indices_offset;
+
+    std::size_t previous = 0u;
+
+    for (std::size_t i = 0;
+         i < sparse.count;
+         ++i) {
+
+        const auto* element =
+            data +
+            i * element_size;
+
+        std::size_t index = 0u;
+
+        switch (
+            sparse.indices_component_type) {
+
+        case 5121u:
+            index = element[0];
+            break;
+
+        case 5123u:
+            index =
+                read_u16_le(
+                    element);
+            break;
+
+        case 5125u:
+            index =
+                read_u32_le(
+                    element);
+            break;
+
+        default:
+            return false;
+        }
+
+        if (index >=
+                accessor.count ||
+            (i != 0u &&
+             index <= previous)) {
+
+            set_error(
+                error,
+                "glTF sparse indices must be strictly increasing and in range");
+            return false;
+        }
+
+        previous = index;
+        indices.push_back(
+            index);
+    }
+
+    return true;
+}
+
+bool sparse_values_span(
+    const Accessor& accessor,
+    const std::vector<BufferView>& views,
+    const std::vector<
+        std::vector<std::uint8_t>>& buffers,
+    std::size_t element_size,
+    const std::uint8_t*& data,
+    std::string* error) {
+
+    data = nullptr;
+
+    if (!accessor.sparse.present) {
+        return true;
+    }
+
+    const auto& sparse =
+        accessor.sparse;
+
+    if (sparse.values_view >=
+            views.size()) {
+
+        set_error(
+            error,
+            "glTF sparse values reference invalid bufferView");
+        return false;
+    }
+
+    const auto& view =
+        views[sparse.values_view];
+
+    if (view.buffer >=
+            buffers.size() ||
+        view.stride != 0u) {
+
+        set_error(
+            error,
+            "glTF sparse values bufferView is invalid");
+        return false;
+    }
+
+    const auto& buffer =
+        buffers[view.buffer];
+
+    if (view.offset >
+            buffer.size() ||
+        view.length >
+            buffer.size() -
+                view.offset ||
+        sparse.values_offset >
+            view.length) {
+
+        set_error(
+            error,
+            "glTF sparse values range is invalid");
+        return false;
+    }
+
+    const auto required =
+        static_cast<std::uint64_t>(
+            sparse.count) *
+        element_size;
+
+    const auto start =
+        view.offset +
+        sparse.values_offset;
+
+    if (required >
+            view.length -
+                sparse.values_offset ||
+        required >
+            buffer.size() -
+                start) {
+
+        set_error(
+            error,
+            "glTF sparse values payload is truncated");
+        return false;
+    }
+
+    data =
+        buffer.data() +
+        start;
+
+    return true;
+}
+
 bool read_vec3_accessor(
     std::size_t accessor_index,
     const std::vector<Accessor>& accessors,
@@ -1641,41 +2001,100 @@ bool read_vec3_accessor(
         accessors[
             accessor_index];
 
-    const std::uint8_t* data =
-        nullptr;
+    if (accessor.component_type !=
+            5126u ||
+        component_count(
+            accessor.type) !=
+            3u) {
 
-    std::size_t stride = 0;
-
-    if (!accessor_span(
-            accessor,
-            views,
-            buffers,
-            data,
-            stride,
-            3u,
-            5126u,
-            error)) {
+        set_error(
+            error,
+            "glTF VEC3 accessor type/componentType is unsupported");
         return false;
     }
 
-    values.resize(
-        accessor.count);
+    values.assign(
+        accessor.count,
+        core::Vec3{});
 
-    for (std::size_t i = 0;
-         i < accessor.count;
-         ++i) {
+    if (accessor.view !=
+        kNoAccessorView) {
 
-        const auto* element =
-            data + i * stride;
+        const std::uint8_t* data =
+            nullptr;
 
-        values[i] = {
-            read_f32_le(
-                element + 0u),
-            read_f32_le(
-                element + 4u),
-            read_f32_le(
-                element + 8u)
-        };
+        std::size_t stride = 0;
+
+        if (!accessor_span(
+                accessor,
+                views,
+                buffers,
+                data,
+                stride,
+                3u,
+                5126u,
+                error)) {
+            return false;
+        }
+
+        for (std::size_t i = 0;
+             i < accessor.count;
+             ++i) {
+
+            const auto* element =
+                data + i * stride;
+
+            values[i] = {
+                read_f32_le(
+                    element + 0u),
+                read_f32_le(
+                    element + 4u),
+                read_f32_le(
+                    element + 8u)
+            };
+        }
+    }
+
+    if (accessor.sparse.present) {
+        std::vector<std::size_t>
+            sparse_index;
+
+        const std::uint8_t*
+            sparse_data = nullptr;
+
+        if (!sparse_indices(
+                accessor,
+                views,
+                buffers,
+                sparse_index,
+                error) ||
+            !sparse_values_span(
+                accessor,
+                views,
+                buffers,
+                12u,
+                sparse_data,
+                error)) {
+            return false;
+        }
+
+        for (std::size_t i = 0;
+             i < sparse_index.size();
+             ++i) {
+
+            const auto* element =
+                sparse_data +
+                i * 12u;
+
+            values[sparse_index[i]] = {
+                read_f32_le(
+                    element + 0u),
+                read_f32_le(
+                    element + 4u),
+                read_f32_le(
+                    element + 8u)
+            };
+        }
     }
 
     return true;
@@ -1703,39 +2122,96 @@ bool read_vec2_accessor(
         accessors[
             accessor_index];
 
-    const std::uint8_t* data =
-        nullptr;
+    if (accessor.component_type !=
+            5126u ||
+        component_count(
+            accessor.type) !=
+            2u) {
 
-    std::size_t stride = 0;
-
-    if (!accessor_span(
-            accessor,
-            views,
-            buffers,
-            data,
-            stride,
-            2u,
-            5126u,
-            error)) {
+        set_error(
+            error,
+            "glTF VEC2 accessor type/componentType is unsupported");
         return false;
     }
 
-    values.resize(
-        accessor.count);
+    values.assign(
+        accessor.count,
+        core::Vec2{});
 
-    for (std::size_t i = 0;
-         i < accessor.count;
-         ++i) {
+    if (accessor.view !=
+        kNoAccessorView) {
 
-        const auto* element =
-            data + i * stride;
+        const std::uint8_t* data =
+            nullptr;
 
-        values[i] = {
-            read_f32_le(
-                element + 0u),
-            read_f32_le(
-                element + 4u)
-        };
+        std::size_t stride = 0;
+
+        if (!accessor_span(
+                accessor,
+                views,
+                buffers,
+                data,
+                stride,
+                2u,
+                5126u,
+                error)) {
+            return false;
+        }
+
+        for (std::size_t i = 0;
+             i < accessor.count;
+             ++i) {
+
+            const auto* element =
+                data + i * stride;
+
+            values[i] = {
+                read_f32_le(
+                    element + 0u),
+                read_f32_le(
+                    element + 4u)
+            };
+        }
+    }
+
+    if (accessor.sparse.present) {
+        std::vector<std::size_t>
+            sparse_index;
+
+        const std::uint8_t*
+            sparse_data = nullptr;
+
+        if (!sparse_indices(
+                accessor,
+                views,
+                buffers,
+                sparse_index,
+                error) ||
+            !sparse_values_span(
+                accessor,
+                views,
+                buffers,
+                8u,
+                sparse_data,
+                error)) {
+            return false;
+        }
+
+        for (std::size_t i = 0;
+             i < sparse_index.size();
+             ++i) {
+
+            const auto* element =
+                sparse_data +
+                i * 8u;
+
+            values[sparse_index[i]] = {
+                read_f32_le(
+                    element + 0u),
+                read_f32_le(
+                    element + 4u)
+            };
+        }
     }
 
     return true;
