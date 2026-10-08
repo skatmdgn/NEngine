@@ -695,6 +695,29 @@ bool VulkanClearPresenter::present_frame(
             return false;
         }
 
+        const auto available_indices =
+            draw.mesh->index_count();
+
+        const auto resolved_count =
+            draw.index_count != 0u
+                ? draw.index_count
+                : available_indices -
+                    std::min(
+                        draw.first_index,
+                        available_indices);
+
+        if (draw.first_index >=
+                available_indices ||
+            resolved_count == 0u ||
+            resolved_count >
+                available_indices -
+                    draw.first_index) {
+
+            diagnostic_ =
+                "Vulkan mesh draw index range is outside the uploaded mesh";
+            return false;
+        }
+
         if (draw.material) {
             if (!draw.material->valid()) {
                 diagnostic_ =
@@ -1114,12 +1137,17 @@ bool VulkanClearPresenter::present_frame(
                     .value
                     .data());
 
+            const auto index_count =
+                draw.index_count != 0u
+                    ? draw.index_count
+                    : draw.mesh->index_count() -
+                        draw.first_index;
+
             draw_indexed(
                 command,
-                draw.mesh
-                    ->index_count(),
+                index_count,
                 1,
-                0,
+                draw.first_index,
                 0,
                 0);
         }

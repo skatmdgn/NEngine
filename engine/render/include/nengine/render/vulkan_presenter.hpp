@@ -20,6 +20,8 @@ struct VulkanMeshDraw {
     const VulkanMeshResource* mesh{nullptr};
     Mat4 mvp{};
     const VulkanMaterialResource* material{nullptr};
+    std::uint32_t first_index{0};
+    std::uint32_t index_count{0};
 };
 
 class VulkanClearPresenter {

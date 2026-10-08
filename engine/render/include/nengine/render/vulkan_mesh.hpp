@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <string>
+#include <span>
+#include <vector>
 
 #include "nengine/render/mesh_data.hpp"
 #include "nengine/render/vulkan_buffer.hpp"
@@ -44,6 +46,11 @@ public:
         return bounds_;
     }
 
+    std::span<const MeshSubmesh>
+    submeshes() const noexcept {
+        return submeshes_;
+    }
+
     const std::string& diagnostic() const noexcept {
         return diagnostic_;
     }
@@ -52,6 +59,7 @@ private:
     VulkanBufferResource vertex_buffer_{};
     VulkanBufferResource index_buffer_{};
     std::uint32_t index_count_{0};
+    std::vector<MeshSubmesh> submeshes_{};
     MeshBounds bounds_{};
     std::string diagnostic_{};
 };

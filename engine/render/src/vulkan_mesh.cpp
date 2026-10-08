@@ -77,6 +77,17 @@ bool VulkanMeshResource::create(
         static_cast<std::uint32_t>(
             mesh.indices.size());
 
+    submeshes_ =
+        mesh.submeshes;
+
+    if (submeshes_.empty()) {
+        submeshes_.push_back({
+            0u,
+            index_count_,
+            kMeshMaterialUnassigned
+        });
+    }
+
     bounds_ =
         mesh.bounds;
 
@@ -90,6 +101,7 @@ void VulkanMeshResource::destroy() noexcept {
     index_buffer_.destroy();
     vertex_buffer_.destroy();
     index_count_ = 0;
+    submeshes_.clear();
     bounds_ = {};
 }
 
