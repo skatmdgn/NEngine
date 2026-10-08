@@ -4,10 +4,12 @@
 #include <cctype>
 #include <cstdint>
 #include <filesystem>
+#include <iomanip>
 #include <fstream>
 #include <iterator>
 #include <limits>
 #include <sstream>
+#include <array>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -252,27 +254,137 @@ private:
     std::size_t position_{0};
 };
 
-bool valid_relative_uri(
+int hex_digit(
+    unsigned char value) noexcept {
+
+    if (value >= '0' && value <= '9') {
+        return value - '0';
+    }
+
+    if (value >= 'a' && value <= 'f') {
+        return 10 + value - 'a';
+    }
+
+    if (value >= 'A' && value <= 'F') {
+        return 10 + value - 'A';
+    }
+
+    return -1;
+}
+
+bool decode_relative_uri(
     std::string_view uri,
     std::filesystem::path& relative) {
 
-    if (uri.empty() || uri.size() > 4096u ||
-        uri.find(':') != std::string_view::npos ||
-        uri.find('\\') != std::string_view::npos ||
-        uri.find('%') != std::string_view::npos ||
-        uri.find('?') != std::string_view::npos ||
-        uri.find('#') != std::string_view::npos) {
+    if (uri.empty() ||
+        uri.size() > 4096u ||
+        uri.find('?') !=
+            std::string_view::npos ||
+        uri.find('#') !=
+            std::string_view::npos) {
+
         return false;
     }
 
-    relative = std::filesystem::u8path(uri.begin(), uri.end());
-    if (relative.empty() || relative.is_absolute() ||
-        relative.has_root_path()) return false;
+    std::string decoded;
+    decoded.reserve(
+        uri.size());
 
-    for (const auto& component : relative) {
-        if (component == "." || component == ".." || component.empty())
+    for (std::size_t i = 0u;
+         i < uri.size();
+         ++i) {
+
+        const auto ch =
+            static_cast<unsigned char>(
+                uri[i]);
+
+        if (ch == '%') {
+            if (i + 2u >=
+                uri.size()) {
+                return false;
+            }
+
+            const int high =
+                hex_digit(
+                    static_cast<
+                        unsigned char>(
+                            uri[i + 1u]));
+
+            const int low =
+                hex_digit(
+                    static_cast<
+                        unsigned char>(
+                            uri[i + 2u]));
+
+            if (high < 0 ||
+                low < 0) {
+                return false;
+            }
+
+            const auto value =
+                static_cast<unsigned char>(
+                    (high << 4) |
+                    low);
+
+            if (value == 0u ||
+                value < 0x20u) {
+                return false;
+            }
+
+            decoded.push_back(
+                static_cast<char>(
+                    value));
+
+            i += 2u;
+            continue;
+        }
+
+        if (ch == 0u ||
+            ch < 0x20u) {
             return false;
+        }
+
+        decoded.push_back(
+            static_cast<char>(
+                ch));
     }
+
+    // Keep local-sidecar handling deliberately narrower than a generic
+    // URI implementation. Schemes and Windows path syntax are excluded
+    // consistently on every host OS.
+    if (decoded.find(':') !=
+            std::string::npos ||
+        decoded.find('\\') !=
+            std::string::npos ||
+        decoded.find('?') !=
+            std::string::npos ||
+        decoded.find('#') !=
+            std::string::npos) {
+
+        return false;
+    }
+
+    relative =
+        std::filesystem::u8path(
+            decoded.begin(),
+            decoded.end());
+
+    if (relative.empty() ||
+        relative.is_absolute() ||
+        relative.has_root_path()) {
+        return false;
+    }
+
+    for (const auto& component :
+         relative) {
+
+        if (component.empty() ||
+            component == "." ||
+            component == "..") {
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -289,6 +401,77 @@ bool is_below(
 }
 
 } // namespace
+
+std::optional<GltfSidecar>
+resolve_gltf_sidecar(
+    const std::filesystem::path& source_gltf,
+    std::string_view uri,
+    std::string* error) {
+
+    if (uri.rfind(
+            "data:",
+            0) == 0u) {
+
+        set_error(
+            error,
+            "embedded glTF data URI is not an external sidecar");
+        return std::nullopt;
+    }
+
+    std::filesystem::path
+        relative;
+
+    if (!decode_relative_uri(
+            uri,
+            relative)) {
+
+        set_error(
+            error,
+            "unsafe or unsupported glTF external URI");
+        return std::nullopt;
+    }
+
+    std::error_code ec;
+
+    const auto parent =
+        std::filesystem::canonical(
+            source_gltf.parent_path(),
+            ec);
+
+    if (ec) {
+        set_error(
+            error,
+            "glTF source directory is unavailable");
+        return std::nullopt;
+    }
+
+    const auto resolved =
+        std::filesystem::canonical(
+            source_gltf.parent_path() /
+                relative,
+            ec);
+
+    if (ec ||
+        !is_below(
+            resolved,
+            parent) ||
+        !std::filesystem::
+            is_regular_file(
+                resolved,
+                ec) ||
+        ec) {
+
+        set_error(
+            error,
+            "glTF sidecar missing, non-file or escapes the model directory");
+        return std::nullopt;
+    }
+
+    return GltfSidecar{
+        relative,
+        resolved
+    };
+}
 
 bool collect_gltf_sidecars(
     const std::filesystem::path& source_gltf,
@@ -320,38 +503,28 @@ bool collect_gltf_sidecars(
         return false;
     }
 
-    const auto parent = std::filesystem::canonical(
-        source_gltf.parent_path(), ec);
-    if (ec) {
-        set_error(error, "glTF source directory is unavailable");
-        return false;
-    }
-
     std::unordered_set<std::string> seen;
 
     for (const auto& uri : uris) {
         if (uri.rfind("data:", 0) == 0u) continue;
 
-        std::filesystem::path relative;
-        if (!valid_relative_uri(uri, relative)) {
-            set_error(error, "unsafe or unsupported glTF external URI");
+        const auto resolved =
+            resolve_gltf_sidecar(
+                source_gltf,
+                uri,
+                error);
+
+        if (!resolved) {
             return false;
         }
 
-        // A symbolic link must not allow escaping the model's directory.
-        const auto sidecar = std::filesystem::canonical(
-            source_gltf.parent_path() / relative, ec);
+        const auto key =
+            resolved->relative_path
+                .generic_string();
 
-        if (ec || !is_below(sidecar, parent) ||
-            !std::filesystem::is_regular_file(sidecar, ec) || ec) {
-            set_error(error,
-                "glTF sidecar missing, non-file or escapes the model directory");
-            return false;
-        }
-
-        const auto key = relative.generic_string();
         if (seen.insert(key).second) {
-            sidecars.push_back({relative, sidecar});
+            sidecars.push_back(
+                *resolved);
         }
     }
 
@@ -372,19 +545,83 @@ std::string gltf_sidecar_fingerprint(
         return ":sidecar-error:" + error;
 
     std::ostringstream fingerprint;
-    for (const auto& sidecar : sidecars) {
-        std::error_code ec;
-        const auto size =
-            std::filesystem::file_size(sidecar.source_path, ec);
-        if (ec) return ":sidecar-stat-error";
-        const auto stamp =
-            std::filesystem::last_write_time(sidecar.source_path, ec);
-        if (ec) return ":sidecar-time-error";
 
-        fingerprint << ":sidecar:" <<
-            sidecar.relative_path.generic_string() << ':' <<
-            size << ':' << stamp.time_since_epoch().count();
+    for (const auto& sidecar :
+         sidecars) {
+
+        std::ifstream input(
+            sidecar.source_path,
+            std::ios::binary);
+
+        if (!input) {
+            return
+                ":sidecar-hash-open-error";
+        }
+
+        // Streaming FNV-1a is not a cryptographic identity; it is a fast
+        // cache invalidation checksum that catches same-size/same-timestamp
+        // source edits that metadata-only fingerprints cannot see.
+        std::uint64_t hash =
+            14695981039346656037ull;
+
+        std::uint64_t size = 0u;
+
+        std::array<char, 64u * 1024u>
+            buffer{};
+
+        while (input) {
+            input.read(
+                buffer.data(),
+                static_cast<std::streamsize>(
+                    buffer.size()));
+
+            const auto count =
+                input.gcount();
+
+            if (count <= 0) {
+                break;
+            }
+
+            size +=
+                static_cast<std::uint64_t>(
+                    count);
+
+            for (std::streamsize i = 0;
+                 i < count;
+                 ++i) {
+
+                hash ^=
+                    static_cast<
+                        unsigned char>(
+                            buffer[
+                                static_cast<
+                                    std::size_t>(
+                                        i)]);
+
+                hash *=
+                    1099511628211ull;
+            }
+        }
+
+        if (!input.eof()) {
+            return
+                ":sidecar-hash-read-error";
+        }
+
+        fingerprint
+            << ":sidecar:"
+            << sidecar.relative_path
+                .generic_string()
+            << ':'
+            << size
+            << ':'
+            << std::hex
+            << std::setw(16)
+            << std::setfill('0')
+            << hash
+            << std::dec;
     }
+
     return fingerprint.str();
 }
 
