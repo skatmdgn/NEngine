@@ -1,0 +1,33 @@
+#pragma once
+
+#include <filesystem>
+#include <string>
+#include <vector>
+
+namespace nengine::assets {
+
+enum class ObjSidecarKind {
+    MaterialLibrary,
+    DiffuseTexture,
+};
+
+struct ObjSidecar {
+    std::filesystem::path relative_path{};
+    std::filesystem::path source_path{};
+    ObjSidecarKind kind{
+        ObjSidecarKind::MaterialLibrary};
+};
+
+// Collect local OBJ material-library dependencies and the diffuse textures
+// referenced by map_Kd. All dependencies must resolve to regular files below
+// the OBJ source directory; absolute/traversing paths are rejected.
+bool collect_obj_sidecars(
+    const std::filesystem::path& source_obj,
+    std::vector<ObjSidecar>& sidecars,
+    std::string* error = nullptr);
+
+// Content-based fingerprint of every tracked .mtl/map_Kd sidecar.
+std::string obj_sidecar_fingerprint(
+    const std::filesystem::path& source_obj);
+
+} // namespace nengine::assets
