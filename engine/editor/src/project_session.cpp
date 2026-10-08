@@ -12,6 +12,7 @@
 #include "nengine/render/components.hpp"
 #include "nengine/render/registration.hpp"
 #include "nengine/render/material_asset.hpp"
+#include "nengine/render/model_importer.hpp"
 #include <system_error>
 #include <utility>
 
@@ -38,7 +39,7 @@ ProjectSession::ProjectSession() {
 
     import_pipeline_.register_processor(
         "NEngine.Model",
-        assets::model_source_importer);
+        render::model_asset_importer);
 
     import_pipeline_.register_processor(
         "NEngine.Audio",
