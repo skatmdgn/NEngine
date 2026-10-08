@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <optional>
 #include <string>
@@ -57,6 +58,18 @@ public:
 
     const VulkanMaterialResource* find_gltf_base_color(
         assets::AssetGuid mesh_guid) const noexcept;
+
+    // Automatic per-primitive glTF material path. material_slot is the
+    // original glTF materials[] index preserved by MeshSubmesh.
+    const VulkanMaterialResource* load_gltf_material(
+        assets::AssetGuid mesh_guid,
+        std::uint32_t material_slot,
+        const assets::CachedArtifactSet& mesh_artifacts,
+        std::string* error = nullptr);
+
+    const VulkanMaterialResource* find_gltf_material(
+        assets::AssetGuid mesh_guid,
+        std::uint32_t material_slot) const noexcept;
 
     bool erase(
         assets::AssetGuid material_guid) noexcept;

@@ -1,5 +1,6 @@
 #include "nengine/render/vulkan_material_asset_cache.hpp"
 
+#include <cstdint>
 #include <utility>
 
 #include "nengine/render/gltf_mesh.hpp"
@@ -15,6 +16,52 @@ void set_error(
     if (error) {
         *error = std::move(message);
     }
+}
+
+std::uint64_t mix64(
+    std::uint64_t value) noexcept {
+
+    value +=
+        0x9e3779b97f4a7c15ull;
+    value =
+        (value ^
+         (value >> 30u)) *
+        0xbf58476d1ce4e5b9ull;
+    value =
+        (value ^
+         (value >> 27u)) *
+        0x94d049bb133111ebull;
+    return
+        value ^
+        (value >> 31u);
+}
+
+assets::AssetGuid
+gltf_material_cache_guid(
+    assets::AssetGuid mesh_guid,
+    std::uint32_t material_slot) noexcept {
+
+    const auto slot =
+        static_cast<std::uint64_t>(
+            material_slot) +
+        1ull;
+
+    assets::AssetGuid key{
+        mix64(
+            mesh_guid.high ^
+            (slot *
+             0xd6e8feb86659fd93ull)),
+        mix64(
+            mesh_guid.low ^
+            (slot *
+             0xa0761d6478bd642full))
+    };
+
+    if (!key.valid()) {
+        key.low = 1u;
+    }
+
+    return key;
 }
 
 } // namespace
@@ -268,6 +315,136 @@ VulkanMaterialAssetCache::load_gltf_base_color(
     diagnostic_ =
         "glTF PBR base-color image uploaded as automatic preview material";
     return &uploaded->material;
+}
+
+const VulkanMaterialResource*
+VulkanMaterialAssetCache::find_gltf_material(
+    assets::AssetGuid mesh_guid,
+    std::uint32_t material_slot) const noexcept {
+
+    if (!mesh_guid.valid()) {
+        return nullptr;
+    }
+
+    const auto key =
+        gltf_material_cache_guid(
+            mesh_guid,
+            material_slot);
+
+    const auto* texture =
+        texture_cache_.find(
+            key);
+
+    return
+        texture &&
+        texture->valid()
+        ? &texture->material
+        : nullptr;
+}
+
+const VulkanMaterialResource*
+VulkanMaterialAssetCache::load_gltf_material(
+    assets::AssetGuid mesh_guid,
+    std::uint32_t material_slot,
+    const assets::CachedArtifactSet&
+        mesh_artifacts,
+    std::string* error) {
+
+    if (!ready() ||
+        !mesh_guid.valid()) {
+
+        set_error(
+            error,
+            "glTF material cache is not ready or mesh AssetGuid is invalid");
+        return nullptr;
+    }
+
+    const auto key =
+        gltf_material_cache_guid(
+            mesh_guid,
+            material_slot);
+
+    if (const auto* loaded =
+            texture_cache_.find(
+                key);
+        loaded &&
+        loaded->valid()) {
+
+        return
+            &loaded->material;
+    }
+
+    const auto missing =
+        gltf_without_base_color_
+            .find(
+                key);
+
+    if (missing !=
+            gltf_without_base_color_
+                .end() &&
+        missing->second ==
+            mesh_artifacts.fingerprint) {
+
+        return nullptr;
+    }
+
+    const auto model =
+        resolve_model_asset(
+            mesh_guid,
+            mesh_artifacts,
+            error);
+
+    if (!model) {
+        return nullptr;
+    }
+
+    DecodedTextureData decoded;
+    std::string decode_error;
+
+    if (!decode_gltf_material_base_color_texture(
+            *model,
+            material_slot,
+            decoded,
+            &decode_error)) {
+
+        gltf_without_base_color_
+            .insert_or_assign(
+                key,
+                mesh_artifacts
+                    .fingerprint);
+
+        set_error(
+            error,
+            std::move(
+                decode_error));
+
+        return nullptr;
+    }
+
+    const auto* uploaded =
+        texture_cache_.upload(
+            key,
+            mesh_artifacts.fingerprint +
+                ":gltf-material:" +
+                std::to_string(
+                    material_slot),
+            decoded,
+            error);
+
+    if (!uploaded ||
+        !uploaded->valid()) {
+
+        return nullptr;
+    }
+
+    gltf_without_base_color_.erase(
+        key);
+
+    diagnostic_ =
+        "glTF primitive material uploaded as automatic Vulkan sampled material";
+
+    return
+        &uploaded->material;
 }
 
 bool VulkanMaterialAssetCache::erase(
