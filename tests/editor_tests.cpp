@@ -153,6 +153,117 @@ int main() {
             "managed-packages.txt"),
         "project creates managed NuGet package manifest template");
 
+
+    const auto generated_model_path =
+        project_root /
+        "Assets" /
+        "Models" /
+        "GeneratedMaterial.gltf";
+
+    std::filesystem::create_directories(
+        generated_model_path
+            .parent_path());
+
+    {
+        std::ofstream output(
+            generated_model_path,
+            std::ios::binary |
+                std::ios::trunc);
+
+        output
+            << R"json({"asset":{"version":"2.0"},"meshes":[{"primitives":[{"material":0}]}],"materials":[{"pbrMetallicRoughness":{"baseColorFactor":[1,0,0,1]}}]})json";
+    }
+
+    model.project().refresh_assets();
+
+    const auto* generated_model_record =
+        model.project()
+            .assets()
+            .find_relative(
+                "Models/GeneratedMaterial.gltf");
+
+    check(
+        generated_model_record != nullptr,
+        "project asset database discovers glTF used for generated subasset test");
+
+    assets::AssetGuid
+        generated_material_guid{};
+
+    assets::AssetGuid
+        generated_texture_guid{};
+
+    if (generated_model_record) {
+        generated_material_guid =
+            assets::derive_subasset_guid(
+                generated_model_record->guid,
+                "gltf-material",
+                0u);
+
+        generated_texture_guid =
+            assets::derive_subasset_guid(
+                generated_model_record->guid,
+                "gltf-base-color",
+                0u);
+
+        const auto imported =
+            model.project()
+                .import_asset(
+                    generated_model_record->guid);
+
+        check(
+            imported.success &&
+            imported.subassets.size() == 2u,
+            "ProjectSession model import indexes generated material and texture subassets");
+
+        const auto material_cache =
+            model.project()
+                .cached_artifacts(
+                    generated_material_guid);
+
+        const auto texture_cache =
+            model.project()
+                .cached_artifacts(
+                    generated_texture_guid);
+
+        check(
+            material_cache &&
+            material_cache->importer_id ==
+                "NEngine.Material" &&
+            texture_cache &&
+            texture_cache->importer_id ==
+                "NEngine.Texture",
+            "ProjectSession resolves generated subasset GUIDs through normal cached_artifacts API");
+    }
+
+    model.project().close();
+
+    check(
+        model.project().open(
+            project_root,
+            &project_error),
+        "project session reopens after generated subasset import");
+
+    const auto reopened_material_cache =
+        model.project()
+            .cached_artifacts(
+                generated_material_guid);
+
+    const auto reopened_texture_cache =
+        model.project()
+            .cached_artifacts(
+                generated_texture_guid);
+
+    check(
+        reopened_material_cache &&
+        reopened_material_cache
+            ->importer_id ==
+            "NEngine.Material" &&
+        reopened_texture_cache &&
+        reopened_texture_cache
+            ->importer_id ==
+            "NEngine.Texture",
+        "ProjectSession lazily recovers generated subasset GUIDs from persistent parent import manifest after reopen");
+
     check(
         model.project().manifest().startup_scene ==
             std::filesystem::path{
