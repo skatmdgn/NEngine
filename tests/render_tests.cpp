@@ -1347,6 +1347,86 @@ int main() {
                     std::string::npos,
             "glTF sparse accessor rejects duplicate or unordered sparse indices");
 
+        const auto quantized_source =
+            root / "quantized_triangle.gltf";
+
+        {
+            std::ofstream output(
+                quantized_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output << R"json({
+  "asset":{"version":"2.0"},
+  "extensionsRequired":["KHR_mesh_quantization"],
+  "buffers":[{
+    "byteLength":54,
+    "uri":"data:application/octet-stream;base64,AYABgAAAAAD/fwGAAAAAAAAA/38AAAAAAAB/AAAAfwAAAH8AAAAAAP//AAAAgP//AAABAAIA"
+  }],
+  "bufferViews":[
+    {"buffer":0,"byteOffset":0,"byteLength":24,"byteStride":8},
+    {"buffer":0,"byteOffset":24,"byteLength":12,"byteStride":4},
+    {"buffer":0,"byteOffset":36,"byteLength":12},
+    {"buffer":0,"byteOffset":48,"byteLength":6}
+  ],
+  "accessors":[
+    {"bufferView":0,"componentType":5122,"normalized":true,"count":3,"type":"VEC3"},
+    {"bufferView":1,"componentType":5120,"normalized":true,"count":3,"type":"VEC3"},
+    {"bufferView":2,"componentType":5123,"normalized":true,"count":3,"type":"VEC2"},
+    {"bufferView":3,"componentType":5123,"count":3,"type":"SCALAR"}
+  ],
+  "meshes":[{"primitives":[{
+    "attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2},
+    "indices":3
+  }]}],
+  "nodes":[{"mesh":0,"scale":[0.5,0.5,1]}],
+  "scenes":[{"nodes":[0]}],
+  "scene":0
+})json";
+        }
+
+        auto quantized_asset =
+            gltf_asset;
+        quantized_asset.source_path =
+            quantized_source;
+
+        render::MeshData quantized_mesh;
+        std::string quantized_error;
+
+        check(
+            render::decode_gltf_mesh(
+                quantized_asset,
+                quantized_mesh,
+                &quantized_error) &&
+            quantized_mesh.valid() &&
+            quantized_mesh.vertices.size() == 3u &&
+            std::abs(
+                quantized_mesh.vertices[0]
+                    .position.x + 0.5f) < 0.0001f &&
+            std::abs(
+                quantized_mesh.vertices[0]
+                    .position.y + 0.5f) < 0.0001f &&
+            std::abs(
+                quantized_mesh.vertices[1]
+                    .position.x - 0.5f) < 0.0001f &&
+            std::abs(
+                quantized_mesh.vertices[2]
+                    .position.y - 0.5f) < 0.0001f &&
+            std::abs(
+                quantized_mesh.vertices[0]
+                    .normal.z + 1.0f) < 0.0001f &&
+            std::abs(
+                quantized_mesh.vertices[1]
+                    .uv.x - 1.0f) < 0.0001f &&
+            std::abs(
+                quantized_mesh.vertices[2]
+                    .uv.x - 0.5000076f) < 0.0001f &&
+            std::abs(
+                quantized_mesh.vertices[2]
+                    .uv.y - 1.0f) < 0.0001f,
+            "KHR_mesh_quantization SHORT/BYTE/USHORT normalized attributes decode through node dequantization");
+
+
 
 
 
