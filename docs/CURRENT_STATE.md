@@ -94,6 +94,11 @@ Implemented:
   - interleaved byteStride support.
   - multiple mesh primitives concatenated into MeshData.
   - right-handed glTF -> NEngine left-handed Z reflection + winding conversion.
+  - selected glTF scene node hierarchy baked into MeshData using parent/child world transforms.
+  - node translation/rotation/scale and explicit column-major 4x4 matrix transforms.
+  - inverse-transpose normal transformation plus mirrored-node winding correction.
+  - repeated mesh node instances are baked as independent transformed geometry ranges.
+  - cyclic/invalid node graphs and singular transforms are rejected diagnostically.
   - glTF external buffer/image path traversal and unsupported URI forms rejected.
 - SPIR-V shader import.
   - .spv validation by size/magic.
@@ -103,7 +108,7 @@ Implemented:
 
 Not yet implemented:
 - WebP pixel decoding and production texture transcoding/mipmap/compression path.
-- Full glTF multi-primitive/multi-material cooking into independent NEngine material/texture AssetGuids, advanced PBR factors/maps, node transforms, skins, morphs, sparse/quantized accessors.
+- Full glTF multi-primitive/multi-material cooking into independent NEngine material/texture AssetGuids, advanced PBR factors/maps, skins, morphs and sparse/quantized accessors.
 - Sidecar change detection by content hash (currently size/write timestamp), restoration without a preserved .meta GUID, encoded/remote glTF URIs and sidecars outside the glTF source directory.
 - OBJ/FBX mesh decoding/cooking.
 - Shader source compilation (GLSL/HLSL -> SPIR-V).
@@ -261,6 +266,6 @@ The concrete Vulkan backend currently grows beneath this contract. The long-term
 1. Extend the first glTF PBR base-color preview path to proper multi-material/image extraction and persistent .nmat/Texture AssetGuid cooking.
 2. Extend external glTF sidecar support to encoded URIs, outside-directory policies and stable recovery without .meta (basic same-directory staging/tracking completed).
 3. Add WebP decoding plus mipmap/compression/transcoding policy behind the decoded-texture cache.
-4. Add node-transform-aware glTF scene/mesh cooking plus quantized/sparse accessor support where needed.
+4. Extend glTF geometry cooking with quantized/sparse accessor support; scene-node TRS/matrix hierarchy baking is implemented.
 5. Add a shader compiler toolchain path rather than making glslang/DXC a hidden build dependency.
 6. Return to .NET hosting after the renderer/resource boundary is stable.

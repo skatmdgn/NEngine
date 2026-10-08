@@ -42,7 +42,7 @@ The repository currently includes:
 - PNG/JPEG decoding through pinned stb_image plus BMP/TGA decode foundation
 - .nmat Material AssetGuid assets with texture dependency tracking and Vulkan descriptor caching
 - texture-sampling diagnostic shaders exercised by VK Preview
-- glTF/GLB geometry decode into MeshData with AssetGuid CPU/GPU mesh caches
+- glTF/GLB geometry decode into MeshData with AssetGuid CPU/GPU mesh caches, including selected-scene node hierarchy TRS/matrix baking and mirrored winding correction
 - opt-in VK Preview that renders the actual presentation World Camera + built-in/imported glTF geometry, explicit .nmat textures, and auto-sampled glTF first-primitive PBR base-color PNG/JPEG or color-only baseColorFactor when MeshRenderer.material is unset
 - external multi-file .gltf BIN/PNG/JPEG sidecar staging, import-fingerprint invalidation and watcher-driven dependency reimport
 - Windows + Ubuntu CI tests

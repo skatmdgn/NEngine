@@ -46,6 +46,9 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [ ] WebP decode + mipmap/compression/transcoding
 - [x] .nmat importer + texture dependency graph
 - [x] glTF/GLB geometry decode into MeshData
+- [x] glTF selected-scene node hierarchy TRS/matrix baking into MeshData
+- [x] glTF inverse-transpose normal transform + mirrored winding correction
+- [x] glTF node-cycle/invalid-transform rejection
 - [x] First glTF PBR base-color image decode (PNG/JPEG GLB bufferView/data URI/external file)
 - [x] glTF baseColorFactor 1x1 color material and linear-space image tint
 - [x] Reject unsafe external glTF resource URIs
