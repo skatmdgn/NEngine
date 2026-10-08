@@ -549,6 +549,154 @@ int main() {
                 .path),
         "generated subasset GUID resolves its independent cached artifact set");
 
+    const auto retained_guid =
+        AssetGuid::generate();
+
+    const auto stale_guid =
+        AssetGuid::generate();
+
+    bool emit_stale_subasset =
+        true;
+
+    AssetImportPipeline
+        cleanup_pipeline;
+
+    check(
+        cleanup_pipeline.register_processor(
+            "Raw",
+            [&](const ImportContext& context) {
+
+                ImportResult result;
+                result.success = true;
+
+                const auto retained_path =
+                    context.cache_directory /
+                    "generated" /
+                    "retained.bin";
+
+                write_file(
+                    retained_path,
+                    "retained");
+
+                GeneratedSubasset retained;
+                retained.guid =
+                    retained_guid;
+                retained.importer_id =
+                    "Generated.Binary";
+                retained.name =
+                    "Retained";
+                retained.artifacts.push_back({
+                    retained_path,
+                    "source"
+                });
+
+                result.subassets.push_back(
+                    std::move(
+                        retained));
+
+                if (emit_stale_subasset) {
+                    const auto stale_path =
+                        context.cache_directory /
+                        "generated" /
+                        "stale.bin";
+
+                    write_file(
+                        stale_path,
+                        "stale");
+
+                    GeneratedSubasset stale;
+                    stale.guid =
+                        stale_guid;
+                    stale.importer_id =
+                        "Generated.Binary";
+                    stale.name =
+                        "Stale";
+                    stale.artifacts.push_back({
+                        stale_path,
+                        "source"
+                    });
+
+                    result.subassets.push_back(
+                        std::move(
+                            stale));
+                }
+
+                return result;
+            }),
+        "stale generated artifact cleanup processor registers");
+
+    auto cleanup_record =
+        raw_record;
+
+    cleanup_record.write_stamp =
+        raw_record.write_stamp +
+        1000;
+
+    const auto cleanup_cache_root =
+        root /
+        "Library" /
+        "CleanupCache";
+
+    const auto cleanup_first =
+        cleanup_pipeline.import(
+            cleanup_record,
+            importers,
+            cleanup_cache_root);
+
+    std::filesystem::path
+        stale_artifact_path;
+
+    std::filesystem::path
+        retained_artifact_path;
+
+    for (const auto& subasset :
+         cleanup_first.subassets) {
+
+        if (subasset.guid ==
+            stale_guid) {
+            stale_artifact_path =
+                subasset.artifacts[0]
+                    .path;
+        }
+
+        if (subasset.guid ==
+            retained_guid) {
+            retained_artifact_path =
+                subasset.artifacts[0]
+                    .path;
+        }
+    }
+
+    check(
+        cleanup_first.success &&
+        cleanup_first.subassets.size() == 2u &&
+        std::filesystem::exists(
+            stale_artifact_path) &&
+        std::filesystem::exists(
+            retained_artifact_path),
+        "first generated-subasset import writes retained and soon-stale artifacts");
+
+    emit_stale_subasset = false;
+    ++cleanup_record.write_stamp;
+
+    const auto cleanup_second =
+        cleanup_pipeline.import(
+            cleanup_record,
+            importers,
+            cleanup_cache_root);
+
+    check(
+        cleanup_second.success &&
+        !cleanup_second.cache_hit &&
+        cleanup_second.subassets.size() == 1u &&
+        cleanup_second.subassets[0].guid ==
+            retained_guid &&
+        std::filesystem::exists(
+            retained_artifact_path) &&
+        !std::filesystem::exists(
+            stale_artifact_path),
+        "reimport removes artifacts no longer referenced by root/subasset manifest while retaining current files");
+
     write_file(
         scene,
         "scene-data-changed");
