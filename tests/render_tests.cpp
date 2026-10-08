@@ -848,6 +848,283 @@ int main() {
             decoded_gltf_fixture.bounds.extents.y == 0.5f,
             "glTF 2.0 embedded-buffer triangle decodes into MeshData");
 
+        const auto node_transform_source =
+            root / "node_transform_triangle.gltf";
+
+        {
+            std::ofstream output(
+                node_transform_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output << R"json({
+  "asset":{"version":"2.0"},
+  "buffers":[{
+    "byteLength":102,
+    "uri":"data:application/octet-stream;base64,AAAAvwAAAL8AAAAAAAAAPwAAAL8AAAAAAAAAAAAAAD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAD8AAIA/AAABAAIA"
+  }],
+  "bufferViews":[
+    {"buffer":0,"byteOffset":0,"byteLength":36},
+    {"buffer":0,"byteOffset":36,"byteLength":36},
+    {"buffer":0,"byteOffset":72,"byteLength":24},
+    {"buffer":0,"byteOffset":96,"byteLength":6}
+  ],
+  "accessors":[
+    {"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"},
+    {"bufferView":1,"componentType":5126,"count":3,"type":"VEC3"},
+    {"bufferView":2,"componentType":5126,"count":3,"type":"VEC2"},
+    {"bufferView":3,"componentType":5123,"count":3,"type":"SCALAR"}
+  ],
+  "meshes":[{"primitives":[{
+    "attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2},
+    "indices":3
+  }]}],
+  "nodes":[
+    {"translation":[1,2,3],"children":[1]},
+    {"mesh":0,"rotation":[0,0,0.7071067811865476,0.7071067811865476],"scale":[2,1,1]}
+  ],
+  "scenes":[{"nodes":[0]}],
+  "scene":0
+})json";
+        }
+
+        auto node_transform_asset =
+            gltf_asset;
+
+        node_transform_asset.source_path =
+            node_transform_source;
+
+        render::MeshData
+            node_transform_mesh;
+
+        check(
+            render::decode_gltf_mesh(
+                node_transform_asset,
+                node_transform_mesh,
+                &resolve_error) &&
+            node_transform_mesh.valid() &&
+            node_transform_mesh.vertices.size() == 3u &&
+            std::abs(
+                node_transform_mesh.vertices[0]
+                    .position.x - 1.5f) < 0.0001f &&
+            std::abs(
+                node_transform_mesh.vertices[0]
+                    .position.y - 1.0f) < 0.0001f &&
+            std::abs(
+                node_transform_mesh.vertices[0]
+                    .position.z + 3.0f) < 0.0001f &&
+            std::abs(
+                node_transform_mesh.vertices[1]
+                    .position.x - 1.5f) < 0.0001f &&
+            std::abs(
+                node_transform_mesh.vertices[1]
+                    .position.y - 3.0f) < 0.0001f &&
+            std::abs(
+                node_transform_mesh.vertices[2]
+                    .position.x - 0.5f) < 0.0001f &&
+            std::abs(
+                node_transform_mesh.vertices[2]
+                    .position.y - 2.0f) < 0.0001f &&
+            node_transform_mesh.indices ==
+                std::vector<std::uint32_t>{
+                    0u, 2u, 1u} &&
+            std::abs(
+                node_transform_mesh.bounds.center.x -
+                    1.0f) < 0.0001f &&
+            std::abs(
+                node_transform_mesh.bounds.center.y -
+                    2.0f) < 0.0001f &&
+            std::abs(
+                node_transform_mesh.bounds.center.z +
+                    3.0f) < 0.0001f &&
+            std::abs(
+                node_transform_mesh.bounds.extents.x -
+                    0.5f) < 0.0001f &&
+            std::abs(
+                node_transform_mesh.bounds.extents.y -
+                    1.0f) < 0.0001f &&
+            std::abs(
+                node_transform_mesh.vertices[0]
+                    .normal.z + 1.0f) < 0.0001f,
+            "glTF scene hierarchy bakes parent translation child rotation and nonuniform scale");
+
+        const auto node_matrix_source =
+            root / "node_matrix_triangle.gltf";
+
+        {
+            std::ofstream output(
+                node_matrix_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output << R"json({
+  "asset":{"version":"2.0"},
+  "buffers":[{
+    "byteLength":102,
+    "uri":"data:application/octet-stream;base64,AAAAvwAAAL8AAAAAAAAAPwAAAL8AAAAAAAAAAAAAAD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAD8AAIA/AAABAAIA"
+  }],
+  "bufferViews":[
+    {"buffer":0,"byteOffset":0,"byteLength":36},
+    {"buffer":0,"byteOffset":36,"byteLength":36},
+    {"buffer":0,"byteOffset":72,"byteLength":24},
+    {"buffer":0,"byteOffset":96,"byteLength":6}
+  ],
+  "accessors":[
+    {"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"},
+    {"bufferView":1,"componentType":5126,"count":3,"type":"VEC3"},
+    {"bufferView":2,"componentType":5126,"count":3,"type":"VEC2"},
+    {"bufferView":3,"componentType":5123,"count":3,"type":"SCALAR"}
+  ],
+  "meshes":[{"primitives":[{
+    "attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2},
+    "indices":3
+  }]}],
+  "nodes":[{
+    "mesh":0,
+    "matrix":[1,0,0,0,0,1,0,0,0,0,1,0,4,5,6,1]
+  }],
+  "scenes":[{"nodes":[0]}]
+})json";
+        }
+
+        node_transform_asset.source_path =
+            node_matrix_source;
+
+        render::MeshData
+            node_matrix_mesh;
+
+        check(
+            render::decode_gltf_mesh(
+                node_transform_asset,
+                node_matrix_mesh,
+                &resolve_error) &&
+            node_matrix_mesh.valid() &&
+            std::abs(
+                node_matrix_mesh.vertices[0]
+                    .position.x - 3.5f) < 0.0001f &&
+            std::abs(
+                node_matrix_mesh.vertices[0]
+                    .position.y - 4.5f) < 0.0001f &&
+            std::abs(
+                node_matrix_mesh.vertices[0]
+                    .position.z + 6.0f) < 0.0001f,
+            "glTF explicit column-major node matrix bakes into MeshData");
+
+        const auto mirrored_node_source =
+            root / "mirrored_node_triangle.gltf";
+
+        {
+            std::ofstream output(
+                mirrored_node_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output << R"json({
+  "asset":{"version":"2.0"},
+  "buffers":[{
+    "byteLength":102,
+    "uri":"data:application/octet-stream;base64,AAAAvwAAAL8AAAAAAAAAPwAAAL8AAAAAAAAAAAAAAD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAD8AAIA/AAABAAIA"
+  }],
+  "bufferViews":[
+    {"buffer":0,"byteOffset":0,"byteLength":36},
+    {"buffer":0,"byteOffset":36,"byteLength":36},
+    {"buffer":0,"byteOffset":72,"byteLength":24},
+    {"buffer":0,"byteOffset":96,"byteLength":6}
+  ],
+  "accessors":[
+    {"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"},
+    {"bufferView":1,"componentType":5126,"count":3,"type":"VEC3"},
+    {"bufferView":2,"componentType":5126,"count":3,"type":"VEC2"},
+    {"bufferView":3,"componentType":5123,"count":3,"type":"SCALAR"}
+  ],
+  "meshes":[{"primitives":[{
+    "attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2},
+    "indices":3
+  }]}],
+  "nodes":[{"mesh":0,"scale":[-1,1,1]}],
+  "scenes":[{"nodes":[0]}]
+})json";
+        }
+
+        node_transform_asset.source_path =
+            mirrored_node_source;
+
+        render::MeshData
+            mirrored_node_mesh;
+
+        check(
+            render::decode_gltf_mesh(
+                node_transform_asset,
+                mirrored_node_mesh,
+                &resolve_error) &&
+            mirrored_node_mesh.valid() &&
+            mirrored_node_mesh.indices ==
+                std::vector<std::uint32_t>{
+                    0u, 1u, 2u} &&
+            std::abs(
+                mirrored_node_mesh.vertices[0]
+                    .position.x - 0.5f) < 0.0001f,
+            "glTF negative node scale preserves front-face winding after handedness conversion");
+
+        const auto cyclic_node_source =
+            root / "cyclic_node_triangle.gltf";
+
+        {
+            std::ofstream output(
+                cyclic_node_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output << R"json({
+  "asset":{"version":"2.0"},
+  "buffers":[{
+    "byteLength":102,
+    "uri":"data:application/octet-stream;base64,AAAAvwAAAL8AAAAAAAAAPwAAAL8AAAAAAAAAAAAAAD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAD8AAIA/AAABAAIA"
+  }],
+  "bufferViews":[
+    {"buffer":0,"byteOffset":0,"byteLength":36},
+    {"buffer":0,"byteOffset":36,"byteLength":36},
+    {"buffer":0,"byteOffset":72,"byteLength":24},
+    {"buffer":0,"byteOffset":96,"byteLength":6}
+  ],
+  "accessors":[
+    {"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"},
+    {"bufferView":1,"componentType":5126,"count":3,"type":"VEC3"},
+    {"bufferView":2,"componentType":5126,"count":3,"type":"VEC2"},
+    {"bufferView":3,"componentType":5123,"count":3,"type":"SCALAR"}
+  ],
+  "meshes":[{"primitives":[{
+    "attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2},
+    "indices":3
+  }]}],
+  "nodes":[
+    {"children":[1]},
+    {"mesh":0,"children":[0]}
+  ],
+  "scenes":[{"nodes":[0]}]
+})json";
+        }
+
+        node_transform_asset.source_path =
+            cyclic_node_source;
+
+        render::MeshData
+            cyclic_node_mesh;
+
+        std::string
+            cyclic_node_error;
+
+        check(
+            !render::decode_gltf_mesh(
+                node_transform_asset,
+                cyclic_node_mesh,
+                &cyclic_node_error) &&
+            cyclic_node_error.find(
+                "cycle") !=
+                std::string::npos,
+            "glTF importer rejects cyclic node graphs");
+
+
         render::DecodedTextureData gltf_embedded_base_color;
 
         check(
