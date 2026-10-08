@@ -1175,6 +1175,7 @@ struct Accessor {
     std::size_t count{0};
     std::uint32_t component_type{0};
     std::string type{};
+    bool normalized{false};
     SparseAccessor sparse{};
 };
 
@@ -1339,6 +1340,24 @@ bool parse_accessors(
                         "byteOffset"))) {
             accessor.offset =
                 *offset;
+        }
+
+        if (const auto* normalized =
+                member(
+                    item,
+                    "normalized")) {
+
+            if (normalized->kind !=
+                JsonValue::Kind::Boolean) {
+
+                set_error(
+                    error,
+                    "glTF accessor normalized flag must be boolean");
+                return false;
+            }
+
+            accessor.normalized =
+                normalized->boolean;
         }
 
         if (const auto* sparse =
@@ -1601,8 +1620,10 @@ std::size_t component_size(
     std::uint32_t type) noexcept {
 
     switch (type) {
+    case 5120u:
     case 5121u:
         return 1u;
+    case 5122u:
     case 5123u:
         return 2u;
     case 5125u:
@@ -1655,8 +1676,9 @@ bool accessor_span(
         return false;
     }
 
-    if (accessor.component_type !=
-            expected_component_type ||
+    if ((expected_component_type != 0u &&
+         accessor.component_type !=
+            expected_component_type) ||
         component_count(
             accessor.type) !=
             expected_components) {
@@ -1743,6 +1765,89 @@ bool accessor_span(
         start;
 
     return true;
+}
+
+bool supported_attribute_component(
+    std::uint32_t type) noexcept {
+
+    return
+        type == 5120u ||
+        type == 5121u ||
+        type == 5122u ||
+        type == 5123u ||
+        type == 5126u;
+}
+
+float read_attribute_component(
+    const std::uint8_t* bytes,
+    std::uint32_t type,
+    bool normalized) noexcept {
+
+    switch (type) {
+    case 5120u: {
+        const auto value =
+            static_cast<std::int8_t>(
+                bytes[0]);
+
+        return normalized
+            ? std::max(
+                static_cast<float>(
+                    value) /
+                    127.0f,
+                -1.0f)
+            : static_cast<float>(
+                value);
+    }
+
+    case 5121u: {
+        const auto value =
+            bytes[0];
+
+        return normalized
+            ? static_cast<float>(
+                value) /
+                255.0f
+            : static_cast<float>(
+                value);
+    }
+
+    case 5122u: {
+        const auto value =
+            static_cast<std::int16_t>(
+                read_u16_le(
+                    bytes));
+
+        return normalized
+            ? std::max(
+                static_cast<float>(
+                    value) /
+                    32767.0f,
+                -1.0f)
+            : static_cast<float>(
+                value);
+    }
+
+    case 5123u: {
+        const auto value =
+            read_u16_le(
+                bytes);
+
+        return normalized
+            ? static_cast<float>(
+                value) /
+                65535.0f
+            : static_cast<float>(
+                value);
+    }
+
+    case 5126u:
+        return
+            read_f32_le(
+                bytes);
+
+    default:
+        return 0.0f;
+    }
 }
 
 bool sparse_indices(
@@ -2001,8 +2106,8 @@ bool read_vec3_accessor(
         accessors[
             accessor_index];
 
-    if (accessor.component_type !=
-            5126u ||
+    if (!supported_attribute_component(
+            accessor.component_type) ||
         component_count(
             accessor.type) !=
             3u) {
@@ -2012,6 +2117,13 @@ bool read_vec3_accessor(
             "glTF VEC3 accessor type/componentType is unsupported");
         return false;
     }
+
+    const auto component_bytes =
+        component_size(
+            accessor.component_type);
+
+    const auto element_bytes =
+        component_bytes * 3u;
 
     values.assign(
         accessor.count,
@@ -2032,7 +2144,7 @@ bool read_vec3_accessor(
                 data,
                 stride,
                 3u,
-                5126u,
+                0u,
                 error)) {
             return false;
         }
@@ -2045,12 +2157,21 @@ bool read_vec3_accessor(
                 data + i * stride;
 
             values[i] = {
-                read_f32_le(
-                    element + 0u),
-                read_f32_le(
-                    element + 4u),
-                read_f32_le(
-                    element + 8u)
+                read_attribute_component(
+                    element +
+                        component_bytes * 0u,
+                    accessor.component_type,
+                    accessor.normalized),
+                read_attribute_component(
+                    element +
+                        component_bytes * 1u,
+                    accessor.component_type,
+                    accessor.normalized),
+                read_attribute_component(
+                    element +
+                        component_bytes * 2u,
+                    accessor.component_type,
+                    accessor.normalized)
             };
         }
     }
@@ -2072,7 +2193,7 @@ bool read_vec3_accessor(
                 accessor,
                 views,
                 buffers,
-                12u,
+                element_bytes,
                 sparse_data,
                 error)) {
             return false;
@@ -2084,15 +2205,24 @@ bool read_vec3_accessor(
 
             const auto* element =
                 sparse_data +
-                i * 12u;
+                i * element_bytes;
 
             values[sparse_index[i]] = {
-                read_f32_le(
-                    element + 0u),
-                read_f32_le(
-                    element + 4u),
-                read_f32_le(
-                    element + 8u)
+                read_attribute_component(
+                    element +
+                        component_bytes * 0u,
+                    accessor.component_type,
+                    accessor.normalized),
+                read_attribute_component(
+                    element +
+                        component_bytes * 1u,
+                    accessor.component_type,
+                    accessor.normalized),
+                read_attribute_component(
+                    element +
+                        component_bytes * 2u,
+                    accessor.component_type,
+                    accessor.normalized)
             };
         }
     }
@@ -2122,8 +2252,8 @@ bool read_vec2_accessor(
         accessors[
             accessor_index];
 
-    if (accessor.component_type !=
-            5126u ||
+    if (!supported_attribute_component(
+            accessor.component_type) ||
         component_count(
             accessor.type) !=
             2u) {
@@ -2133,6 +2263,13 @@ bool read_vec2_accessor(
             "glTF VEC2 accessor type/componentType is unsupported");
         return false;
     }
+
+    const auto component_bytes =
+        component_size(
+            accessor.component_type);
+
+    const auto element_bytes =
+        component_bytes * 2u;
 
     values.assign(
         accessor.count,
@@ -2153,7 +2290,7 @@ bool read_vec2_accessor(
                 data,
                 stride,
                 2u,
-                5126u,
+                0u,
                 error)) {
             return false;
         }
@@ -2166,10 +2303,16 @@ bool read_vec2_accessor(
                 data + i * stride;
 
             values[i] = {
-                read_f32_le(
-                    element + 0u),
-                read_f32_le(
-                    element + 4u)
+                read_attribute_component(
+                    element +
+                        component_bytes * 0u,
+                    accessor.component_type,
+                    accessor.normalized),
+                read_attribute_component(
+                    element +
+                        component_bytes * 1u,
+                    accessor.component_type,
+                    accessor.normalized)
             };
         }
     }
@@ -2191,7 +2334,7 @@ bool read_vec2_accessor(
                 accessor,
                 views,
                 buffers,
-                8u,
+                element_bytes,
                 sparse_data,
                 error)) {
             return false;
@@ -2203,13 +2346,19 @@ bool read_vec2_accessor(
 
             const auto* element =
                 sparse_data +
-                i * 8u;
+                i * element_bytes;
 
             values[sparse_index[i]] = {
-                read_f32_le(
-                    element + 0u),
-                read_f32_le(
-                    element + 4u)
+                read_attribute_component(
+                    element +
+                        component_bytes * 0u,
+                    accessor.component_type,
+                    accessor.normalized),
+                read_attribute_component(
+                    element +
+                        component_bytes * 1u,
+                    accessor.component_type,
+                    accessor.normalized)
             };
         }
     }
