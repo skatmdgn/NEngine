@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iterator>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
