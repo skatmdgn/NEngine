@@ -9,6 +9,7 @@
 #include "nengine/render/builtin_assets.hpp"
 #include "nengine/render/diagnostic_shaders.hpp"
 #include "nengine/render/matrix.hpp"
+#include "nengine/render/model_importer.hpp"
 #include "nengine/render/render_snapshot.hpp"
 
 namespace nengine::render {
@@ -290,6 +291,7 @@ bool VulkanDiagnosticScene::present_world(
 
     std::size_t imported_draws = 0;
     std::size_t imported_materials = 0;
+    std::size_t cooked_materials = 0;
     std::size_t gltf_auto_materials = 0;
     std::size_t unresolved_draws = 0;
     std::size_t unresolved_materials = 0;
@@ -426,11 +428,65 @@ bool VulkanDiagnosticScene::present_world(
                 submesh.material_slot !=
                     kMeshMaterialUnassigned) {
 
-                const auto* automatic =
-                    imported_material_cache_
-                        .find_gltf_material(
-                            item.renderer.mesh,
+                const VulkanMaterialResource*
+                    automatic = nullptr;
+
+                bool used_cooked =
+                    false;
+
+                if (model_artifacts &&
+                    asset_resolver) {
+
+                    const auto cooked_guid =
+                        find_cooked_model_material(
+                            *model_artifacts,
                             submesh.material_slot);
+
+                    if (cooked_guid) {
+                        automatic =
+                            imported_material_cache_
+                                .find(
+                                    *cooked_guid);
+
+                        if (!automatic) {
+                            const auto cooked_artifacts =
+                                asset_resolver(
+                                    *cooked_guid);
+
+                            if (cooked_artifacts) {
+                                std::string
+                                    material_error;
+
+                                automatic =
+                                    imported_material_cache_
+                                        .load(
+                                            *cooked_guid,
+                                            *cooked_artifacts,
+                                            asset_resolver,
+                                            &material_error);
+
+                                if (!automatic &&
+                                    !material_error.empty()) {
+
+                                    last_asset_error =
+                                        std::move(
+                                            material_error);
+                                }
+                            }
+                        }
+
+                        used_cooked =
+                            automatic != nullptr;
+                    }
+                }
+
+                if (!automatic) {
+                    automatic =
+                        imported_material_cache_
+                            .find_gltf_material(
+                                item.renderer.mesh,
+                                submesh.material_slot);
+                }
 
                 if (!automatic &&
                     model_artifacts) {
@@ -459,7 +515,11 @@ bool VulkanDiagnosticScene::present_world(
                     draw_material =
                         automatic;
 
-                    ++gltf_auto_materials;
+                    if (used_cooked) {
+                        ++cooked_materials;
+                    } else {
+                        ++gltf_auto_materials;
+                    }
                 } else {
                     ++unresolved_materials;
                 }
@@ -520,8 +580,10 @@ bool VulkanDiagnosticScene::present_world(
         std::to_string(
             imported_materials) +
         " imported material, " +
+        std::to_string(cooked_materials) +
+        " cooked glTF material, " +
         std::to_string(gltf_auto_materials) +
-        " automatic glTF texture";
+        " direct glTF fallback";
 
     if (unresolved_draws != 0u) {
         diagnostic_ +=
