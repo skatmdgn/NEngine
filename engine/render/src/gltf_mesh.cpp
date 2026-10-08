@@ -2414,113 +2414,183 @@ bool read_index_accessor(
         return false;
     }
 
-    if (accessor.view >=
-        views.size()) {
+    values.assign(
+        accessor.count,
+        0u);
 
-        set_error(
-            error,
-            "glTF indices reference invalid bufferView");
-        return false;
-    }
+    if (accessor.view !=
+        kNoAccessorView) {
 
-    const auto& view =
-        views[accessor.view];
-
-    if (view.buffer >=
-        buffers.size()) {
-
-        set_error(
-            error,
-            "glTF indices bufferView references invalid buffer");
-        return false;
-    }
-
-    const auto stride =
-        view.stride != 0u
-            ? view.stride
-            : element_size;
-
-    if (stride < element_size) {
-        set_error(
-            error,
-            "glTF index byteStride is invalid");
-        return false;
-    }
-
-    const auto& buffer =
-        buffers[view.buffer];
-
-    if (view.offset >
-            buffer.size() ||
-        view.length >
-            buffer.size() -
-                view.offset ||
-        accessor.offset >
-            view.length) {
-
-        set_error(
-            error,
-            "glTF index accessor range is invalid");
-        return false;
-    }
-
-    const auto start =
-        view.offset +
-        accessor.offset;
-
-    if (accessor.count != 0u) {
-        const auto required =
-            static_cast<std::uint64_t>(
-                accessor.count - 1u) *
-                stride +
-            element_size;
-
-        if (required >
-                view.length -
-                    accessor.offset ||
-            required >
-                buffer.size() -
-                    start) {
+        if (accessor.view >=
+            views.size()) {
 
             set_error(
                 error,
-                "glTF index payload is truncated");
+                "glTF indices reference invalid bufferView");
             return false;
+        }
+
+        const auto& view =
+            views[accessor.view];
+
+        if (view.buffer >=
+            buffers.size()) {
+
+            set_error(
+                error,
+                "glTF indices bufferView references invalid buffer");
+            return false;
+        }
+
+        const auto stride =
+            view.stride != 0u
+                ? view.stride
+                : element_size;
+
+        if (stride < element_size) {
+            set_error(
+                error,
+                "glTF index byteStride is invalid");
+            return false;
+        }
+
+        const auto& buffer =
+            buffers[view.buffer];
+
+        if (view.offset >
+                buffer.size() ||
+            view.length >
+                buffer.size() -
+                    view.offset ||
+            accessor.offset >
+                view.length) {
+
+            set_error(
+                error,
+                "glTF index accessor range is invalid");
+            return false;
+        }
+
+        const auto start =
+            view.offset +
+            accessor.offset;
+
+        if (accessor.count != 0u) {
+            const auto required =
+                static_cast<std::uint64_t>(
+                    accessor.count - 1u) *
+                    stride +
+                element_size;
+
+            if (required >
+                    view.length -
+                        accessor.offset ||
+                required >
+                    buffer.size() -
+                        start) {
+
+                set_error(
+                    error,
+                    "glTF index payload is truncated");
+                return false;
+            }
+        }
+
+        for (std::size_t i = 0;
+             i < accessor.count;
+             ++i) {
+
+            const auto* element =
+                buffer.data() +
+                start +
+                i * stride;
+
+            switch (
+                accessor.component_type) {
+
+            case 5121u:
+                values[i] =
+                    element[0];
+                break;
+
+            case 5123u:
+                values[i] =
+                    read_u16_le(
+                        element);
+                break;
+
+            case 5125u:
+                values[i] =
+                    read_u32_le(
+                        element);
+                break;
+
+            default:
+                return false;
+            }
         }
     }
 
-    values.resize(
-        accessor.count);
+    if (accessor.sparse.present) {
+        std::vector<std::size_t>
+            sparse_index;
 
-    for (std::size_t i = 0;
-         i < accessor.count;
-         ++i) {
+        const std::uint8_t*
+            sparse_data = nullptr;
 
-        const auto* element =
-            buffer.data() +
-            start +
-            i * stride;
+        if (!sparse_indices(
+                accessor,
+                views,
+                buffers,
+                sparse_index,
+                error) ||
+            !sparse_values_span(
+                accessor,
+                views,
+                buffers,
+                element_size,
+                sparse_data,
+                error)) {
 
-        switch (accessor.component_type) {
-        case 5121u:
-            values[i] =
-                element[0];
-            break;
-
-        case 5123u:
-            values[i] =
-                read_u16_le(
-                    element);
-            break;
-
-        case 5125u:
-            values[i] =
-                read_u32_le(
-                    element);
-            break;
-
-        default:
             return false;
+        }
+
+        for (std::size_t i = 0;
+             i < sparse_index.size();
+             ++i) {
+
+            const auto* element =
+                sparse_data +
+                i * element_size;
+
+            std::uint32_t value = 0u;
+
+            switch (
+                accessor.component_type) {
+
+            case 5121u:
+                value =
+                    element[0];
+                break;
+
+            case 5123u:
+                value =
+                    read_u16_le(
+                        element);
+                break;
+
+            case 5125u:
+                value =
+                    read_u32_le(
+                        element);
+                break;
+
+            default:
+                return false;
+            }
+
+            values[sparse_index[i]] =
+                value;
         }
     }
 
