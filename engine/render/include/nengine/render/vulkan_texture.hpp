@@ -76,6 +76,10 @@ public:
         return format_;
     }
 
+    std::uint32_t mip_levels() const noexcept {
+        return mip_levels_;
+    }
+
     const std::string& diagnostic() const noexcept {
         return diagnostic_;
     }
@@ -90,6 +94,7 @@ private:
     std::uint32_t width_{0};
     std::uint32_t height_{0};
     std::uint32_t format_{0};
+    std::uint32_t mip_levels_{0};
     std::string diagnostic_{};
 };
 

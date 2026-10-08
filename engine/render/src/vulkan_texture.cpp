@@ -1,10 +1,14 @@
 #include "nengine/render/vulkan_texture.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "nengine/render/vulkan_buffer.hpp"
 
@@ -382,12 +386,337 @@ find_memory_type(
     return std::nullopt;
 }
 
+struct Rgba8MipLevel {
+    std::uint32_t width{0};
+    std::uint32_t height{0};
+    std::uint64_t offset{0};
+};
+
+struct Rgba8MipChain {
+    std::vector<std::uint8_t> bytes{};
+    std::vector<Rgba8MipLevel> levels{};
+};
+
+double srgb_to_linear(
+    std::uint8_t value) noexcept {
+
+    const double encoded =
+        static_cast<double>(
+            value) /
+        255.0;
+
+    return encoded <= 0.04045
+        ? encoded / 12.92
+        : std::pow(
+            (encoded + 0.055) /
+                1.055,
+            2.4);
+}
+
+std::uint8_t linear_to_srgb(
+    double value) noexcept {
+
+    value =
+        std::clamp(
+            value,
+            0.0,
+            1.0);
+
+    const double encoded =
+        value <= 0.0031308
+            ? value * 12.92
+            : 1.055 *
+                std::pow(
+                    value,
+                    1.0 / 2.4) -
+                0.055;
+
+    return static_cast<std::uint8_t>(
+        std::lround(
+            std::clamp(
+                encoded,
+                0.0,
+                1.0) *
+            255.0));
+}
+
+bool build_rgba8_mip_chain(
+    std::uint32_t width,
+    std::uint32_t height,
+    const void* pixels,
+    std::size_t pixel_bytes,
+    VulkanTextureColorSpace color_space,
+    Rgba8MipChain& chain,
+    std::string& diagnostic) {
+
+    chain = {};
+
+    const auto base_bytes =
+        static_cast<std::uint64_t>(
+            width) *
+        static_cast<std::uint64_t>(
+            height) *
+        4u;
+
+    if (width == 0u ||
+        height == 0u ||
+        !pixels ||
+        base_bytes !=
+            static_cast<std::uint64_t>(
+                pixel_bytes) ||
+        base_bytes >
+            std::numeric_limits<
+                std::size_t>::max()) {
+
+        diagnostic =
+            "invalid RGBA8 base image for mip generation";
+        return false;
+    }
+
+    std::uint32_t mip_count = 1u;
+
+    for (auto w = width,
+              h = height;
+         w > 1u || h > 1u;) {
+
+        w =
+            std::max(
+                1u,
+                w / 2u);
+
+        h =
+            std::max(
+                1u,
+                h / 2u);
+
+        ++mip_count;
+    }
+
+    std::uint64_t total_bytes = 0u;
+    std::uint32_t level_width =
+        width;
+    std::uint32_t level_height =
+        height;
+
+    chain.levels.reserve(
+        mip_count);
+
+    for (std::uint32_t level = 0u;
+         level < mip_count;
+         ++level) {
+
+        const auto level_bytes =
+            static_cast<std::uint64_t>(
+                level_width) *
+            static_cast<std::uint64_t>(
+                level_height) *
+            4u;
+
+        if (level_bytes >
+                std::numeric_limits<
+                    std::size_t>::max() ||
+            total_bytes >
+                std::numeric_limits<
+                    std::size_t>::max() -
+                    level_bytes) {
+
+            diagnostic =
+                "RGBA8 mip chain exceeds addressable memory";
+            return false;
+        }
+
+        chain.levels.push_back({
+            level_width,
+            level_height,
+            total_bytes
+        });
+
+        total_bytes +=
+            level_bytes;
+
+        level_width =
+            std::max(
+                1u,
+                level_width / 2u);
+
+        level_height =
+            std::max(
+                1u,
+                level_height / 2u);
+    }
+
+    chain.bytes.resize(
+        static_cast<std::size_t>(
+            total_bytes));
+
+    std::copy_n(
+        static_cast<
+            const std::uint8_t*>(
+                pixels),
+        pixel_bytes,
+        chain.bytes.data());
+
+    for (std::size_t level = 1u;
+         level < chain.levels.size();
+         ++level) {
+
+        const auto& source =
+            chain.levels[level - 1u];
+
+        const auto& destination =
+            chain.levels[level];
+
+        const auto* source_pixels =
+            chain.bytes.data() +
+            static_cast<std::size_t>(
+                source.offset);
+
+        auto* destination_pixels =
+            chain.bytes.data() +
+            static_cast<std::size_t>(
+                destination.offset);
+
+        for (std::uint32_t y = 0u;
+             y < destination.height;
+             ++y) {
+
+            for (std::uint32_t x = 0u;
+                 x < destination.width;
+                 ++x) {
+
+                double rgb[3]{
+                    0.0,
+                    0.0,
+                    0.0};
+
+                double alpha = 0.0;
+                std::uint32_t samples = 0u;
+
+                for (std::uint32_t oy = 0u;
+                     oy < 2u;
+                     ++oy) {
+
+                    const auto sy =
+                        y * 2u + oy;
+
+                    if (sy >=
+                        source.height) {
+                        continue;
+                    }
+
+                    for (std::uint32_t ox = 0u;
+                         ox < 2u;
+                         ++ox) {
+
+                        const auto sx =
+                            x * 2u + ox;
+
+                        if (sx >=
+                            source.width) {
+                            continue;
+                        }
+
+                        const auto index =
+                            (static_cast<
+                                std::size_t>(
+                                    sy) *
+                                source.width +
+                             sx) *
+                            4u;
+
+                        for (std::size_t channel = 0u;
+                             channel < 3u;
+                             ++channel) {
+
+                            rgb[channel] +=
+                                color_space ==
+                                    VulkanTextureColorSpace::SRgb
+                                    ? srgb_to_linear(
+                                        source_pixels[
+                                            index +
+                                            channel])
+                                    : static_cast<double>(
+                                        source_pixels[
+                                            index +
+                                            channel]) /
+                                        255.0;
+                        }
+
+                        alpha +=
+                            static_cast<double>(
+                                source_pixels[
+                                    index + 3u]) /
+                            255.0;
+
+                        ++samples;
+                    }
+                }
+
+                const auto output =
+                    (static_cast<
+                        std::size_t>(
+                            y) *
+                        destination.width +
+                     x) *
+                    4u;
+
+                const double divisor =
+                    samples != 0u
+                        ? static_cast<double>(
+                            samples)
+                        : 1.0;
+
+                for (std::size_t channel = 0u;
+                     channel < 3u;
+                     ++channel) {
+
+                    const auto averaged =
+                        rgb[channel] /
+                        divisor;
+
+                    destination_pixels[
+                        output +
+                        channel] =
+                        color_space ==
+                            VulkanTextureColorSpace::SRgb
+                            ? linear_to_srgb(
+                                averaged)
+                            : static_cast<
+                                std::uint8_t>(
+                                    std::lround(
+                                        std::clamp(
+                                            averaged,
+                                            0.0,
+                                            1.0) *
+                                        255.0));
+                }
+
+                destination_pixels[
+                    output + 3u] =
+                    static_cast<
+                        std::uint8_t>(
+                            std::lround(
+                                std::clamp(
+                                    alpha /
+                                        divisor,
+                                    0.0,
+                                    1.0) *
+                                255.0));
+            }
+        }
+    }
+
+    diagnostic =
+        "RGBA8 mip chain generated";
+
+    return true;
+}
+
 bool upload_image_sync(
     const VulkanDevice& device,
     void* staging_buffer,
     void* image,
-    std::uint32_t width,
-    std::uint32_t height,
+    std::span<const Rgba8MipLevel> levels,
     std::string& diagnostic) {
 
     const auto create_pool =
@@ -505,9 +834,24 @@ bool upload_image_sync(
         return false;
     }
 
+    if (levels.empty()) {
+        destroy_pool(
+            device.native_device(),
+            pool,
+            nullptr);
+
+        diagnostic =
+            "Vulkan texture upload requires at least one mip level";
+        return false;
+    }
+
     const VkImageSubresourceRange range{
         VK_IMAGE_ASPECT_COLOR_BIT,
-        0, 1, 0, 1
+        0,
+        static_cast<std::uint32_t>(
+            levels.size()),
+        0,
+        1
     };
 
     const VkImageMemoryBarrier to_transfer{
@@ -532,27 +876,47 @@ bool upload_image_sync(
         0, nullptr,
         1, &to_transfer);
 
-    const VkBufferImageCopy copy{
-        0,
-        0,
-        0,
-        {
-            VK_IMAGE_ASPECT_COLOR_BIT,
+    std::vector<VkBufferImageCopy>
+        copies;
+
+    copies.reserve(
+        levels.size());
+
+    for (std::size_t level = 0u;
+         level < levels.size();
+         ++level) {
+
+        const auto& mip =
+            levels[level];
+
+        copies.push_back({
+            mip.offset,
             0,
             0,
-            1
-        },
-        {0, 0, 0},
-        {width, height, 1}
-    };
+            {
+                VK_IMAGE_ASPECT_COLOR_BIT,
+                static_cast<std::uint32_t>(
+                    level),
+                0,
+                1
+            },
+            {0, 0, 0},
+            {
+                mip.width,
+                mip.height,
+                1
+            }
+        });
+    }
 
     copy_buffer_to_image(
         command,
         staging_buffer,
         image,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        1,
-        &copy);
+        static_cast<std::uint32_t>(
+            copies.size()),
+        copies.data());
 
     const VkImageMemoryBarrier to_shader{
         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -671,6 +1035,9 @@ VulkanTextureResource::VulkanTextureResource(
       format_(
           std::exchange(
               other.format_, 0)),
+      mip_levels_(
+          std::exchange(
+              other.mip_levels_, 0)),
       diagnostic_(
           std::move(
               other.diagnostic_)) {}
@@ -712,6 +1079,9 @@ VulkanTextureResource::operator=(
     format_ =
         std::exchange(
             other.format_, 0);
+    mip_levels_ =
+        std::exchange(
+            other.mip_levels_, 0);
     diagnostic_ =
         std::move(
             other.diagnostic_);
@@ -732,23 +1102,26 @@ bool VulkanTextureResource::create_rgba8(
     destroy();
     diagnostic_.clear();
 
-    const auto expected_bytes =
-        static_cast<std::size_t>(
-            width) *
-        static_cast<std::size_t>(
-            height) *
-        4u;
-
     if (!loader.loaded() ||
         !instance.valid() ||
-        !device.valid() ||
-        width == 0 ||
-        height == 0 ||
-        !pixels ||
-        pixel_bytes != expected_bytes) {
+        !device.valid()) {
 
         diagnostic_ =
-            "valid Vulkan runtime and exact RGBA8 pixel payload are required";
+            "valid Vulkan runtime is required";
+        return false;
+    }
+
+    Rgba8MipChain mip_chain;
+
+    if (!build_rgba8_mip_chain(
+            width,
+            height,
+            pixels,
+            pixel_bytes,
+            color_space,
+            mip_chain,
+            diagnostic_)) {
+
         return false;
     }
 
@@ -758,10 +1131,10 @@ bool VulkanTextureResource::create_rgba8(
             loader,
             instance,
             device,
-            pixel_bytes,
+            mip_chain.bytes.size(),
             VulkanBufferUsage::TransferSource,
             VulkanMemoryPreference::HostVisible,
-            pixels)) {
+            mip_chain.bytes.data())) {
 
         diagnostic_ =
             "texture staging buffer failed: " +
@@ -825,7 +1198,8 @@ bool VulkanTextureResource::create_rgba8(
         VK_IMAGE_TYPE_2D,
         format,
         {width, height, 1},
-        1,
+        static_cast<std::uint32_t>(
+            mip_chain.levels.size()),
         1,
         VK_SAMPLE_COUNT_1_BIT,
         VK_IMAGE_TILING_OPTIMAL,
@@ -934,8 +1308,7 @@ bool VulkanTextureResource::create_rgba8(
             device,
             staging.native_buffer(),
             image,
-            width,
-            height,
+            mip_chain.levels,
             diagnostic_)) {
 
         destroy_image(
@@ -964,7 +1337,11 @@ bool VulkanTextureResource::create_rgba8(
         },
         {
             VK_IMAGE_ASPECT_COLOR_BIT,
-            0, 1, 0, 1
+            0,
+            static_cast<std::uint32_t>(
+                mip_chain.levels.size()),
+            0,
+            1
         }
     };
 
@@ -1008,7 +1385,9 @@ bool VulkanTextureResource::create_rgba8(
         0,
         VK_COMPARE_OP_ALWAYS,
         0.0f,
-        0.0f,
+        static_cast<float>(
+            mip_chain.levels.size() -
+            1u),
         VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
         0
     };
@@ -1059,9 +1438,15 @@ bool VulkanTextureResource::create_rgba8(
     width_ = width;
     height_ = height;
     format_ = format;
+    mip_levels_ =
+        static_cast<std::uint32_t>(
+            mip_chain.levels.size());
 
     diagnostic_ =
-        "Vulkan RGBA8 texture image/view/sampler created";
+        "Vulkan RGBA8 texture image/view/sampler created with " +
+        std::to_string(
+            mip_levels_) +
+        " mip level(s)";
 
     return true;
 }
@@ -1123,6 +1508,7 @@ void VulkanTextureResource::destroy() noexcept {
     width_ = 0;
     height_ = 0;
     format_ = 0;
+    mip_levels_ = 0;
 }
 
 } // namespace nengine::render
