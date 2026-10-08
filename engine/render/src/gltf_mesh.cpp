@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <functional>
 #include <fstream>
 #include <iterator>
 #include <limits>
@@ -20,6 +21,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -1900,12 +1902,341 @@ bool read_index_accessor(
     return true;
 }
 
+struct GltfNodeMatrix {
+    // glTF matrices are column-major.
+    std::array<double, 16> elements{};
+};
+
+GltfNodeMatrix identity_node_matrix() {
+    GltfNodeMatrix value;
+    value.elements = {
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 1.0
+    };
+    return value;
+}
+
+GltfNodeMatrix multiply_node_matrix(
+    const GltfNodeMatrix& left,
+    const GltfNodeMatrix& right) {
+
+    GltfNodeMatrix result;
+
+    for (std::size_t column = 0; column < 4u; ++column) {
+        for (std::size_t row = 0; row < 4u; ++row) {
+            double sum = 0.0;
+
+            for (std::size_t k = 0; k < 4u; ++k) {
+                sum +=
+                    left.elements[k * 4u + row] *
+                    right.elements[column * 4u + k];
+            }
+
+            result.elements[column * 4u + row] = sum;
+        }
+    }
+
+    return result;
+}
+
+template <std::size_t Size>
+bool json_number_array(
+    const JsonValue* value,
+    std::array<double, Size>& numbers) {
+
+    if (!value ||
+        value->kind != JsonValue::Kind::Array ||
+        value->array.size() != Size) {
+        return false;
+    }
+
+    for (std::size_t i = 0; i < Size; ++i) {
+        const auto& item = value->array[i];
+
+        if (item.kind != JsonValue::Kind::Number ||
+            !std::isfinite(item.number)) {
+            return false;
+        }
+
+        numbers[i] = item.number;
+    }
+
+    return true;
+}
+
+bool gltf_node_local_matrix(
+    const JsonValue& node,
+    GltfNodeMatrix& matrix,
+    std::string* error) {
+
+    const auto* explicit_matrix =
+        member(node, "matrix");
+
+    if (explicit_matrix) {
+        if (member(node, "translation") ||
+            member(node, "rotation") ||
+            member(node, "scale") ||
+            !json_number_array(
+                explicit_matrix,
+                matrix.elements)) {
+
+            set_error(
+                error,
+                "glTF node matrix is invalid or mixed with TRS");
+            return false;
+        }
+    } else {
+        std::array<double, 3> translation{
+            0.0, 0.0, 0.0};
+        std::array<double, 4> rotation{
+            0.0, 0.0, 0.0, 1.0};
+        std::array<double, 3> scale{
+            1.0, 1.0, 1.0};
+
+        if ((member(node, "translation") &&
+             !json_number_array(
+                member(node, "translation"),
+                translation)) ||
+            (member(node, "rotation") &&
+             !json_number_array(
+                member(node, "rotation"),
+                rotation)) ||
+            (member(node, "scale") &&
+             !json_number_array(
+                member(node, "scale"),
+                scale))) {
+
+            set_error(
+                error,
+                "glTF node translation/rotation/scale is invalid");
+            return false;
+        }
+
+        double x = rotation[0];
+        double y = rotation[1];
+        double z = rotation[2];
+        double w = rotation[3];
+
+        const double length =
+            std::sqrt(
+                x * x +
+                y * y +
+                z * z +
+                w * w);
+
+        if (!std::isfinite(length) ||
+            length < 1e-12) {
+
+            set_error(
+                error,
+                "glTF node quaternion is invalid");
+            return false;
+        }
+
+        x /= length;
+        y /= length;
+        z /= length;
+        w /= length;
+
+        matrix = identity_node_matrix();
+
+        auto& m = matrix.elements;
+
+        // glTF local transform is T * R * S.
+        m[0] =
+            (1.0 - 2.0 * (y * y + z * z)) *
+            scale[0];
+        m[1] =
+            (2.0 * (x * y + z * w)) *
+            scale[0];
+        m[2] =
+            (2.0 * (x * z - y * w)) *
+            scale[0];
+
+        m[4] =
+            (2.0 * (x * y - z * w)) *
+            scale[1];
+        m[5] =
+            (1.0 - 2.0 * (x * x + z * z)) *
+            scale[1];
+        m[6] =
+            (2.0 * (y * z + x * w)) *
+            scale[1];
+
+        m[8] =
+            (2.0 * (x * z + y * w)) *
+            scale[2];
+        m[9] =
+            (2.0 * (y * z - x * w)) *
+            scale[2];
+        m[10] =
+            (1.0 - 2.0 * (x * x + y * y)) *
+            scale[2];
+
+        m[12] = translation[0];
+        m[13] = translation[1];
+        m[14] = translation[2];
+    }
+
+    const auto& m = matrix.elements;
+
+    if (std::abs(m[3]) > 1e-8 ||
+        std::abs(m[7]) > 1e-8 ||
+        std::abs(m[11]) > 1e-8 ||
+        std::abs(m[15] - 1.0) > 1e-8) {
+
+        set_error(
+            error,
+            "glTF node transform must be affine");
+        return false;
+    }
+
+    for (const double number : m) {
+        if (!std::isfinite(number)) {
+            set_error(
+                error,
+                "glTF node transform contains nonfinite values");
+            return false;
+        }
+    }
+
+    return true;
+}
+
+std::array<double, 3> cross3(
+    const std::array<double, 3>& left,
+    const std::array<double, 3>& right) {
+
+    return {
+        left[1] * right[2] -
+            left[2] * right[1],
+        left[2] * right[0] -
+            left[0] * right[2],
+        left[0] * right[1] -
+            left[1] * right[0]
+    };
+}
+
+double gltf_linear_determinant(
+    const GltfNodeMatrix& matrix) {
+
+    const auto& m = matrix.elements;
+
+    const std::array<double, 3> a{
+        m[0], m[1], m[2]};
+    const std::array<double, 3> b{
+        m[4], m[5], m[6]};
+    const std::array<double, 3> c{
+        m[8], m[9], m[10]};
+
+    const auto bc =
+        cross3(b, c);
+
+    return
+        a[0] * bc[0] +
+        a[1] * bc[1] +
+        a[2] * bc[2];
+}
+
+core::Vec3 gltf_transform_position(
+    const GltfNodeMatrix& matrix,
+    core::Vec3 value) {
+
+    const auto& m = matrix.elements;
+
+    return {
+        static_cast<float>(
+            m[0] * value.x +
+            m[4] * value.y +
+            m[8] * value.z +
+            m[12]),
+        static_cast<float>(
+            m[1] * value.x +
+            m[5] * value.y +
+            m[9] * value.z +
+            m[13]),
+        static_cast<float>(
+            m[2] * value.x +
+            m[6] * value.y +
+            m[10] * value.z +
+            m[14])
+    };
+}
+
+core::Vec3 gltf_transform_normal(
+    const GltfNodeMatrix& matrix,
+    core::Vec3 value,
+    double determinant) {
+
+    const auto& m = matrix.elements;
+
+    const std::array<double, 3> a{
+        m[0], m[1], m[2]};
+    const std::array<double, 3> b{
+        m[4], m[5], m[6]};
+    const std::array<double, 3> c{
+        m[8], m[9], m[10]};
+
+    const auto cofactor_x =
+        cross3(b, c);
+    const auto cofactor_y =
+        cross3(c, a);
+    const auto cofactor_z =
+        cross3(a, b);
+
+    const double determinant_sign =
+        determinant < 0.0
+            ? -1.0
+            : 1.0;
+
+    double x =
+        determinant_sign *
+        (cofactor_x[0] * value.x +
+         cofactor_y[0] * value.y +
+         cofactor_z[0] * value.z);
+
+    double y =
+        determinant_sign *
+        (cofactor_x[1] * value.x +
+         cofactor_y[1] * value.y +
+         cofactor_z[1] * value.z);
+
+    double z =
+        determinant_sign *
+        (cofactor_x[2] * value.x +
+         cofactor_y[2] * value.y +
+         cofactor_z[2] * value.z);
+
+    const double length =
+        std::sqrt(
+            x * x +
+            y * y +
+            z * z);
+
+    if (std::isfinite(length) &&
+        length > 1e-20) {
+
+        x /= length;
+        y /= length;
+        z /= length;
+    }
+
+    return {
+        static_cast<float>(x),
+        static_cast<float>(y),
+        static_cast<float>(z)
+    };
+}
+
 bool append_primitive(
     const JsonValue& primitive,
     const std::vector<Accessor>& accessors,
     const std::vector<BufferView>& views,
     const std::vector<
         std::vector<std::uint8_t>>& buffers,
+    const GltfNodeMatrix& transform,
     MeshData& mesh,
     std::string* error) {
 
@@ -2040,6 +2371,22 @@ bool append_primitive(
         return false;
     }
 
+    const double transform_determinant =
+        gltf_linear_determinant(
+            transform);
+
+    if (!std::isfinite(
+            transform_determinant) ||
+        std::abs(
+            transform_determinant) <
+            1e-14) {
+
+        set_error(
+            error,
+            "glTF node transform is singular");
+        return false;
+    }
+
     const auto base =
         static_cast<std::uint32_t>(
             mesh.vertices.size());
@@ -2053,7 +2400,19 @@ bool append_primitive(
          ++i) {
 
         auto position =
-            positions[i];
+            gltf_transform_position(
+                transform,
+                positions[i]);
+
+        if (!std::isfinite(position.x) ||
+            !std::isfinite(position.y) ||
+            !std::isfinite(position.z)) {
+
+            set_error(
+                error,
+                "glTF transformed position is not finite");
+            return false;
+        }
 
         // glTF uses a right-handed coordinate system while NEngine's
         // current renderer/camera convention is left-handed. Reflect Z
@@ -2069,10 +2428,24 @@ bool append_primitive(
                     0.0f,
                     1.0f};
 
-        if (i < normals.size()) {
-            normal.z =
-                -normal.z;
+        normal =
+            gltf_transform_normal(
+                transform,
+                normal,
+                transform_determinant);
+
+        if (!std::isfinite(normal.x) ||
+            !std::isfinite(normal.y) ||
+            !std::isfinite(normal.z)) {
+
+            set_error(
+                error,
+                "glTF transformed normal is not finite");
+            return false;
         }
+
+        normal.z =
+            -normal.z;
 
         mesh.vertices.push_back({
             position,
@@ -2152,11 +2525,21 @@ bool append_primitive(
         mesh.indices.push_back(
             base + indices[i + 0u]);
 
-        mesh.indices.push_back(
-            base + indices[i + 2u]);
+        if (transform_determinant < 0.0) {
+            // A mirrored node plus the NEngine Z reflection gives two
+            // handedness flips, so preserve the original triangle order.
+            mesh.indices.push_back(
+                base + indices[i + 1u]);
 
-        mesh.indices.push_back(
-            base + indices[i + 1u]);
+            mesh.indices.push_back(
+                base + indices[i + 2u]);
+        } else {
+            mesh.indices.push_back(
+                base + indices[i + 2u]);
+
+            mesh.indices.push_back(
+                base + indices[i + 1u]);
+        }
     }
 
     return true;
@@ -2187,12 +2570,22 @@ bool append_meshes(
         return false;
     }
 
-    for (const auto& mesh_value :
-         meshes->array) {
+    const auto append_mesh_instance =
+        [&](std::size_t mesh_index,
+            const GltfNodeMatrix& transform) {
+
+        if (mesh_index >=
+            meshes->array.size()) {
+
+            set_error(
+                error,
+                "glTF node references invalid mesh index");
+            return false;
+        }
 
         const auto* primitives =
             member(
-                mesh_value,
+                meshes->array[mesh_index],
                 "primitives");
 
         if (!primitives ||
@@ -2214,11 +2607,259 @@ bool append_meshes(
                     accessors,
                     views,
                     buffers,
+                    transform,
                     mesh,
                     error)) {
                 return false;
             }
         }
+
+        return true;
+    };
+
+    const auto* scenes =
+        member(
+            root,
+            "scenes");
+
+    const auto* nodes =
+        member(
+            root,
+            "nodes");
+
+    if (!scenes) {
+        // Preserve the historical geometry-only behavior for glTF files
+        // without a scene graph.
+        const auto identity =
+            identity_node_matrix();
+
+        for (std::size_t i = 0;
+             i < meshes->array.size();
+             ++i) {
+
+            if (!append_mesh_instance(
+                    i,
+                    identity)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    if (scenes->kind !=
+            JsonValue::Kind::Array ||
+        scenes->array.empty() ||
+        !nodes ||
+        nodes->kind !=
+            JsonValue::Kind::Array) {
+
+        set_error(
+            error,
+            "glTF scene graph is invalid");
+        return false;
+    }
+
+    std::size_t scene_index = 0u;
+
+    if (const auto* selected_scene =
+            member(
+                root,
+                "scene")) {
+
+        const auto parsed =
+            index_value(
+                selected_scene);
+
+        if (!parsed) {
+            set_error(
+                error,
+                "glTF default scene index is invalid");
+            return false;
+        }
+
+        scene_index = *parsed;
+    }
+
+    if (scene_index >=
+        scenes->array.size()) {
+
+        set_error(
+            error,
+            "glTF default scene is out of range");
+        return false;
+    }
+
+    const auto* root_nodes =
+        member(
+            scenes->array[scene_index],
+            "nodes");
+
+    if (!root_nodes ||
+        root_nodes->kind !=
+            JsonValue::Kind::Array) {
+
+        set_error(
+            error,
+            "glTF scene root nodes array is missing");
+        return false;
+    }
+
+    std::unordered_set<std::size_t>
+        active_nodes;
+
+    std::function<
+        bool(
+            std::size_t,
+            const GltfNodeMatrix&,
+            std::size_t)>
+        visit_node;
+
+    visit_node =
+        [&](std::size_t node_index,
+            const GltfNodeMatrix& parent,
+            std::size_t depth) {
+
+        if (depth > 128u ||
+            node_index >=
+                nodes->array.size()) {
+
+            set_error(
+                error,
+                "glTF node graph depth or index is invalid");
+            return false;
+        }
+
+        if (!active_nodes
+                 .insert(
+                     node_index)
+                 .second) {
+
+            set_error(
+                error,
+                "glTF node graph contains a cycle");
+            return false;
+        }
+
+        const auto& node =
+            nodes->array[node_index];
+
+        if (node.kind !=
+            JsonValue::Kind::Object) {
+
+            active_nodes.erase(
+                node_index);
+
+            set_error(
+                error,
+                "glTF node must be an object");
+            return false;
+        }
+
+        GltfNodeMatrix local;
+
+        if (!gltf_node_local_matrix(
+                node,
+                local,
+                error)) {
+
+            active_nodes.erase(
+                node_index);
+            return false;
+        }
+
+        const auto world =
+            multiply_node_matrix(
+                parent,
+                local);
+
+        if (const auto* mesh_value =
+                member(
+                    node,
+                    "mesh")) {
+
+            const auto mesh_index =
+                index_value(
+                    mesh_value);
+
+            if (!mesh_index ||
+                !append_mesh_instance(
+                    *mesh_index,
+                    world)) {
+
+                active_nodes.erase(
+                    node_index);
+                return false;
+            }
+        }
+
+        if (const auto* children =
+                member(
+                    node,
+                    "children")) {
+
+            if (children->kind !=
+                JsonValue::Kind::Array) {
+
+                active_nodes.erase(
+                    node_index);
+
+                set_error(
+                    error,
+                    "glTF node children must be an array");
+                return false;
+            }
+
+            for (const auto& child :
+                 children->array) {
+
+                const auto child_index =
+                    index_value(
+                        &child);
+
+                if (!child_index ||
+                    !visit_node(
+                        *child_index,
+                        world,
+                        depth + 1u)) {
+
+                    active_nodes.erase(
+                        node_index);
+                    return false;
+                }
+            }
+        }
+
+        active_nodes.erase(
+            node_index);
+
+        return true;
+    };
+
+    const auto identity =
+        identity_node_matrix();
+
+    for (const auto& root_node :
+         root_nodes->array) {
+
+        const auto node_index =
+            index_value(
+                &root_node);
+
+        if (!node_index ||
+            !visit_node(
+                *node_index,
+                identity,
+                0u)) {
+            return false;
+        }
+    }
+
+    if (mesh.vertices.empty()) {
+        set_error(
+            error,
+            "glTF selected scene contains no mesh instances");
+        return false;
     }
 
     return true;
