@@ -1,5 +1,6 @@
 #include "nengine/render/vulkan_presenter.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <limits>
 #include <string>

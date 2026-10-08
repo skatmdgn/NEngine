@@ -350,16 +350,18 @@ bool VulkanDiagnosticScene::present_world(
             ++imported_draws;
         }
 
-        const VulkanMaterialResource*
-            draw_material =
-                &material_;
+        const bool explicit_material_requested =
+            item.renderer.material.valid();
 
-        if (item.renderer.material.valid()) {
-            draw_material =
+        const VulkanMaterialResource*
+            explicit_material = nullptr;
+
+        if (explicit_material_requested) {
+            explicit_material =
                 imported_material_cache_.find(
                     item.renderer.material);
 
-            if (!draw_material &&
+            if (!explicit_material &&
                 asset_resolver) {
 
                 const auto material_artifacts =
@@ -369,14 +371,14 @@ bool VulkanDiagnosticScene::present_world(
                 if (material_artifacts) {
                     std::string material_error;
 
-                    draw_material =
+                    explicit_material =
                         imported_material_cache_.load(
                             item.renderer.material,
                             *material_artifacts,
                             asset_resolver,
                             &material_error);
 
-                    if (!draw_material &&
+                    if (!explicit_material &&
                         !material_error.empty()) {
                         last_asset_error =
                             std::move(
@@ -385,44 +387,93 @@ bool VulkanDiagnosticScene::present_world(
                 }
             }
 
-            if (draw_material) {
+            if (explicit_material) {
                 ++imported_materials;
             } else {
                 ++unresolved_materials;
-                draw_material =
-                    &material_;
-            }
-        } else if (imported) {
-            // A GLB with a base-color image should look textured even
-            // without a manually authored .nmat Material GUID.
-            const VulkanMaterialResource* automatic =
-                imported_material_cache_.find_gltf_base_color(
-                    item.renderer.mesh);
-
-            if (!automatic && asset_resolver) {
-                if (const auto model_artifacts =
-                        asset_resolver(item.renderer.mesh)) {
-                    automatic =
-                        imported_material_cache_.load_gltf_base_color(
-                            item.renderer.mesh,
-                            *model_artifacts);
-                }
-            }
-
-            if (automatic) {
-                draw_material = automatic;
-                ++gltf_auto_materials;
             }
         }
 
-        draws.push_back({
-            &pipeline_,
-            mesh,
+        std::optional<
+            assets::CachedArtifactSet>
+            model_artifacts;
+
+        if (!explicit_material_requested &&
+            imported &&
+            asset_resolver) {
+
+            model_artifacts =
+                asset_resolver(
+                    item.renderer.mesh);
+        }
+
+        const auto mvp =
             multiply(
                 matrices->view_projection,
-                item.world),
-            draw_material
-        });
+                item.world);
+
+        for (const auto& submesh :
+             mesh->submeshes()) {
+
+            const VulkanMaterialResource*
+                draw_material =
+                    explicit_material
+                        ? explicit_material
+                        : &material_;
+
+            if (!explicit_material_requested &&
+                imported &&
+                submesh.material_slot !=
+                    kMeshMaterialUnassigned) {
+
+                const auto* automatic =
+                    imported_material_cache_
+                        .find_gltf_material(
+                            item.renderer.mesh,
+                            submesh.material_slot);
+
+                if (!automatic &&
+                    model_artifacts) {
+
+                    std::string
+                        material_error;
+
+                    automatic =
+                        imported_material_cache_
+                            .load_gltf_material(
+                                item.renderer.mesh,
+                                submesh.material_slot,
+                                *model_artifacts,
+                                &material_error);
+
+                    if (!automatic &&
+                        !material_error.empty()) {
+
+                        last_asset_error =
+                            std::move(
+                                material_error);
+                    }
+                }
+
+                if (automatic) {
+                    draw_material =
+                        automatic;
+
+                    ++gltf_auto_materials;
+                } else {
+                    ++unresolved_materials;
+                }
+            }
+
+            draws.push_back({
+                &pipeline_,
+                mesh,
+                mvp,
+                draw_material,
+                submesh.first_index,
+                submesh.index_count
+            });
+        }
     }
 
     if (draws.empty()) {
