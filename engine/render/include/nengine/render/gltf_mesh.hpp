@@ -18,13 +18,14 @@ namespace nengine::render {
 // - .gltf JSON with external buffers when they are available beside the source.
 // - .glb 2.0 JSON + BIN chunks.
 // - triangle primitives.
-// - float POSITION/NORMAL/TEXCOORD_0 attributes.
+// - float and supported 8/16-bit quantized POSITION/NORMAL/TEXCOORD_0 attributes.
 // - unsigned byte/short/int indices.
+// - sparse VEC2/VEC3 attributes and sparse index overlays.
 // - non-interleaved or byteStride-interleaved buffer views.
-// - multiple mesh primitives concatenated into one MeshData.
+// - multiple mesh primitives with preserved submesh/material ranges.
 //
-// Sparse accessors, morph targets, skinning and material cooking are intentionally
-// handled by later milestones.
+// Morph targets and skinning remain later milestones. Referenced base-color
+// materials are cooked by model_asset_importer into generated subassets.
 bool decode_gltf_mesh(
     const ResolvedModelAsset& asset,
     MeshData& mesh,
