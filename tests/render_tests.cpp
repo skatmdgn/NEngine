@@ -1347,6 +1347,65 @@ int main() {
                     std::string::npos,
             "glTF sparse accessor rejects duplicate or unordered sparse indices");
 
+        const auto sparse_indices_source =
+            root / "sparse_indices_triangle.gltf";
+
+        {
+            std::ofstream output(
+                sparse_indices_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output << R"json({
+  "asset":{"version":"2.0"},
+  "buffers":[{
+    "byteLength":44,
+    "uri":"data:application/octet-stream;base64,AAAAvwAAAL8AAAAAAAAAPwAAAL8AAAAAAAAAAAAAAD8AAAAAAQIAAAIAAQA="
+  }],
+  "bufferViews":[
+    {"buffer":0,"byteOffset":0,"byteLength":36},
+    {"buffer":0,"byteOffset":36,"byteLength":2},
+    {"buffer":0,"byteOffset":40,"byteLength":4}
+  ],
+  "accessors":[
+    {"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"},
+    {
+      "componentType":5123,
+      "count":3,
+      "type":"SCALAR",
+      "sparse":{
+        "count":2,
+        "indices":{"bufferView":1,"componentType":5121},
+        "values":{"bufferView":2}
+      }
+    }
+  ],
+  "meshes":[{"primitives":[{
+    "attributes":{"POSITION":0},
+    "indices":1
+  }]}]
+})json";
+        }
+
+        sparse_asset.source_path =
+            sparse_indices_source;
+
+        render::MeshData
+            sparse_index_mesh;
+        sparse_error.clear();
+
+        check(
+            render::decode_gltf_mesh(
+                sparse_asset,
+                sparse_index_mesh,
+                &sparse_error) &&
+            sparse_index_mesh.valid() &&
+            sparse_index_mesh.indices ==
+                std::vector<std::uint32_t>{
+                    0u, 1u, 2u},
+            "glTF sparse SCALAR index accessor overlays a zero base index stream");
+
+
         const auto quantized_source =
             root / "quantized_triangle.gltf";
 
