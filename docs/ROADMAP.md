@@ -32,6 +32,8 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] File watcher
 - [x] Importer contract
 - [x] Import fingerprint/cache manifest
+- [x] Generated subasset manifest v3 with deterministic derived GUIDs
+- [x] Stale root/subasset cache artifact pruning after reimport
 - [x] Validated cache artifact lookup
 - [x] Dependency graph
 - [x] Project startup Scene/bootstrap
@@ -43,7 +45,8 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Renderer cache resolver for texture/model/shader artifacts
 - [x] PNG/JPEG RGBA8 decode with pinned stb_image
 - [x] BMP/TGA RGBA8 decode foundation
-- [ ] WebP decode + mipmap/compression/transcoding
+- [x] Gamma-aware full RGBA8 mip-chain generation/upload
+- [ ] WebP decode + texture compression/transcoding
 - [x] .nmat importer + texture dependency graph
 - [x] glTF/GLB geometry decode into MeshData
 - [x] glTF selected-scene node hierarchy TRS/matrix baking into MeshData
@@ -53,11 +56,14 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] glTF baseColorFactor 1x1 color material and linear-space image tint
 - [x] Reject unsafe external glTF resource URIs
 - [x] AssetGuid decoded/GPU mesh caches
-- [ ] glTF material/image dependency cooking
+- [x] glTF referenced material slots -> stable generated .nmat/Texture subasset cooking
 - [x] External .gltf BIN/image sidecar dependency staging with fingerprint + watcher reimport
 - [x] Sidecar removal/restoration recovery with persistent .meta GUID
-- [ ] Sidecar encoded URI, nonlocal path policy and recovery without .meta
-- [ ] OBJ/FBX mesh decoding/cooking
+- [x] Percent-encoded local sidecar URIs + content-hash invalidation + recovery without .meta
+- [ ] Explicit policy/support for nonlocal/outside-model-directory glTF resources
+- [x] OBJ mesh decoding (v/vt/vn, negative indices, n-gon triangulation, generated normals)
+- [ ] OBJ MTL material cooking
+- [ ] FBX mesh/material decoding/cooking
 - [ ] GLSL/HLSL shader compile toolchain
 
 ## 0.4 — Vulkan renderer
@@ -94,9 +100,11 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Per-device Vulkan texture/material AssetGuid cache
 - [x] Imported glTF/GLB mesh AssetGuid resolution in VK Preview
 - [x] .nmat Material AssetGuid -> imported texture Vulkan binding
-- [x] GLB/glTF first-primitive base-color texture automatic Vulkan preview fallback
-- [x] GLB/glTF first-primitive baseColorFactor image-free color auto preview
-- [ ] Automatic glTF material/image -> NEngine material cooking
+- [x] GLB/glTF per-primitive base-color texture automatic Vulkan preview fallback
+- [x] GLB/glTF baseColorFactor image-free color auto preview
+- [x] Multi-primitive/submesh ranged draws + per-material Vulkan descriptors
+- [x] Automatic referenced glTF material/image -> stable generated NEngine .nmat/Texture subasset cooking
+- [x] Cooked model material-map cache with direct-glTF fallback
 - [ ] Scene View Vulkan presentation replacement
 - [ ] Android Vulkan surface
 - [ ] PBR/lights/shadows/sprites
