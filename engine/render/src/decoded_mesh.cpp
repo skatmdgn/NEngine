@@ -6,6 +6,7 @@
 
 #include "nengine/render/asset_resources.hpp"
 #include "nengine/render/gltf_mesh.hpp"
+#include "nengine/render/obj_mesh.hpp"
 
 namespace nengine::render {
 namespace {
@@ -92,6 +93,15 @@ DecodedMeshCache::load(
         format == "glb") {
 
         if (!decode_gltf_mesh(
+                *resolved,
+                decoded,
+                error)) {
+            return nullptr;
+        }
+    } else if (
+        format == "obj") {
+
+        if (!decode_obj_mesh(
                 *resolved,
                 decoded,
                 error)) {
