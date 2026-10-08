@@ -343,6 +343,7 @@ void ProjectSession::close() {
     assets_.clear();
     watcher_.set_root({});
     dependency_graph_.clear();
+    generated_subasset_parents_.clear();
 }
 
 assets::AssetScanResult ProjectSession::refresh_assets() {
@@ -576,6 +577,10 @@ assets::ImportResult ProjectSession::import_asset(
             root_ / "Library" / "Cache");
 
     if (result.success) {
+        index_generated_subassets(
+            guid,
+            result.subassets);
+
         if (record->importer_id == "NEngine.Model" &&
             record->source_path.extension() == ".gltf") {
 
@@ -647,21 +652,130 @@ std::optional<assets::CachedArtifactSet>
 ProjectSession::cached_artifacts(
     assets::AssetGuid guid) const {
 
-    if (!open_) {
+    if (!open_ ||
+        !guid.valid()) {
         return std::nullopt;
     }
 
-    const auto* record =
-        assets_.find(guid);
+    if (const auto* record =
+            assets_.find(guid)) {
 
-    if (!record) {
-        return std::nullopt;
+        return
+            import_pipeline_
+                .cached_artifacts(
+                    *record,
+                    importers_,
+                    root_ /
+                        "Library" /
+                        "Cache");
     }
 
-    return import_pipeline_.cached_artifacts(
-        *record,
-        importers_,
-        root_ / "Library" / "Cache");
+    const auto resolve_from_parent =
+        [&](assets::AssetGuid parent_guid)
+            -> std::optional<
+                assets::CachedArtifactSet> {
+
+        const auto* parent =
+            assets_.find(
+                parent_guid);
+
+        if (!parent) {
+            return std::nullopt;
+        }
+
+        return import_pipeline_
+            .cached_subasset_artifacts(
+                *parent,
+                guid,
+                importers_,
+                root_ /
+                    "Library" /
+                    "Cache");
+    };
+
+    if (const auto known =
+            generated_subasset_parents_
+                .find(guid);
+        known !=
+            generated_subasset_parents_
+                .end()) {
+
+        if (auto cached =
+                resolve_from_parent(
+                    known->second)) {
+
+            return cached;
+        }
+
+        generated_subasset_parents_
+            .erase(
+                known);
+    }
+
+    for (const auto& candidate :
+         assets_.records()) {
+
+        if (auto cached =
+                import_pipeline_
+                    .cached_subasset_artifacts(
+                        candidate,
+                        guid,
+                        importers_,
+                        root_ /
+                            "Library" /
+                            "Cache")) {
+
+            generated_subasset_parents_
+                .insert_or_assign(
+                    guid,
+                    candidate.guid);
+
+            return cached;
+        }
+    }
+
+    return std::nullopt;
+}
+
+void ProjectSession::index_generated_subassets(
+    assets::AssetGuid parent_guid,
+    const std::vector<
+        assets::GeneratedSubasset>&
+        subassets) {
+
+    for (auto it =
+             generated_subasset_parents_
+                 .begin();
+         it !=
+             generated_subasset_parents_
+                 .end();) {
+
+        if (it->second ==
+            parent_guid) {
+
+            it =
+                generated_subasset_parents_
+                    .erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    for (const auto& subasset :
+         subassets) {
+
+        if (!subasset.valid() ||
+            assets_.find(
+                subasset.guid)) {
+
+            continue;
+        }
+
+        generated_subasset_parents_
+            .insert_or_assign(
+                subasset.guid,
+                parent_guid);
+    }
 }
 
 AssetActivation ProjectSession::activation_for(
