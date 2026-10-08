@@ -6,6 +6,7 @@
 #include <fstream>
 #include <iomanip>
 #include <sstream>
+#include <unordered_set>
 #include <system_error>
 #include <utility>
 
@@ -338,6 +339,185 @@ bool artifacts_exist(
     return true;
 }
 
+std::optional<std::filesystem::path>
+safe_cache_artifact_path(
+    const std::filesystem::path& cache_directory,
+    const std::filesystem::path& stored) {
+
+    std::error_code error;
+
+    const auto cache =
+        std::filesystem::absolute(
+            cache_directory,
+            error)
+            .lexically_normal();
+
+    if (error) {
+        return std::nullopt;
+    }
+
+    auto candidate =
+        stored.is_relative()
+            ? cache / stored
+            : stored;
+
+    candidate =
+        std::filesystem::absolute(
+            candidate,
+            error)
+            .lexically_normal();
+
+    if (error) {
+        return std::nullopt;
+    }
+
+    const auto relative =
+        candidate.lexically_relative(
+            cache);
+
+    if (relative.empty() ||
+        relative == "." ||
+        relative.has_root_path()) {
+        return std::nullopt;
+    }
+
+    for (const auto& part :
+         relative) {
+        if (part == "..") {
+            return std::nullopt;
+        }
+    }
+
+    return candidate;
+}
+
+std::vector<std::filesystem::path>
+manifest_artifact_paths(
+    const std::filesystem::path& cache_directory,
+    const CachedManifest& manifest) {
+
+    std::vector<std::filesystem::path>
+        paths;
+
+    const auto append =
+        [&](const auto& artifacts) {
+
+            for (const auto& artifact :
+                 artifacts) {
+
+                if (const auto safe =
+                        safe_cache_artifact_path(
+                            cache_directory,
+                            artifact.path)) {
+                    paths.push_back(
+                        *safe);
+                }
+            }
+        };
+
+    append(
+        manifest.artifacts);
+
+    for (const auto& subasset :
+         manifest.subassets) {
+        append(
+            subasset.artifacts);
+    }
+
+    std::sort(
+        paths.begin(),
+        paths.end());
+
+    paths.erase(
+        std::unique(
+            paths.begin(),
+            paths.end()),
+        paths.end());
+
+    return paths;
+}
+
+void cleanup_stale_artifacts(
+    const std::filesystem::path& cache_directory,
+    const CachedManifest& previous,
+    const CachedManifest& current) {
+
+    const auto old_paths =
+        manifest_artifact_paths(
+            cache_directory,
+            previous);
+
+    const auto new_paths =
+        manifest_artifact_paths(
+            cache_directory,
+            current);
+
+    std::unordered_set<std::string>
+        retained;
+
+    retained.reserve(
+        new_paths.size());
+
+    for (const auto& path :
+         new_paths) {
+        retained.insert(
+            path.generic_string());
+    }
+
+    std::error_code error;
+
+    for (const auto& path :
+         old_paths) {
+
+        if (retained.contains(
+                path.generic_string())) {
+            continue;
+        }
+
+        error.clear();
+
+        if (std::filesystem::
+                is_regular_file(
+                    path,
+                    error) &&
+            !error) {
+
+            std::filesystem::remove(
+                path,
+                error);
+        }
+
+        auto parent =
+            path.parent_path();
+
+        while (!error &&
+               !parent.empty() &&
+               parent !=
+                   cache_directory) {
+
+            if (!std::filesystem::
+                    is_directory(
+                        parent,
+                        error) ||
+                error ||
+                !std::filesystem::
+                    is_empty(
+                        parent,
+                        error) ||
+                error) {
+                break;
+            }
+
+            std::filesystem::remove(
+                parent,
+                error);
+
+            parent =
+                parent.parent_path();
+        }
+    }
+}
+
 } // namespace
 
 bool AssetImportPipeline::register_processor(
@@ -589,9 +769,13 @@ ImportResult AssetImportPipeline::import(
 
     CachedManifest cached;
 
-    if (read_manifest(
-            manifest_path(cache_directory),
-            cached) &&
+    const bool had_cached_manifest =
+        read_manifest(
+            manifest_path(
+                cache_directory),
+            cached);
+
+    if (had_cached_manifest &&
         cached.fingerprint ==
             expected_fingerprint &&
         cached.importer_id ==
@@ -734,6 +918,13 @@ ImportResult AssetImportPipeline::import(
         result.message =
             "import succeeded but cache manifest write failed";
         return result;
+    }
+
+    if (had_cached_manifest) {
+        cleanup_stale_artifacts(
+            cache_directory,
+            cached,
+            manifest);
     }
 
     return result;
