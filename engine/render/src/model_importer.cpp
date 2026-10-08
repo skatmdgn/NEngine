@@ -448,11 +448,12 @@ assets::ImportResult model_asset_importer(
     return result;
 }
 
-std::optional<assets::AssetGuid>
-find_cooked_model_material(
+bool read_cooked_model_material_map(
     const assets::CachedArtifactSet&
         model_artifacts,
-    std::uint32_t material_slot) {
+    CookedModelMaterialMap& materials) {
+
+    materials.clear();
 
     const auto* mapping =
         find_role(
@@ -460,7 +461,7 @@ find_cooked_model_material(
             "model-material-map");
 
     if (!mapping) {
-        return std::nullopt;
+        return true;
     }
 
     std::ifstream input(
@@ -468,7 +469,7 @@ find_cooked_model_material(
         std::ios::binary);
 
     if (!input) {
-        return std::nullopt;
+        return false;
     }
 
     std::string token;
@@ -478,7 +479,7 @@ find_cooked_model_material(
         token !=
             "NENGINE_MODEL_MATERIALS" ||
         version != 1u) {
-        return std::nullopt;
+        return false;
     }
 
     std::size_t count = 0u;
@@ -486,11 +487,11 @@ find_cooked_model_material(
     if (!(input >> token >> count) ||
         token != "MATERIALS" ||
         count > 65536u) {
-        return std::nullopt;
+        return false;
     }
 
-    std::optional<assets::AssetGuid>
-        found;
+    materials.reserve(
+        count);
 
     for (std::size_t i = 0u;
          i < count;
@@ -504,11 +505,8 @@ find_cooked_model_material(
             !(input >>
                 std::quoted(
                     guid_text))) {
-            return std::nullopt;
-        }
-
-        if (slot != material_slot) {
-            continue;
+            materials.clear();
+            return false;
         }
 
         const auto guid =
@@ -516,20 +514,55 @@ find_cooked_model_material(
                 guid_text);
 
         if (!guid ||
-            !guid->valid()) {
-            return std::nullopt;
+            !guid->valid() ||
+            materials.contains(
+                slot)) {
+
+            materials.clear();
+            return false;
         }
 
-        found = *guid;
+        materials.emplace(
+            slot,
+            *guid);
     }
 
     if (!(input >> token) ||
         token !=
             "END_MODEL_MATERIALS") {
+
+        materials.clear();
+        return false;
+    }
+
+    return true;
+}
+
+std::optional<assets::AssetGuid>
+find_cooked_model_material(
+    const assets::CachedArtifactSet&
+        model_artifacts,
+    std::uint32_t material_slot) {
+
+    CookedModelMaterialMap
+        materials;
+
+    if (!read_cooked_model_material_map(
+            model_artifacts,
+            materials)) {
         return std::nullopt;
     }
 
-    return found;
+    const auto it =
+        materials.find(
+            material_slot);
+
+    return it ==
+        materials.end()
+        ? std::nullopt
+        : std::optional<
+            assets::AssetGuid>{
+                it->second};
 }
 
 } // namespace nengine::render
