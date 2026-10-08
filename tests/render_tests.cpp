@@ -68,6 +68,7 @@ int main() {
     using namespace nengine;
 
     render::MeshData decoded_gltf_fixture;
+    render::MeshData decoded_multi_material_fixture;
 
     core::ComponentRegistry metadata;
     core::ComponentSerializationRegistry serialization;
@@ -1123,6 +1124,110 @@ int main() {
                 "cycle") !=
                 std::string::npos,
             "glTF importer rejects cyclic node graphs");
+
+        const auto multi_material_source =
+            root / "multi_material_triangle.gltf";
+
+        {
+            std::ofstream output(
+                multi_material_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output << R"json({
+  "asset":{"version":"2.0"},
+  "buffers":[{
+    "byteLength":102,
+    "uri":"data:application/octet-stream;base64,AAAAvwAAAL8AAAAAAAAAPwAAAL8AAAAAAAAAAAAAAD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAD8AAIA/AAABAAIA"
+  }],
+  "bufferViews":[
+    {"buffer":0,"byteOffset":0,"byteLength":36},
+    {"buffer":0,"byteOffset":36,"byteLength":36},
+    {"buffer":0,"byteOffset":72,"byteLength":24},
+    {"buffer":0,"byteOffset":96,"byteLength":6}
+  ],
+  "accessors":[
+    {"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"},
+    {"bufferView":1,"componentType":5126,"count":3,"type":"VEC3"},
+    {"bufferView":2,"componentType":5126,"count":3,"type":"VEC2"},
+    {"bufferView":3,"componentType":5123,"count":3,"type":"SCALAR"}
+  ],
+  "meshes":[{"primitives":[
+    {
+      "attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2},
+      "indices":3,
+      "material":0
+    },
+    {
+      "attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2},
+      "indices":3,
+      "material":1
+    }
+  ]}],
+  "materials":[
+    {"pbrMetallicRoughness":{"baseColorFactor":[1,0,0,1]}},
+    {"pbrMetallicRoughness":{"baseColorFactor":[0,0.5,1,1]}}
+  ],
+  "nodes":[{"mesh":0}],
+  "scenes":[{"nodes":[0]}],
+  "scene":0
+})json";
+        }
+
+        auto multi_material_asset =
+            gltf_asset;
+
+        multi_material_asset.source_path =
+            multi_material_source;
+
+        check(
+            render::decode_gltf_mesh(
+                multi_material_asset,
+                decoded_multi_material_fixture,
+                &resolve_error) &&
+            decoded_multi_material_fixture.valid() &&
+            decoded_multi_material_fixture.vertices.size() == 6u &&
+            decoded_multi_material_fixture.indices.size() == 6u &&
+            decoded_multi_material_fixture.submeshes.size() == 2u &&
+            decoded_multi_material_fixture.submeshes[0].first_index == 0u &&
+            decoded_multi_material_fixture.submeshes[0].index_count == 3u &&
+            decoded_multi_material_fixture.submeshes[0].material_slot == 0u &&
+            decoded_multi_material_fixture.submeshes[1].first_index == 3u &&
+            decoded_multi_material_fixture.submeshes[1].index_count == 3u &&
+            decoded_multi_material_fixture.submeshes[1].material_slot == 1u,
+            "glTF multiple primitives preserve independent submesh ranges and material slots");
+
+        render::DecodedTextureData
+            multi_material_red;
+        render::DecodedTextureData
+            multi_material_blue;
+
+        check(
+            render::decode_gltf_material_base_color_texture(
+                multi_material_asset,
+                0u,
+                multi_material_red,
+                &resolve_error) &&
+            multi_material_red.valid() &&
+            multi_material_red.width == 1u &&
+            multi_material_red.height == 1u &&
+            multi_material_red.rgba8 ==
+                std::vector<std::uint8_t>{
+                    255u, 0u, 0u, 255u},
+            "glTF material slot 0 decodes independent red base color");
+
+        check(
+            render::decode_gltf_material_base_color_texture(
+                multi_material_asset,
+                1u,
+                multi_material_blue,
+                &resolve_error) &&
+            multi_material_blue.valid() &&
+            multi_material_blue.rgba8 ==
+                std::vector<std::uint8_t>{
+                    0u, 188u, 255u, 255u},
+            "glTF material slot 1 decodes independent blue base color");
+
 
 
         render::DecodedTextureData gltf_embedded_base_color;
