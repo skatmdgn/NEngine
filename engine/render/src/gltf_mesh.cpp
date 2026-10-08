@@ -2254,6 +2254,29 @@ bool append_primitive(
         return false;
     }
 
+    std::uint32_t material_slot =
+        kMeshMaterialUnassigned;
+
+    if (const auto material_index =
+            index_value(
+                member(
+                    primitive,
+                    "material"))) {
+
+        if (*material_index >=
+            kMeshMaterialUnassigned) {
+
+            set_error(
+                error,
+                "glTF primitive material index exceeds NEngine material-slot range");
+            return false;
+        }
+
+        material_slot =
+            static_cast<std::uint32_t>(
+                *material_index);
+    }
+
     const auto* attributes =
         member(
             primitive,
@@ -2498,6 +2521,20 @@ bool append_primitive(
         return false;
     }
 
+    if (mesh.indices.size() >
+            std::numeric_limits<std::uint32_t>::max() -
+                indices.size()) {
+
+        set_error(
+            error,
+            "glTF mesh exceeds 32-bit index range");
+        return false;
+    }
+
+    const auto first_index =
+        static_cast<std::uint32_t>(
+            mesh.indices.size());
+
     mesh.indices.reserve(
         mesh.indices.size() +
         indices.size());
@@ -2541,6 +2578,13 @@ bool append_primitive(
                 base + indices[i + 1u]);
         }
     }
+
+    mesh.submeshes.push_back({
+        first_index,
+        static_cast<std::uint32_t>(
+            indices.size()),
+        material_slot
+    });
 
     return true;
 }
@@ -3068,8 +3112,9 @@ bool decode_gltf_mesh(
     return true;
 }
 
-bool decode_gltf_base_color_texture(
+bool decode_gltf_material_base_color_texture(
     const ResolvedModelAsset& asset,
+    std::size_t material_index,
     DecodedTextureData& texture,
     std::string* error) {
 
@@ -3105,38 +3150,17 @@ bool decode_gltf_base_color_texture(
         return false;
     }
 
-    // Our first mesh path merges the primitives into one draw. For now
-    // only the first primitive's base-color map is used for that draw.
-    const auto* meshes = member(root, "meshes");
-
-    if (!meshes || meshes->kind != JsonValue::Kind::Array ||
-        meshes->array.empty()) {
-        set_error(error, "glTF texture has no mesh");
-        return false;
-    }
-
-    const auto* primitives = member(meshes->array.front(), "primitives");
-
-    if (!primitives ||
-        primitives->kind != JsonValue::Kind::Array ||
-        primitives->array.empty()) {
-        set_error(error, "glTF texture has no mesh primitive");
-        return false;
-    }
-
-    const auto material_index =
-        index_value(member(primitives->array.front(), "material"));
     const auto* materials = member(root, "materials");
 
-    if (!material_index || !materials ||
+    if (!materials ||
         materials->kind != JsonValue::Kind::Array ||
-        *material_index >= materials->array.size()) {
-        set_error(error, "glTF mesh has no base-color material");
+        material_index >= materials->array.size()) {
+        set_error(error, "glTF material index is unavailable");
         return false;
     }
 
     const auto* pbr = member(
-        materials->array[*material_index],
+        materials->array[material_index],
         "pbrMetallicRoughness");
 
     // glTF baseColorFactor values are linear. Vulkan SRGB textures
@@ -3354,6 +3378,97 @@ bool decode_gltf_base_color_texture(
                 factor[3]));
     }
     return true;
+}
+
+bool decode_gltf_base_color_texture(
+    const ResolvedModelAsset& asset,
+    DecodedTextureData& texture,
+    std::string* error) {
+
+    if (!asset.guid.valid()) {
+        set_error(
+            error,
+            "glTF texture model AssetGuid is invalid");
+        return false;
+    }
+
+    GltfSource source;
+
+    if (!load_gltf_source(
+            asset,
+            source,
+            error)) {
+        return false;
+    }
+
+    JsonValue root;
+    std::string json_error;
+    JsonParser parser{source.json};
+
+    if (!parser.parse(
+            root,
+            json_error) ||
+        root.kind !=
+            JsonValue::Kind::Object) {
+
+        set_error(
+            error,
+            "glTF texture JSON parse failed: " +
+                json_error);
+        return false;
+    }
+
+    const auto* meshes =
+        member(
+            root,
+            "meshes");
+
+    if (!meshes ||
+        meshes->kind !=
+            JsonValue::Kind::Array ||
+        meshes->array.empty()) {
+
+        set_error(
+            error,
+            "glTF texture has no mesh");
+        return false;
+    }
+
+    const auto* primitives =
+        member(
+            meshes->array.front(),
+            "primitives");
+
+    if (!primitives ||
+        primitives->kind !=
+            JsonValue::Kind::Array ||
+        primitives->array.empty()) {
+
+        set_error(
+            error,
+            "glTF texture has no mesh primitive");
+        return false;
+    }
+
+    const auto material_index =
+        index_value(
+            member(
+                primitives->array.front(),
+                "material"));
+
+    if (!material_index) {
+        set_error(
+            error,
+            "glTF first primitive has no material");
+        return false;
+    }
+
+    return
+        decode_gltf_material_base_color_texture(
+            asset,
+            *material_index,
+            texture,
+            error);
 }
 
 } // namespace nengine::render

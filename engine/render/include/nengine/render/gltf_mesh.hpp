@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <string>
 
 #include "nengine/render/asset_resources.hpp"
@@ -27,11 +28,16 @@ bool decode_gltf_mesh(
     MeshData& mesh,
     std::string* error = nullptr);
 
-// Decode the first primitive's glTF 2.0 PBR base-color texture into
-// top-left-origin RGBA8. Supports GLB bufferView images, data URI images,
-// and external PNG/JPEG when present beside a glTF source. A missing
-// base-color texture is a nonfatal false result for preview callers.
-// Per-primitive materials, factors and advanced PBR are not yet cooked.
+// Decode one glTF material's PBR base-color input into top-left-origin
+// RGBA8. Supports image-free baseColorFactor plus PNG/JPEG bufferView,
+// data URI or staged external images.
+bool decode_gltf_material_base_color_texture(
+    const ResolvedModelAsset& asset,
+    std::size_t material_index,
+    DecodedTextureData& texture,
+    std::string* error = nullptr);
+
+// Compatibility helper: decode the first mesh primitive's material.
 bool decode_gltf_base_color_texture(
     const ResolvedModelAsset& asset,
     DecodedTextureData& texture,
