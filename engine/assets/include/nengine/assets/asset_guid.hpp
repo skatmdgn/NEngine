@@ -27,4 +27,12 @@ struct AssetGuidHash {
     std::size_t operator()(AssetGuid guid) const noexcept;
 };
 
+// Stable identity for generated/imported subassets. The result is derived
+// entirely from the parent GUID plus a caller-owned namespace/local key, so
+// reimporting the same source preserves generated material/sprite/clip IDs.
+AssetGuid derive_subasset_guid(
+    AssetGuid parent,
+    std::string_view name_space,
+    std::uint64_t local_key) noexcept;
+
 } // namespace nengine::assets

@@ -64,4 +64,64 @@ std::size_t AssetGuidHash::operator()(AssetGuid guid) const noexcept {
     return static_cast<std::size_t>(mixed);
 }
 
+
+AssetGuid derive_subasset_guid(
+    AssetGuid parent,
+    std::string_view name_space,
+    std::uint64_t local_key) noexcept {
+
+    auto mix =
+        [](std::uint64_t value) noexcept {
+
+            value +=
+                0x9e3779b97f4a7c15ull;
+            value =
+                (value ^
+                 (value >> 30u)) *
+                0xbf58476d1ce4e5b9ull;
+            value =
+                (value ^
+                 (value >> 27u)) *
+                0x94d049bb133111ebull;
+
+            return
+                value ^
+                (value >> 31u);
+        };
+
+    std::uint64_t namespace_hash =
+        14695981039346656037ull;
+
+    for (const auto ch :
+         name_space) {
+
+        namespace_hash ^=
+            static_cast<unsigned char>(
+                ch);
+
+        namespace_hash *=
+            1099511628211ull;
+    }
+
+    AssetGuid derived{
+        mix(
+            parent.high ^
+            namespace_hash ^
+            (local_key *
+             0xd6e8feb86659fd93ull)),
+        mix(
+            parent.low ^
+            (namespace_hash <<
+                1u) ^
+            (local_key *
+             0xa0761d6478bd642full))
+    };
+
+    if (!derived.valid()) {
+        derived.low = 1u;
+    }
+
+    return derived;
+}
+
 } // namespace nengine::assets
