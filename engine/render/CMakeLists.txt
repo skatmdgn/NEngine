@@ -8,6 +8,7 @@ add_library(NEngineRender STATIC
   src/material_asset.cpp
   src/matrix.cpp
   src/mesh_data.cpp
+  src/model_importer.cpp
   src/obj_mesh.cpp
   src/registration.cpp
   src/render_snapshot.cpp
