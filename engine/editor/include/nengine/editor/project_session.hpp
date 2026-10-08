@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "nengine/assets/asset_database.hpp"
@@ -108,6 +109,12 @@ public:
 private:
     void register_builtin_importers();
 
+    void index_generated_subassets(
+        assets::AssetGuid parent_guid,
+        const std::vector<
+            assets::GeneratedSubasset>&
+            subassets);
+
     bool open_{false};
     std::filesystem::path root_{};
     std::filesystem::path assets_path_{};
@@ -119,6 +126,12 @@ private:
     assets::PollingFileWatcher watcher_{};
     assets::AssetDependencyGraph dependency_graph_{};
     assets::AssetImportPipeline import_pipeline_{};
+
+    mutable std::unordered_map<
+        assets::AssetGuid,
+        assets::AssetGuid,
+        assets::AssetGuidHash>
+        generated_subasset_parents_{};
 };
 
 } // namespace nengine::editor
