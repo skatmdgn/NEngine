@@ -1228,6 +1228,126 @@ int main() {
                     0u, 188u, 255u, 255u},
             "glTF material slot 1 decodes independent blue base color");
 
+        const auto sparse_source =
+            root / "sparse_position_triangle.gltf";
+
+        {
+            std::ofstream output(
+                sparse_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output << R"json({
+  "asset":{"version":"2.0"},
+  "buffers":[{
+    "byteLength":40,
+    "uri":"data:application/octet-stream;base64,AAECAAAAAL8AAAC/AAAAAAAAAD8AAAC/AAAAAAAAAAAAAAA/AAAAAA=="
+  }],
+  "bufferViews":[
+    {"buffer":0,"byteOffset":0,"byteLength":3},
+    {"buffer":0,"byteOffset":4,"byteLength":36}
+  ],
+  "accessors":[{
+    "componentType":5126,
+    "count":3,
+    "type":"VEC3",
+    "sparse":{
+      "count":3,
+      "indices":{"bufferView":0,"componentType":5121},
+      "values":{"bufferView":1}
+    }
+  }],
+  "meshes":[{"primitives":[{
+    "attributes":{"POSITION":0}
+  }]}]
+})json";
+        }
+
+        auto sparse_asset =
+            gltf_asset;
+        sparse_asset.source_path =
+            sparse_source;
+
+        render::MeshData sparse_mesh;
+        std::string sparse_error;
+
+        check(
+            render::decode_gltf_mesh(
+                sparse_asset,
+                sparse_mesh,
+                &sparse_error) &&
+            sparse_mesh.valid() &&
+            sparse_mesh.vertices.size() == 3u &&
+            sparse_mesh.indices ==
+                std::vector<std::uint32_t>{
+                    0u, 2u, 1u} &&
+            std::abs(
+                sparse_mesh.vertices[0]
+                    .position.x + 0.5f) < 0.0001f &&
+            std::abs(
+                sparse_mesh.vertices[0]
+                    .position.y + 0.5f) < 0.0001f &&
+            std::abs(
+                sparse_mesh.vertices[1]
+                    .position.x - 0.5f) < 0.0001f &&
+            std::abs(
+                sparse_mesh.vertices[2]
+                    .position.y - 0.5f) < 0.0001f &&
+            sparse_mesh.submeshes.size() == 1u &&
+            sparse_mesh.submeshes[0].material_slot ==
+                render::kMeshMaterialUnassigned,
+            "glTF sparse POSITION accessor overlays zero base storage into native MeshData");
+
+        const auto invalid_sparse_source =
+            root / "invalid_sparse_position.gltf";
+
+        {
+            std::ofstream output(
+                invalid_sparse_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output << R"json({
+  "asset":{"version":"2.0"},
+  "buffers":[{
+    "byteLength":40,
+    "uri":"data:application/octet-stream;base64,AAEBAAAAAL8AAAC/AAAAAAAAAD8AAAC/AAAAAAAAAAAAAAA/AAAAAA=="
+  }],
+  "bufferViews":[
+    {"buffer":0,"byteOffset":0,"byteLength":3},
+    {"buffer":0,"byteOffset":4,"byteLength":36}
+  ],
+  "accessors":[{
+    "componentType":5126,
+    "count":3,
+    "type":"VEC3",
+    "sparse":{
+      "count":3,
+      "indices":{"bufferView":0,"componentType":5121},
+      "values":{"bufferView":1}
+    }
+  }],
+  "meshes":[{"primitives":[{
+    "attributes":{"POSITION":0}
+  }]}]
+})json";
+        }
+
+        sparse_asset.source_path =
+            invalid_sparse_source;
+        sparse_error.clear();
+
+        check(
+            !render::decode_gltf_mesh(
+                sparse_asset,
+                sparse_mesh,
+                &sparse_error) &&
+            sparse_error.find(
+                "strictly increasing") !=
+                    std::string::npos,
+            "glTF sparse accessor rejects duplicate or unordered sparse indices");
+
+
 
 
         render::DecodedTextureData gltf_embedded_base_color;
