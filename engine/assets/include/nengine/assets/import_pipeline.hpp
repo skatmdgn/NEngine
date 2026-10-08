@@ -25,12 +25,26 @@ struct ImportContext {
     std::filesystem::path cache_directory{};
 };
 
+struct GeneratedSubasset {
+    AssetGuid guid{};
+    std::string importer_id{};
+    std::string name{};
+    std::vector<ImportArtifact> artifacts{};
+
+    bool valid() const noexcept {
+        return guid.valid() &&
+            !importer_id.empty() &&
+            !artifacts.empty();
+    }
+};
+
 struct ImportResult {
     bool success{false};
     bool cache_hit{false};
     std::string message{};
     std::vector<ImportArtifact> artifacts{};
     std::vector<AssetGuid> dependencies{};
+    std::vector<GeneratedSubasset> subassets{};
 };
 
 struct CachedArtifactSet {
@@ -59,6 +73,13 @@ public:
 
     std::optional<CachedArtifactSet> cached_artifacts(
         const AssetRecord& asset,
+        const ImporterRegistry& registry,
+        const std::filesystem::path& cache_root) const;
+
+    std::optional<CachedArtifactSet>
+    cached_subasset_artifacts(
+        const AssetRecord& parent_asset,
+        AssetGuid subasset_guid,
         const ImporterRegistry& registry,
         const std::filesystem::path& cache_root) const;
 

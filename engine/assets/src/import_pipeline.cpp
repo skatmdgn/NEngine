@@ -18,6 +18,7 @@ struct CachedManifest {
     std::uint32_t importer_version{0};
     std::vector<ImportArtifact> artifacts{};
     std::vector<AssetGuid> dependencies{};
+    std::vector<GeneratedSubasset> subassets{};
 };
 
 std::filesystem::path manifest_path(
@@ -38,7 +39,9 @@ bool read_manifest(
 
     if (!(input >> token >> version) ||
         token != "NENGINE_IMPORT" ||
-        (version != 1 && version != 2)) {
+        (version != 1 &&
+         version != 2 &&
+         version != 3)) {
         return false;
     }
 
@@ -113,6 +116,89 @@ bool read_manifest(
         }
     }
 
+    manifest.subassets.clear();
+
+    if (version >= 3u) {
+        std::size_t subasset_count = 0;
+
+        if (!(input >> token) ||
+            token != "SUBASSETS" ||
+            !(input >> subasset_count) ||
+            subasset_count > 8192u) {
+            return false;
+        }
+
+        manifest.subassets.reserve(
+            subasset_count);
+
+        for (std::size_t i = 0;
+             i < subasset_count;
+             ++i) {
+
+            GeneratedSubasset subasset;
+            std::string guid_text;
+            std::size_t artifact_count = 0;
+
+            if (!(input >> token) ||
+                token != "SUBASSET" ||
+                !(input >> std::quoted(guid_text)) ||
+                !(input >> std::quoted(subasset.importer_id)) ||
+                !(input >> std::quoted(subasset.name)) ||
+                !(input >> artifact_count) ||
+                artifact_count == 0u ||
+                artifact_count > 1024u) {
+                return false;
+            }
+
+            const auto guid =
+                AssetGuid::parse(
+                    guid_text);
+
+            if (!guid ||
+                !guid->valid()) {
+                return false;
+            }
+
+            subasset.guid =
+                *guid;
+
+            subasset.artifacts.reserve(
+                artifact_count);
+
+            for (std::size_t artifact_index = 0;
+                 artifact_index < artifact_count;
+                 ++artifact_index) {
+
+                ImportArtifact artifact;
+                std::string path_text;
+
+                if (!(input >> token) ||
+                    token != "SUBARTIFACT" ||
+                    !(input >> std::quoted(artifact.role)) ||
+                    !(input >> std::quoted(path_text))) {
+                    return false;
+                }
+
+                artifact.path =
+                    std::filesystem::path{
+                        std::move(
+                            path_text)};
+
+                subasset.artifacts.push_back(
+                    std::move(
+                        artifact));
+            }
+
+            if (!subasset.valid()) {
+                return false;
+            }
+
+            manifest.subassets.push_back(
+                std::move(
+                    subasset));
+        }
+    }
+
     return (input >> token) &&
         token == "END_IMPORT";
 }
@@ -127,7 +213,7 @@ bool write_manifest(
 
     if (!output) return false;
 
-    output << "NENGINE_IMPORT 2\n";
+    output << "NENGINE_IMPORT 3\n";
     output << "FINGERPRINT "
            << std::quoted(manifest.fingerprint)
            << "\n";
@@ -160,6 +246,40 @@ bool write_manifest(
                << "\n";
     }
 
+    output << "SUBASSETS "
+           << manifest.subassets.size()
+           << "\n";
+
+    for (const auto& subasset :
+         manifest.subassets) {
+
+        output << "SUBASSET "
+               << std::quoted(
+                    subasset.guid.to_string())
+               << " "
+               << std::quoted(
+                    subasset.importer_id)
+               << " "
+               << std::quoted(
+                    subasset.name)
+               << " "
+               << subasset.artifacts.size()
+               << "\n";
+
+        for (const auto& artifact :
+             subasset.artifacts) {
+
+            output << "SUBARTIFACT "
+                   << std::quoted(
+                        artifact.role)
+                   << " "
+                   << std::quoted(
+                        artifact.path
+                            .generic_string())
+                   << "\n";
+        }
+    }
+
     output << "END_IMPORT\n";
     return output.good();
 }
@@ -184,6 +304,34 @@ bool artifacts_exist(
                 error) ||
             error) {
             return false;
+        }
+    }
+
+    for (const auto& subasset :
+         manifest.subassets) {
+
+        if (!subasset.valid()) {
+            return false;
+        }
+
+        for (const auto& artifact :
+             subasset.artifacts) {
+
+            auto path =
+                artifact.path;
+
+            if (path.is_relative()) {
+                path =
+                    cache_directory /
+                    path;
+            }
+
+            if (!std::filesystem::exists(
+                    path,
+                    error) ||
+                error) {
+                return false;
+            }
         }
     }
 
@@ -311,6 +459,90 @@ AssetImportPipeline::cached_artifacts(
     return result;
 }
 
+std::optional<CachedArtifactSet>
+AssetImportPipeline::cached_subasset_artifacts(
+    const AssetRecord& parent_asset,
+    AssetGuid subasset_guid,
+    const ImporterRegistry& registry,
+    const std::filesystem::path& cache_root) const {
+
+    if (!subasset_guid.valid()) {
+        return std::nullopt;
+    }
+
+    const auto* importer =
+        registry.find(
+            parent_asset.importer_id);
+
+    if (!importer) {
+        return std::nullopt;
+    }
+
+    const auto cache_directory =
+        cache_root /
+        parent_asset.guid.to_string();
+
+    CachedManifest cached;
+
+    if (!read_manifest(
+            manifest_path(
+                cache_directory),
+            cached) ||
+        cached.fingerprint !=
+            fingerprint(
+                parent_asset,
+                *importer) ||
+        cached.importer_id !=
+            importer->id ||
+        cached.importer_version !=
+            importer->version ||
+        !artifacts_exist(
+            cache_directory,
+            cached)) {
+
+        return std::nullopt;
+    }
+
+    for (auto subasset :
+         cached.subassets) {
+
+        if (subasset.guid !=
+            subasset_guid) {
+            continue;
+        }
+
+        CachedArtifactSet result;
+        result.fingerprint =
+            cached.fingerprint +
+            ":subasset:" +
+            subasset.guid.to_string();
+        result.importer_id =
+            subasset.importer_id;
+        result.importer_version = 1u;
+
+        result.artifacts.reserve(
+            subasset.artifacts.size());
+
+        for (auto artifact :
+             subasset.artifacts) {
+
+            if (artifact.path.is_relative()) {
+                artifact.path =
+                    cache_directory /
+                    artifact.path;
+            }
+
+            result.artifacts.push_back(
+                std::move(
+                    artifact));
+        }
+
+        return result;
+    }
+
+    return std::nullopt;
+}
+
 ImportResult AssetImportPipeline::import(
     const AssetRecord& asset,
     const ImporterRegistry& registry,
@@ -388,6 +620,27 @@ ImportResult AssetImportPipeline::import(
                 std::move(artifact));
         }
 
+        result.subassets.reserve(
+            cached.subassets.size());
+
+        for (auto subasset :
+             cached.subassets) {
+
+            for (auto& artifact :
+                 subasset.artifacts) {
+
+                if (artifact.path.is_relative()) {
+                    artifact.path =
+                        cache_directory /
+                        artifact.path;
+                }
+            }
+
+            result.subassets.push_back(
+                std::move(
+                    subasset));
+        }
+
         return result;
     }
 
@@ -412,6 +665,43 @@ ImportResult AssetImportPipeline::import(
     manifest.importer_version =
         importer->version;
     manifest.dependencies = result.dependencies;
+
+    for (const auto& subasset :
+         result.subassets) {
+
+        if (!subasset.valid()) {
+            result.success = false;
+            result.message =
+                "import produced invalid generated subasset";
+            return result;
+        }
+
+        GeneratedSubasset stored =
+            subasset;
+
+        for (auto& artifact :
+             stored.artifacts) {
+
+            std::error_code
+                relative_error;
+
+            const auto relative =
+                std::filesystem::relative(
+                    artifact.path,
+                    cache_directory,
+                    relative_error);
+
+            if (!relative_error &&
+                !relative.empty()) {
+                artifact.path =
+                    relative;
+            }
+        }
+
+        manifest.subassets.push_back(
+            std::move(
+                stored));
+    }
 
     for (const auto& artifact :
          result.artifacts) {
