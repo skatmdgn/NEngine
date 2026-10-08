@@ -427,6 +427,128 @@ int main() {
         !cached_artifacts->artifacts.empty(),
         "validated cache lookup returns current artifacts");
 
+    const auto generated_subasset_guid =
+        AssetGuid::generate();
+
+    AssetImportPipeline
+        generated_pipeline;
+
+    check(
+        generated_pipeline.register_processor(
+            "Raw",
+            [generated_subasset_guid](
+                const ImportContext& context) {
+
+                ImportResult result;
+
+                const auto generated_source =
+                    context.cache_directory /
+                    "generated" /
+                    "material.nmat";
+
+                std::error_code local_error;
+
+                std::filesystem::create_directories(
+                    generated_source.parent_path(),
+                    local_error);
+
+                if (local_error) {
+                    result.message =
+                        "generated subasset directory failed";
+                    return result;
+                }
+
+                write_file(
+                    generated_source,
+                    "NENGINE_MATERIAL 1\n"
+                    "BASE_COLOR_TEXTURE "
+                    "\"11111111111111112222222222222222\"\n"
+                    "END_MATERIAL\n");
+
+                result.success = true;
+                result.message =
+                    "generated subasset test import";
+
+                GeneratedSubasset subasset;
+                subasset.guid =
+                    generated_subasset_guid;
+                subasset.importer_id =
+                    "NEngine.Material";
+                subasset.name =
+                    "Generated Material";
+                subasset.artifacts.push_back({
+                    generated_source,
+                    "source"
+                });
+
+                result.subassets.push_back(
+                    std::move(
+                        subasset));
+
+                return result;
+            }),
+        "generated-subasset test processor registers");
+
+    const auto generated_cache_root =
+        root /
+        "Library" /
+        "GeneratedCache";
+
+    const auto generated_first =
+        generated_pipeline.import(
+            raw_record,
+            importers,
+            generated_cache_root);
+
+    check(
+        generated_first.success &&
+        !generated_first.cache_hit &&
+        generated_first.subassets.size() == 1u &&
+        generated_first.subassets[0].guid ==
+            generated_subasset_guid &&
+        generated_first.subassets[0].valid(),
+        "import pipeline returns generated subasset on first import");
+
+    const auto generated_cached =
+        generated_pipeline.import(
+            raw_record,
+            importers,
+            generated_cache_root);
+
+    check(
+        generated_cached.success &&
+        generated_cached.cache_hit &&
+        generated_cached.subassets.size() == 1u &&
+        generated_cached.subassets[0].guid ==
+            generated_subasset_guid &&
+        std::filesystem::exists(
+            generated_cached
+                .subassets[0]
+                .artifacts[0]
+                .path),
+        "import manifest v3 restores generated subassets on cache hit");
+
+    const auto generated_artifacts =
+        generated_pipeline
+            .cached_subasset_artifacts(
+                raw_record,
+                generated_subasset_guid,
+                importers,
+                generated_cache_root);
+
+    check(
+        generated_artifacts.has_value() &&
+        generated_artifacts->importer_id ==
+            "NEngine.Material" &&
+        generated_artifacts->artifacts.size() == 1u &&
+        generated_artifacts->artifacts[0].role ==
+            "source" &&
+        std::filesystem::exists(
+            generated_artifacts
+                ->artifacts[0]
+                .path),
+        "generated subasset GUID resolves its independent cached artifact set");
+
     write_file(
         scene,
         "scene-data-changed");
