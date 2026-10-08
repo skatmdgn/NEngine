@@ -13,6 +13,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -510,6 +511,15 @@ bool decode_obj_mesh(
     std::vector<core::Vec3>
         normals;
 
+    std::unordered_map<
+        std::string,
+        std::uint32_t>
+        material_slots;
+
+    std::uint32_t
+        current_material_slot =
+            kMeshMaterialUnassigned;
+
     std::string line;
     std::size_t line_number = 0u;
 
@@ -667,6 +677,57 @@ bool decode_obj_mesh(
             continue;
         }
 
+        if (directive == "usemtl") {
+            const auto material_name =
+                trim(
+                    view.substr(
+                        directive.size()));
+
+            if (material_name.empty()) {
+                set_error(
+                    error,
+                    "OBJ usemtl name is missing at line " +
+                        std::to_string(
+                            line_number));
+                return false;
+            }
+
+            const auto existing =
+                material_slots.find(
+                    std::string{
+                        material_name});
+
+            if (existing !=
+                material_slots.end()) {
+
+                current_material_slot =
+                    existing->second;
+            } else {
+                if (material_slots.size() >=
+                    kMeshMaterialUnassigned) {
+
+                    set_error(
+                        error,
+                        "OBJ material slot range exceeds NEngine limit");
+                    return false;
+                }
+
+                const auto slot =
+                    static_cast<std::uint32_t>(
+                        material_slots.size());
+
+                material_slots.emplace(
+                    std::string{
+                        material_name},
+                    slot);
+
+                current_material_slot =
+                    slot;
+            }
+
+            continue;
+        }
+
         if (directive != "f") {
             continue;
         }
@@ -680,6 +741,29 @@ bool decode_obj_mesh(
                     std::to_string(
                         line_number));
             return false;
+        }
+
+        if (mesh.submeshes.empty() ||
+            mesh.submeshes.back()
+                .material_slot !=
+                    current_material_slot) {
+
+            if (mesh.indices.size() >
+                std::numeric_limits<
+                    std::uint32_t>::max()) {
+
+                set_error(
+                    error,
+                    "OBJ submesh index range exceeds NEngine limit");
+                return false;
+            }
+
+            mesh.submeshes.push_back({
+                static_cast<std::uint32_t>(
+                    mesh.indices.size()),
+                0u,
+                current_material_slot
+            });
         }
 
         std::vector<ObjCorner>
@@ -838,6 +922,9 @@ bool decode_obj_mesh(
                     base + 1u,
                     base + 2u
                 });
+
+            mesh.submeshes.back()
+                .index_count += 3u;
         }
     }
 
@@ -858,13 +945,6 @@ bool decode_obj_mesh(
             "OBJ source contains no renderable faces");
         return false;
     }
-
-    mesh.submeshes.push_back({
-        0u,
-        static_cast<std::uint32_t>(
-            mesh.indices.size()),
-        kMeshMaterialUnassigned
-    });
 
     calculate_bounds(
         mesh);
