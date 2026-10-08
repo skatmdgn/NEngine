@@ -1,5 +1,6 @@
 #include "nengine/assets/builtin_processors.hpp"
 #include "nengine/assets/gltf_sidecars.hpp"
+#include "nengine/assets/obj_sidecars.hpp"
 
 #include <algorithm>
 #include <array>
@@ -810,6 +811,55 @@ ImportResult model_source_importer(
             }
             result.artifacts.push_back({staged, "model-sidecar"});
         }
+    } else if (format == ".obj") {
+        std::vector<ObjSidecar> sidecars;
+        std::string sidecar_error;
+
+        if (!collect_obj_sidecars(
+                context.asset->source_path,
+                sidecars,
+                &sidecar_error)) {
+            result.message = sidecar_error;
+            return result;
+        }
+
+        for (const auto& sidecar : sidecars) {
+            const auto staged =
+                context.cache_directory /
+                sidecar.relative_path;
+
+            std::error_code ec;
+            std::filesystem::create_directories(
+                staged.parent_path(), ec);
+
+            if (ec) {
+                result.message =
+                    "OBJ sidecar directory creation failed: " +
+                    ec.message();
+                return result;
+            }
+
+            std::filesystem::copy_file(
+                sidecar.source_path,
+                staged,
+                std::filesystem::copy_options::overwrite_existing,
+                ec);
+
+            if (ec) {
+                result.message =
+                    "OBJ sidecar copy failed: " +
+                    ec.message();
+                return result;
+            }
+
+            result.artifacts.push_back({
+                staged,
+                sidecar.kind ==
+                    ObjSidecarKind::MaterialLibrary
+                    ? "obj-mtl-sidecar"
+                    : "obj-texture-sidecar"
+            });
+        }
     }
 
     const auto descriptor =
@@ -850,7 +900,9 @@ ImportResult model_source_importer(
     result.message =
         format == ".gltf"
             ? "glTF source and external sidecars staged"
-            : "model source staged";
+            : format == ".obj"
+                ? "OBJ source, MTL and diffuse-texture sidecars staged"
+                : "model source staged";
 
     return result;
 }
