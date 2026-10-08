@@ -400,6 +400,9 @@ bool VulkanDiagnosticScene::present_world(
             assets::CachedArtifactSet>
             model_artifacts;
 
+        const CookedModelMaterialMap*
+            cooked_material_map = nullptr;
+
         if (!explicit_material_requested &&
             imported &&
             asset_resolver) {
@@ -407,6 +410,36 @@ bool VulkanDiagnosticScene::present_world(
             model_artifacts =
                 asset_resolver(
                     item.renderer.mesh);
+
+            if (model_artifacts) {
+                auto& cached_map =
+                    cooked_model_material_maps_[
+                        item.renderer.mesh];
+
+                if (cached_map.fingerprint !=
+                        model_artifacts
+                            ->fingerprint) {
+
+                    cached_map = {};
+
+                    if (read_cooked_model_material_map(
+                            *model_artifacts,
+                            cached_map.materials)) {
+
+                        cached_map.fingerprint =
+                            model_artifacts
+                                ->fingerprint;
+                    }
+                }
+
+                if (cached_map.fingerprint ==
+                    model_artifacts
+                        ->fingerprint) {
+
+                    cooked_material_map =
+                        &cached_map.materials;
+                }
+            }
         }
 
         const auto mvp =
@@ -434,24 +467,29 @@ bool VulkanDiagnosticScene::present_world(
                 bool used_cooked =
                     false;
 
-                if (model_artifacts &&
+                if (cooked_material_map &&
                     asset_resolver) {
 
-                    const auto cooked_guid =
-                        find_cooked_model_material(
-                            *model_artifacts,
-                            submesh.material_slot);
+                    const auto cooked =
+                        cooked_material_map
+                            ->find(
+                                submesh.material_slot);
 
-                    if (cooked_guid) {
+                    if (cooked !=
+                        cooked_material_map
+                            ->end()) {
+
+                        const auto cooked_guid =
+                            cooked->second;
                         automatic =
                             imported_material_cache_
                                 .find(
-                                    *cooked_guid);
+                                    cooked_guid);
 
                         if (!automatic) {
                             const auto cooked_artifacts =
                                 asset_resolver(
-                                    *cooked_guid);
+                                    cooked_guid);
 
                             if (cooked_artifacts) {
                                 std::string
@@ -460,7 +498,7 @@ bool VulkanDiagnosticScene::present_world(
                                 automatic =
                                     imported_material_cache_
                                         .load(
-                                            *cooked_guid,
+                                            cooked_guid,
                                             *cooked_artifacts,
                                             asset_resolver,
                                             &material_error);
@@ -610,6 +648,7 @@ void VulkanDiagnosticScene::shutdown() noexcept {
     texture_.destroy();
     imported_material_cache_.shutdown();
     imported_mesh_cache_.shutdown();
+    cooked_model_material_maps_.clear();
     mesh_cache_.shutdown();
     fragment_shader_.destroy();
     vertex_shader_.destroy();
