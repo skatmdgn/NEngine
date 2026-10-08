@@ -2242,6 +2242,28 @@ int main() {
                             gpu_gltf.index_count() == 3u,
                             "decoded glTF MeshData uploads through existing Vulkan mesh path");
 
+                        render::VulkanMeshResource
+                            gpu_multi_material;
+
+                        check(
+                            decoded_multi_material_fixture.valid() &&
+                            gpu_multi_material.create(
+                                loader,
+                                instance,
+                                device,
+                                decoded_multi_material_fixture) &&
+                            gpu_multi_material.valid() &&
+                            gpu_multi_material.index_count() == 6u &&
+                            gpu_multi_material.submeshes().size() == 2u &&
+                            gpu_multi_material.submeshes()[0].first_index == 0u &&
+                            gpu_multi_material.submeshes()[0].index_count == 3u &&
+                            gpu_multi_material.submeshes()[0].material_slot == 0u &&
+                            gpu_multi_material.submeshes()[1].first_index == 3u &&
+                            gpu_multi_material.submeshes()[1].index_count == 3u &&
+                            gpu_multi_material.submeshes()[1].material_slot == 1u,
+                            "Vulkan mesh resource preserves glTF submesh material ranges");
+
+
                         render::VulkanMeshAssetCache
                             gpu_mesh_asset_cache;
 
