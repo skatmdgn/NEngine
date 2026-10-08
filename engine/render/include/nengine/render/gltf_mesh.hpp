@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
+#include <vector>
 
 #include "nengine/render/asset_resources.hpp"
 #include "nengine/render/decoded_texture.hpp"
@@ -26,6 +28,14 @@ namespace nengine::render {
 bool decode_gltf_mesh(
     const ResolvedModelAsset& asset,
     MeshData& mesh,
+    std::string* error = nullptr);
+
+// Enumerate unique glTF materials[] indices actually referenced by mesh
+// primitives. Used by import-time subasset cooking so unused authoring
+// materials do not produce cache assets.
+bool discover_gltf_material_slots(
+    const ResolvedModelAsset& asset,
+    std::vector<std::uint32_t>& material_slots,
     std::string* error = nullptr);
 
 // Decode one glTF material's PBR base-color input into top-left-origin

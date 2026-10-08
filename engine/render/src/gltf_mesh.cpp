@@ -3794,6 +3794,153 @@ bool decode_gltf_mesh(
     return true;
 }
 
+bool discover_gltf_material_slots(
+    const ResolvedModelAsset& asset,
+    std::vector<std::uint32_t>& material_slots,
+    std::string* error) {
+
+    material_slots.clear();
+
+    if (!asset.guid.valid()) {
+        set_error(
+            error,
+            "glTF material discovery model AssetGuid is invalid");
+        return false;
+    }
+
+    GltfSource source;
+
+    if (!load_gltf_source(
+            asset,
+            source,
+            error)) {
+        return false;
+    }
+
+    JsonValue root;
+    std::string json_error;
+    JsonParser parser{
+        source.json};
+
+    if (!parser.parse(
+            root,
+            json_error) ||
+        root.kind !=
+            JsonValue::Kind::Object) {
+
+        set_error(
+            error,
+            "glTF material discovery JSON parse failed: " +
+                json_error);
+        return false;
+    }
+
+    const auto* asset_info =
+        member(
+            root,
+            "asset");
+
+    const auto version =
+        asset_info
+            ? string_value(
+                member(
+                    *asset_info,
+                    "version"))
+            : std::nullopt;
+
+    if (!version ||
+        version->rfind(
+            "2.",
+            0) != 0u) {
+
+        set_error(
+            error,
+            "glTF material discovery requires glTF 2.x");
+        return false;
+    }
+
+    const auto* meshes =
+        member(
+            root,
+            "meshes");
+
+    if (!meshes) {
+        return true;
+    }
+
+    if (meshes->kind !=
+        JsonValue::Kind::Array) {
+
+        set_error(
+            error,
+            "glTF meshes must be an array");
+        return false;
+    }
+
+    for (const auto& mesh :
+         meshes->array) {
+
+        const auto* primitives =
+            member(
+                mesh,
+                "primitives");
+
+        if (!primitives) {
+            continue;
+        }
+
+        if (primitives->kind !=
+            JsonValue::Kind::Array) {
+
+            set_error(
+                error,
+                "glTF mesh primitives must be an array");
+            return false;
+        }
+
+        for (const auto& primitive :
+             primitives->array) {
+
+            const auto material =
+                index_value(
+                    member(
+                        primitive,
+                        "material"));
+
+            if (!material) {
+                continue;
+            }
+
+            if (*material >
+                std::numeric_limits<
+                    std::uint32_t>::max()) {
+
+                set_error(
+                    error,
+                    "glTF material index exceeds NEngine slot range");
+                return false;
+            }
+
+            material_slots.push_back(
+                static_cast<
+                    std::uint32_t>(
+                        *material));
+        }
+    }
+
+    std::sort(
+        material_slots.begin(),
+        material_slots.end());
+
+    material_slots.erase(
+        std::unique(
+            material_slots.begin(),
+            material_slots.end()),
+        material_slots.end());
+
+    return true;
+}
+
 bool decode_gltf_material_base_color_texture(
     const ResolvedModelAsset& asset,
     std::size_t material_index,
