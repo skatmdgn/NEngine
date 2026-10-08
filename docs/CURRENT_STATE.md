@@ -58,7 +58,7 @@ Implemented:
 - Win32 Scene View attempts Vulkan window-context bootstrap.
 - Vulkan bootstrap success/failure is reported to Console without making Vulkan availability an editor-startup requirement.
 
-The Scene View still uses GDI by default for interactive diagnostic object/gizmo drawing. An opt-in **VK Preview** toolbar toggle now renders the actual presentation World through Vulkan when supported: it reads the active Camera plus MeshRenderer items from RenderSnapshot, resolves built-in Cube/Quad AssetGuids and supported imported glTF/GLB AssetGuids to cached GPU meshes, computes per-object MVP matrices, and submits multiple indexed draws in one render pass. Imported geometry uses an explicitly assigned .nmat texture when available; if material is unset, supported glTF/GLB first-primitive PBR base-color PNG/JPEG or linear baseColorFactor is decoded/baked and sampled automatically. Otherwise the renderer retains its diagnostic textured fallback. Turning the toggle off immediately returns to the GDI interaction view.
+The Scene View still uses GDI by default for interactive diagnostic object/gizmo drawing. An opt-in **VK Preview** toolbar toggle now renders the actual presentation World through Vulkan when supported: it reads the active Camera plus MeshRenderer items from RenderSnapshot, resolves built-in Cube/Quad AssetGuids and supported imported glTF/GLB AssetGuids to cached GPU meshes, computes per-object MVP matrices, and submits multiple indexed draws in one render pass. Imported geometry uses an explicitly assigned .nmat texture when available; if material is unset, imported glTF/GLB submeshes first resolve persistent cooked material/texture subassets per primitive material slot, with the direct glTF PBR base-color decoder retained only as a fallback. Otherwise the renderer retains its diagnostic textured fallback. Turning the toggle off immediately returns to the GDI interaction view.
 
 ## Project / Asset database
 
@@ -72,7 +72,8 @@ Implemented:
 - Extension importer registry.
 - Polling file watcher.
 - Automatic rescan and reimport for changed files.
-- Import fingerprint/cache manifest.
+- Import fingerprint/cache manifest v3.
+- Deterministic generated subasset GUIDs, persistent generated artifact lists, lazy ProjectSession GUID recovery after reopen, and stale generated artifact pruning after reimport.
 - Validated cache artifact lookup rejecting stale source/importer versions.
 - Dependency graph forward/reverse edges, plus reimport of transitive dependents after file changes.
 - Assets panel backed by AssetDatabase.
@@ -83,16 +84,17 @@ Implemented:
 - Audio source staging + WAV metadata descriptor.
   - channels, sample rate, bits/sample, data bytes.
 - Model source staging + format/source-size descriptor.
-- External .gltf sidecar BIN/image staging, AssetGuid dependency graph edges, size/timestamp import fingerprints, and watcher-triggered parent reimport; deleting/restoring a sidecar with persistent .meta triggers recovery.
+- External .gltf sidecar BIN/image staging, AssetGuid dependency graph edges, content-hash import fingerprints, percent-decoded safe local URIs, and watcher-triggered parent reimport; deletion/restoration recovers the parent even when the sidecar .meta was lost.
 - First glTF 2.0 geometry decode path:
   - .glb 2.0 JSON/BIN chunks.
   - .gltf base64 data-URI buffers.
   - external .gltf buffer/image sidecars copied into matching nested paths in the import cache, with sandboxed relative-URI checks.
   - TRIANGLES primitives.
-  - float POSITION/NORMAL/TEXCOORD_0.
-  - unsigned byte/short/int indices.
+  - float plus normalized BYTE/UNSIGNED_BYTE/SHORT/UNSIGNED_SHORT POSITION/NORMAL/TEXCOORD_0 attributes.
+  - unsigned byte/short/int indices, including sparse index overlays.
+  - sparse VEC2/VEC3 attribute overlays, including accessors with no base bufferView.
   - interleaved byteStride support.
-  - multiple mesh primitives concatenated into MeshData.
+  - multiple mesh primitives concatenated into MeshData while preserving submesh index ranges/material slots.
   - right-handed glTF -> NEngine left-handed Z reflection + winding conversion.
   - selected glTF scene node hierarchy baked into MeshData using parent/child world transforms.
   - node translation/rotation/scale and explicit column-major 4x4 matrix transforms.
@@ -100,6 +102,8 @@ Implemented:
   - repeated mesh node instances are baked as independent transformed geometry ranges.
   - cyclic/invalid node graphs and singular transforms are rejected diagnostically.
   - glTF external buffer/image path traversal and unsupported URI forms rejected.
+- Referenced glTF material slots are cooked at import time into deterministic generated Texture + .nmat subassets; a persistent model material map binds submesh material slots back to those GUIDs.
+- OBJ geometry decode with v/vt/vn, positive/negative face indices, n-gon fan triangulation, UV normalization, generated flat normals, bounds and shared MeshData/GPU-cache routing.
 - SPIR-V shader import.
   - .spv validation by size/magic.
   - .vert.spv/.frag.spv stage hints.
@@ -107,10 +111,10 @@ Implemented:
 - Automatic import feedback in Console.
 
 Not yet implemented:
-- WebP pixel decoding and production texture transcoding/mipmap/compression path.
-- Full glTF multi-primitive/multi-material cooking into independent NEngine material/texture AssetGuids, advanced PBR factors/maps, skins, morphs and sparse/quantized accessors.
-- Sidecar change detection by content hash (currently size/write timestamp), restoration without a preserved .meta GUID, encoded/remote glTF URIs and sidecars outside the glTF source directory.
-- OBJ/FBX mesh decoding/cooking.
+- WebP pixel decoding and texture compression/transcoding policy (gamma-aware CPU mip generation + Vulkan mip upload are implemented).
+- Advanced glTF PBR maps/factors beyond baked base color, plus skins and morph targets.
+- Remote/nonlocal or outside-model-directory glTF resource policy/support; local percent-encoded sidecars are implemented.
+- OBJ MTL material cooking and FBX decoding/cooking.
 - Shader source compilation (GLSL/HLSL -> SPIR-V).
 - Audio decode/stream runtime.
 - Dependency extraction from asset contents.
@@ -159,15 +163,15 @@ Implemented:
 - PNG/JPEG -> RGBA8 decoding through pinned vendored stb_image.
 - BMP 24/32-bit uncompressed true-color -> normalized top-left RGBA8 decoding.
 - TGA 24/32-bit uncompressed true-color -> normalized top-left RGBA8 decoding.
-- Per-device AssetGuid Vulkan texture/material cache that uploads decoded RGBA8 pixels and reuses matching fingerprints.
+- Per-device AssetGuid Vulkan texture/material cache that uploads decoded RGBA8 pixels, generates a complete gamma-aware mip chain, and reuses matching fingerprints.
 - First .nmat Material AssetGuid format containing a base-color Texture AssetGuid.
 - Per-device Vulkan Material AssetGuid cache resolving .nmat -> texture cache -> combined-image-sampler descriptor.
 - AssetGuid -> validated cached model metadata resolution.
-- AssetGuid + import-fingerprint decoded MeshData cache for glTF/GLB geometry.
-- Per-device AssetGuid Vulkan mesh cache reusing uploaded vertex/index buffers.
-- VK Preview can resolve imported glTF/GLB MeshRenderer.mesh GUIDs through the project cache.
+- AssetGuid + import-fingerprint decoded MeshData cache for glTF/GLB/OBJ geometry.
+- Per-device AssetGuid Vulkan mesh cache reusing uploaded vertex/index buffers while preserving submesh ranges.
+- VK Preview can resolve imported glTF/GLB/OBJ MeshRenderer.mesh GUIDs through the project cache.
 - MeshRenderer.material can resolve a .nmat AssetGuid to a real imported PNG/JPEG/BMP/TGA texture and Vulkan descriptor, with diagnostic material fallback on failure.
-- When no explicit material is assigned, GLB/glTF first-primitive PBR baseColorTexture automatically decodes a PNG/JPEG bufferView, base64 data URI or staged local external image into RGBA8 and uploads it as a sampled Vulkan material.
+- When no explicit material is assigned, glTF/GLB primitive material slots prefer import-time cooked generated .nmat/Texture subassets; PNG/JPEG bufferView, data-URI, external image and baseColorFactor paths are baked to ordinary cached texture/material artifacts. Direct glTF decode remains a compatibility fallback.
 - glTF PBR baseColorFactor: synthesizes a 1x1 sRGB texture for image-free color materials, or multiplies the image in linear space then encodes to sRGB; alpha channel is multiplied linearly.
 - Explicit .nmat overrides the automatic glTF texture; a missing/unsupported auto texture falls back to diagnostic material without repeated parsing every frame.
 - Imported mesh/material GPU caches are invalidated after asset filesystem changes.
@@ -225,7 +229,7 @@ Implemented:
 - Depth-tested pipelines with depth clear/write/LESS compare.
 
 Implemented:
-- RGBA8 Vulkan texture upload from decoded CPU pixels.
+- RGBA8 Vulkan texture upload from decoded CPU pixels with full 1x1 mip-chain generation.
 - Host-visible staging buffer -> device-local sampled VkImage.
 - Image layout transitions to shader-read-only.
 - Texture VkImageView.
@@ -243,7 +247,7 @@ Implemented:
 - Headless Vulkan CI validates texture upload, sampler creation, material descriptors, textured shader modules, a real texture-sampling graphics pipeline, .nmat -> texture descriptors and glTF auto-texture upload. CPU tests cover GLB JSON/BIN geometry plus PNG bufferView, glTF PNG data URIs, baseColorFactor and sRGB tinting, staged external .gltf BIN/PNG rendering resources, sidecar watcher invalidation/recovery and unsafe URI rejection.
 
 Not yet implemented:
-- Automatic glTF material/texture dependency cooking into NEngine material assets.
+- Advanced multi-map PBR material cooking (normal/metallic-roughness/emissive/occlusion, alpha modes, samplers).
 - Shader source compiler and reflection.
 - General descriptor/uniform binding beyond the first texture slot.
 - Vulkan Game View.
@@ -263,9 +267,10 @@ The concrete Vulkan backend currently grows beneath this contract. The long-term
 
 ## Immediate next work
 
-1. Extend the first glTF PBR base-color preview path to proper multi-material/image extraction and persistent .nmat/Texture AssetGuid cooking.
-2. Extend external glTF sidecar support to encoded URIs, outside-directory policies and stable recovery without .meta (basic same-directory staging/tracking completed).
-3. Add WebP decoding plus mipmap/compression/transcoding policy behind the decoded-texture cache.
-4. Extend glTF geometry cooking with quantized/sparse accessor support; scene-node TRS/matrix hierarchy baking is implemented.
-5. Add a shader compiler toolchain path rather than making glslang/DXC a hidden build dependency.
-6. Return to .NET hosting after the renderer/resource boundary is stable.
+1. Extend cooked materials from baked base color to normal/metallic-roughness/emissive/occlusion maps, alpha modes and sampler state.
+2. Decide and implement the explicit policy for remote/nonlocal or outside-directory glTF resources while preserving sandbox safety.
+3. Add WebP decoding plus texture compression/transcoding policy; mipmap generation/upload is already implemented.
+4. Add OBJ MTL material cooking, then choose a vendored FBX decoder strategy.
+5. Replace the GDI Scene View presentation only together with a Vulkan Editor Camera + matching picking/gizmo projection.
+6. Add a shader compiler toolchain path rather than making glslang/DXC a hidden build dependency.
+7. Return to .NET hosting after the renderer/resource boundary is stable.
