@@ -1,5 +1,6 @@
 #include "nengine/assets/import_pipeline.hpp"
 #include "nengine/assets/gltf_sidecars.hpp"
+#include "nengine/assets/obj_sidecars.hpp"
 
 #include <cctype>
 
@@ -569,6 +570,8 @@ std::string AssetImportPipeline::fingerprint(
         }
         if (extension == ".gltf") {
             stream << gltf_sidecar_fingerprint(asset.source_path);
+        } else if (extension == ".obj") {
+            stream << obj_sidecar_fingerprint(asset.source_path);
         }
     }
 
