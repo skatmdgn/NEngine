@@ -2190,11 +2190,81 @@ int main() {
                                 gltf_auto_guid) == auto_gpu_material,
                             "GLB/glTF auto material uploads first PBR base-color image as Vulkan descriptor");
 
+                        const auto multi_auto_source =
+                            material_gpu_root / "multi_auto.gltf";
+                        const auto multi_auto_descriptor =
+                            material_gpu_root / "multi_auto.nasset";
+                        const auto multi_auto_guid =
+                            assets::AssetGuid::generate();
+
+                        {
+                            std::ofstream output(
+                                multi_auto_source,
+                                std::ios::binary | std::ios::trunc);
+                            output
+                                << R"json({"asset":{"version":"2.0"},"materials":[{"pbrMetallicRoughness":{"baseColorFactor":[1,0,0,1]}},{"pbrMetallicRoughness":{"baseColorFactor":[0,0.5,1,1]}}]})json";
+                        }
+
+                        {
+                            std::ofstream output(
+                                multi_auto_descriptor,
+                                std::ios::binary | std::ios::trunc);
+                            output
+                                << "NENGINE_MODEL 1\n"
+                                << "FORMAT \".gltf\"\n"
+                                << "SOURCE \"multi_auto.gltf\"\n"
+                                << "SOURCE_BYTES "
+                                << std::filesystem::file_size(
+                                    multi_auto_source)
+                                << "\n"
+                                << "END_MODEL\n";
+                        }
+
+                        assets::CachedArtifactSet multi_auto_cached;
+                        multi_auto_cached.importer_id = "NEngine.Model";
+                        multi_auto_cached.fingerprint = "multi-auto-v1";
+                        multi_auto_cached.artifacts.push_back({
+                            multi_auto_source, "source"
+                        });
+                        multi_auto_cached.artifacts.push_back({
+                            multi_auto_descriptor, "model-descriptor"
+                        });
+
+                        const auto* auto_material_0 =
+                            gpu_material_asset_cache.load_gltf_material(
+                                multi_auto_guid,
+                                0u,
+                                multi_auto_cached,
+                                &material_asset_error);
+
+                        const auto* auto_material_1 =
+                            gpu_material_asset_cache.load_gltf_material(
+                                multi_auto_guid,
+                                1u,
+                                multi_auto_cached,
+                                &material_asset_error);
+
+                        check(
+                            auto_material_0 &&
+                            auto_material_0->valid() &&
+                            auto_material_1 &&
+                            auto_material_1->valid() &&
+                            auto_material_0 != auto_material_1 &&
+                            gpu_material_asset_cache.find_gltf_material(
+                                multi_auto_guid, 0u) == auto_material_0 &&
+                            gpu_material_asset_cache.find_gltf_material(
+                                multi_auto_guid, 1u) == auto_material_1,
+                            "automatic glTF material cache keeps independent Vulkan descriptors per material slot");
+
                         gpu_material_asset_cache.clear();
 
                         check(
                             gpu_material_asset_cache.find_gltf_base_color(
                                 gltf_auto_guid) == nullptr &&
+                            gpu_material_asset_cache.find_gltf_material(
+                                multi_auto_guid, 0u) == nullptr &&
+                            gpu_material_asset_cache.find_gltf_material(
+                                multi_auto_guid, 1u) == nullptr &&
                             gpu_material_asset_cache.find(
                                 imported_material_guid) == nullptr,
                             "automatic glTF and explicit nmat GPU materials invalidate together");
