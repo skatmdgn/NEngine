@@ -28,6 +28,7 @@
 #include "nengine/render/material_asset.hpp"
 #include "nengine/render/matrix.hpp"
 #include "nengine/render/mesh_data.hpp"
+#include "nengine/render/obj_mesh.hpp"
 #include "nengine/render/registration.hpp"
 #include "nengine/render/render_snapshot.hpp"
 #include "nengine/render/rhi.hpp"
@@ -1928,6 +1929,209 @@ int main() {
             cached_mesh_again == cached_mesh &&
             decoded_mesh_cache.size() == 1u,
             "decoded mesh cache reuses matching import fingerprint");
+
+        const auto obj_source =
+            root / "textured_quad.obj";
+
+        {
+            std::ofstream output(
+                obj_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output
+                << "# OBJ quad / n-gon test\n"
+                << "v -1 -1 1\n"
+                << "v 1 -1 1\n"
+                << "v 1 1 1\n"
+                << "v -1 1 1\n"
+                << "vt 0 0\n"
+                << "vt 1 0\n"
+                << "vt 1 1\n"
+                << "vt 0 1\n"
+                << "vn 0 0 1\n"
+                << "f 1/1/1 2/2/1 3/3/1 4/4/1\n";
+        }
+
+        render::ResolvedModelAsset
+            obj_asset;
+
+        obj_asset.guid =
+            assets::AssetGuid::generate();
+        obj_asset.metadata.format =
+            ".obj";
+        obj_asset.source_path =
+            obj_source;
+
+        render::MeshData
+            decoded_obj;
+
+        std::string obj_error;
+
+        check(
+            render::decode_obj_mesh(
+                obj_asset,
+                decoded_obj,
+                &obj_error) &&
+            decoded_obj.valid() &&
+            decoded_obj.vertices.size() == 6u &&
+            decoded_obj.indices ==
+                std::vector<std::uint32_t>{
+                    0u, 1u, 2u,
+                    3u, 4u, 5u} &&
+            decoded_obj.submeshes.size() == 1u &&
+            decoded_obj.submeshes[0].first_index == 0u &&
+            decoded_obj.submeshes[0].index_count == 6u &&
+            decoded_obj.submeshes[0].material_slot ==
+                render::kMeshMaterialUnassigned &&
+            std::abs(
+                decoded_obj.vertices[0]
+                    .position.z + 1.0f) < 0.0001f &&
+            std::abs(
+                decoded_obj.vertices[0]
+                    .normal.z + 1.0f) < 0.0001f &&
+            std::abs(
+                decoded_obj.vertices[0]
+                    .uv.y - 1.0f) < 0.0001f &&
+            std::abs(
+                decoded_obj.vertices[1]
+                    .uv.y - 0.0f) < 0.0001f &&
+            std::abs(
+                decoded_obj.bounds.center.z + 1.0f) < 0.0001f &&
+            std::abs(
+                decoded_obj.bounds.extents.x - 1.0f) < 0.0001f &&
+            std::abs(
+                decoded_obj.bounds.extents.y - 1.0f) < 0.0001f,
+            "OBJ quad n-gon triangulates with UV normal bounds and handedness conversion");
+
+        const auto negative_obj_source =
+            root / "negative_indices.obj";
+
+        {
+            std::ofstream output(
+                negative_obj_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output
+                << "v -1 -1 0\n"
+                << "v 1 -1 0\n"
+                << "v 1 1 0\n"
+                << "v -1 1 0\n"
+                << "f -4 -3 -2 -1\n";
+        }
+
+        obj_asset.source_path =
+            negative_obj_source;
+
+        render::MeshData
+            negative_obj;
+
+        obj_error.clear();
+
+        check(
+            render::decode_obj_mesh(
+                obj_asset,
+                negative_obj,
+                &obj_error) &&
+            negative_obj.valid() &&
+            negative_obj.vertices.size() == 6u &&
+            std::abs(
+                negative_obj.vertices[0]
+                    .normal.z + 1.0f) < 0.0001f &&
+            std::abs(
+                negative_obj.vertices[5]
+                    .normal.z + 1.0f) < 0.0001f,
+            "OBJ negative relative indices decode and missing normals generate flat face normals");
+
+        const auto invalid_obj_source =
+            root / "invalid_index.obj";
+
+        {
+            std::ofstream output(
+                invalid_obj_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output
+                << "v 0 0 0\n"
+                << "v 1 0 0\n"
+                << "v 0 1 0\n"
+                << "f 0 2 3\n";
+        }
+
+        obj_asset.source_path =
+            invalid_obj_source;
+        obj_error.clear();
+
+        check(
+            !render::decode_obj_mesh(
+                obj_asset,
+                negative_obj,
+                &obj_error) &&
+            obj_error.find(
+                "position index") !=
+                    std::string::npos,
+            "OBJ decoder rejects zero face indices");
+
+        const auto obj_descriptor =
+            root / "obj_model.nasset";
+
+        {
+            std::ofstream output(
+                obj_descriptor,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output
+                << "NENGINE_MODEL 1\n"
+                << "FORMAT \".obj\"\n"
+                << "SOURCE \"textured_quad.obj\"\n"
+                << "SOURCE_BYTES "
+                << std::filesystem::file_size(
+                    obj_source)
+                << "\n"
+                << "END_MODEL\n";
+        }
+
+        assets::CachedArtifactSet
+            obj_cached;
+
+        obj_cached.fingerprint =
+            "obj-v1";
+        obj_cached.importer_id =
+            "NEngine.Model";
+
+        obj_cached.artifacts.push_back({
+            obj_source,
+            "source"
+        });
+
+        obj_cached.artifacts.push_back({
+            obj_descriptor,
+            "model-descriptor"
+        });
+
+        const auto obj_guid =
+            assets::AssetGuid::generate();
+
+        render::DecodedMeshCache
+            obj_mesh_cache;
+
+        const auto* cached_obj =
+            obj_mesh_cache.load(
+                obj_guid,
+                obj_cached,
+                &obj_error);
+
+        check(
+            cached_obj &&
+            cached_obj->valid() &&
+            cached_obj->indices.size() == 6u &&
+            obj_mesh_cache.find(
+                obj_guid) ==
+                cached_obj,
+            "OBJ model artifacts resolve through common AssetGuid decoded mesh cache");
 
         const auto shader_source =
             root / "source.vert.spv";
