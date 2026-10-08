@@ -2312,6 +2312,55 @@ int main() {
                 decoded_obj.bounds.extents.y - 1.0f) < 0.0001f,
             "OBJ quad n-gon triangulates with UV normal bounds and handedness conversion");
 
+        const auto material_group_obj_source =
+            root / "material_groups.obj";
+
+        {
+            std::ofstream output(
+                material_group_obj_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output
+                << "v 0 0 0\n"
+                << "v 1 0 0\n"
+                << "v 0 1 0\n"
+                << "v 1 1 0\n"
+                << "usemtl Red\n"
+                << "f 1 2 3\n"
+                << "usemtl Blue\n"
+                << "f 2 4 3\n"
+                << "usemtl Red\n"
+                << "f 1 3 4\n";
+        }
+
+        obj_asset.source_path =
+            material_group_obj_source;
+
+        render::MeshData
+            material_group_obj;
+
+        obj_error.clear();
+
+        check(
+            render::decode_obj_mesh(
+                obj_asset,
+                material_group_obj,
+                &obj_error) &&
+            material_group_obj.valid() &&
+            material_group_obj.indices.size() == 9u &&
+            material_group_obj.submeshes.size() == 3u &&
+            material_group_obj.submeshes[0].first_index == 0u &&
+            material_group_obj.submeshes[0].index_count == 3u &&
+            material_group_obj.submeshes[0].material_slot == 0u &&
+            material_group_obj.submeshes[1].first_index == 3u &&
+            material_group_obj.submeshes[1].index_count == 3u &&
+            material_group_obj.submeshes[1].material_slot == 1u &&
+            material_group_obj.submeshes[2].first_index == 6u &&
+            material_group_obj.submeshes[2].index_count == 3u &&
+            material_group_obj.submeshes[2].material_slot == 0u,
+            "OBJ usemtl changes create contiguous submeshes while repeated material names reuse stable slots");
+
         const auto negative_obj_source =
             root / "negative_indices.obj";
 
