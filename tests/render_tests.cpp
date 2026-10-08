@@ -28,6 +28,7 @@
 #include "nengine/render/material_asset.hpp"
 #include "nengine/render/matrix.hpp"
 #include "nengine/render/mesh_data.hpp"
+#include "nengine/render/model_importer.hpp"
 #include "nengine/render/obj_mesh.hpp"
 #include "nengine/render/registration.hpp"
 #include "nengine/render/render_snapshot.hpp"
@@ -1228,6 +1229,313 @@ int main() {
                 std::vector<std::uint8_t>{
                     0u, 188u, 255u, 255u},
             "glTF material slot 1 decodes independent blue base color");
+
+        const auto cooked_cache =
+            root /
+            "cooked_multi_material";
+
+        std::error_code
+            cooked_directory_error;
+
+        std::filesystem::create_directories(
+            cooked_cache,
+            cooked_directory_error);
+
+        assets::AssetRecord
+            cooked_model_record;
+
+        cooked_model_record.guid =
+            assets::AssetGuid::generate();
+        cooked_model_record.source_path =
+            multi_material_source;
+        cooked_model_record.relative_path =
+            "multi_material_triangle.gltf";
+        cooked_model_record.importer_id =
+            "NEngine.Model";
+        cooked_model_record.file_size =
+            std::filesystem::file_size(
+                multi_material_source);
+
+        assets::ImporterDescriptor
+            cooked_model_importer{
+                "NEngine.Model",
+                1u,
+                {".gltf", ".glb"},
+                false
+            };
+
+        const assets::ImportContext
+            cooked_context{
+                &cooked_model_record,
+                &cooked_model_importer,
+                cooked_cache
+            };
+
+        const auto cooked_result =
+            render::model_asset_importer(
+                cooked_context);
+
+        const auto cooked_material_0 =
+            assets::derive_subasset_guid(
+                cooked_model_record.guid,
+                "gltf-material",
+                0u);
+
+        const auto cooked_material_1 =
+            assets::derive_subasset_guid(
+                cooked_model_record.guid,
+                "gltf-material",
+                1u);
+
+        const auto cooked_texture_0 =
+            assets::derive_subasset_guid(
+                cooked_model_record.guid,
+                "gltf-base-color",
+                0u);
+
+        const auto cooked_texture_1 =
+            assets::derive_subasset_guid(
+                cooked_model_record.guid,
+                "gltf-base-color",
+                1u);
+
+        check(
+            cooked_result.success &&
+            cooked_result.subassets.size() == 4u,
+            "render-aware glTF importer cooks two materials into texture/material generated subassets");
+
+        const auto find_subasset =
+            [&](assets::AssetGuid guid)
+                -> const assets::GeneratedSubasset* {
+
+                const auto it =
+                    std::find_if(
+                        cooked_result.subassets.begin(),
+                        cooked_result.subassets.end(),
+                        [&](const auto& subasset) {
+                            return
+                                subasset.guid ==
+                                guid;
+                        });
+
+                return it ==
+                    cooked_result.subassets.end()
+                    ? nullptr
+                    : &*it;
+            };
+
+        const auto* cooked_material_subasset_0 =
+            find_subasset(
+                cooked_material_0);
+
+        const auto* cooked_material_subasset_1 =
+            find_subasset(
+                cooked_material_1);
+
+        const auto* cooked_texture_subasset_0 =
+            find_subasset(
+                cooked_texture_0);
+
+        const auto* cooked_texture_subasset_1 =
+            find_subasset(
+                cooked_texture_1);
+
+        check(
+            cooked_material_subasset_0 &&
+            cooked_material_subasset_1 &&
+            cooked_texture_subasset_0 &&
+            cooked_texture_subasset_1,
+            "cooked glTF subasset GUIDs are deterministic and independently addressable");
+
+        assets::CachedArtifactSet
+            cooked_parent_artifacts;
+
+        cooked_parent_artifacts.fingerprint =
+            "cooked-parent";
+        cooked_parent_artifacts.importer_id =
+            "NEngine.Model";
+        cooked_parent_artifacts.importer_version =
+            1u;
+        cooked_parent_artifacts.artifacts =
+            cooked_result.artifacts;
+
+        check(
+            render::find_cooked_model_material(
+                cooked_parent_artifacts,
+                0u) ==
+                std::optional<
+                    assets::AssetGuid>{
+                        cooked_material_0} &&
+            render::find_cooked_model_material(
+                cooked_parent_artifacts,
+                1u) ==
+                std::optional<
+                    assets::AssetGuid>{
+                        cooked_material_1},
+            "cooked model material map resolves each primitive material slot to stable Material GUID");
+
+        if (cooked_material_subasset_0 &&
+            cooked_material_subasset_1) {
+
+            assets::CachedArtifactSet
+                material_artifacts_0;
+
+            material_artifacts_0
+                .fingerprint =
+                "material-0";
+            material_artifacts_0
+                .importer_id =
+                "NEngine.Material";
+            material_artifacts_0
+                .importer_version =
+                1u;
+            material_artifacts_0
+                .artifacts =
+                cooked_material_subasset_0
+                    ->artifacts;
+
+            assets::CachedArtifactSet
+                material_artifacts_1 =
+                    material_artifacts_0;
+
+            material_artifacts_1
+                .fingerprint =
+                "material-1";
+            material_artifacts_1
+                .artifacts =
+                cooked_material_subasset_1
+                    ->artifacts;
+
+            const auto material_0 =
+                render::resolve_material_asset(
+                    cooked_material_0,
+                    material_artifacts_0,
+                    &resolve_error);
+
+            const auto material_1 =
+                render::resolve_material_asset(
+                    cooked_material_1,
+                    material_artifacts_1,
+                    &resolve_error);
+
+            check(
+                material_0 &&
+                material_1 &&
+                material_0->material
+                    .base_color_texture ==
+                    cooked_texture_0 &&
+                material_1->material
+                    .base_color_texture ==
+                    cooked_texture_1,
+                "cooked glTF .nmat subassets reference their deterministic Texture subassets");
+        }
+
+        if (cooked_texture_subasset_0 &&
+            cooked_texture_subasset_1) {
+
+            assets::CachedArtifactSet
+                texture_artifacts_0;
+
+            texture_artifacts_0
+                .fingerprint =
+                "texture-0";
+            texture_artifacts_0
+                .importer_id =
+                "NEngine.Texture";
+            texture_artifacts_0
+                .importer_version =
+                1u;
+            texture_artifacts_0
+                .artifacts =
+                cooked_texture_subasset_0
+                    ->artifacts;
+
+            assets::CachedArtifactSet
+                texture_artifacts_1 =
+                    texture_artifacts_0;
+
+            texture_artifacts_1
+                .fingerprint =
+                "texture-1";
+            texture_artifacts_1
+                .artifacts =
+                cooked_texture_subasset_1
+                    ->artifacts;
+
+            const auto texture_asset_0 =
+                render::resolve_texture_asset(
+                    cooked_texture_0,
+                    texture_artifacts_0,
+                    &resolve_error);
+
+            const auto texture_asset_1 =
+                render::resolve_texture_asset(
+                    cooked_texture_1,
+                    texture_artifacts_1,
+                    &resolve_error);
+
+            render::DecodedTextureData
+                cooked_pixels_0;
+
+            render::DecodedTextureData
+                cooked_pixels_1;
+
+            check(
+                texture_asset_0 &&
+                texture_asset_1 &&
+                render::decode_texture_rgba8(
+                    *texture_asset_0,
+                    cooked_pixels_0,
+                    &resolve_error) &&
+                render::decode_texture_rgba8(
+                    *texture_asset_1,
+                    cooked_pixels_1,
+                    &resolve_error) &&
+                cooked_pixels_0.rgba8 ==
+                    std::vector<std::uint8_t>{
+                        255u, 0u, 0u, 255u} &&
+                cooked_pixels_1.rgba8 ==
+                    std::vector<std::uint8_t>{
+                        0u, 188u, 255u, 255u},
+                "cooked glTF Texture subassets preserve baseColorFactor pixels through normal texture resolver");
+        }
+
+        const auto second_cooked_cache =
+            root /
+            "cooked_multi_material_second";
+
+        std::filesystem::create_directories(
+            second_cooked_cache,
+            cooked_directory_error);
+
+        const assets::ImportContext
+            second_cooked_context{
+                &cooked_model_record,
+                &cooked_model_importer,
+                second_cooked_cache
+            };
+
+        const auto second_cooked_result =
+            render::model_asset_importer(
+                second_cooked_context);
+
+        check(
+            second_cooked_result.success &&
+            second_cooked_result.subassets.size() ==
+                cooked_result.subassets.size() &&
+            std::equal(
+                cooked_result.subassets.begin(),
+                cooked_result.subassets.end(),
+                second_cooked_result.subassets.begin(),
+                [](const auto& left,
+                   const auto& right) {
+                    return
+                        left.guid ==
+                        right.guid &&
+                        left.importer_id ==
+                        right.importer_id;
+                }),
+            "reimporting the same glTF preserves all generated material and texture GUIDs");
 
         const auto sparse_source =
             root / "sparse_position_triangle.gltf";
