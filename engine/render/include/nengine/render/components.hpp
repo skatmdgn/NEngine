@@ -38,6 +38,15 @@ struct Light {
     bool cast_shadows{true};
 };
 
+struct SpriteRenderer {
+    bool enabled{true};
+    assets::AssetGuid texture{};
+    float pixels_per_unit{100.0f};
+    std::int64_t sort_order{0};
+    bool flip_x{false};
+    bool flip_y{false};
+};
+
 struct MeshRenderer {
     bool enabled{true};
     assets::AssetGuid mesh{};
@@ -56,6 +65,10 @@ inline core::ComponentTypeId light_type() noexcept {
 
 inline core::ComponentTypeId mesh_renderer_type() noexcept {
     return core::ComponentRegistry::stable_id("NEngine.MeshRenderer");
+}
+
+inline core::ComponentTypeId sprite_renderer_type() noexcept {
+    return core::ComponentRegistry::stable_id("NEngine.SpriteRenderer");
 }
 
 } // namespace nengine::render
