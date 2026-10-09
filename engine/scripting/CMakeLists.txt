@@ -12,7 +12,7 @@ target_include_directories(NEngineScripting
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(NEngineScripting PUBLIC NEngineCore)
+target_link_libraries(NEngineScripting PUBLIC NEngineCore NEngineInput)
 target_compile_features(NEngineScripting PUBLIC cxx_std_20)
 
 if(MSVC)

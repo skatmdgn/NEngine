@@ -168,6 +168,9 @@ bool EditorModel::initialize_managed_runtime(
         return false;
     }
 
+    managed_runtime_.bind_input(
+        &input_state_);
+
     managed_script_system_.bind(
         &managed_runtime_);
 
@@ -204,6 +207,9 @@ bool EditorModel::reload_managed_runtime(
 
         return false;
     }
+
+    managed_runtime_.bind_input(
+        &input_state_);
 
     managed_script_system_.bind(
         &managed_runtime_);
@@ -261,6 +267,9 @@ void EditorModel::tick_runtime(
 
         if (managed_runtime_.valid()) {
             std::string script_error;
+
+            managed_runtime_.bind_input(
+                &input_state_);
 
             managed_script_system_.update(
                 *runtime,
