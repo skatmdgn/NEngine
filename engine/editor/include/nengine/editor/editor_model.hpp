@@ -1,3 +1,7 @@
+#include <filesystem>
+#include <string>
+#include <string_view>
+
 #pragma once
 
 #include "nengine/core/component_registry.hpp"
