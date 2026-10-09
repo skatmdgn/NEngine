@@ -774,11 +774,10 @@ bool ManagedProjectGenerator::generate(
         << "  </PropertyGroup>\n"
         << "  <ItemGroup>\n"
         << "    <Compile Include=\"../../Assets/Scripts/**/*.cs\" />\n"
-        << "    <Compile Include=\"NEngine.ManagedBridge.cs\" />\n"
         << "  </ItemGroup>\n"
         << "  <ItemGroup>\n"
         << "    <ProjectReference Include=\"NEngine.API.csproj\" />\n"
-        << "    <ProjectReference Include=\"NEngine.Bridge.csproj\" />\n"
+        << "    <ProjectReference Include=\"NEngine.Bridge.csproj\" ReferenceOutputAssembly=\"false\" />\n"
         << "  </ItemGroup>\n";
 
     std::ostringstream api_project;
