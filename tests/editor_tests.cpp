@@ -955,6 +955,61 @@ int main() {
 
     model.commands().clear();
 
+    const auto factory_entity =
+        world.create(
+            "Factory Target");
+
+    check(
+        model.component_factories().contains(
+            render::camera_type()) &&
+        model.component_factories().contains(
+            render::light_type()) &&
+        model.component_factories().contains(
+            render::mesh_renderer_type()) &&
+        model.component_factories().contains(
+            render::sprite_renderer_type()) &&
+        model.component_factories().contains(
+            render::sprite_animator_type()),
+        "EditorModel registers add-component factories for all native render components");
+
+    check(
+        model.commands().execute(
+            world,
+            std::make_unique<
+                editor::AddComponentCommand>(
+                    factory_entity,
+                    render::sprite_animator_type(),
+                    &model.component_factories())) &&
+        world.has_component(
+            factory_entity,
+            render::sprite_animator_type()),
+        "AddComponentCommand creates SpriteAnimator through generic factory registry");
+
+    check(
+        !model.component_factories().add(
+            world,
+            factory_entity,
+            render::sprite_animator_type()),
+        "component factory rejects duplicate component on the same entity");
+
+    check(
+        model.commands().undo(
+            world) &&
+        !world.has_component(
+            factory_entity,
+            render::sprite_animator_type()),
+        "AddComponentCommand undo removes the added component");
+
+    check(
+        model.commands().redo(
+            world) &&
+        world.has_component(
+            factory_entity,
+            render::sprite_animator_type()),
+        "AddComponentCommand redo recreates the component");
+
+    model.commands().clear();
+
     const auto sprite_entity =
         world.create("Render Sprite");
 
