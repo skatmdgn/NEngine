@@ -15,6 +15,35 @@
 
 namespace nengine::render {
 
+namespace {
+
+const VulkanGraphicsPipeline*
+select_material_pipeline(
+    const MaterialAssetData* material,
+    const VulkanGraphicsPipeline& opaque,
+    const VulkanGraphicsPipeline& double_sided,
+    const VulkanGraphicsPipeline& blend,
+    const VulkanGraphicsPipeline& blend_double_sided) noexcept {
+
+    if (!material) {
+        return &opaque;
+    }
+
+    if (material->alpha_mode ==
+        MaterialAlphaMode::Blend) {
+
+        return material->double_sided
+            ? &blend_double_sided
+            : &blend;
+    }
+
+    return material->double_sided
+        ? &double_sided
+        : &opaque;
+}
+
+} // namespace
+
 VulkanDiagnosticScene::~VulkanDiagnosticScene() {
     shutdown();
 }
@@ -144,6 +173,77 @@ bool VulkanDiagnosticScene::initialize(
         diagnostic_ =
             "diagnostic textured graphics pipeline failed: " +
             pipeline_.diagnostic();
+
+        shutdown();
+        return false;
+    }
+
+    VulkanGraphicsPipelineOptions
+        double_sided_options;
+
+    double_sided_options.back_face_culling =
+        false;
+
+    if (!double_sided_pipeline_.create(
+            context.device(),
+            context.render_targets()
+                .render_pass_resource(),
+            vertex_shader_,
+            fragment_shader_,
+            material_,
+            double_sided_options)) {
+
+        diagnostic_ =
+            "double-sided textured graphics pipeline failed: " +
+            double_sided_pipeline_.diagnostic();
+
+        shutdown();
+        return false;
+    }
+
+    VulkanGraphicsPipelineOptions
+        blend_options;
+
+    blend_options.depth_test = true;
+    blend_options.depth_write = false;
+    blend_options.alpha_blend = true;
+    blend_options.back_face_culling = true;
+
+    if (!blend_pipeline_.create(
+            context.device(),
+            context.render_targets()
+                .render_pass_resource(),
+            vertex_shader_,
+            fragment_shader_,
+            material_,
+            blend_options)) {
+
+        diagnostic_ =
+            "alpha-blended textured graphics pipeline failed: " +
+            blend_pipeline_.diagnostic();
+
+        shutdown();
+        return false;
+    }
+
+    auto blend_double_sided_options =
+        blend_options;
+
+    blend_double_sided_options
+        .back_face_culling = false;
+
+    if (!blend_double_sided_pipeline_.create(
+            context.device(),
+            context.render_targets()
+                .render_pass_resource(),
+            vertex_shader_,
+            fragment_shader_,
+            material_,
+            blend_double_sided_options)) {
+
+        diagnostic_ =
+            "double-sided alpha-blended graphics pipeline failed: " +
+            blend_double_sided_pipeline_.diagnostic();
 
         shutdown();
         return false;
@@ -387,6 +487,9 @@ bool VulkanDiagnosticScene::present_world(
         const VulkanMaterialResource*
             explicit_material = nullptr;
 
+        const MaterialAssetData*
+            explicit_material_data = nullptr;
+
         if (explicit_material_requested) {
             explicit_material =
                 imported_material_cache_.find(
@@ -419,6 +522,11 @@ bool VulkanDiagnosticScene::present_world(
             }
 
             if (explicit_material) {
+                explicit_material_data =
+                    imported_material_cache_
+                        .find_material_data(
+                            item.renderer.material);
+
                 ++imported_materials;
             } else {
                 ++unresolved_materials;
@@ -485,6 +593,10 @@ bool VulkanDiagnosticScene::present_world(
                         ? explicit_material
                         : &material_;
 
+            const MaterialAssetData*
+                draw_material_data =
+                    explicit_material_data;
+
             if (!explicit_material_requested &&
                 imported &&
                 submesh.material_slot !=
@@ -510,6 +622,12 @@ bool VulkanDiagnosticScene::present_world(
 
                         const auto cooked_guid =
                             cooked->second;
+
+                        const MaterialAssetData*
+                            cooked_material_data =
+                                imported_material_cache_
+                                    .find_material_data(
+                                        cooked_guid);
                         automatic =
                             imported_material_cache_
                                 .find(
@@ -531,6 +649,11 @@ bool VulkanDiagnosticScene::present_world(
                                             *cooked_artifacts,
                                             asset_resolver,
                                             &material_error);
+
+                                cooked_material_data =
+                                    imported_material_cache_
+                                        .find_material_data(
+                                            cooked_guid);
 
                                 if (!automatic &&
                                     !material_error.empty()) {
@@ -583,6 +706,9 @@ bool VulkanDiagnosticScene::present_world(
                         automatic;
 
                     if (used_cooked) {
+                        draw_material_data =
+                            cooked_material_data;
+
                         ++cooked_materials;
                     } else {
                         ++gltf_auto_materials;
@@ -592,8 +718,16 @@ bool VulkanDiagnosticScene::present_world(
                 }
             }
 
+            const auto* draw_pipeline =
+                select_material_pipeline(
+                    draw_material_data,
+                    pipeline_,
+                    double_sided_pipeline_,
+                    blend_pipeline_,
+                    blend_double_sided_pipeline_);
+
             draws.push_back({
-                &pipeline_,
+                draw_pipeline,
                 mesh,
                 mvp,
                 draw_material,
@@ -816,6 +950,9 @@ bool VulkanDiagnosticScene::present_world(
 
 void VulkanDiagnosticScene::shutdown() noexcept {
     sprite_pipeline_.destroy();
+    blend_double_sided_pipeline_.destroy();
+    blend_pipeline_.destroy();
+    double_sided_pipeline_.destroy();
     pipeline_.destroy();
     material_.destroy();
     texture_.destroy();
