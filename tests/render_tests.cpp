@@ -3331,6 +3331,22 @@ int main() {
                                 device),
                             "Vulkan Material AssetGuid cache initializes for headless device");
 
+                        std::string sprite_texture_error;
+
+                        const auto* direct_texture_material =
+                            gpu_material_asset_cache.load_texture(
+                                material_texture_guid,
+                                material_texture_cached,
+                                &sprite_texture_error);
+
+                        check(
+                            direct_texture_material &&
+                            direct_texture_material->valid() &&
+                            gpu_material_asset_cache.find_texture(
+                                material_texture_guid) ==
+                                direct_texture_material,
+                            "SpriteRenderer Texture AssetGuid resolves directly to a Vulkan sampled material descriptor");
+
                         const auto dependency_resolver =
                             [&](
                                 assets::AssetGuid guid)
