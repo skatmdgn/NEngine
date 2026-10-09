@@ -1796,10 +1796,22 @@ int main() {
                 "gltf-base-color",
                 1u);
 
+        const auto cooked_mr_texture_0 =
+            assets::derive_subasset_guid(
+                cooked_model_record.guid,
+                "gltf-metallic-roughness",
+                0u);
+
+        const auto cooked_mr_texture_1 =
+            assets::derive_subasset_guid(
+                cooked_model_record.guid,
+                "gltf-metallic-roughness",
+                1u);
+
         check(
             cooked_result.success &&
-            cooked_result.subassets.size() == 4u,
-            "render-aware glTF importer cooks two materials into texture/material generated subassets");
+            cooked_result.subassets.size() == 6u,
+            "render-aware glTF importer cooks base-color metallic-roughness and material subassets for two materials");
 
         const auto find_subasset =
             [&](assets::AssetGuid guid)
@@ -1841,8 +1853,12 @@ int main() {
             cooked_material_subasset_0 &&
             cooked_material_subasset_1 &&
             cooked_texture_subasset_0 &&
-            cooked_texture_subasset_1,
-            "cooked glTF subasset GUIDs are deterministic and independently addressable");
+            cooked_texture_subasset_1 &&
+            find_subasset(
+                cooked_mr_texture_0) &&
+            find_subasset(
+                cooked_mr_texture_1),
+            "cooked glTF base-color metallic-roughness and material GUIDs are deterministic and independently addressable");
 
         assets::CachedArtifactSet
             cooked_parent_artifacts;
