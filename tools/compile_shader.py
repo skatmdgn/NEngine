@@ -61,7 +61,7 @@ def main() -> int:
     compiler = None
     for candidate in candidates(args.compiler):
         if candidate.is_file():
-            compiler = candidate.resolve()
+            compiler = candidate
             break
 
     if compiler is None:
