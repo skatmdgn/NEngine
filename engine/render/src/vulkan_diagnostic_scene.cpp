@@ -313,13 +313,16 @@ bool VulkanDiagnosticScene::present_world(
 
     std::vector<VulkanMeshDraw> draws;
     draws.reserve(
-        snapshot.meshes.size());
+        snapshot.meshes.size() +
+        snapshot.sprites.size());
 
     std::size_t imported_draws = 0;
+    std::size_t sprite_draws = 0;
     std::size_t imported_materials = 0;
     std::size_t cooked_materials = 0;
     std::size_t gltf_auto_materials = 0;
     std::size_t unresolved_draws = 0;
+    std::size_t unresolved_sprites = 0;
     std::size_t unresolved_materials = 0;
     std::string last_asset_error;
 
@@ -600,6 +603,139 @@ bool VulkanDiagnosticScene::present_world(
         }
     }
 
+    if (!snapshot.sprites.empty()) {
+        const auto* sprite_mesh =
+            mesh_cache_.find(
+                builtin_unit_quad_mesh_guid());
+
+        auto sprites =
+            snapshot.sprites;
+
+        std::stable_sort(
+            sprites.begin(),
+            sprites.end(),
+            [](const auto& left,
+               const auto& right) {
+                return
+                    left.renderer.sort_order <
+                    right.renderer.sort_order;
+            });
+
+        for (const auto& item :
+             sprites) {
+
+            if (!sprite_mesh ||
+                !item.renderer.texture.valid() ||
+                item.renderer.pixels_per_unit <=
+                    0.0f ||
+                !asset_resolver) {
+
+                ++unresolved_sprites;
+                continue;
+            }
+
+            const auto texture_artifacts =
+                asset_resolver(
+                    item.renderer.texture);
+
+            if (!texture_artifacts) {
+                ++unresolved_sprites;
+                continue;
+            }
+
+            std::string sprite_error;
+
+            const auto texture_asset =
+                resolve_texture_asset(
+                    item.renderer.texture,
+                    *texture_artifacts,
+                    &sprite_error);
+
+            if (!texture_asset) {
+                ++unresolved_sprites;
+
+                if (!sprite_error.empty()) {
+                    last_asset_error =
+                        std::move(
+                            sprite_error);
+                }
+
+                continue;
+            }
+
+            const VulkanMaterialResource*
+                sprite_material =
+                    imported_material_cache_
+                        .find_texture(
+                            item.renderer.texture);
+
+            if (!sprite_material) {
+                sprite_material =
+                    imported_material_cache_
+                        .load_texture(
+                            item.renderer.texture,
+                            *texture_artifacts,
+                            &sprite_error);
+            }
+
+            if (!sprite_material) {
+                ++unresolved_sprites;
+
+                if (!sprite_error.empty()) {
+                    last_asset_error =
+                        std::move(
+                            sprite_error);
+                }
+
+                continue;
+            }
+
+            const float width_units =
+                static_cast<float>(
+                    texture_asset
+                        ->metadata.width) /
+                item.renderer
+                    .pixels_per_unit;
+
+            const float height_units =
+                static_cast<float>(
+                    texture_asset
+                        ->metadata.height) /
+                item.renderer
+                    .pixels_per_unit;
+
+            const auto sprite_scale =
+                scaling_matrix({
+                    item.renderer.flip_x
+                        ? -width_units
+                        : width_units,
+                    item.renderer.flip_y
+                        ? -height_units
+                        : height_units,
+                    1.0f
+                });
+
+            const auto sprite_world =
+                multiply(
+                    item.world,
+                    sprite_scale);
+
+            draws.push_back({
+                &sprite_pipeline_,
+                sprite_mesh,
+                multiply(
+                    matrices
+                        ->view_projection,
+                    sprite_world),
+                sprite_material,
+                0u,
+                0u
+            });
+
+            ++sprite_draws;
+        }
+    }
+
     if (draws.empty()) {
         if (!context.present_clear(
                 0.08f,
@@ -613,7 +749,7 @@ bool VulkanDiagnosticScene::present_world(
         }
 
         diagnostic_ =
-            "Vulkan World preview cleared; no resolvable MeshRenderer items found";
+            "Vulkan World preview cleared; no resolvable MeshRenderer or SpriteRenderer items found";
 
         if (unresolved_draws != 0u &&
             !last_asset_error.empty()) {
@@ -645,9 +781,11 @@ bool VulkanDiagnosticScene::present_world(
             imported_materials) +
         " imported material, " +
         std::to_string(cooked_materials) +
-        " cooked glTF material, " +
+        " cooked model material, " +
         std::to_string(gltf_auto_materials) +
-        " direct glTF fallback";
+        " direct glTF fallback, " +
+        std::to_string(sprite_draws) +
+        " sprite";
 
     if (unresolved_draws != 0u) {
         diagnostic_ +=
@@ -655,6 +793,14 @@ bool VulkanDiagnosticScene::present_world(
             std::to_string(
                 unresolved_draws) +
             " unresolved mesh";
+    }
+
+    if (unresolved_sprites != 0u) {
+        diagnostic_ +=
+            ", " +
+            std::to_string(
+                unresolved_sprites) +
+            " unresolved sprite";
     }
 
     if (unresolved_materials != 0u) {
