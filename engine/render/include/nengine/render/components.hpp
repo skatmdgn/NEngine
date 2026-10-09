@@ -47,6 +47,17 @@ struct SpriteRenderer {
     bool flip_y{false};
 };
 
+struct SpriteAnimator {
+    bool enabled{true};
+    assets::AssetGuid clip{};
+    bool playing{true};
+    bool loop{true};
+    float speed{1.0f};
+
+    // Runtime-only state. Serialization intentionally restarts clips from 0.
+    float time_seconds{0.0f};
+};
+
 struct MeshRenderer {
     bool enabled{true};
     assets::AssetGuid mesh{};
@@ -69,6 +80,10 @@ inline core::ComponentTypeId mesh_renderer_type() noexcept {
 
 inline core::ComponentTypeId sprite_renderer_type() noexcept {
     return core::ComponentRegistry::stable_id("NEngine.SpriteRenderer");
+}
+
+inline core::ComponentTypeId sprite_animator_type() noexcept {
+    return core::ComponentRegistry::stable_id("NEngine.SpriteAnimator");
 }
 
 } // namespace nengine::render
