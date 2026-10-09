@@ -457,6 +457,62 @@ int main() {
                     .filename() ==
                     "IntegrationScripts.dll",
                 "real dotnet SDK builds generated gameplay assembly into deterministic output");
+
+
+            if (build.success) {
+                std::string runtime_error;
+
+                const auto runtime =
+                    discover_dotnet_host(
+                        {},
+                        &runtime_error);
+
+                check(
+                    runtime &&
+                    runtime->valid(),
+                    "real dotnet runtime host is discoverable after managed build");
+
+                if (runtime) {
+                    DotnetHost host;
+
+                    const bool initialized =
+                        host.initialize(
+                            runtime->hostfxr_path,
+                            integration_output
+                                .runtime_config_path);
+
+                    check(
+                        initialized,
+                        "hostfxr initializes generated gameplay runtime configuration");
+
+                    if (initialized) {
+                        void* raw =
+                            host.load_unmanaged_entry(
+                                build.plan
+                                    .assembly_path,
+                                "NEngine.Internal.NativeBridge, IntegrationScripts",
+                                "GetAbiVersion");
+
+                        check(
+                            raw != nullptr,
+                            "hostfxr resolves generated UnmanagedCallersOnly bridge entry");
+
+                        if (raw) {
+                            using AbiFn =
+                                int (*)();
+
+                            const auto abi =
+                                reinterpret_cast<
+                                    AbiFn>(
+                                        raw)();
+
+                            check(
+                                abi == 1,
+                                "managed gameplay assembly executes bridge ABI v1 through hostfxr");
+                        }
+                    }
+                }
+            }
         }
     }
 
