@@ -596,6 +596,195 @@ bool register_render_integration(
         "Receive Shadows",
         &render::MeshRenderer::receive_shadows);
 
+    const auto sprite_type =
+        render::sprite_renderer_type();
+
+    auto register_sprite_bool =
+        [&properties, sprite_type, &ok](
+            const char* name,
+            auto member) {
+
+            ok =
+                properties.register_property(
+                    sprite_type,
+                    name,
+                    core::PropertyKind::Boolean,
+                    [sprite_type, member](
+                        const core::World& world,
+                        core::Entity entity) {
+                        return read_component_property<
+                            render::SpriteRenderer>(
+                                world,
+                                entity,
+                                sprite_type,
+                                [member](
+                                    const render::SpriteRenderer& renderer) {
+                                    return core::PropertyValue{
+                                        renderer.*member};
+                                });
+                    },
+                    [sprite_type, member](
+                        core::World& world,
+                        core::Entity entity,
+                        const core::PropertyValue& value) {
+                        return write_component_property<
+                            render::SpriteRenderer>(
+                                world,
+                                entity,
+                                sprite_type,
+                                value,
+                                [member](
+                                    render::SpriteRenderer& renderer,
+                                    const core::PropertyValue& raw) {
+                                    const auto* typed =
+                                        std::get_if<bool>(&raw);
+                                    if (!typed) return false;
+                                    renderer.*member =
+                                        *typed;
+                                    return true;
+                                });
+                    }) &&
+                ok;
+        };
+
+    register_sprite_bool(
+        "Enabled",
+        &render::SpriteRenderer::enabled);
+
+    register_sprite_bool(
+        "Flip X",
+        &render::SpriteRenderer::flip_x);
+
+    register_sprite_bool(
+        "Flip Y",
+        &render::SpriteRenderer::flip_y);
+
+    ok =
+        properties.register_property(
+            sprite_type,
+            "Texture",
+            core::PropertyKind::AssetReference,
+            [sprite_type](
+                const core::World& world,
+                core::Entity entity) {
+                return read_component_property<
+                    render::SpriteRenderer>(
+                        world,
+                        entity,
+                        sprite_type,
+                        [](const render::SpriteRenderer& renderer) {
+                            return core::PropertyValue{
+                                asset_reference_text(
+                                    renderer.texture)};
+                        });
+            },
+            [sprite_type](
+                core::World& world,
+                core::Entity entity,
+                const core::PropertyValue& value) {
+                return write_component_property<
+                    render::SpriteRenderer>(
+                        world,
+                        entity,
+                        sprite_type,
+                        value,
+                        [](render::SpriteRenderer& renderer,
+                           const core::PropertyValue& raw) {
+                            assets::AssetGuid parsed;
+                            if (!parse_asset_reference(
+                                    raw,
+                                    parsed)) {
+                                return false;
+                            }
+                            renderer.texture =
+                                parsed;
+                            return true;
+                        });
+            }) && ok;
+
+    ok =
+        properties.register_property(
+            sprite_type,
+            "Pixels Per Unit",
+            core::PropertyKind::Float,
+            [sprite_type](
+                const core::World& world,
+                core::Entity entity) {
+                return read_component_property<
+                    render::SpriteRenderer>(
+                        world,
+                        entity,
+                        sprite_type,
+                        [](const render::SpriteRenderer& renderer) {
+                            return core::PropertyValue{
+                                static_cast<double>(
+                                    renderer.pixels_per_unit)};
+                        });
+            },
+            [sprite_type](
+                core::World& world,
+                core::Entity entity,
+                const core::PropertyValue& value) {
+                return write_component_property<
+                    render::SpriteRenderer>(
+                        world,
+                        entity,
+                        sprite_type,
+                        value,
+                        [](render::SpriteRenderer& renderer,
+                           const core::PropertyValue& raw) {
+                            const auto* typed =
+                                std::get_if<double>(&raw);
+                            if (!typed ||
+                                *typed <= 0.0) {
+                                return false;
+                            }
+                            renderer.pixels_per_unit =
+                                static_cast<float>(
+                                    *typed);
+                            return true;
+                        });
+            }) && ok;
+
+    ok =
+        properties.register_property(
+            sprite_type,
+            "Sort Order",
+            core::PropertyKind::Integer,
+            [sprite_type](
+                const core::World& world,
+                core::Entity entity) {
+                return read_component_property<
+                    render::SpriteRenderer>(
+                        world,
+                        entity,
+                        sprite_type,
+                        [](const render::SpriteRenderer& renderer) {
+                            return core::PropertyValue{
+                                renderer.sort_order};
+                        });
+            },
+            [sprite_type](
+                core::World& world,
+                core::Entity entity,
+                const core::PropertyValue& value) {
+                return write_component_property<
+                    render::SpriteRenderer>(
+                        world,
+                        entity,
+                        sprite_type,
+                        value,
+                        [](render::SpriteRenderer& renderer,
+                           const core::PropertyValue& raw) {
+                            const auto* typed =
+                                std::get_if<std::int64_t>(&raw);
+                            if (!typed) return false;
+                            renderer.sort_order =
+                                *typed;
+                            return true;
+                        });
+            }) && ok;
+
     return ok;
 }
 
