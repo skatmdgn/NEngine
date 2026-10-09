@@ -134,7 +134,7 @@ int main() {
             "<TargetFramework>net8.0</TargetFramework>") !=
                 std::string::npos &&
         project.find(
-            "NEngine.ManagedBridge.cs") !=
+            "NEngine.ManagedBridge.cs") ==
                 std::string::npos &&
         project.find(
             "NEngine.API.csproj") !=
@@ -143,12 +143,15 @@ int main() {
             "NEngine.Bridge.csproj") !=
                 std::string::npos &&
         project.find(
+            "ReferenceOutputAssembly=\"false\"") !=
+                std::string::npos &&
+        project.find(
             "<Compile Include=\"NEngine.API.cs\"") ==
                 std::string::npos &&
         project.find(
             "GenerateRuntimeConfigurationFiles") !=
                 std::string::npos,
-        "gameplay csproj targets hostable net8 and references dedicated NEngine API project");
+        "gameplay csproj compiles only user scripts and references API while building Bridge out-of-band");
 
     const auto api_project =
         read_all(
