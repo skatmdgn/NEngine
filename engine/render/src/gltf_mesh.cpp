@@ -3941,6 +3941,608 @@ bool discover_gltf_material_slots(
     return true;
 }
 
+
+bool decode_gltf_texture_info_image(
+    const JsonValue& root,
+    const GltfSource& source,
+    const std::filesystem::path& source_path,
+    const JsonValue& texture_info,
+    DecodedTextureColorSpace color_space,
+    DecodedTextureData& texture,
+    std::string* error) {
+
+    texture = {};
+
+    if (texture_info.kind !=
+        JsonValue::Kind::Object) {
+
+        set_error(
+            error,
+            "glTF texture info must be an object");
+        return false;
+    }
+
+    const auto texture_index =
+        index_value(
+            member(
+                texture_info,
+                "index"));
+
+    const auto* textures =
+        member(
+            root,
+            "textures");
+
+    if (!texture_index ||
+        !textures ||
+        textures->kind !=
+            JsonValue::Kind::Array ||
+        *texture_index >=
+            textures->array.size()) {
+
+        set_error(
+            error,
+            "glTF texture info index is unavailable");
+        return false;
+    }
+
+    const auto image_index =
+        index_value(
+            member(
+                textures->array[
+                    *texture_index],
+                "source"));
+
+    const auto* images =
+        member(
+            root,
+            "images");
+
+    if (!image_index ||
+        !images ||
+        images->kind !=
+            JsonValue::Kind::Array ||
+        *image_index >=
+            images->array.size()) {
+
+        set_error(
+            error,
+            "glTF texture image source is unavailable");
+        return false;
+    }
+
+    const auto& image =
+        images->array[
+            *image_index];
+
+    const auto mime =
+        string_value(
+            member(
+                image,
+                "mimeType"));
+
+    if (mime &&
+        *mime != "image/png" &&
+        *mime != "image/jpeg") {
+
+        set_error(
+            error,
+            "glTF cooked PBR image must be PNG or JPEG");
+        return false;
+    }
+
+    std::vector<std::uint8_t>
+        image_bytes;
+
+    const auto image_view =
+        index_value(
+            member(
+                image,
+                "bufferView"));
+
+    const auto image_uri =
+        string_value(
+            member(
+                image,
+                "uri"));
+
+    if (image_view) {
+        if (!mime) {
+            set_error(
+                error,
+                "glTF bufferView image requires mimeType");
+            return false;
+        }
+
+        std::vector<BufferView>
+            views;
+
+        std::vector<
+            std::vector<std::uint8_t>>
+            buffers;
+
+        if (!parse_buffer_views(
+                root,
+                views,
+                error) ||
+            !load_buffers(
+                root,
+                source,
+                source_path,
+                buffers,
+                error)) {
+
+            return false;
+        }
+
+        if (*image_view >=
+            views.size()) {
+
+            set_error(
+                error,
+                "glTF image bufferView index is invalid");
+            return false;
+        }
+
+        const auto& view =
+            views[
+                *image_view];
+
+        if (view.buffer >=
+                buffers.size() ||
+            view.offset >
+                buffers[view.buffer]
+                    .size() ||
+            view.length >
+                buffers[view.buffer]
+                    .size() -
+                view.offset) {
+
+            set_error(
+                error,
+                "glTF image bufferView is outside its buffer");
+            return false;
+        }
+
+        const auto& bytes =
+            buffers[
+                view.buffer];
+
+        image_bytes.assign(
+            bytes.begin() +
+                static_cast<
+                    std::ptrdiff_t>(
+                        view.offset),
+            bytes.begin() +
+                static_cast<
+                    std::ptrdiff_t>(
+                        view.offset +
+                        view.length));
+    } else if (image_uri) {
+        if (image_uri->rfind(
+                "data:",
+                0) == 0u) {
+
+            const auto comma =
+                image_uri->find(',');
+
+            if (comma ==
+                    std::string::npos ||
+                image_uri
+                    ->substr(
+                        0,
+                        comma)
+                    .find(";base64") ==
+                    std::string::npos) {
+
+                set_error(
+                    error,
+                    "glTF image data URI must be base64");
+                return false;
+            }
+
+            if (!decode_base64(
+                    std::string_view{
+                        *image_uri}
+                        .substr(
+                            comma + 1u),
+                    image_bytes,
+                    error)) {
+
+                return false;
+            }
+        } else {
+            const auto path =
+                gltf_sidecar_path(
+                    source_path,
+                    *image_uri,
+                    error);
+
+            if (!path ||
+                !read_binary_file(
+                    *path,
+                    image_bytes,
+                    error)) {
+
+                return false;
+            }
+        }
+    } else {
+        set_error(
+            error,
+            "glTF image has neither bufferView nor URI");
+        return false;
+    }
+
+    if (image_bytes.empty() ||
+        image_bytes.size() >
+            INT_MAX) {
+
+        set_error(
+            error,
+            "glTF cooked PBR image payload is invalid");
+        return false;
+    }
+
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+
+    stbi_uc* pixels =
+        stbi_load_from_memory(
+            image_bytes.data(),
+            static_cast<int>(
+                image_bytes.size()),
+            &width,
+            &height,
+            &channels,
+            4);
+
+    if (!pixels ||
+        width <= 0 ||
+        height <= 0 ||
+        static_cast<std::uint64_t>(
+            width) *
+            static_cast<std::uint64_t>(
+                height) >
+            std::numeric_limits<
+                std::size_t>::max() /
+            4u) {
+
+        if (pixels) {
+            stbi_image_free(
+                pixels);
+        }
+
+        set_error(
+            error,
+            "glTF cooked PBR image decode failed");
+        return false;
+    }
+
+    texture.width =
+        static_cast<std::uint32_t>(
+            width);
+
+    texture.height =
+        static_cast<std::uint32_t>(
+            height);
+
+    texture.color_space =
+        color_space;
+
+    texture.rgba8.assign(
+        pixels,
+        pixels +
+            static_cast<std::size_t>(
+                width) *
+            static_cast<std::size_t>(
+                height) *
+            4u);
+
+    stbi_image_free(
+        pixels);
+
+    return true;
+}
+
+bool decode_gltf_pbr_material(
+    const ResolvedModelAsset& asset,
+    std::size_t material_index,
+    GltfPbrMaterialCookData& material,
+    std::string* error) {
+
+    material = {};
+
+    if (!asset.guid.valid()) {
+        set_error(
+            error,
+            "glTF PBR material model AssetGuid is invalid");
+        return false;
+    }
+
+    if (!decode_gltf_material_base_color_texture(
+            asset,
+            material_index,
+            material.base_color,
+            error)) {
+
+        return false;
+    }
+
+    GltfSource source;
+
+    if (!load_gltf_source(
+            asset,
+            source,
+            error)) {
+
+        return false;
+    }
+
+    JsonValue root;
+    std::string json_error;
+
+    JsonParser parser{
+        source.json};
+
+    if (!parser.parse(
+            root,
+            json_error) ||
+        root.kind !=
+            JsonValue::Kind::Object) {
+
+        set_error(
+            error,
+            "glTF PBR material JSON parse failed: " +
+                json_error);
+        return false;
+    }
+
+    const auto* materials =
+        member(
+            root,
+            "materials");
+
+    if (!materials ||
+        materials->kind !=
+            JsonValue::Kind::Array ||
+        material_index >=
+            materials->array.size()) {
+
+        set_error(
+            error,
+            "glTF PBR material index is unavailable");
+        return false;
+    }
+
+    const auto& json_material =
+        materials->array[
+            material_index];
+
+    const auto* pbr =
+        member(
+            json_material,
+            "pbrMetallicRoughness");
+
+    const auto parse_unit_factor =
+        [&](const JsonValue* value,
+            float& target,
+            std::string_view name) {
+
+            if (!value) {
+                return true;
+            }
+
+            if (value->kind !=
+                    JsonValue::Kind::Number ||
+                !std::isfinite(
+                    value->number) ||
+                value->number < 0.0 ||
+                value->number > 1.0) {
+
+                set_error(
+                    error,
+                    "glTF " +
+                        std::string{name} +
+                        " is outside [0,1]");
+                return false;
+            }
+
+            target =
+                static_cast<float>(
+                    value->number);
+
+            return true;
+        };
+
+    if (!parse_unit_factor(
+            pbr
+                ? member(
+                    *pbr,
+                    "metallicFactor")
+                : nullptr,
+            material.metallic_factor,
+            "metallicFactor") ||
+        !parse_unit_factor(
+            pbr
+                ? member(
+                    *pbr,
+                    "roughnessFactor")
+                : nullptr,
+            material.roughness_factor,
+            "roughnessFactor")) {
+
+        return false;
+    }
+
+    if (const auto* emissive =
+            member(
+                json_material,
+                "emissiveFactor")) {
+
+        if (emissive->kind !=
+                JsonValue::Kind::Array ||
+            emissive->array.size() !=
+                3u) {
+
+            set_error(
+                error,
+                "glTF emissiveFactor must contain three values");
+            return false;
+        }
+
+        float* targets[] = {
+            &material.emissive_factor.x,
+            &material.emissive_factor.y,
+            &material.emissive_factor.z
+        };
+
+        for (std::size_t i = 0u;
+             i < 3u;
+             ++i) {
+
+            const auto& value =
+                emissive->array[i];
+
+            if (value.kind !=
+                    JsonValue::Kind::Number ||
+                !std::isfinite(
+                    value.number) ||
+                value.number < 0.0 ||
+                value.number > 1.0) {
+
+                set_error(
+                    error,
+                    "glTF emissiveFactor component is outside [0,1]");
+                return false;
+            }
+
+            *targets[i] =
+                static_cast<float>(
+                    value.number);
+        }
+    }
+
+    if (const auto alpha_mode =
+            string_value(
+                member(
+                    json_material,
+                    "alphaMode"))) {
+
+        if (*alpha_mode ==
+            "OPAQUE") {
+            material.alpha_mode =
+                MaterialAlphaMode::Opaque;
+        } else if (*alpha_mode ==
+                   "MASK") {
+            material.alpha_mode =
+                MaterialAlphaMode::Mask;
+        } else if (*alpha_mode ==
+                   "BLEND") {
+            material.alpha_mode =
+                MaterialAlphaMode::Blend;
+        } else {
+            set_error(
+                error,
+                "glTF alphaMode is unsupported");
+            return false;
+        }
+    }
+
+    if (!parse_unit_factor(
+            member(
+                json_material,
+                "alphaCutoff"),
+            material.alpha_cutoff,
+            "alphaCutoff")) {
+
+        return false;
+    }
+
+    if (const auto* double_sided =
+            member(
+                json_material,
+                "doubleSided")) {
+
+        if (double_sided->kind !=
+            JsonValue::Kind::Boolean) {
+
+            set_error(
+                error,
+                "glTF doubleSided must be boolean");
+            return false;
+        }
+
+        material.double_sided =
+            double_sided->boolean;
+    }
+
+    const auto decode_optional =
+        [&](const JsonValue* texture_info,
+            DecodedTextureColorSpace color_space,
+            std::optional<
+                DecodedTextureData>& target) {
+
+            if (!texture_info) {
+                target.reset();
+                return true;
+            }
+
+            DecodedTextureData decoded;
+
+            if (!decode_gltf_texture_info_image(
+                    root,
+                    source,
+                    asset.source_path,
+                    *texture_info,
+                    color_space,
+                    decoded,
+                    error)) {
+
+                return false;
+            }
+
+            target =
+                std::move(
+                    decoded);
+
+            return true;
+        };
+
+    if (!decode_optional(
+            member(
+                json_material,
+                "normalTexture"),
+            DecodedTextureColorSpace::Linear,
+            material.normal) ||
+        !decode_optional(
+            pbr
+                ? member(
+                    *pbr,
+                    "metallicRoughnessTexture")
+                : nullptr,
+            DecodedTextureColorSpace::Linear,
+            material.metallic_roughness) ||
+        !decode_optional(
+            member(
+                json_material,
+                "emissiveTexture"),
+            DecodedTextureColorSpace::SRgb,
+            material.emissive) ||
+        !decode_optional(
+            member(
+                json_material,
+                "occlusionTexture"),
+            DecodedTextureColorSpace::Linear,
+            material.occlusion)) {
+
+        return false;
+    }
+
+    return true;
+}
+
 bool decode_gltf_material_base_color_texture(
     const ResolvedModelAsset& asset,
     std::size_t material_index,
