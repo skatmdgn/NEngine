@@ -239,6 +239,54 @@ VulkanMaterialAssetCache::find(
 }
 
 const VulkanMaterialResource*
+VulkanMaterialAssetCache::load_texture(
+    assets::AssetGuid texture_guid,
+    const assets::CachedArtifactSet&
+        texture_artifacts,
+    std::string* error) {
+
+    if (!ready() ||
+        !texture_guid.valid()) {
+
+        set_error(
+            error,
+            "direct texture material cache is not ready or AssetGuid is invalid");
+        return nullptr;
+    }
+
+    const auto* texture =
+        texture_cache_.load(
+            texture_guid,
+            texture_artifacts,
+            error);
+
+    if (!texture ||
+        !texture->valid()) {
+        return nullptr;
+    }
+
+    diagnostic_ =
+        "Texture AssetGuid resolved directly to sampled Vulkan material";
+
+    return &texture->material;
+}
+
+const VulkanMaterialResource*
+VulkanMaterialAssetCache::find_texture(
+    assets::AssetGuid texture_guid) const noexcept {
+
+    const auto* texture =
+        texture_cache_.find(
+            texture_guid);
+
+    return
+        texture &&
+        texture->valid()
+        ? &texture->material
+        : nullptr;
+}
+
+const VulkanMaterialResource*
 VulkanMaterialAssetCache::find_gltf_base_color(
     assets::AssetGuid mesh_guid) const noexcept {
 

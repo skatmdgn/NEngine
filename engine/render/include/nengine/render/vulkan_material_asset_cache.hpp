@@ -49,6 +49,16 @@ public:
     const VulkanMaterialResource* find(
         assets::AssetGuid material_guid) const noexcept;
 
+    // Direct sampled-texture material path for Sprite/UI style renderers that
+    // own a Texture AssetGuid rather than a separate .nmat.
+    const VulkanMaterialResource* load_texture(
+        assets::AssetGuid texture_guid,
+        const assets::CachedArtifactSet& texture_artifacts,
+        std::string* error = nullptr);
+
+    const VulkanMaterialResource* find_texture(
+        assets::AssetGuid texture_guid) const noexcept;
+
     // Compatibility fallback for glTF/GLB assets that predate or cannot use
     // import-time cooked material subassets. Uses the first primitive's PBR
     // base-color input.
