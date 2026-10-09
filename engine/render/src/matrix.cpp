@@ -116,6 +116,13 @@ Mat4 rotation_matrix(
 
 } // namespace
 
+Mat4 scaling_matrix(
+    core::Vec3 value) noexcept {
+
+    return scale_matrix(
+        value);
+}
+
 Mat4 Mat4::identity() noexcept {
     Mat4 result{};
     result.at(0, 0) = 1.0f;

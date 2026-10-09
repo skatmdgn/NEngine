@@ -40,6 +40,9 @@ Mat4 multiply(
     const Mat4& a,
     const Mat4& b) noexcept;
 
+Mat4 scaling_matrix(
+    core::Vec3 value) noexcept;
+
 core::Vec3 transform_point(
     const Mat4& matrix,
     core::Vec3 point) noexcept;
