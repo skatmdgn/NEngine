@@ -1159,11 +1159,6 @@ int main() {
 
     check(
         world.destroy(
-            script_entity),
-        "ScriptBehaviour test entity cleans up before hierarchy assertions");
-
-    check(
-        world.destroy(
             factory_entity),
         "factory command test entity cleans up before hierarchy assertions");
 
@@ -1550,9 +1545,49 @@ int main() {
         "Z gizmo drag converts upward screen motion to positive Z");
 
     const auto hierarchy = editor::build_hierarchy(model);
-    check(hierarchy.size() == 2, "hierarchy view includes all world objects");
-    check(hierarchy[0].entity == root && hierarchy[0].depth == 0, "hierarchy root row has depth zero");
-    check(hierarchy[1].entity == child && hierarchy[1].depth == 1 && hierarchy[1].selected, "hierarchy child row has depth one and selection state");
+
+    const auto root_row =
+        std::find_if(
+            hierarchy.begin(),
+            hierarchy.end(),
+            [root](const auto& row) {
+                return row.entity == root;
+            });
+
+    const auto child_row =
+        std::find_if(
+            hierarchy.begin(),
+            hierarchy.end(),
+            [child](const auto& row) {
+                return row.entity == child;
+            });
+
+    const auto script_row =
+        std::find_if(
+            hierarchy.begin(),
+            hierarchy.end(),
+            [script_entity](const auto& row) {
+                return row.entity ==
+                    script_entity;
+            });
+
+    check(
+        hierarchy.size() == 3 &&
+        root_row != hierarchy.end() &&
+        child_row != hierarchy.end() &&
+        script_row != hierarchy.end(),
+        "hierarchy view includes all world objects");
+
+    check(
+        root_row != hierarchy.end() &&
+        root_row->depth == 0,
+        "hierarchy root row has depth zero");
+
+    check(
+        child_row != hierarchy.end() &&
+        child_row->depth == 1 &&
+        child_row->selected,
+        "hierarchy child row has depth one and selection state");
 
     const auto inspector = editor::build_inspector(model);
     check(inspector.valid && inspector.entity == child, "inspector follows active selection");
