@@ -2,12 +2,14 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "nengine/render/asset_resources.hpp"
 #include "nengine/render/decoded_texture.hpp"
 #include "nengine/render/mesh_data.hpp"
+#include "nengine/render/material_asset.hpp"
 
 namespace nengine::render {
 
@@ -37,6 +39,31 @@ bool decode_gltf_mesh(
 bool discover_gltf_material_slots(
     const ResolvedModelAsset& asset,
     std::vector<std::uint32_t>& material_slots,
+    std::string* error = nullptr);
+
+struct GltfPbrMaterialCookData {
+    DecodedTextureData base_color{};
+    std::optional<DecodedTextureData> normal{};
+    std::optional<DecodedTextureData> metallic_roughness{};
+    std::optional<DecodedTextureData> emissive{};
+    std::optional<DecodedTextureData> occlusion{};
+
+    float metallic_factor{1.0f};
+    float roughness_factor{1.0f};
+    core::Vec3 emissive_factor{};
+    MaterialAlphaMode alpha_mode{
+        MaterialAlphaMode::Opaque};
+    float alpha_cutoff{0.5f};
+    bool double_sided{false};
+};
+
+// Decode the supported glTF 2.0 metallic-roughness material payload used by
+// import-time Material v2 cooking. Base color is always synthesized or
+// decoded; optional maps retain their glTF color-space semantics.
+bool decode_gltf_pbr_material(
+    const ResolvedModelAsset& asset,
+    std::size_t material_index,
+    GltfPbrMaterialCookData& material,
     std::string* error = nullptr);
 
 // Decode one glTF material's PBR base-color input into top-left-origin
