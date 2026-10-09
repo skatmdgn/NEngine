@@ -81,12 +81,13 @@ std::string managed_bridge(
         << "using System;\n"
         << "using System.Collections.Generic;\n"
         << "using System.Reflection;\n"
-        << "using System.Runtime.InteropServices;\n\n"
+        << "using System.Runtime.InteropServices;\n"
+        << "using System.Text;\n\n"
         << "namespace NEngine.Internal\n"
         << "{\n"
         << "    public static class NativeBridge\n"
         << "    {\n"
-        << "        public const int AbiVersion = 3;\n"
+        << "        public const int AbiVersion = 4;\n"
         << "        private static readonly Dictionary<long, NEngine.Behaviour> Instances = new();\n"
         << "        private static long _nextHandle = 1;\n\n"
         << "        [UnmanagedCallersOnly]\n"
@@ -102,7 +103,7 @@ std::string managed_bridge(
         << "                if (type == null || type.IsAbstract || !typeof(NEngine.Behaviour).IsAssignableFrom(type)) return 0;\n"
         << "                if (Activator.CreateInstance(type) is not NEngine.Behaviour instance) return 0;\n"
         << "                var gameObject = new NEngine.GameObject { name = type.Name };\n"
-        << "                instance.gameObject = gameObject;\n"
+        << "                gameObject.Attach(instance);\n"
         << "                long handle = _nextHandle++;\n"
         << "                if (handle <= 0) { _nextHandle = 2; handle = 1; }\n"
         << "                Instances[handle] = instance;\n"
@@ -192,6 +193,58 @@ std::string managed_bridge(
         << "            }\n"
         << "            catch { return -2; }\n"
         << "        }\n\n"
+        << "        [StructLayout(LayoutKind.Sequential)]\n"
+        << "        private struct NativeGameObjectState\n"
+        << "        {\n"
+        << "            public ulong entityId;\n"
+        << "            public int active;\n"
+        << "            public int nameBytes;\n"
+        << "        }\n\n"
+        << "        [UnmanagedCallersOnly]\n"
+        << "        public static int SetGameObjectState(long handle, ulong entityId, int active, nint nameUtf8)\n"
+        << "        {\n"
+        << "            if (!Instances.TryGetValue(handle, out var instance)) return -1;\n"
+        << "            try\n"
+        << "            {\n"
+        << "                string name = nameUtf8 == 0 ? string.Empty : (Marshal.PtrToStringUTF8(nameUtf8) ?? string.Empty);\n"
+        << "                instance.gameObject.SetNativeState(entityId, name, active != 0);\n"
+        << "                return 1;\n"
+        << "            }\n"
+        << "            catch { return -2; }\n"
+        << "        }\n\n"
+        << "        [UnmanagedCallersOnly]\n"
+        << "        public static int GetGameObjectState(long handle, nint statePtr)\n"
+        << "        {\n"
+        << "            if (statePtr == 0 || !Instances.TryGetValue(handle, out var instance)) return -1;\n"
+        << "            try\n"
+        << "            {\n"
+        << "                string name = instance.gameObject.name ?? string.Empty;\n"
+        << "                NativeGameObjectState state = new NativeGameObjectState\n"
+        << "                {\n"
+        << "                    entityId = instance.gameObject.instanceId,\n"
+        << "                    active = instance.gameObject.activeSelf ? 1 : 0,\n"
+        << "                    nameBytes = Encoding.UTF8.GetByteCount(name) + 1\n"
+        << "                };\n"
+        << "                Marshal.StructureToPtr(state, statePtr, false);\n"
+        << "                return 1;\n"
+        << "            }\n"
+        << "            catch { return -2; }\n"
+        << "        }\n\n"
+        << "        [UnmanagedCallersOnly]\n"
+        << "        public static int CopyGameObjectNameUtf8(long handle, nint buffer, int capacity)\n"
+        << "        {\n"
+        << "            if (!Instances.TryGetValue(handle, out var instance)) return -1;\n"
+        << "            try\n"
+        << "            {\n"
+        << "                byte[] bytes = Encoding.UTF8.GetBytes(instance.gameObject.name ?? string.Empty);\n"
+        << "                int required = bytes.Length + 1;\n"
+        << "                if (buffer == 0 || capacity < required) return -required;\n"
+        << "                if (bytes.Length != 0) Marshal.Copy(bytes, 0, buffer, bytes.Length);\n"
+        << "                Marshal.WriteByte(buffer, bytes.Length, 0);\n"
+        << "                return required;\n"
+        << "            }\n"
+        << "            catch { return -2; }\n"
+        << "        }\n\n"
 
         << "        public static string AssemblyName => \""
         << assembly_name
@@ -222,22 +275,63 @@ namespace NEngine
 
     public sealed class GameObject
     {
-        public string name { get; set; } = "GameObject";
-        public bool activeSelf { get; private set; } = true;
+        private readonly System.Collections.Generic.List<Component> _components = new();
+        private string _name = "GameObject";
+        private bool _activeSelf = true;
+        private ulong _instanceId;
+
+        public string name
+        {
+            get => _name;
+            set => _name = value ?? string.Empty;
+        }
+
+        public bool activeSelf => _activeSelf;
+        public ulong instanceId => _instanceId;
         public Transform transform { get; }
 
         public GameObject()
         {
             transform = new Transform();
-            transform.gameObject = this;
+            Attach(transform);
         }
 
-        public void SetActive(bool active) => activeSelf = active;
-        public T? GetComponent<T>() where T : Component => default;
+        internal void Attach(Component component)
+        {
+            component.gameObject = this;
+
+            if (!_components.Contains(component))
+                _components.Add(component);
+        }
+
+        internal void SetNativeState(
+            ulong instanceId,
+            string name,
+            bool active)
+        {
+            _instanceId = instanceId;
+            _name = name ?? string.Empty;
+            _activeSelf = active;
+        }
+
+        public ulong GetInstanceID() => _instanceId;
+
+        public void SetActive(bool active) =>
+            _activeSelf = active;
+
+        public T? GetComponent<T>() where T : Component
+        {
+            foreach (var component in _components)
+                if (component is T typed)
+                    return typed;
+
+            return null;
+        }
+
         public T AddComponent<T>() where T : Component, new()
         {
             var component = new T();
-            component.gameObject = this;
+            Attach(component);
             return component;
         }
     }
