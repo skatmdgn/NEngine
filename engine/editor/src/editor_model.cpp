@@ -134,11 +134,52 @@ EditorModel::EditorModel() {
             "Scripting component factories were only partially registered.");
     }
 
+    managed_script_system_.bind(
+        &managed_runtime_);
+
     console_.info(
         "Editor",
         "EditorModel initialized.");
 }
 
+
+bool EditorModel::initialize_managed_runtime(
+    const std::filesystem::path& hostfxr_path,
+    const std::filesystem::path& runtime_config_path,
+    const std::filesystem::path& assembly_path,
+    std::string_view assembly_name,
+    std::string* error) {
+
+    managed_script_system_.clear();
+    managed_runtime_.shutdown();
+
+    if (!managed_runtime_.initialize(
+            hostfxr_path,
+            runtime_config_path,
+            assembly_path,
+            assembly_name)) {
+
+        if (error) {
+            *error =
+                managed_runtime_
+                    .diagnostic();
+        }
+
+        return false;
+    }
+
+    managed_script_system_.bind(
+        &managed_runtime_);
+
+    return true;
+}
+
+void EditorModel::shutdown_managed_runtime()
+    noexcept {
+
+    managed_script_system_.clear();
+    managed_runtime_.shutdown();
+}
 
 void EditorModel::tick_runtime(
     double elapsed_seconds) {
@@ -147,6 +188,7 @@ void EditorModel::tick_runtime(
         play_session_.runtime_world();
 
     if (!runtime) {
+        managed_script_system_.clear();
         return;
     }
 
@@ -178,6 +220,25 @@ void EditorModel::tick_runtime(
                         guid);
             },
             &animation_error);
+
+
+        if (managed_runtime_.valid()) {
+            std::string script_error;
+
+            managed_script_system_.update(
+                *runtime,
+                static_cast<float>(
+                    play_session_
+                        .fixed_delta_seconds()),
+                &script_error);
+
+            if (!script_error.empty()) {
+                console_.warning(
+                    "Scripting",
+                    std::move(
+                        script_error));
+            }
+        }
     }
 
     if (!animation_error.empty()) {

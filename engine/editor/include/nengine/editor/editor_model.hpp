@@ -12,6 +12,8 @@
 #include "nengine/editor/property_access.hpp"
 #include "nengine/editor/selection.hpp"
 #include "nengine/render/sprite_animation.hpp"
+#include "nengine/scripting/managed_runtime.hpp"
+#include "nengine/scripting/script_system.hpp"
 
 namespace nengine::editor {
 
@@ -88,6 +90,19 @@ public:
 
     bool can_edit() const noexcept { return !play_session_.is_playing(); }
 
+    bool initialize_managed_runtime(
+        const std::filesystem::path& hostfxr_path,
+        const std::filesystem::path& runtime_config_path,
+        const std::filesystem::path& assembly_path,
+        std::string_view assembly_name,
+        std::string* error = nullptr);
+
+    void shutdown_managed_runtime() noexcept;
+
+    bool managed_runtime_ready() const noexcept {
+        return managed_runtime_.valid();
+    }
+
     void tick_runtime(
         double elapsed_seconds);
 
@@ -121,6 +136,13 @@ private:
     PropertyAccessRegistry property_access_{};
     render::SpriteAnimationClipCache
         sprite_animation_cache_{};
+
+    scripting::ManagedRuntime
+        managed_runtime_{};
+
+    scripting::ManagedScriptSystem
+        managed_script_system_{};
+
     std::uint64_t saved_scene_state_id_{0};
 };
 
