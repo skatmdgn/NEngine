@@ -62,9 +62,10 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Percent-encoded local sidecar URIs + content-hash invalidation + recovery without .meta
 - [ ] Explicit policy/support for nonlocal/outside-model-directory glTF resources
 - [x] OBJ mesh decoding (v/vt/vn, negative indices, n-gon triangulation, generated normals)
-- [ ] OBJ MTL material cooking
+- [x] OBJ MTL material cooking
 - [ ] FBX mesh/material decoding/cooking
-- [ ] GLSL/HLSL shader compile toolchain
+- [x] GLSL shader compile/embed toolchain + CI fixture validation
+- [ ] HLSL shader compiler validation/toolchain parity
 
 ## 0.4 — Vulkan renderer
 - [x] RHI contract
@@ -107,14 +108,25 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Cooked model material-map cache with direct-glTF fallback
 - [ ] Scene View Vulkan presentation replacement
 - [ ] Android Vulkan surface
-- [ ] PBR/lights/shadows/sprites
+- [x] SpriteRenderer Texture/PPU/sort/flip + alpha-blended Vulkan draw path
+- [x] SpriteAnimation clip importer/cache + Play Mode frame animation
+- [x] glTF PBR material v2 cooking (base/normal/metallic-roughness/emissive/occlusion + factors/alpha/double-sided)
+- [x] PBR shader source/compiler fixture foundation
+- [ ] Production lighting/shadows and full PBR validation
 
 ## 0.5 — C# scripting + IDE
-- [ ] .NET host
-- [ ] NEngine managed API assemblies
+- [x] hostfxr discovery/runtime loading foundation
 - [x] generated sln/csproj foundation
 - [x] NuGet package-reference manifest foundation
-- [ ] compile/reload
+- [x] dotnet SDK discovery + gameplay DLL/PDB build
+- [x] Editor Build C# workflow
+- [x] ScriptBehaviour native component + Scene serialization + Inspector/Add Component
+- [x] Managed Behaviour Create/Start/Update/OnDestroy lifecycle bridge
+- [x] Play Mode ScriptBehaviour execution on cloned World
+- [x] Native <-> managed Transform local position/rotation/scale synchronization
+- [ ] Dedicated NEngine managed API assembly/package (current API is generated stub)
+- [ ] Safe collectible AssemblyLoadContext hot reload/unload
+- [ ] Wider GameObject/component/input/physics/audio managed bindings
 - [ ] Visual Studio attach/debug symbols
 - [ ] coroutine/timer scheduler
 
