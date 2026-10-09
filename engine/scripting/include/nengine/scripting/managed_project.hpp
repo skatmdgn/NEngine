@@ -24,6 +24,7 @@ struct ManagedProjectOutput {
     std::filesystem::path project_path{};
     std::filesystem::path api_project_path{};
     std::filesystem::path api_stub_path{};
+    std::filesystem::path bridge_project_path{};
     std::filesystem::path bridge_path{};
     std::filesystem::path runtime_config_path{};
 };
