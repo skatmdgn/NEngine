@@ -238,20 +238,6 @@ resolve_obj_sidecar_impl(
         return std::nullopt;
     }
 
-    for (const auto& part :
-         relative) {
-
-        if (part.empty() ||
-            part == "." ||
-            part == "..") {
-
-            set_error(
-                error,
-                "OBJ sidecar path traversal is not allowed");
-            return std::nullopt;
-        }
-    }
-
     std::error_code ec;
 
     const auto root =

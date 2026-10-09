@@ -31,7 +31,8 @@ std::optional<ObjSidecar> resolve_obj_sidecar(
 
 // Collect local OBJ material-library dependencies and the diffuse textures
 // referenced by map_Kd. All dependencies must resolve to regular files below
-// the OBJ source directory; absolute/traversing paths are rejected.
+// the OBJ source directory. Relative "."/".." segments are allowed for common
+// MTL layouts, but canonical resolution must remain inside the OBJ directory.
 bool collect_obj_sidecars(
     const std::filesystem::path& source_obj,
     std::vector<ObjSidecar>& sidecars,
