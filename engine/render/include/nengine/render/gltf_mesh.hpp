@@ -66,6 +66,41 @@ bool decode_gltf_pbr_material(
     GltfPbrMaterialCookData& material,
     std::string* error = nullptr);
 
+enum class GltfMaterialTextureKind {
+    Normal,
+    MetallicRoughness,
+    Emissive,
+    Occlusion
+};
+
+struct GltfMaterialProperties {
+    float metallic_factor{1.0f};
+    float roughness_factor{1.0f};
+    float normal_scale{1.0f};
+    float occlusion_strength{1.0f};
+    core::Vec3 emissive_factor{};
+    MaterialAlphaMode alpha_mode{
+        MaterialAlphaMode::Opaque};
+    float alpha_cutoff{0.5f};
+    bool double_sided{false};
+};
+
+bool read_gltf_material_properties(
+    const ResolvedModelAsset& asset,
+    std::size_t material_index,
+    GltfMaterialProperties& properties,
+    std::string* error = nullptr);
+
+// Decode one optional non-base-color glTF material texture. A false return
+// means either the slot is absent or decode failed; error is populated only
+// for malformed/unsupported data.
+bool decode_gltf_material_texture(
+    const ResolvedModelAsset& asset,
+    std::size_t material_index,
+    GltfMaterialTextureKind kind,
+    DecodedTextureData& texture,
+    std::string* error = nullptr);
+
 // Decode one glTF material's PBR base-color input into top-left-origin
 // RGBA8. Supports image-free baseColorFactor plus PNG/JPEG bufferView,
 // data URI or staged external images.
