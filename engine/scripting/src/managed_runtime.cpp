@@ -42,6 +42,74 @@ std::string path_utf8(
 
 } // namespace
 
+std::uint64_t ManagedRuntime::callback_create(
+    void* context,
+    const char* name) {
+
+    const auto* state =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!state ||
+        !state->world) {
+        return core::Entity::invalid_value;
+    }
+
+    const auto entity =
+        state->world->create(
+            name
+                ? std::string{name}
+                : std::string{"GameObject"});
+
+    return entity.value;
+}
+
+int ManagedRuntime::callback_destroy(
+    void* context,
+    std::uint64_t entity_id) {
+
+    const auto* state =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!state ||
+        !state->world) {
+        return -1;
+    }
+
+    return state->world->destroy(
+        core::Entity{entity_id})
+        ? 1
+        : -1;
+}
+
+std::uint64_t ManagedRuntime::callback_find(
+    void* context,
+    const char* name) {
+
+    const auto* state =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!state ||
+        !state->world ||
+        !name) {
+        return core::Entity::invalid_value;
+    }
+
+    for (const auto entity :
+         state->world->entities()) {
+
+        if (state->world->name(
+                entity) ==
+            name) {
+            return entity.value;
+        }
+    }
+
+    return core::Entity::invalid_value;
+}
+
 int ManagedRuntime::callback_is_alive(
     void* context,
     std::uint64_t entity_id) {
@@ -794,9 +862,9 @@ bool ManagedRuntime::initialize(
     const int abi_version =
         abi();
 
-    if (abi_version != 6) {
+    if (abi_version != 7) {
         diagnostic_ =
-            "managed bridge ABI mismatch: expected 6, got " +
+            "managed bridge ABI mismatch: expected 7, got " +
             std::to_string(
                 abi_version);
         shutdown();
@@ -933,7 +1001,7 @@ bool ManagedRuntime::initialize(
         !count_) {
 
         diagnostic_ =
-            "managed bridge is missing one or more ABI v6 entry points";
+            "managed bridge is missing one or more ABI v7 entry points";
         shutdown();
         return false;
     }
@@ -947,6 +1015,12 @@ bool ManagedRuntime::initialize(
     NativeWorldCallbacks callbacks;
     callbacks.context =
         world_context_.get();
+    callbacks.create =
+        &ManagedRuntime::callback_create;
+    callbacks.destroy =
+        &ManagedRuntime::callback_destroy;
+    callbacks.find =
+        &ManagedRuntime::callback_find;
     callbacks.is_alive =
         &ManagedRuntime::callback_is_alive;
     callbacks.copy_name_utf8 =
@@ -1030,7 +1104,7 @@ bool ManagedRuntime::initialize(
     }
 
     diagnostic_ =
-        "managed gameplay runtime initialized; ABI v6 collectible gameplay lifecycle and native World callbacks ready";
+        "managed gameplay runtime initialized; ABI v7 collectible gameplay lifecycle native World lifetime and input callbacks ready";
 
     return true;
 }
