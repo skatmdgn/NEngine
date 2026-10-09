@@ -128,6 +128,7 @@ bool ProjectSession::open(
         assets_path_ / "Scenes",
         assets_path_ / "Scripts",
         assets_path_ / "Materials",
+        assets_path_ / "Animations",
         root_ / "ProjectSettings",
         root_ / "Packages",
         root_ / "Library",

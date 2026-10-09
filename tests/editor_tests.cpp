@@ -138,6 +138,9 @@ int main() {
         std::filesystem::exists(project_root / "Assets" / "Materials"),
         "project creates Assets/Materials");
     check(
+        std::filesystem::exists(project_root / "Assets" / "Animations"),
+        "project creates Assets/Animations");
+    check(
         std::filesystem::exists(project_root / "Library" / "Cache"),
         "project creates Library/Cache");
 
@@ -613,6 +616,82 @@ int main() {
 
     const auto persistent_material_guid =
         material_asset ? material_asset->guid : assets::AssetGuid{};
+
+    const auto animation_path =
+        project_root /
+        "Assets" /
+        "Animations" /
+        "Pulse.nspriteanim";
+
+    {
+        std::ofstream animation(
+            animation_path,
+            std::ios::binary |
+                std::ios::trunc);
+
+        animation
+            << "NENGINE_SPRITE_ANIMATION 1\n"
+            << "FRAMES 2\n"
+            << "FRAME \""
+            << texture_guid.to_string()
+            << "\" 0.05\n"
+            << "FRAME \""
+            << texture_guid.to_string()
+            << "\" 0.10\n"
+            << "END_SPRITE_ANIMATION\n";
+    }
+
+    const auto animation_poll =
+        model.project().poll_assets();
+
+    check(
+        animation_poll.changes.size() == 1u &&
+        animation_poll.imports.attempted == 1u &&
+        animation_poll.imports.imported == 1u &&
+        animation_poll.imports.failed == 0u,
+        "new nspriteanim is detected and automatically imported");
+
+    const auto* animation_asset =
+        model.project().assets().find_relative(
+            "Animations/Pulse.nspriteanim");
+
+    check(
+        animation_asset &&
+        animation_asset->importer_id ==
+            "NEngine.SpriteAnimation",
+        "nspriteanim selects SpriteAnimation importer");
+
+    if (animation_asset) {
+        const auto dependencies =
+            model.project()
+                .dependency_graph()
+                .dependencies(
+                    animation_asset->guid);
+
+        check(
+            dependencies.size() == 1u &&
+            dependencies.front() ==
+                texture_guid,
+            "SpriteAnimation importer de-duplicates and records frame texture dependency");
+
+        const auto cached_animation =
+            model.project().import_asset(
+                animation_asset->guid);
+
+        const auto cached_dependencies =
+            model.project()
+                .dependency_graph()
+                .dependencies(
+                    animation_asset->guid);
+
+        check(
+            cached_animation.success &&
+            cached_animation.cache_hit &&
+            cached_dependencies.size() == 1u &&
+            cached_dependencies.front() ==
+                texture_guid,
+            "SpriteAnimation dependency survives import cache hit");
+    }
 
     // External glTF sources should stage .bin/images as ordinary asset
     // dependencies. A sidecar edit invalidates the parent model import
