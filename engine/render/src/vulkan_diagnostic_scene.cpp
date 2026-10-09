@@ -605,6 +605,9 @@ bool VulkanDiagnosticScene::present_world(
                 const VulkanMaterialResource*
                     automatic = nullptr;
 
+                const MaterialAssetData*
+                    cooked_material_data = nullptr;
+
                 bool used_cooked =
                     false;
 
@@ -623,11 +626,10 @@ bool VulkanDiagnosticScene::present_world(
                         const auto cooked_guid =
                             cooked->second;
 
-                        const MaterialAssetData*
-                            cooked_material_data =
-                                imported_material_cache_
-                                    .find_material_data(
-                                        cooked_guid);
+                        cooked_material_data =
+                            imported_material_cache_
+                                .find_material_data(
+                                    cooked_guid);
                         automatic =
                             imported_material_cache_
                                 .find(
