@@ -119,30 +119,36 @@ namespace NEngine.Internal
     internal sealed class GameplayLoadContext : AssemblyLoadContext
     {
         private readonly AssemblyDependencyResolver _resolver;
+        private readonly Assembly _apiAssembly;
+        private readonly Assembly _bridgeAssembly;
 
-        public GameplayLoadContext(string mainAssemblyPath)
+        public GameplayLoadContext(
+            string mainAssemblyPath,
+            Assembly apiAssembly,
+            Assembly bridgeAssembly)
             : base("NEngine.Gameplay", isCollectible: true)
         {
             _resolver = new AssemblyDependencyResolver(mainAssemblyPath);
+            _apiAssembly = apiAssembly;
+            _bridgeAssembly = bridgeAssembly;
         }
 
         protected override Assembly? Load(AssemblyName assemblyName)
         {
-            if (assemblyName.Name == "NEngine.API" ||
-                assemblyName.Name == "NEngine.Bridge")
+            if (string.Equals(
+                    assemblyName.Name,
+                    _apiAssembly.GetName().Name,
+                    StringComparison.Ordinal))
             {
-                foreach (Assembly loaded in Default.Assemblies)
-                {
-                    if (string.Equals(
-                        loaded.GetName().Name,
-                        assemblyName.Name,
-                        StringComparison.Ordinal))
-                    {
-                        return loaded;
-                    }
-                }
+                return _apiAssembly;
+            }
 
-                return null;
+            if (string.Equals(
+                    assemblyName.Name,
+                    _bridgeAssembly.GetName().Name,
+                    StringComparison.Ordinal))
+            {
+                return _bridgeAssembly;
             }
 
             string? path = _resolver.ResolveAssemblyToPath(assemblyName);
@@ -194,8 +200,13 @@ namespace NEngine.Internal
                 string fullPath = Path.GetFullPath(rawPath);
                 if (!File.Exists(fullPath)) return -4;
 
-                var context = new GameplayLoadContext(fullPath);
-                Assembly assembly = context.LoadFromAssemblyPath(fullPath);
+                var context = new GameplayLoadContext(
+                    fullPath,
+                    typeof(NEngine.Behaviour).Assembly,
+                    typeof(NativeBridge).Assembly);
+
+                Assembly assembly =
+                    context.LoadFromAssemblyPath(fullPath);
                 string actualName = assembly.GetName().Name ?? string.Empty;
 
                 if (!string.Equals(actualName, expectedName, StringComparison.Ordinal))
