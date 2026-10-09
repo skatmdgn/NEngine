@@ -955,6 +955,94 @@ int main() {
 
     model.commands().clear();
 
+    const auto sprite_entity =
+        world.create("Render Sprite");
+
+    auto* sprite_renderer =
+        world.add_component<
+            render::SpriteRenderer>(
+                sprite_entity,
+                render::sprite_renderer_type());
+
+    check(
+        sprite_renderer != nullptr,
+        "EditorModel accepts registered SpriteRenderer component");
+
+    const auto sprite_texture =
+        assets::AssetGuid::generate();
+
+    if (sprite_renderer) {
+        sprite_renderer->texture =
+            sprite_texture;
+    }
+
+    model.selection().set(
+        sprite_entity);
+
+    const auto sprite_inspector =
+        editor::build_inspector(
+            model);
+
+    const auto sprite_component =
+        std::find_if(
+            sprite_inspector.components.begin(),
+            sprite_inspector.components.end(),
+            [](const auto& component) {
+                return component.type ==
+                    render::sprite_renderer_type();
+            });
+
+    check(
+        sprite_component !=
+            sprite_inspector.components.end() &&
+        sprite_component->fields.size() == 6u,
+        "generic Inspector exposes SpriteRenderer texture PPU sort and flip properties");
+
+    check(
+        model.commands().execute(
+            world,
+            std::make_unique<
+                editor::SetPropertyCommand>(
+                    &model.property_access(),
+                    sprite_entity,
+                    render::sprite_renderer_type(),
+                    "Pixels Per Unit",
+                    core::PropertyValue{
+                        32.0
+                    })),
+        "generic property command edits SpriteRenderer Pixels Per Unit");
+
+    check(
+        sprite_renderer &&
+        sprite_renderer->pixels_per_unit ==
+            32.0f,
+        "SpriteRenderer PPU edit reaches native render component");
+
+    check(
+        !model.property_access().write(
+            world,
+            sprite_entity,
+            render::sprite_renderer_type(),
+            "Pixels Per Unit",
+            core::PropertyValue{
+                0.0
+            }),
+        "SpriteRenderer generic property access rejects non-positive Pixels Per Unit");
+
+    check(
+        model.commands().undo(
+            world) &&
+        sprite_renderer &&
+        sprite_renderer->pixels_per_unit ==
+            100.0f,
+        "SpriteRenderer PPU edit supports undo");
+
+    model.commands().clear();
+
+    check(
+        world.destroy(sprite_entity),
+        "sprite render integration test entity cleanup succeeds");
+
     check(
         world.destroy(render_entity),
         "render integration test entity cleanup succeeds");
