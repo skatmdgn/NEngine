@@ -10,6 +10,7 @@
 #include "nengine/scripting/dotnet_host.hpp"
 #include "nengine/scripting/managed_build.hpp"
 #include "nengine/scripting/managed_project.hpp"
+#include "nengine/scripting/managed_runtime.hpp"
 
 namespace {
 int failures = 0;
@@ -154,9 +155,9 @@ int main() {
             "GetAbiVersion") !=
                 std::string::npos &&
         bridge.find(
-            "AbiVersion = 1") !=
+            "AbiVersion = 2") !=
                 std::string::npos,
-        "managed bridge exposes stable unmanaged ABI version entry");
+        "managed bridge exposes managed lifecycle ABI v2 entry");
 
     const auto runtime_config =
         read_all(
@@ -402,7 +403,12 @@ int main() {
 
             script
                 << "using NEngine;\n"
-                << "public class Example : Behaviour {}\n";
+                << "public class Example : Behaviour {\n"
+                << "    public int starts;\n"
+                << "    public int updates;\n"
+                << "    private void Start() { starts++; }\n"
+                << "    private void Update() { updates++; }\n"
+                << "}\n";
         }
 
         ManagedProjectConfig
@@ -473,42 +479,53 @@ int main() {
                     "real dotnet runtime host is discoverable after managed build");
 
                 if (runtime) {
-                    DotnetHost host;
+                    ManagedRuntime
+                        managed_runtime;
 
                     const bool initialized =
-                        host.initialize(
+                        managed_runtime.initialize(
                             runtime->hostfxr_path,
                             integration_output
-                                .runtime_config_path);
+                                .runtime_config_path,
+                            build.plan
+                                .assembly_path,
+                            "IntegrationScripts");
 
                     check(
                         initialized,
-                        "hostfxr initializes generated gameplay runtime configuration");
+                        "ManagedRuntime initializes generated gameplay assembly lifecycle bridge");
 
                     if (initialized) {
-                        void* raw =
-                            host.load_unmanaged_entry(
-                                build.plan
-                                    .assembly_path,
-                                "NEngine.Internal.NativeBridge, IntegrationScripts",
-                                "GetAbiVersion");
+                        check(
+                            managed_runtime.instance_count() == 0,
+                            "managed lifecycle starts with no Behaviour instances");
+
+                        const auto behaviour =
+                            managed_runtime.create_behaviour(
+                                "Example");
 
                         check(
-                            raw != nullptr,
-                            "hostfxr resolves generated UnmanagedCallersOnly bridge entry");
+                            behaviour.valid() &&
+                            managed_runtime.instance_count() == 1,
+                            "managed lifecycle creates Behaviour instance by C# type name");
 
-                        if (raw) {
-                            using AbiFn =
-                                int (*)();
-
-                            const auto abi =
-                                reinterpret_cast<
-                                    AbiFn>(
-                                        raw)();
+                        if (behaviour.valid()) {
+                            check(
+                                managed_runtime.start(
+                                    behaviour),
+                                "managed lifecycle invokes Start");
 
                             check(
-                                abi == 1,
-                                "managed gameplay assembly executes bridge ABI v1 through hostfxr");
+                                managed_runtime.update(
+                                    behaviour,
+                                    1.0f / 60.0f),
+                                "managed lifecycle invokes Update with frame delta");
+
+                            check(
+                                managed_runtime.destroy(
+                                    behaviour) &&
+                                managed_runtime.instance_count() == 0,
+                                "managed lifecycle invokes OnDestroy path and releases instance handle");
                         }
                     }
                 }
