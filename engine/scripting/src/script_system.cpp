@@ -135,6 +135,31 @@ ManagedScriptSystem::update(
 
             ++stats.created;
 
+            auto* native_transform =
+                world.transform(
+                    entity);
+
+            if (!native_transform ||
+                !runtime_->set_transform(
+                    created->second.handle,
+                    *native_transform)) {
+
+                ++stats.unresolved;
+
+                if (error) {
+                    *error =
+                        runtime_->diagnostic();
+                }
+
+                runtime_->destroy(
+                    created->second.handle);
+
+                instances_.erase(
+                    created);
+
+                continue;
+            }
+
             if (!runtime_->start(
                     created->second.handle)) {
 
@@ -156,6 +181,18 @@ ManagedScriptSystem::update(
 
             ++stats.started;
 
+            if (!runtime_->get_transform(
+                    created->second.handle,
+                    *native_transform)) {
+
+                ++stats.unresolved;
+
+                if (error) {
+                    *error =
+                        runtime_->diagnostic();
+                }
+            }
+
             existing =
                 instances_.find(
                     entity.value);
@@ -164,11 +201,42 @@ ManagedScriptSystem::update(
         if (existing !=
                 instances_.end()) {
 
+            auto* native_transform =
+                world.transform(
+                    entity);
+
+            if (!native_transform ||
+                !runtime_->set_transform(
+                    existing->second.handle,
+                    *native_transform)) {
+
+                ++stats.unresolved;
+
+                if (error) {
+                    *error =
+                        runtime_->diagnostic();
+                }
+
+                continue;
+            }
+
             if (runtime_->update(
                     existing->second.handle,
                     delta_seconds)) {
 
                 ++stats.updated;
+
+                if (!runtime_->get_transform(
+                        existing->second.handle,
+                        *native_transform)) {
+
+                    ++stats.unresolved;
+
+                    if (error) {
+                        *error =
+                            runtime_->diagnostic();
+                    }
+                }
             } else {
                 ++stats.unresolved;
 
