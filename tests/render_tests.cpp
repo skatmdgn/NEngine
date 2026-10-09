@@ -33,6 +33,7 @@
 #include "nengine/render/registration.hpp"
 #include "nengine/render/render_snapshot.hpp"
 #include "nengine/render/rhi.hpp"
+#include "nengine/render/sprite_animation.hpp"
 #include "nengine/render/vulkan_buffer.hpp"
 #include "nengine/render/vulkan_loader.hpp"
 #include "nengine/render/vulkan_material.hpp"
@@ -93,8 +94,10 @@ int main() {
         metadata.find(
             render::mesh_renderer_type()) != nullptr &&
         metadata.find(
-            render::sprite_renderer_type()) != nullptr,
-        "render component descriptors including SpriteRenderer are discoverable");
+            render::sprite_renderer_type()) != nullptr &&
+        metadata.find(
+            render::sprite_animator_type()) != nullptr,
+        "render component descriptors including SpriteRenderer and SpriteAnimator are discoverable");
 
     core::World world;
 
@@ -200,6 +203,28 @@ int main() {
 
     const auto sprite_texture_guid =
         assets::AssetGuid::generate();
+
+    const auto sprite_clip_guid =
+        assets::AssetGuid::generate();
+
+    auto* sprite_animator =
+        world.add_component<
+            render::SpriteAnimator>(
+                sprite_entity,
+                render::sprite_animator_type());
+
+    check(
+        sprite_animator != nullptr,
+        "sprite animator component attaches");
+
+    if (sprite_animator) {
+        sprite_animator->clip =
+            sprite_clip_guid;
+        sprite_animator->playing = true;
+        sprite_animator->loop = false;
+        sprite_animator->speed = 1.5f;
+        sprite_animator->time_seconds = 9.0f;
+    }
 
     if (sprite_renderer) {
         sprite_renderer->texture =
@@ -377,6 +402,26 @@ int main() {
                     render::sprite_renderer_type())
             : nullptr;
 
+    const auto* restored_animator_component =
+        restored_sprite.valid()
+            ? restored.get_component<
+                render::SpriteAnimator>(
+                    restored_sprite,
+                    render::sprite_animator_type())
+            : nullptr;
+
+    check(
+        restored_animator_component &&
+        restored_animator_component->clip ==
+            sprite_clip_guid &&
+        restored_animator_component->playing &&
+        !restored_animator_component->loop &&
+        restored_animator_component->speed ==
+            1.5f &&
+        restored_animator_component->time_seconds ==
+            0.0f,
+        "SpriteAnimator settings survive Scene roundtrip while runtime time resets");
+
     check(
         restored_sprite_component &&
         restored_sprite_component->texture ==
@@ -387,6 +432,270 @@ int main() {
         restored_sprite_component->flip_x &&
         !restored_sprite_component->flip_y,
         "SpriteRenderer texture PPU sort and flip values survive Scene roundtrip");
+
+    {
+        const auto frame_a =
+            assets::AssetGuid::generate();
+
+        const auto frame_b =
+            assets::AssetGuid::generate();
+
+        std::stringstream clip_stream;
+
+        clip_stream
+            << "NENGINE_SPRITE_ANIMATION 1\n"
+            << "FRAMES 2\n"
+            << "FRAME \""
+            << frame_a.to_string()
+            << "\" 0.1\n"
+            << "FRAME \""
+            << frame_b.to_string()
+            << "\" 0.2\n"
+            << "END_SPRITE_ANIMATION\n";
+
+        render::SpriteAnimationClip
+            clip;
+
+        std::string clip_error;
+
+        check(
+            render::read_sprite_animation_clip(
+                clip_stream,
+                clip,
+                &clip_error) &&
+            clip.valid() &&
+            clip.frames.size() == 2u &&
+            std::abs(
+                clip.duration_seconds() -
+                0.3f) < 0.0001f,
+            "SpriteAnimationClip parser accepts timed Texture AssetGuid frames");
+
+        check(
+            render::sample_sprite_animation_frame(
+                clip,
+                0.0f,
+                true) ==
+                std::optional<std::size_t>{0u} &&
+            render::sample_sprite_animation_frame(
+                clip,
+                0.11f,
+                true) ==
+                std::optional<std::size_t>{1u} &&
+            render::sample_sprite_animation_frame(
+                clip,
+                0.31f,
+                true) ==
+                std::optional<std::size_t>{0u} &&
+            render::sample_sprite_animation_frame(
+                clip,
+                5.0f,
+                false) ==
+                std::optional<std::size_t>{1u},
+            "SpriteAnimationClip sampler handles frame boundaries loop and non-loop clamp");
+
+        const auto animation_root =
+            std::filesystem::temp_directory_path() /
+            ("nengine_sprite_anim_" +
+             std::to_string(
+                 std::chrono::
+                     high_resolution_clock::
+                     now()
+                     .time_since_epoch()
+                     .count()));
+
+        std::filesystem::create_directories(
+            animation_root);
+
+        const auto animation_source =
+            animation_root /
+            "walk.nspriteanim";
+
+        {
+            std::ofstream output(
+                animation_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output
+                << "NENGINE_SPRITE_ANIMATION 1\n"
+                << "FRAMES 2\n"
+                << "FRAME \""
+                << frame_a.to_string()
+                << "\" 0.1\n"
+                << "FRAME \""
+                << frame_b.to_string()
+                << "\" 0.2\n"
+                << "END_SPRITE_ANIMATION\n";
+        }
+
+        assets::AssetRecord
+            animation_record;
+
+        animation_record.guid =
+            assets::AssetGuid::generate();
+        animation_record.source_path =
+            animation_source;
+        animation_record.relative_path =
+            "walk.nspriteanim";
+        animation_record.importer_id =
+            "NEngine.SpriteAnimation";
+        animation_record.file_size =
+            std::filesystem::file_size(
+                animation_source);
+
+        assets::ImporterDescriptor
+            animation_importer{
+                "NEngine.SpriteAnimation",
+                1u,
+                {".nspriteanim"},
+                false
+            };
+
+        const auto animation_cache_dir =
+            animation_root /
+            "cache";
+
+        std::filesystem::create_directories(
+            animation_cache_dir);
+
+        const assets::ImportContext
+            animation_context{
+                &animation_record,
+                &animation_importer,
+                animation_cache_dir
+            };
+
+        const auto animation_import =
+            render::sprite_animation_source_importer(
+                animation_context);
+
+        check(
+            animation_import.success &&
+            animation_import.dependencies.size() == 2u &&
+            std::find(
+                animation_import.dependencies.begin(),
+                animation_import.dependencies.end(),
+                frame_a) !=
+                    animation_import.dependencies.end() &&
+            std::find(
+                animation_import.dependencies.begin(),
+                animation_import.dependencies.end(),
+                frame_b) !=
+                    animation_import.dependencies.end(),
+            "SpriteAnimation importer records unique frame Texture AssetGuid dependencies");
+
+        assets::CachedArtifactSet
+            animation_artifacts;
+
+        animation_artifacts.fingerprint =
+            "animation-v1";
+        animation_artifacts.importer_id =
+            "NEngine.SpriteAnimation";
+        animation_artifacts.importer_version =
+            1u;
+        animation_artifacts.artifacts =
+            animation_import.artifacts;
+
+        core::World animation_world;
+
+        const auto animated_entity =
+            animation_world.create(
+                "Animated Sprite");
+
+        auto* animated_renderer =
+            animation_world.add_component<
+                render::SpriteRenderer>(
+                    animated_entity,
+                    render::sprite_renderer_type());
+
+        auto* animated_animator =
+            animation_world.add_component<
+                render::SpriteAnimator>(
+                    animated_entity,
+                    render::sprite_animator_type());
+
+        if (animated_animator) {
+            animated_animator->clip =
+                animation_record.guid;
+            animated_animator->loop =
+                false;
+            animated_animator->playing =
+                true;
+            animated_animator->speed =
+                1.0f;
+        }
+
+        render::SpriteAnimationClipCache
+            animation_cache;
+
+        const auto resolver =
+            [&](assets::AssetGuid guid)
+                -> std::optional<
+                    assets::CachedArtifactSet> {
+
+                return guid ==
+                    animation_record.guid
+                    ? std::optional<
+                        assets::CachedArtifactSet>{
+                            animation_artifacts}
+                    : std::nullopt;
+            };
+
+        const auto first_update =
+            render::update_sprite_animators(
+                animation_world,
+                0.05f,
+                animation_cache,
+                resolver,
+                &clip_error);
+
+        check(
+            animated_renderer &&
+            animated_animator &&
+            first_update.sampled == 1u &&
+            animated_renderer->texture ==
+                frame_a &&
+            animated_animator->playing,
+            "SpriteAnimator samples first frame during initial runtime update");
+
+        const auto second_update =
+            render::update_sprite_animators(
+                animation_world,
+                0.06f,
+                animation_cache,
+                resolver,
+                &clip_error);
+
+        check(
+            second_update.sampled == 1u &&
+            animated_renderer &&
+            animated_renderer->texture ==
+                frame_b,
+            "SpriteAnimator advances SpriteRenderer texture across frame boundary");
+
+        render::update_sprite_animators(
+            animation_world,
+            0.30f,
+            animation_cache,
+            resolver,
+            &clip_error);
+
+        check(
+            animated_animator &&
+            animated_renderer &&
+            !animated_animator->playing &&
+            std::abs(
+                animated_animator->time_seconds -
+                0.3f) < 0.0001f &&
+            animated_renderer->texture ==
+                frame_b,
+            "non-loop SpriteAnimator clamps to final frame and stops");
+
+        std::error_code cleanup_error;
+        std::filesystem::remove_all(
+            animation_root,
+            cleanup_error);
+    }
 
     {
         std::stringstream texture_descriptor;
