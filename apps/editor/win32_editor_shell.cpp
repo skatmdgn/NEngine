@@ -26,6 +26,8 @@
 #include "nengine/editor/property_command.hpp"
 #include "nengine/editor/property_text.hpp"
 #include "nengine/editor/scene_interaction.hpp"
+#include "nengine/scripting/dotnet_host.hpp"
+#include "nengine/scripting/managed_build.hpp"
 #include "nengine/scripting/managed_project.hpp"
 #include "nengine/render/vulkan_context.hpp"
 #include "nengine/render/vulkan_diagnostic_scene.hpp"
@@ -48,6 +50,7 @@ enum ControlId : int {
     IdDeleteEntity,
     IdRefreshAssets,
     IdScripts,
+    IdBuildScripts,
     IdUndo,
     IdRedo,
     IdPlay,
@@ -276,6 +279,7 @@ struct Win32EditorShell::Impl {
     HWND delete_entity{nullptr};
     HWND refresh_assets{nullptr};
     HWND scripts{nullptr};
+    HWND build_scripts{nullptr};
     HWND undo{nullptr};
     HWND redo{nullptr};
     HWND play{nullptr};
@@ -700,6 +704,7 @@ struct Win32EditorShell::Impl {
         delete_entity = create_control(host, L"BUTTON", L"Delete", BS_PUSHBUTTON, IdDeleteEntity);
         refresh_assets = create_control(host, L"BUTTON", L"Assets", BS_PUSHBUTTON, IdRefreshAssets);
         scripts = create_control(host, L"BUTTON", L"Scripts", BS_PUSHBUTTON, IdScripts);
+        build_scripts = create_control(host, L"BUTTON", L"Build C#", BS_PUSHBUTTON, IdBuildScripts);
         undo = create_control(host, L"BUTTON", L"Undo", BS_PUSHBUTTON, IdUndo);
         redo = create_control(host, L"BUTTON", L"Redo", BS_PUSHBUTTON, IdRedo);
         play = create_control(host, L"BUTTON", L"Play", BS_PUSHBUTTON, IdPlay);
@@ -714,7 +719,7 @@ struct Win32EditorShell::Impl {
             IdVulkanPreview);
 
         if (!open_scene || !save_scene || !new_entity || !delete_entity ||
-            !refresh_assets || !scripts || !undo || !redo ||
+            !refresh_assets || !scripts || !build_scripts || !undo || !redo ||
             !play || !pause || !step || !stop ||
             !vulkan_preview) {
             shell_log("attach failed: toolbar control creation");
@@ -1505,7 +1510,16 @@ struct Win32EditorShell::Impl {
             button_width,
             button_height,
             TRUE);
-        x += button_width + 16;
+        x += button_width + 4;
+
+        MoveWindow(
+            build_scripts,
+            x,
+            6,
+            84,
+            button_height,
+            TRUE);
+        x += 84 + 16;
 
         MoveWindow(
             undo,
@@ -2234,6 +2248,7 @@ struct Win32EditorShell::Impl {
                 editor.selection().active()));
         EnableWindow(refresh_assets, editor.project().is_open());
         EnableWindow(scripts, editor.project().is_open());
+        EnableWindow(build_scripts, editor.project().is_open());
         EnableWindow(undo, state.can_undo);
         EnableWindow(redo, state.can_redo);
         EnableWindow(play, state.can_play);
@@ -3014,6 +3029,179 @@ struct Win32EditorShell::Impl {
         return true;
     }
 
+    bool build_managed_scripts() {
+        if (!editor.project().is_open()) {
+            editor.console().warning(
+                "Scripting",
+                "No project is open.");
+            refresh_console();
+            return false;
+        }
+
+        const auto package_manifest =
+            editor.project().root() /
+            "Packages" /
+            "managed-packages.txt";
+
+        std::string package_error;
+
+        const auto packages =
+            nengine::scripting::
+                ManagedProjectGenerator::
+                    load_package_manifest(
+                        package_manifest,
+                        &package_error);
+
+        if (!package_error.empty()) {
+            editor.console().warning(
+                "Scripting",
+                "Package manifest warning: " +
+                    package_error);
+        }
+
+        nengine::scripting::
+            ManagedProjectConfig project_config;
+
+        project_config.project_name =
+            "GameScripts";
+        project_config.project_root =
+            editor.project().root();
+        project_config.packages =
+            packages;
+
+        nengine::scripting::
+            ManagedProjectOutput generated;
+
+        std::string generate_error;
+
+        if (!nengine::scripting::
+                ManagedProjectGenerator::
+                    generate(
+                        project_config,
+                        generated,
+                        &generate_error)) {
+
+            editor.console().error(
+                "Scripting",
+                "Managed project generation failed: " +
+                    generate_error);
+            refresh_console();
+            return false;
+        }
+
+        nengine::scripting::
+            ManagedBuildConfig build_config;
+
+        build_config.project_path =
+            generated.project_path;
+        build_config.output_directory =
+            editor.project().root() /
+            "Library" /
+            "ManagedBuild" /
+            "Debug";
+        build_config.configuration =
+            "Debug";
+
+        editor.console().info(
+            "Scripting",
+            "Building C# gameplay assembly...");
+        refresh_console();
+
+        const auto build =
+            nengine::scripting::
+                run_managed_build(
+                    build_config);
+
+        if (!build.success) {
+            editor.console().error(
+                "Scripting",
+                build.message);
+            refresh_console();
+            return false;
+        }
+
+        editor.console().info(
+            "Scripting",
+            "Built " +
+                wide_to_utf8(
+                    build.plan
+                        .assembly_path
+                        .filename()
+                        .wstring()));
+
+        std::string host_error;
+
+        const auto host_info =
+            nengine::scripting::
+                discover_dotnet_host(
+                    {},
+                    &host_error);
+
+        if (!host_info) {
+            editor.console().error(
+                "Scripting",
+                "C# build succeeded, but .NET runtime host discovery failed: " +
+                    host_error);
+            refresh_console();
+            return false;
+        }
+
+        nengine::scripting::
+            DotnetHost dotnet_host;
+
+        if (!dotnet_host.initialize(
+                host_info->hostfxr_path,
+                generated.runtime_config_path)) {
+
+            editor.console().error(
+                "Scripting",
+                "C# build succeeded, but CLR initialization failed: " +
+                    dotnet_host.diagnostic());
+            refresh_console();
+            return false;
+        }
+
+        void* raw_entry =
+            dotnet_host.load_unmanaged_entry(
+                build.plan.assembly_path,
+                "NEngine.Internal.NativeBridge, GameScripts",
+                "GetAbiVersion");
+
+        if (!raw_entry) {
+            editor.console().error(
+                "Scripting",
+                "Gameplay assembly load failed: " +
+                    dotnet_host.diagnostic());
+            refresh_console();
+            return false;
+        }
+
+        using AbiVersionFn =
+            int (*)();
+
+        const auto abi_version =
+            reinterpret_cast<
+                AbiVersionFn>(
+                    raw_entry)();
+
+        if (abi_version != 1) {
+            editor.console().error(
+                "Scripting",
+                "Managed bridge ABI mismatch: expected 1, got " +
+                    std::to_string(
+                        abi_version));
+            refresh_console();
+            return false;
+        }
+
+        editor.console().info(
+            "Scripting",
+            "Managed gameplay DLL loaded through hostfxr; ABI v1 verified.");
+
+        refresh_console();
+        return true;
+    }
+
     bool generate_and_open_scripts() {
         if (!editor.project().is_open()) {
             editor.console().warning(
@@ -3257,6 +3445,12 @@ struct Win32EditorShell::Impl {
         case IdScripts:
             if (notification != BN_CLICKED) return false;
             generate_and_open_scripts();
+            handled = true;
+            break;
+
+        case IdBuildScripts:
+            if (notification != BN_CLICKED) return false;
+            build_managed_scripts();
             handled = true;
             break;
 
