@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -17,6 +18,16 @@ struct ObjSidecar {
     ObjSidecarKind kind{
         ObjSidecarKind::MaterialLibrary};
 };
+
+// Resolve one local OBJ/MTL dependency using the same sandbox policy used
+// by sidecar staging. root_directory is the OBJ directory; base_directory is
+// the directory containing the directive (OBJ or MTL).
+std::optional<ObjSidecar> resolve_obj_sidecar(
+    const std::filesystem::path& root_directory,
+    const std::filesystem::path& base_directory,
+    std::string_view raw_path,
+    ObjSidecarKind kind,
+    std::string* error = nullptr);
 
 // Collect local OBJ material-library dependencies and the diffuse textures
 // referenced by map_Kd. All dependencies must resolve to regular files below

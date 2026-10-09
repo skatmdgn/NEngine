@@ -176,7 +176,7 @@ bool is_below_or_equal(
 }
 
 std::optional<ObjSidecar>
-resolve_obj_sidecar(
+resolve_obj_sidecar_impl(
     const std::filesystem::path& root_directory,
     const std::filesystem::path& base_directory,
     std::string_view raw_path,
@@ -471,6 +471,22 @@ std::string content_fingerprint(
 
 } // namespace
 
+std::optional<ObjSidecar>
+resolve_obj_sidecar(
+    const std::filesystem::path& root_directory,
+    const std::filesystem::path& base_directory,
+    std::string_view raw_path,
+    ObjSidecarKind kind,
+    std::string* error) {
+
+    return resolve_obj_sidecar_impl(
+        root_directory,
+        base_directory,
+        raw_path,
+        kind,
+        error);
+}
+
 bool collect_obj_sidecars(
     const std::filesystem::path& source_obj,
     std::vector<ObjSidecar>& sidecars,
@@ -541,7 +557,7 @@ bool collect_obj_sidecars(
              ++i) {
 
             auto resolved =
-                resolve_obj_sidecar(
+                resolve_obj_sidecar_impl(
                     root,
                     root,
                     fields[i],
@@ -621,7 +637,7 @@ bool collect_obj_sidecars(
                 fields.back();
 
             auto resolved =
-                resolve_obj_sidecar(
+                resolve_obj_sidecar_impl(
                     root,
                     library.source_path
                         .parent_path(),
