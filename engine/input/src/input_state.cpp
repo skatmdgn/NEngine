@@ -175,7 +175,7 @@ bool ActionMap::contains(
 
 const std::vector<ActionBinding>*
 ActionMap::bindings(
-    std::string_view action) const noexcept {
+    std::string_view action) const {
 
     const auto found =
         bindings_.find(
@@ -188,7 +188,7 @@ ActionMap::bindings(
 
 bool ActionMap::held(
     std::string_view action,
-    const InputState& input) const noexcept {
+    const InputState& input) const {
 
     const auto* list =
         bindings(action);

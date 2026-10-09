@@ -115,7 +115,7 @@ public:
 
     bool held(
         std::string_view action,
-        const InputState& input) const noexcept;
+        const InputState& input) const;
 
     bool pressed(
         std::string_view action,
@@ -127,7 +127,7 @@ public:
 
     const std::vector<ActionBinding>*
     bindings(
-        std::string_view action) const noexcept;
+        std::string_view action) const;
 
 private:
     std::unordered_map<
