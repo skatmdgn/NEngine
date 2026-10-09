@@ -2055,10 +2055,10 @@ int main() {
       "roughnessFactor":0.75,
       "metallicRoughnessTexture":{"index":1}
     },
-    "normalTexture":{"index":2},
+    "normalTexture":{"index":2,"scale":0.6},
     "emissiveTexture":{"index":3},
     "emissiveFactor":[0.1,0.2,0.3],
-    "occlusionTexture":{"index":4},
+    "occlusionTexture":{"index":4,"strength":0.35},
     "alphaMode":"MASK",
     "alphaCutoff":0.4,
     "doubleSided":true
@@ -2111,6 +2111,12 @@ int main() {
             std::abs(
                 pbr_five_map_data.roughness_factor -
                     0.75f) < 0.0001f &&
+            std::abs(
+                pbr_five_map_data.normal_scale -
+                    0.6f) < 0.0001f &&
+            std::abs(
+                pbr_five_map_data.occlusion_strength -
+                    0.35f) < 0.0001f &&
             std::abs(
                 pbr_five_map_data.emissive_factor.x -
                     0.1f) < 0.0001f &&
@@ -2291,6 +2297,14 @@ int main() {
                     resolved_pbr_material
                         ->material.roughness_factor -
                         0.75f) < 0.0001f &&
+                std::abs(
+                    resolved_pbr_material
+                        ->material.normal_scale -
+                        0.6f) < 0.0001f &&
+                std::abs(
+                    resolved_pbr_material
+                        ->material.occlusion_strength -
+                        0.35f) < 0.0001f &&
                 resolved_pbr_material
                     ->material.alpha_mode ==
                     render::MaterialAlphaMode::Mask &&
