@@ -14,6 +14,10 @@ namespace nengine::core {
 class World;
 }
 
+namespace nengine::input {
+class InputState;
+}
+
 namespace nengine::scripting {
 
 struct ManagedBehaviourHandle {
@@ -89,6 +93,9 @@ public:
     void bind_world(
         core::World* world) noexcept;
 
+    void bind_input(
+        const input::InputState* input_state) noexcept;
+
     bool unload_gameplay();
 
     bool gameplay_loaded() const noexcept {
@@ -115,6 +122,7 @@ public:
             get_game_object_ != nullptr &&
             copy_game_object_name_ != nullptr &&
             configure_world_callbacks_ != nullptr &&
+            configure_input_callbacks_ != nullptr &&
             world_context_ != nullptr &&
             load_gameplay_ != nullptr &&
             unload_gameplay_ != nullptr &&
@@ -189,6 +197,7 @@ private:
 
     struct NativeWorldContext {
         core::World* world{nullptr};
+        const input::InputState* input{nullptr};
     };
 
     using WorldIsAliveFn =
@@ -331,6 +340,52 @@ private:
         std::uint64_t entity_id,
         const char* type_name);
 
+    using InputKeyFn =
+        int (*)(
+            void*,
+            std::uint32_t);
+
+    struct NativePointerState {
+        float x{0.0f};
+        float y{0.0f};
+        float delta_x{0.0f};
+        float delta_y{0.0f};
+        float wheel_y{0.0f};
+    };
+
+    using InputPointerFn =
+        int (*)(
+            void*,
+            NativePointerState*);
+
+    struct NativeInputCallbacks {
+        void* context{nullptr};
+        InputKeyFn held{nullptr};
+        InputKeyFn pressed{nullptr};
+        InputKeyFn released{nullptr};
+        InputPointerFn pointer{nullptr};
+    };
+
+    using ConfigureInputCallbacksFn =
+        int (*)(
+            const NativeInputCallbacks*);
+
+    static int callback_input_held(
+        void* context,
+        std::uint32_t key);
+
+    static int callback_input_pressed(
+        void* context,
+        std::uint32_t key);
+
+    static int callback_input_released(
+        void* context,
+        std::uint32_t key);
+
+    static int callback_input_pointer(
+        void* context,
+        NativePointerState* state);
+
     using LoadGameplayFn =
         int (*)(
             const char*,
@@ -353,6 +408,7 @@ private:
     GetGameObjectFn get_game_object_{nullptr};
     CopyGameObjectNameFn copy_game_object_name_{nullptr};
     ConfigureWorldCallbacksFn configure_world_callbacks_{nullptr};
+    ConfigureInputCallbacksFn configure_input_callbacks_{nullptr};
     std::unique_ptr<NativeWorldContext> world_context_{};
     LoadGameplayFn load_gameplay_{nullptr};
     SimpleFn unload_gameplay_{nullptr};
