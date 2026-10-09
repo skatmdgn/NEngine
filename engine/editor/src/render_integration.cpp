@@ -785,6 +785,158 @@ bool register_render_integration(
                         });
             }) && ok;
 
+    const auto animator_type =
+        render::sprite_animator_type();
+
+    auto register_animator_bool =
+        [&properties, animator_type, &ok](
+            const char* name,
+            auto member) {
+
+            ok =
+                properties.register_property(
+                    animator_type,
+                    name,
+                    core::PropertyKind::Boolean,
+                    [animator_type, member](
+                        const core::World& world,
+                        core::Entity entity) {
+                        return read_component_property<
+                            render::SpriteAnimator>(
+                                world,
+                                entity,
+                                animator_type,
+                                [member](
+                                    const render::SpriteAnimator& animator) {
+                                    return core::PropertyValue{
+                                        animator.*member};
+                                });
+                    },
+                    [animator_type, member](
+                        core::World& world,
+                        core::Entity entity,
+                        const core::PropertyValue& value) {
+                        return write_component_property<
+                            render::SpriteAnimator>(
+                                world,
+                                entity,
+                                animator_type,
+                                value,
+                                [member](
+                                    render::SpriteAnimator& animator,
+                                    const core::PropertyValue& raw) {
+                                    const auto* typed =
+                                        std::get_if<bool>(&raw);
+                                    if (!typed) return false;
+                                    animator.*member =
+                                        *typed;
+                                    return true;
+                                });
+                    }) &&
+                ok;
+        };
+
+    register_animator_bool(
+        "Enabled",
+        &render::SpriteAnimator::enabled);
+
+    register_animator_bool(
+        "Playing",
+        &render::SpriteAnimator::playing);
+
+    register_animator_bool(
+        "Loop",
+        &render::SpriteAnimator::loop);
+
+    ok =
+        properties.register_property(
+            animator_type,
+            "Clip",
+            core::PropertyKind::AssetReference,
+            [animator_type](
+                const core::World& world,
+                core::Entity entity) {
+                return read_component_property<
+                    render::SpriteAnimator>(
+                        world,
+                        entity,
+                        animator_type,
+                        [](const render::SpriteAnimator& animator) {
+                            return core::PropertyValue{
+                                asset_reference_text(
+                                    animator.clip)};
+                        });
+            },
+            [animator_type](
+                core::World& world,
+                core::Entity entity,
+                const core::PropertyValue& value) {
+                return write_component_property<
+                    render::SpriteAnimator>(
+                        world,
+                        entity,
+                        animator_type,
+                        value,
+                        [](render::SpriteAnimator& animator,
+                           const core::PropertyValue& raw) {
+                            assets::AssetGuid parsed;
+                            if (!parse_asset_reference(
+                                    raw,
+                                    parsed)) {
+                                return false;
+                            }
+                            animator.clip =
+                                parsed;
+                            animator.time_seconds =
+                                0.0f;
+                            return true;
+                        });
+            }) && ok;
+
+    ok =
+        properties.register_property(
+            animator_type,
+            "Speed",
+            core::PropertyKind::Float,
+            [animator_type](
+                const core::World& world,
+                core::Entity entity) {
+                return read_component_property<
+                    render::SpriteAnimator>(
+                        world,
+                        entity,
+                        animator_type,
+                        [](const render::SpriteAnimator& animator) {
+                            return core::PropertyValue{
+                                static_cast<double>(
+                                    animator.speed)};
+                        });
+            },
+            [animator_type](
+                core::World& world,
+                core::Entity entity,
+                const core::PropertyValue& value) {
+                return write_component_property<
+                    render::SpriteAnimator>(
+                        world,
+                        entity,
+                        animator_type,
+                        value,
+                        [](render::SpriteAnimator& animator,
+                           const core::PropertyValue& raw) {
+                            const auto* typed =
+                                std::get_if<double>(&raw);
+                            if (!typed ||
+                                *typed < 0.0) {
+                                return false;
+                            }
+                            animator.speed =
+                                static_cast<float>(
+                                    *typed);
+                            return true;
+                        });
+            }) && ok;
+
     return ok;
 }
 
