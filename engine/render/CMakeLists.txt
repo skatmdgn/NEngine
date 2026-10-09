@@ -10,6 +10,7 @@ add_library(NEngineRender STATIC
   src/mesh_data.cpp
   src/model_importer.cpp
   src/obj_mesh.cpp
+  src/obj_material.cpp
   src/registration.cpp
   src/render_snapshot.cpp
   src/stb_image_impl.cpp
