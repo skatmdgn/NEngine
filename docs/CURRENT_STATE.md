@@ -104,6 +104,7 @@ Implemented:
   - glTF external buffer/image path traversal and unsupported URI forms rejected.
 - Referenced glTF material slots are cooked at import time into deterministic generated Texture + .nmat subassets; a persistent model material map binds submesh material slots back to those GUIDs.
 - OBJ geometry decode with v/vt/vn, positive/negative face indices, n-gon fan triangulation, UV normalization, generated flat normals, bounds and shared MeshData/GPU-cache routing.
+- OBJ usemtl/mtllib/map_Kd staging and MTL diffuse color/alpha/texture cooking into deterministic generated Texture + .nmat subassets.
 - SPIR-V shader import.
   - .spv validation by size/magic.
   - .vert.spv/.frag.spv stage hints.
@@ -112,10 +113,10 @@ Implemented:
 
 Not yet implemented:
 - WebP pixel decoding and texture compression/transcoding policy (gamma-aware CPU mip generation + Vulkan mip upload are implemented).
-- Advanced glTF PBR maps/factors beyond baked base color, plus skins and morph targets.
+- glTF skins and morph targets; current material cooking supports base color, normal, metallic-roughness, emissive, occlusion, factors, alpha mode/cutoff and double-sided metadata.
 - Remote/nonlocal or outside-model-directory glTF resource policy/support; local percent-encoded sidecars are implemented.
-- OBJ MTL material cooking and FBX decoding/cooking.
-- Shader source compilation (GLSL/HLSL -> SPIR-V).
+- FBX decoding/cooking.
+- HLSL compiler-path parity/validation; GLSL -> SPIR-V compile/embed tooling is implemented and exercised in CI.
 - Audio decode/stream runtime.
 - Dependency extraction from asset contents.
 
@@ -127,12 +128,17 @@ Implemented:
 - Assets/Scripts source inclusion.
 - managed-packages.txt NuGet reference manifest.
 - Visual Studio/Rider/default .sln association open path.
+- hostfxr discovery/dynamic loading with generated runtimeconfig.
+- dotnet SDK discovery, deterministic gameplay DLL/PDB build output and Editor **Build C#** action.
+- Managed ABI v3 lifecycle bridge: Behaviour Create / Start / Update / OnDestroy.
+- Native ScriptBehaviour component with Scene serialization, Add Component and generic Inspector editing.
+- Play Mode ScriptBehaviour instance management against the cloned runtime World.
+- Native <-> managed local Transform position/rotation/scale synchronization around Start/Update.
 
 Not yet implemented:
-- .NET host/runtime embedding.
-- Gameplay assembly compile/load.
-- hot reload.
-- managed component discovery.
+- Safe unload/hot reload with a collectible AssemblyLoadContext or equivalent.
+- Dedicated packaged NEngine managed API assembly (current API/bridge sources are generated into the gameplay project).
+- Broader GameObject/component/input/physics/audio managed bindings.
 - debugger attach integration.
 
 ## Renderer 0.4
@@ -243,15 +249,17 @@ Implemented:
 - Diagnostic textured vertex/fragment GLSL sources with audited SPIR-V fixtures.
 - Textured vertex path forwards MeshVertex UVs to the fragment stage.
 - Diagnostic fragment shader samples set 0 / binding 0 sampler2D.
-- VK Preview uses a 2x2 diagnostic RGBA8 texture/material as the fallback material; .nmat MeshRenderer.material binds explicitly imported texture descriptors and an unset material can sample the first glTF PBR base-color texture.
+- VK Preview uses a diagnostic fallback material, imported .nmat/PBR material descriptors, per-submesh cooked model materials and direct glTF fallback when required.
+- SpriteRenderer renders Texture AssetGuids as PPU-scaled XY quads through a depthless alpha-blended Vulkan pipeline with flip/sort support.
+- SpriteAnimation clips are imported/cached and update SpriteRenderer frame textures during Play Mode.
 - Headless Vulkan CI validates texture upload, sampler creation, material descriptors, textured shader modules, a real texture-sampling graphics pipeline, .nmat -> texture descriptors and glTF auto-texture upload. CPU tests cover GLB JSON/BIN geometry plus PNG bufferView, glTF PNG data URIs, baseColorFactor and sRGB tinting, staged external .gltf BIN/PNG rendering resources, sidecar watcher invalidation/recovery and unsafe URI rejection.
 
 Not yet implemented:
-- Advanced multi-map PBR material cooking (normal/metallic-roughness/emissive/occlusion, alpha modes, samplers).
-- Shader source compiler and reflection.
+- Full sampler-state cooking and remaining production PBR validation/shadow integration.
+- Shader reflection and HLSL compiler-path parity; GLSL compilation/embed tooling exists.
 - General descriptor/uniform binding beyond the first texture slot.
 - Vulkan Game View.
-- PBR/lights/shadows/sprites.
+- Production lighting/shadows and remaining full-PBR validation.
 - Android Vulkan surface.
 
 ## RHI boundary
@@ -267,10 +275,10 @@ The concrete Vulkan backend currently grows beneath this contract. The long-term
 
 ## Immediate next work
 
-1. Extend cooked materials from baked base color to normal/metallic-roughness/emissive/occlusion maps, alpha modes and sampler state.
-2. Decide and implement the explicit policy for remote/nonlocal or outside-directory glTF resources while preserving sandbox safety.
-3. Add WebP decoding plus texture compression/transcoding policy; mipmap generation/upload is already implemented.
-4. Add OBJ MTL material cooking, then choose a vendored FBX decoder strategy.
-5. Replace the GDI Scene View presentation only together with a Vulkan Editor Camera + matching picking/gizmo projection.
-6. Add a shader compiler toolchain path rather than making glslang/DXC a hidden build dependency.
-7. Return to .NET hosting after the renderer/resource boundary is stable.
+1. Stabilize C# ScriptBehaviour lifecycle/Transform sync, then add wider native GameObject/component API bindings and safe hot reload.
+2. Finish production PBR validation: sampler state, lights/shadows and remaining material behavior.
+3. Decide and implement the explicit policy for remote/nonlocal or outside-directory glTF resources while preserving sandbox safety.
+4. Add WebP decoding plus texture compression/transcoding policy; mipmap generation/upload is already implemented.
+5. Choose a vendored FBX decoder strategy and add FBX mesh/material cooking.
+6. Replace the GDI Scene View presentation only together with a Vulkan Editor Camera + matching picking/gizmo projection.
+7. Extend shader tooling with reflection and validated HLSL compiler parity.
