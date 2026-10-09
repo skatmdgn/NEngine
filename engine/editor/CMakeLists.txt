@@ -1,5 +1,6 @@
 add_library(NEngineEditorModel STATIC
   src/command.cpp
+  src/component_factory.cpp
   src/console_model.cpp
   src/editor_layout.cpp
   src/editor_model.cpp
