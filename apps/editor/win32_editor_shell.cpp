@@ -2249,7 +2249,10 @@ struct Win32EditorShell::Impl {
                 editor.selection().active()));
         EnableWindow(refresh_assets, editor.project().is_open());
         EnableWindow(scripts, editor.project().is_open());
-        EnableWindow(build_scripts, editor.project().is_open());
+        EnableWindow(
+            build_scripts,
+            editor.project().is_open() &&
+                editor.can_edit());
         EnableWindow(undo, state.can_undo);
         EnableWindow(redo, state.can_redo);
         EnableWindow(play, state.can_play);
@@ -3147,26 +3150,26 @@ struct Win32EditorShell::Impl {
             return false;
         }
 
-        nengine::scripting::
-            ManagedRuntime runtime;
+        std::string runtime_error;
 
-        if (!runtime.initialize(
+        if (!editor.initialize_managed_runtime(
                 host_info->hostfxr_path,
                 generated.runtime_config_path,
                 build.plan.assembly_path,
-                "GameScripts")) {
+                "GameScripts",
+                &runtime_error)) {
 
             editor.console().error(
                 "Scripting",
                 "C# build succeeded, but managed runtime initialization failed: " +
-                    runtime.diagnostic());
+                    runtime_error);
             refresh_console();
             return false;
         }
 
         editor.console().info(
             "Scripting",
-            "Managed gameplay DLL loaded through hostfxr; ABI v2 lifecycle verified.");
+            "Managed gameplay DLL loaded through hostfxr; ABI v2 lifecycle is ready for Play Mode ScriptBehaviour components.");
 
         refresh_console();
         return true;
