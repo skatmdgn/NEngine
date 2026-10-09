@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 
+#include "nengine/core/transform.hpp"
 #include "nengine/scripting/dotnet_host.hpp"
 
 namespace nengine::scripting {
@@ -55,6 +56,14 @@ public:
     bool destroy(
         ManagedBehaviourHandle handle);
 
+    bool set_transform(
+        ManagedBehaviourHandle handle,
+        const core::Transform& transform);
+
+    bool get_transform(
+        ManagedBehaviourHandle handle,
+        core::Transform& transform);
+
     int instance_count() const;
 
     bool valid() const noexcept {
@@ -63,6 +72,8 @@ public:
             start_ != nullptr &&
             update_ != nullptr &&
             destroy_ != nullptr &&
+            set_transform_ != nullptr &&
+            get_transform_ != nullptr &&
             count_ != nullptr;
     }
 
@@ -87,6 +98,24 @@ private:
             std::int64_t,
             float);
 
+    struct NativeTransformState {
+        float px{0.0f};
+        float py{0.0f};
+        float pz{0.0f};
+        float rx{0.0f};
+        float ry{0.0f};
+        float rz{0.0f};
+        float rw{1.0f};
+        float sx{1.0f};
+        float sy{1.0f};
+        float sz{1.0f};
+    };
+
+    using TransformFn =
+        int (*)(
+            std::int64_t,
+            NativeTransformState*);
+
     using CountFn =
         int (*)();
 
@@ -95,6 +124,8 @@ private:
     InvokeFn start_{nullptr};
     UpdateFn update_{nullptr};
     InvokeFn destroy_{nullptr};
+    TransformFn set_transform_{nullptr};
+    TransformFn get_transform_{nullptr};
     CountFn count_{nullptr};
     std::string diagnostic_{};
 };

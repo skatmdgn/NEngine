@@ -47,6 +47,14 @@ ManagedRuntime::ManagedRuntime(
           std::exchange(
               other.destroy_,
               nullptr)),
+      set_transform_(
+          std::exchange(
+              other.set_transform_,
+              nullptr)),
+      get_transform_(
+          std::exchange(
+              other.get_transform_,
+              nullptr)),
       count_(
           std::exchange(
               other.count_,
@@ -87,6 +95,16 @@ ManagedRuntime::operator=(
     destroy_ =
         std::exchange(
             other.destroy_,
+            nullptr);
+
+    set_transform_ =
+        std::exchange(
+            other.set_transform_,
+            nullptr);
+
+    get_transform_ =
+        std::exchange(
+            other.get_transform_,
             nullptr);
 
     count_ =
@@ -156,9 +174,9 @@ bool ManagedRuntime::initialize(
     const int abi_version =
         abi();
 
-    if (abi_version != 2) {
+    if (abi_version != 3) {
         diagnostic_ =
-            "managed bridge ABI mismatch: expected 2, got " +
+            "managed bridge ABI mismatch: expected 3, got " +
             std::to_string(
                 abi_version);
         shutdown();
@@ -193,6 +211,20 @@ bool ManagedRuntime::initialize(
             bridge_type,
             "DestroyBehaviour");
 
+    set_transform_ =
+        load_entry<TransformFn>(
+            host_,
+            assembly_path,
+            bridge_type,
+            "SetTransformState");
+
+    get_transform_ =
+        load_entry<TransformFn>(
+            host_,
+            assembly_path,
+            bridge_type,
+            "GetTransformState");
+
     count_ =
         load_entry<CountFn>(
             host_,
@@ -208,7 +240,7 @@ bool ManagedRuntime::initialize(
     }
 
     diagnostic_ =
-        "managed gameplay runtime initialized; ABI v2 lifecycle ready";
+        "managed gameplay runtime initialized; ABI v3 lifecycle and Transform sync ready";
 
     return true;
 }
@@ -313,6 +345,85 @@ bool ManagedRuntime::destroy(
     return true;
 }
 
+bool ManagedRuntime::set_transform(
+    ManagedBehaviourHandle handle,
+    const core::Transform& transform) {
+
+    if (!valid() ||
+        !handle.valid()) {
+        return false;
+    }
+
+    NativeTransformState state;
+    state.px = transform.local_position.x;
+    state.py = transform.local_position.y;
+    state.pz = transform.local_position.z;
+    state.rx = transform.local_rotation.x;
+    state.ry = transform.local_rotation.y;
+    state.rz = transform.local_rotation.z;
+    state.rw = transform.local_rotation.w;
+    state.sx = transform.local_scale.x;
+    state.sy = transform.local_scale.y;
+    state.sz = transform.local_scale.z;
+
+    const int result =
+        set_transform_(
+            handle.value,
+            &state);
+
+    if (result < 0) {
+        diagnostic_ =
+            "managed Transform push failed";
+        return false;
+    }
+
+    return true;
+}
+
+bool ManagedRuntime::get_transform(
+    ManagedBehaviourHandle handle,
+    core::Transform& transform) {
+
+    if (!valid() ||
+        !handle.valid()) {
+        return false;
+    }
+
+    NativeTransformState state;
+
+    const int result =
+        get_transform_(
+            handle.value,
+            &state);
+
+    if (result < 0) {
+        diagnostic_ =
+            "managed Transform pull failed";
+        return false;
+    }
+
+    transform.local_position = {
+        state.px,
+        state.py,
+        state.pz
+    };
+
+    transform.local_rotation = {
+        state.rx,
+        state.ry,
+        state.rz,
+        state.rw
+    };
+
+    transform.local_scale = {
+        state.sx,
+        state.sy,
+        state.sz
+    };
+
+    return true;
+}
+
 int ManagedRuntime::instance_count()
     const {
 
@@ -326,6 +437,8 @@ void ManagedRuntime::shutdown() noexcept {
     start_ = nullptr;
     update_ = nullptr;
     destroy_ = nullptr;
+    set_transform_ = nullptr;
+    get_transform_ = nullptr;
     count_ = nullptr;
     host_.shutdown();
 }
