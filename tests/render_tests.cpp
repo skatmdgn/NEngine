@@ -2034,6 +2034,325 @@ int main() {
                 }),
             "reimporting the same glTF preserves all generated material and texture GUIDs");
 
+
+        const auto pbr_five_map_source =
+            root / "pbr_five_map.gltf";
+
+        {
+            std::ofstream output(
+                pbr_five_map_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output << R"json({
+  "asset":{"version":"2.0"},
+  "meshes":[{"primitives":[{"material":0}]}],
+  "materials":[{
+    "pbrMetallicRoughness":{
+      "baseColorFactor":[0.5,1.0,1.0,0.75],
+      "baseColorTexture":{"index":0},
+      "metallicFactor":0.25,
+      "roughnessFactor":0.75,
+      "metallicRoughnessTexture":{"index":1}
+    },
+    "normalTexture":{"index":2},
+    "emissiveTexture":{"index":3},
+    "emissiveFactor":[0.1,0.2,0.3],
+    "occlusionTexture":{"index":4},
+    "alphaMode":"MASK",
+    "alphaCutoff":0.4,
+    "doubleSided":true
+  }],
+  "textures":[
+    {"source":0},
+    {"source":0},
+    {"source":0},
+    {"source":0},
+    {"source":0}
+  ],
+  "images":[{
+    "uri":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAEUlEQVR42mP4z8Dwn+E/w38AEPgD/Tyf5vYAAAAASUVORK5CYII="
+  }]
+})json";
+        }
+
+        auto pbr_five_map_asset =
+            gltf_asset;
+
+        pbr_five_map_asset.source_path =
+            pbr_five_map_source;
+
+        render::GltfPbrMaterialCookData
+            pbr_five_map_data;
+
+        check(
+            render::decode_gltf_pbr_material(
+                pbr_five_map_asset,
+                0u,
+                pbr_five_map_data,
+                &resolve_error) &&
+            pbr_five_map_data.base_color.valid() &&
+            pbr_five_map_data.normal.has_value() &&
+            pbr_five_map_data.normal->valid() &&
+            pbr_five_map_data.normal->color_space ==
+                render::DecodedTextureColorSpace::Linear &&
+            pbr_five_map_data.metallic_roughness.has_value() &&
+            pbr_five_map_data.metallic_roughness->color_space ==
+                render::DecodedTextureColorSpace::Linear &&
+            pbr_five_map_data.emissive.has_value() &&
+            pbr_five_map_data.emissive->color_space ==
+                render::DecodedTextureColorSpace::SRgb &&
+            pbr_five_map_data.occlusion.has_value() &&
+            pbr_five_map_data.occlusion->color_space ==
+                render::DecodedTextureColorSpace::Linear &&
+            std::abs(
+                pbr_five_map_data.metallic_factor -
+                    0.25f) < 0.0001f &&
+            std::abs(
+                pbr_five_map_data.roughness_factor -
+                    0.75f) < 0.0001f &&
+            std::abs(
+                pbr_five_map_data.emissive_factor.x -
+                    0.1f) < 0.0001f &&
+            std::abs(
+                pbr_five_map_data.emissive_factor.y -
+                    0.2f) < 0.0001f &&
+            std::abs(
+                pbr_five_map_data.emissive_factor.z -
+                    0.3f) < 0.0001f &&
+            pbr_five_map_data.alpha_mode ==
+                render::MaterialAlphaMode::Mask &&
+            std::abs(
+                pbr_five_map_data.alpha_cutoff -
+                    0.4f) < 0.0001f &&
+            pbr_five_map_data.double_sided,
+            "glTF full PBR material decoder preserves five maps factors alpha and double-sided state");
+
+        const auto pbr_cook_cache =
+            root / "pbr_five_map_cache";
+
+        std::filesystem::create_directories(
+            pbr_cook_cache,
+            cooked_directory_error);
+
+        assets::AssetRecord
+            pbr_model_record;
+
+        pbr_model_record.guid =
+            assets::AssetGuid::generate();
+        pbr_model_record.source_path =
+            pbr_five_map_source;
+        pbr_model_record.relative_path =
+            "pbr_five_map.gltf";
+        pbr_model_record.importer_id =
+            "NEngine.Model";
+        pbr_model_record.file_size =
+            std::filesystem::file_size(
+                pbr_five_map_source);
+
+        const assets::ImportContext
+            pbr_cook_context{
+                &pbr_model_record,
+                &cooked_model_importer,
+                pbr_cook_cache
+            };
+
+        const auto pbr_cooked =
+            render::model_asset_importer(
+                pbr_cook_context);
+
+        const auto pbr_material_guid =
+            assets::derive_subasset_guid(
+                pbr_model_record.guid,
+                "gltf-material",
+                0u);
+
+        const auto pbr_base_guid =
+            assets::derive_subasset_guid(
+                pbr_model_record.guid,
+                "gltf-base-color",
+                0u);
+
+        const auto pbr_normal_guid =
+            assets::derive_subasset_guid(
+                pbr_model_record.guid,
+                "gltf-normal",
+                0u);
+
+        const auto pbr_mr_guid =
+            assets::derive_subasset_guid(
+                pbr_model_record.guid,
+                "gltf-metallic-roughness",
+                0u);
+
+        const auto pbr_emissive_guid =
+            assets::derive_subasset_guid(
+                pbr_model_record.guid,
+                "gltf-emissive",
+                0u);
+
+        const auto pbr_occlusion_guid =
+            assets::derive_subasset_guid(
+                pbr_model_record.guid,
+                "gltf-occlusion",
+                0u);
+
+        check(
+            pbr_cooked.success &&
+            pbr_cooked.subassets.size() == 6u,
+            "glTF five-map material cooks five Texture subassets plus one Material v2 subasset");
+
+        const auto find_pbr_subasset =
+            [&](assets::AssetGuid guid)
+                -> const assets::GeneratedSubasset* {
+
+                const auto it =
+                    std::find_if(
+                        pbr_cooked.subassets.begin(),
+                        pbr_cooked.subassets.end(),
+                        [&](const auto& subasset) {
+                            return
+                                subasset.guid ==
+                                guid;
+                        });
+
+                return it ==
+                    pbr_cooked.subassets.end()
+                    ? nullptr
+                    : &*it;
+            };
+
+        const auto* pbr_material_subasset =
+            find_pbr_subasset(
+                pbr_material_guid);
+
+        const auto* pbr_normal_subasset =
+            find_pbr_subasset(
+                pbr_normal_guid);
+
+        const auto* pbr_emissive_subasset =
+            find_pbr_subasset(
+                pbr_emissive_guid);
+
+        check(
+            find_pbr_subasset(
+                pbr_base_guid) &&
+            pbr_normal_subasset &&
+            find_pbr_subasset(
+                pbr_mr_guid) &&
+            pbr_emissive_subasset &&
+            find_pbr_subasset(
+                pbr_occlusion_guid) &&
+            pbr_material_subasset,
+            "glTF five-map cooker generates deterministic GUIDs for every PBR texture slot");
+
+        if (pbr_material_subasset) {
+            assets::CachedArtifactSet
+                pbr_material_artifacts;
+
+            pbr_material_artifacts.fingerprint =
+                "pbr-five-map-material";
+            pbr_material_artifacts.importer_id =
+                "NEngine.Material";
+            pbr_material_artifacts.importer_version =
+                2u;
+            pbr_material_artifacts.artifacts =
+                pbr_material_subasset
+                    ->artifacts;
+
+            const auto resolved_pbr_material =
+                render::resolve_material_asset(
+                    pbr_material_guid,
+                    pbr_material_artifacts,
+                    &resolve_error);
+
+            check(
+                resolved_pbr_material &&
+                resolved_pbr_material
+                    ->material.base_color_texture ==
+                    pbr_base_guid &&
+                resolved_pbr_material
+                    ->material.normal_texture ==
+                    pbr_normal_guid &&
+                resolved_pbr_material
+                    ->material.metallic_roughness_texture ==
+                    pbr_mr_guid &&
+                resolved_pbr_material
+                    ->material.emissive_texture ==
+                    pbr_emissive_guid &&
+                resolved_pbr_material
+                    ->material.occlusion_texture ==
+                    pbr_occlusion_guid &&
+                std::abs(
+                    resolved_pbr_material
+                        ->material.metallic_factor -
+                        0.25f) < 0.0001f &&
+                std::abs(
+                    resolved_pbr_material
+                        ->material.roughness_factor -
+                        0.75f) < 0.0001f &&
+                resolved_pbr_material
+                    ->material.alpha_mode ==
+                    render::MaterialAlphaMode::Mask &&
+                std::abs(
+                    resolved_pbr_material
+                        ->material.alpha_cutoff -
+                        0.4f) < 0.0001f &&
+                resolved_pbr_material
+                    ->material.double_sided,
+                "cooked glTF Material v2 resolves all five texture GUIDs and scalar render state");
+        }
+
+        if (pbr_normal_subasset &&
+            pbr_emissive_subasset) {
+
+            assets::CachedArtifactSet
+                normal_artifacts;
+
+            normal_artifacts.fingerprint =
+                "pbr-normal";
+            normal_artifacts.importer_id =
+                "NEngine.Texture";
+            normal_artifacts.importer_version =
+                1u;
+            normal_artifacts.artifacts =
+                pbr_normal_subasset
+                    ->artifacts;
+
+            assets::CachedArtifactSet
+                emissive_artifacts =
+                    normal_artifacts;
+
+            emissive_artifacts.fingerprint =
+                "pbr-emissive";
+            emissive_artifacts.artifacts =
+                pbr_emissive_subasset
+                    ->artifacts;
+
+            const auto normal_asset =
+                render::resolve_texture_asset(
+                    pbr_normal_guid,
+                    normal_artifacts,
+                    &resolve_error);
+
+            const auto emissive_asset =
+                render::resolve_texture_asset(
+                    pbr_emissive_guid,
+                    emissive_artifacts,
+                    &resolve_error);
+
+            check(
+                normal_asset &&
+                emissive_asset &&
+                normal_asset
+                    ->metadata.color_space ==
+                    "Linear" &&
+                emissive_asset
+                    ->metadata.color_space ==
+                    "sRGB",
+                "cooked glTF PBR texture descriptors preserve linear versus sRGB semantics");
+        }
+
         const auto sparse_source =
             root / "sparse_position_triangle.gltf";
 
