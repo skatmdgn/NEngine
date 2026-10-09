@@ -330,6 +330,7 @@ struct Win32EditorShell::Impl {
     std::filesystem::path current_scene_path{};
     ULONGLONG next_asset_poll_tick{0};
     ULONGLONG last_runtime_tick{0};
+    ULONGLONG managed_build_generation{0};
 
     std::unique_ptr<
         nengine::render::VulkanContext>
@@ -3098,11 +3099,16 @@ struct Win32EditorShell::Impl {
 
         build_config.project_path =
             generated.project_path;
+        ++managed_build_generation;
+
         build_config.output_directory =
             editor.project().root() /
             "Library" /
             "ManagedBuild" /
-            "Debug";
+            "Debug" /
+            ("Generation-" +
+             std::to_string(
+                 managed_build_generation));
         build_config.configuration =
             "Debug";
 
@@ -3133,43 +3139,62 @@ struct Win32EditorShell::Impl {
                         .filename()
                         .wstring()));
 
-        std::string host_error;
-
-        const auto host_info =
-            nengine::scripting::
-                discover_dotnet_host(
-                    {},
-                    &host_error);
-
-        if (!host_info) {
-            editor.console().error(
-                "Scripting",
-                "C# build succeeded, but .NET runtime host discovery failed: " +
-                    host_error);
-            refresh_console();
-            return false;
-        }
-
         std::string runtime_error;
 
-        if (!editor.initialize_managed_runtime(
-                host_info->hostfxr_path,
-                generated.runtime_config_path,
-                build.plan.assembly_path,
-                "GameScripts",
-                &runtime_error)) {
+        if (editor.managed_runtime_ready()) {
+            if (!editor.reload_managed_runtime(
+                    build.plan.assembly_path,
+                    "GameScripts",
+                    &runtime_error)) {
 
-            editor.console().error(
+                editor.console().error(
+                    "Scripting",
+                    "C# build succeeded, but collectible gameplay hot reload failed: " +
+                        runtime_error);
+                refresh_console();
+                return false;
+            }
+
+            editor.console().info(
                 "Scripting",
-                "C# build succeeded, but managed runtime initialization failed: " +
-                    runtime_error);
-            refresh_console();
-            return false;
-        }
+                "Managed gameplay DLL hot-reloaded through the stable NEngine.Bridge assembly; hostfxr stayed alive.");
+        } else {
+            std::string host_error;
 
-        editor.console().info(
-            "Scripting",
-            "Managed gameplay DLL loaded through hostfxr; ABI v3 lifecycle and Transform sync are ready for Play Mode ScriptBehaviour components.");
+            const auto host_info =
+                nengine::scripting::
+                    discover_dotnet_host(
+                        {},
+                        &host_error);
+
+            if (!host_info) {
+                editor.console().error(
+                    "Scripting",
+                    "C# build succeeded, but .NET runtime host discovery failed: " +
+                        host_error);
+                refresh_console();
+                return false;
+            }
+
+            if (!editor.initialize_managed_runtime(
+                    host_info->hostfxr_path,
+                    generated.runtime_config_path,
+                    build.plan.assembly_path,
+                    "GameScripts",
+                    &runtime_error)) {
+
+                editor.console().error(
+                    "Scripting",
+                    "C# build succeeded, but managed runtime initialization failed: " +
+                        runtime_error);
+                refresh_console();
+                return false;
+            }
+
+            editor.console().info(
+                "Scripting",
+                "Managed gameplay DLL loaded through hostfxr + NEngine.Bridge ABI v5; collectible hot reload is ready.");
+        }
 
         refresh_console();
         return true;
