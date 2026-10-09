@@ -2529,6 +2529,106 @@ struct Win32EditorShell::Impl {
         return true;
     }
 
+    void refresh_add_component_options(
+        const nengine::editor::InspectorSnapshot& snapshot) {
+
+        add_component_rows.clear();
+
+        if (!add_component_list ||
+            !add_component) {
+            return;
+        }
+
+        SendMessageW(
+            add_component_list,
+            CB_RESETCONTENT,
+            0,
+            0);
+
+        const bool editable =
+            snapshot.valid &&
+            editor.can_edit() &&
+            editor.world().is_alive(
+                snapshot.entity);
+
+        if (!editable) {
+            EnableWindow(
+                add_component_list,
+                FALSE);
+
+            EnableWindow(
+                add_component,
+                FALSE);
+
+            return;
+        }
+
+        for (const auto& descriptor :
+             editor.component_registry()
+                 .descriptors()) {
+
+            if (descriptor.id ==
+                    nengine::core::World::
+                        transform_type ||
+                !editor.component_factories()
+                    .contains(
+                        descriptor.id) ||
+                editor.world()
+                    .has_component(
+                        snapshot.entity,
+                        descriptor.id)) {
+                continue;
+            }
+
+            add_component_rows.push_back(
+                descriptor.id);
+
+            auto display =
+                descriptor.name;
+
+            constexpr std::string_view
+                prefix{"NEngine."};
+
+            if (display.rfind(
+                    prefix,
+                    0) == 0u) {
+                display.erase(
+                    0,
+                    prefix.size());
+            }
+
+            const auto wide =
+                utf8_to_wide(
+                    display);
+
+            SendMessageW(
+                add_component_list,
+                CB_ADDSTRING,
+                0,
+                reinterpret_cast<LPARAM>(
+                    wide.c_str()));
+        }
+
+        const bool has_options =
+            !add_component_rows.empty();
+
+        if (has_options) {
+            SendMessageW(
+                add_component_list,
+                CB_SETCURSEL,
+                0,
+                0);
+        }
+
+        EnableWindow(
+            add_component_list,
+            has_options);
+
+        EnableWindow(
+            add_component,
+            has_options);
+    }
+
     void refresh_inspector() {
         const auto snapshot =
             nengine::editor::build_inspector(editor);
@@ -2585,6 +2685,9 @@ struct Win32EditorShell::Impl {
                 apply_property,
                 FALSE);
 
+            refresh_add_component_options(
+                snapshot);
+
             return;
         }
 
@@ -2640,6 +2743,9 @@ struct Win32EditorShell::Impl {
             transform->local_scale.z);
 
         refresh_generic_property_editor(
+            snapshot);
+
+        refresh_add_component_options(
             snapshot);
     }
 
@@ -3185,6 +3291,77 @@ struct Win32EditorShell::Impl {
             }
 
             apply_generic_property_edit();
+            handled = true;
+            break;
+
+        case IdAddComponent:
+            if (notification != BN_CLICKED) {
+                return false;
+            }
+
+            if (editor.can_edit() &&
+                add_component_list) {
+
+                const int index =
+                    static_cast<int>(
+                        SendMessageW(
+                            add_component_list,
+                            CB_GETCURSEL,
+                            0,
+                            0));
+
+                const auto entity =
+                    editor.selection()
+                        .active();
+
+                if (index >= 0 &&
+                    static_cast<std::size_t>(
+                        index) <
+                        add_component_rows
+                            .size() &&
+                    editor.world()
+                        .is_alive(
+                            entity)) {
+
+                    const auto type =
+                        add_component_rows[
+                            static_cast<
+                                std::size_t>(
+                                    index)];
+
+                    const auto* descriptor =
+                        editor.component_registry()
+                            .find(
+                                type);
+
+                    const bool added =
+                        editor.commands().execute(
+                            editor.world(),
+                            std::make_unique<
+                                nengine::editor::
+                                    AddComponentCommand>(
+                                        entity,
+                                        type,
+                                        &editor
+                                            .component_factories()));
+
+                    if (added) {
+                        editor.console().info(
+                            "Inspector",
+                            "Added component " +
+                                (descriptor
+                                    ? descriptor
+                                        ->name
+                                    : std::string{
+                                        "unknown"}));
+                    } else {
+                        editor.console().warning(
+                            "Inspector",
+                            "Component could not be added.");
+                    }
+                }
+            }
+
             handled = true;
             break;
 
