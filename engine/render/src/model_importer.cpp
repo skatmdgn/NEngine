@@ -453,6 +453,333 @@ bool append_cooked_material(
     return true;
 }
 
+
+bool append_generated_texture(
+    const assets::ImportContext& context,
+    assets::ImportResult& result,
+    std::uint32_t slot,
+    std::string_view guid_namespace,
+    std::string_view file_stem,
+    std::string_view display_name,
+    const DecodedTextureData& texture,
+    assets::AssetGuid& texture_guid) {
+
+    if (!texture.valid()) {
+        return false;
+    }
+
+    texture_guid =
+        assets::derive_subasset_guid(
+            context.asset->guid,
+            guid_namespace,
+            slot);
+
+    const auto directory =
+        context.cache_directory /
+        "subassets" /
+        ("material_" +
+         std::to_string(slot));
+
+    const auto source =
+        directory /
+        (std::string{file_stem} +
+         ".tga");
+
+    const auto descriptor =
+        directory /
+        (std::string{file_stem} +
+         ".nasset");
+
+    if (!write_rgba8_tga(
+            source,
+            texture)) {
+        return false;
+    }
+
+    std::ostringstream text;
+    text
+        << "NENGINE_TEXTURE 1\n"
+        << "FORMAT "
+        << std::quoted("tga")
+        << "\n"
+        << "WIDTH "
+        << texture.width
+        << "\n"
+        << "HEIGHT "
+        << texture.height
+        << "\n"
+        << "COLOR_SPACE "
+        << std::quoted(
+            texture.color_space ==
+                    DecodedTextureColorSpace::SRgb
+                ? "sRGB"
+                : "Linear")
+        << "\n"
+        << "SOURCE "
+        << std::quoted(
+            source.filename()
+                .generic_string())
+        << "\n"
+        << "END_TEXTURE\n";
+
+    if (!write_text(
+            descriptor,
+            text.str())) {
+        return false;
+    }
+
+    assets::GeneratedSubasset subasset;
+    subasset.guid =
+        texture_guid;
+    subasset.importer_id =
+        "NEngine.Texture";
+    subasset.name =
+        std::string{display_name};
+    subasset.artifacts = {
+        {
+            source,
+            "source"
+        },
+        {
+            descriptor,
+            "texture-descriptor"
+        }
+    };
+
+    result.subassets.push_back(
+        std::move(
+            subasset));
+
+    return true;
+}
+
+const char* alpha_mode_text(
+    MaterialAlphaMode mode) noexcept {
+
+    switch (mode) {
+    case MaterialAlphaMode::Opaque:
+        return "OPAQUE";
+    case MaterialAlphaMode::Mask:
+        return "MASK";
+    case MaterialAlphaMode::Blend:
+        return "BLEND";
+    }
+
+    return "OPAQUE";
+}
+
+bool append_cooked_gltf_pbr_material(
+    const assets::ImportContext& context,
+    assets::ImportResult& result,
+    std::uint32_t slot,
+    const GltfPbrMaterialCookData& pbr,
+    std::vector<CookedMapping>& mappings) {
+
+    assets::AssetGuid base_color_guid;
+
+    if (!append_generated_texture(
+            context,
+            result,
+            slot,
+            "gltf-base-color",
+            "base_color",
+            "glTF Base Color " +
+                std::to_string(slot),
+            pbr.base_color,
+            base_color_guid)) {
+
+        return false;
+    }
+
+    assets::AssetGuid normal_guid;
+    assets::AssetGuid metallic_roughness_guid;
+    assets::AssetGuid emissive_guid;
+    assets::AssetGuid occlusion_guid;
+
+    if (pbr.normal &&
+        !append_generated_texture(
+            context,
+            result,
+            slot,
+            "gltf-normal",
+            "normal",
+            "glTF Normal " +
+                std::to_string(slot),
+            *pbr.normal,
+            normal_guid)) {
+
+        return false;
+    }
+
+    if (pbr.metallic_roughness &&
+        !append_generated_texture(
+            context,
+            result,
+            slot,
+            "gltf-metallic-roughness",
+            "metallic_roughness",
+            "glTF Metallic Roughness " +
+                std::to_string(slot),
+            *pbr.metallic_roughness,
+            metallic_roughness_guid)) {
+
+        return false;
+    }
+
+    if (pbr.emissive &&
+        !append_generated_texture(
+            context,
+            result,
+            slot,
+            "gltf-emissive",
+            "emissive",
+            "glTF Emissive " +
+                std::to_string(slot),
+            *pbr.emissive,
+            emissive_guid)) {
+
+        return false;
+    }
+
+    if (pbr.occlusion &&
+        !append_generated_texture(
+            context,
+            result,
+            slot,
+            "gltf-occlusion",
+            "occlusion",
+            "glTF Occlusion " +
+                std::to_string(slot),
+            *pbr.occlusion,
+            occlusion_guid)) {
+
+        return false;
+    }
+
+    const auto material_guid =
+        assets::derive_subasset_guid(
+            context.asset->guid,
+            "gltf-material",
+            slot);
+
+    const auto directory =
+        context.cache_directory /
+        "subassets" /
+        ("material_" +
+         std::to_string(slot));
+
+    const auto material_source =
+        directory /
+        "material.nmat";
+
+    std::ostringstream text;
+
+    text
+        << "NENGINE_MATERIAL 2\n"
+        << "BASE_COLOR_TEXTURE "
+        << std::quoted(
+            base_color_guid
+                .to_string())
+        << "\n";
+
+    if (normal_guid.valid()) {
+        text
+            << "NORMAL_TEXTURE "
+            << std::quoted(
+                normal_guid.to_string())
+            << "\n";
+    }
+
+    if (metallic_roughness_guid.valid()) {
+        text
+            << "METALLIC_ROUGHNESS_TEXTURE "
+            << std::quoted(
+                metallic_roughness_guid
+                    .to_string())
+            << "\n";
+    }
+
+    if (emissive_guid.valid()) {
+        text
+            << "EMISSIVE_TEXTURE "
+            << std::quoted(
+                emissive_guid
+                    .to_string())
+            << "\n";
+    }
+
+    if (occlusion_guid.valid()) {
+        text
+            << "OCCLUSION_TEXTURE "
+            << std::quoted(
+                occlusion_guid
+                    .to_string())
+            << "\n";
+    }
+
+    text
+        << "METALLIC_FACTOR "
+        << pbr.metallic_factor
+        << "\n"
+        << "ROUGHNESS_FACTOR "
+        << pbr.roughness_factor
+        << "\n"
+        << "EMISSIVE_FACTOR "
+        << pbr.emissive_factor.x
+        << " "
+        << pbr.emissive_factor.y
+        << " "
+        << pbr.emissive_factor.z
+        << "\n"
+        << "ALPHA_MODE "
+        << std::quoted(
+            alpha_mode_text(
+                pbr.alpha_mode))
+        << "\n"
+        << "ALPHA_CUTOFF "
+        << pbr.alpha_cutoff
+        << "\n"
+        << "DOUBLE_SIDED "
+        << (pbr.double_sided
+                ? 1
+                : 0)
+        << "\n"
+        << "END_MATERIAL\n";
+
+    if (!write_text(
+            material_source,
+            text.str())) {
+
+        return false;
+    }
+
+    assets::GeneratedSubasset material_subasset;
+    material_subasset.guid =
+        material_guid;
+    material_subasset.importer_id =
+        "NEngine.Material";
+    material_subasset.name =
+        "glTF Material " +
+        std::to_string(slot);
+    material_subasset.artifacts = {
+        {
+            material_source,
+            "source"
+        }
+    };
+
+    result.subassets.push_back(
+        std::move(
+            material_subasset));
+
+    mappings.push_back({
+        slot,
+        material_guid
+    });
+
+    return true;
+}
+
 std::string lower_extension(
     const std::filesystem::path& path) {
 
@@ -599,159 +926,34 @@ assets::ImportResult model_asset_importer(
         for (const auto slot :
              material_slots) {
 
-        DecodedTextureData base_color;
-        std::string decode_error;
+            GltfPbrMaterialCookData
+                pbr;
 
-        if (!decode_gltf_material_base_color_texture(
-                model,
-                slot,
-                base_color,
-                &decode_error)) {
-            continue;
-        }
+            std::string decode_error;
 
-        const auto texture_guid =
-            assets::derive_subasset_guid(
-                context.asset->guid,
-                "gltf-base-color",
-                slot);
+            if (!decode_gltf_pbr_material(
+                    model,
+                    slot,
+                    pbr,
+                    &decode_error)) {
 
-        const auto material_guid =
-            assets::derive_subasset_guid(
-                context.asset->guid,
-                "gltf-material",
-                slot);
-
-        const auto directory =
-            context.cache_directory /
-            "subassets" /
-            ("material_" +
-             std::to_string(slot));
-
-        const auto texture_source =
-            directory /
-            "base_color.tga";
-
-        const auto texture_descriptor =
-            directory /
-            "base_color.nasset";
-
-        const auto material_source =
-            directory /
-            "material.nmat";
-
-        if (!write_rgba8_tga(
-                texture_source,
-                base_color)) {
-
-            result.success = false;
-            result.message =
-                "could not write cooked glTF base-color texture";
-            return result;
-        }
-
-        std::ostringstream texture_text;
-        texture_text
-            << "NENGINE_TEXTURE 1\n"
-            << "FORMAT "
-            << std::quoted("tga")
-            << "\n"
-            << "WIDTH "
-            << base_color.width
-            << "\n"
-            << "HEIGHT "
-            << base_color.height
-            << "\n"
-            << "COLOR_SPACE "
-            << std::quoted("sRGB")
-            << "\n"
-            << "SOURCE "
-            << std::quoted(
-                texture_source
-                    .filename()
-                    .generic_string())
-            << "\n"
-            << "END_TEXTURE\n";
-
-        if (!write_text(
-                texture_descriptor,
-                texture_text.str())) {
-
-            result.success = false;
-            result.message =
-                "could not write cooked glTF texture descriptor";
-            return result;
-        }
-
-        std::ostringstream material_text;
-        material_text
-            << "NENGINE_MATERIAL 1\n"
-            << "BASE_COLOR_TEXTURE "
-            << std::quoted(
-                texture_guid.to_string())
-            << "\n"
-            << "END_MATERIAL\n";
-
-        if (!write_text(
-                material_source,
-                material_text.str())) {
-
-            result.success = false;
-            result.message =
-                "could not write cooked glTF material";
-            return result;
-        }
-
-        assets::GeneratedSubasset
-            texture_subasset;
-
-        texture_subasset.guid =
-            texture_guid;
-        texture_subasset.importer_id =
-            "NEngine.Texture";
-        texture_subasset.name =
-            "glTF Base Color " +
-            std::to_string(slot);
-        texture_subasset.artifacts = {
-            {
-                texture_source,
-                "source"
-            },
-            {
-                texture_descriptor,
-                "texture-descriptor"
+                // Keep geometry importable when a material uses image
+                // encodings/extensions outside the current cooking subset.
+                continue;
             }
-        };
 
-        assets::GeneratedSubasset
-            material_subasset;
+            if (!append_cooked_gltf_pbr_material(
+                    context,
+                    result,
+                    slot,
+                    pbr,
+                    mappings)) {
 
-        material_subasset.guid =
-            material_guid;
-        material_subasset.importer_id =
-            "NEngine.Material";
-        material_subasset.name =
-            "glTF Material " +
-            std::to_string(slot);
-        material_subasset.artifacts = {
-            {
-                material_source,
-                "source"
+                result.success = false;
+                result.message =
+                    "could not write cooked glTF Material v2 subassets";
+                return result;
             }
-        };
-
-        result.subassets.push_back(
-            std::move(
-                texture_subasset));
-
-        result.subassets.push_back(
-            std::move(
-                material_subasset));
-
-        mappings.push_back({
-            slot,
-            material_guid
-        });
         }
     }
 
