@@ -232,6 +232,12 @@ int main() {
             std::string::npos &&
         api.find("mousePosition") !=
             std::string::npos &&
+        api.find("StartCoroutine") !=
+            std::string::npos &&
+        api.find("WaitForSeconds") !=
+            std::string::npos &&
+        api.find("frameCount") !=
+            std::string::npos &&
         api.find(
             "InternalsVisibleTo(\"NEngine.Bridge\")") !=
                 std::string::npos,
@@ -558,6 +564,15 @@ int main() {
                 << "        }\n"
                 << "        frame++;\n"
                 << "    }\n"
+                << "}\n                << "public class CoroutineProbe : Behaviour {\n"
+                << "    private System.Collections.IEnumerator Routine() {\n"
+                << "        gameObject.name = \"Coroutine Started\";\n"
+                << "        yield return null;\n"
+                << "        transform.localPosition = transform.localPosition + new Vector3(1, 0, 0);\n"
+                << "        yield return new WaitForSeconds(0.03f);\n"
+                << "        gameObject.name = \"Coroutine Done\";\n"
+                << "    }\n"
+                << "    private void Start() { StartCoroutine(Routine()); }\n"
                 << "}\n";
         }
 
@@ -1091,6 +1106,105 @@ int main() {
                                 script_system.instance_count() == 0u &&
                                 managed_runtime.instance_count() == 0,
                                 "managed Input fixture releases instance before hot reload");
+
+                            const auto coroutine_entity =
+                                script_world.create(
+                                    "Coroutine Target");
+
+                            auto* coroutine_script =
+                                script_world.add_component<
+                                    ScriptBehaviour>(
+                                        coroutine_entity,
+                                        script_behaviour_type());
+
+                            if (coroutine_script) {
+                                coroutine_script->type_name =
+                                    "CoroutineProbe";
+                            }
+
+                            auto* coroutine_transform =
+                                script_world.transform(
+                                    coroutine_entity);
+
+                            const auto coroutine_tick_1 =
+                                script_system.update(
+                                    script_world,
+                                    0.02f,
+                                    &system_error);
+
+                            check(
+                                coroutine_script &&
+                                coroutine_tick_1.created == 1u &&
+                                coroutine_tick_1.started == 1u &&
+                                coroutine_tick_1.updated == 1u &&
+                                coroutine_tick_1.unresolved == 0u &&
+                                coroutine_transform &&
+                                coroutine_transform
+                                    ->local_position.x == 0.0f &&
+                                script_world.name(
+                                    coroutine_entity) ==
+                                    "Coroutine Started",
+                                "managed coroutine Start primes through first yield and defers continuation for one frame");
+
+                            const auto coroutine_tick_2 =
+                                script_system.update(
+                                    script_world,
+                                    0.02f,
+                                    &system_error);
+
+                            check(
+                                coroutine_tick_2.updated == 1u &&
+                                coroutine_tick_2.unresolved == 0u &&
+                                coroutine_transform &&
+                                coroutine_transform
+                                    ->local_position.x == 1.0f &&
+                                script_world.name(
+                                    coroutine_entity) ==
+                                    "Coroutine Started",
+                                "yield return null resumes on following managed update and enters WaitForSeconds");
+
+                            const auto coroutine_tick_3 =
+                                script_system.update(
+                                    script_world,
+                                    0.02f,
+                                    &system_error);
+
+                            check(
+                                coroutine_tick_3.updated == 1u &&
+                                coroutine_tick_3.unresolved == 0u &&
+                                script_world.name(
+                                    coroutine_entity) ==
+                                    "Coroutine Started",
+                                "WaitForSeconds remains suspended before requested duration elapses");
+
+                            const auto coroutine_tick_4 =
+                                script_system.update(
+                                    script_world,
+                                    0.02f,
+                                    &system_error);
+
+                            check(
+                                coroutine_tick_4.updated == 1u &&
+                                coroutine_tick_4.unresolved == 0u &&
+                                script_world.name(
+                                    coroutine_entity) ==
+                                    "Coroutine Done",
+                                "WaitForSeconds resumes coroutine after accumulated managed frame time");
+
+                            script_world.destroy(
+                                coroutine_entity);
+
+                            const auto coroutine_cleanup =
+                                script_system.update(
+                                    script_world,
+                                    0.0f,
+                                    &system_error);
+
+                            check(
+                                coroutine_cleanup.destroyed == 1u &&
+                                script_system.instance_count() == 0u &&
+                                managed_runtime.instance_count() == 0,
+                                "destroying coroutine Behaviour stops scheduler state and releases managed instance");
 
                             {
                                 std::ofstream script(
