@@ -738,6 +738,10 @@ bool ManagedProjectGenerator::generate(
         generated_directory /
         "NEngine.API.cs";
 
+    output.bridge_project_path =
+        generated_directory /
+        "NEngine.Bridge.csproj";
+
     output.bridge_path =
         generated_directory /
         "NEngine.ManagedBridge.cs";
@@ -774,6 +778,7 @@ bool ManagedProjectGenerator::generate(
         << "  </ItemGroup>\n"
         << "  <ItemGroup>\n"
         << "    <ProjectReference Include=\"NEngine.API.csproj\" />\n"
+        << "    <ProjectReference Include=\"NEngine.Bridge.csproj\" />\n"
         << "  </ItemGroup>\n";
 
     std::ostringstream api_project;
@@ -792,6 +797,26 @@ bool ManagedProjectGenerator::generate(
         << "  </PropertyGroup>\n"
         << "  <ItemGroup>\n"
         << "    <Compile Include=\"NEngine.API.cs\" />\n"
+        << "  </ItemGroup>\n"
+        << "</Project>\n";
+
+    std::ostringstream bridge_project;
+
+    bridge_project
+        << "<Project Sdk=\"Microsoft.NET.Sdk\">\n"
+        << "  <PropertyGroup>\n"
+        << "    <TargetFramework>"
+        << xml_escape(
+            config.target_framework)
+        << "</TargetFramework>\n"
+        << "    <LangVersion>latest</LangVersion>\n"
+        << "    <Nullable>enable</Nullable>\n"
+        << "    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>\n"
+        << "    <AssemblyName>NEngine.Bridge</AssemblyName>\n"
+        << "  </PropertyGroup>\n"
+        << "  <ItemGroup>\n"
+        << "    <Compile Include=\"NEngine.ManagedBridge.cs\" />\n"
+        << "    <ProjectReference Include=\"NEngine.API.csproj\" />\n"
         << "  </ItemGroup>\n"
         << "</Project>\n";
 
@@ -825,6 +850,9 @@ bool ManagedProjectGenerator::generate(
     constexpr std::string_view api_project_guid =
         "{4E1A67CE-8C2A-4BC0-9813-9A62154E9B43}";
 
+    constexpr std::string_view bridge_project_guid =
+        "{C731B50F-76D6-4A42-9E1D-24F40C28AA2E}";
+
     std::ostringstream solution;
 
     solution
@@ -844,6 +872,10 @@ bool ManagedProjectGenerator::generate(
         << api_project_guid
         << "\"\r\n"
         << "EndProject\r\n"
+        << "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"NEngine.Bridge\", \".nengine\\Managed\\NEngine.Bridge.csproj\", \""
+        << bridge_project_guid
+        << "\"\r\n"
+        << "EndProject\r\n"
         << "Global\r\n"
         << "\tGlobalSection(SolutionConfigurationPlatforms) = preSolution\r\n"
         << "\t\tDebug|Any CPU = Debug|Any CPU\r\n"
@@ -858,21 +890,24 @@ bool ManagedProjectGenerator::generate(
         << "\t\t" << api_project_guid << ".Debug|Any CPU.Build.0 = Debug|Any CPU\r\n"
         << "\t\t" << api_project_guid << ".Release|Any CPU.ActiveCfg = Release|Any CPU\r\n"
         << "\t\t" << api_project_guid << ".Release|Any CPU.Build.0 = Release|Any CPU\r\n"
+        << "\t\t" << bridge_project_guid << ".Debug|Any CPU.ActiveCfg = Debug|Any CPU\r\n"
+        << "\t\t" << bridge_project_guid << ".Debug|Any CPU.Build.0 = Debug|Any CPU\r\n"
+        << "\t\t" << bridge_project_guid << ".Release|Any CPU.ActiveCfg = Release|Any CPU\r\n"
+        << "\t\t" << bridge_project_guid << ".Release|Any CPU.Build.0 = Release|Any CPU\r\n"
         << "\tEndGlobalSection\r\n"
         << "EndGlobal\r\n";
 
     if (!write_text(
             output.api_stub_path,
             api_stub(
-                config.project_name),
+                "NEngine.Bridge"),
             error)) {
         return false;
     }
 
     if (!write_text(
             output.bridge_path,
-            managed_bridge(
-                config.project_name),
+            managed_bridge(),
             error)) {
         return false;
     }
@@ -893,6 +928,13 @@ bool ManagedProjectGenerator::generate(
     if (!write_text(
             output.api_project_path,
             api_project.str(),
+            error)) {
+        return false;
+    }
+
+    if (!write_text(
+            output.bridge_project_path,
+            bridge_project.str(),
             error)) {
         return false;
     }
