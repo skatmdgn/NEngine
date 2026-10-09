@@ -10,6 +10,7 @@
 #include "nengine/editor/project_session.hpp"
 #include "nengine/editor/property_access.hpp"
 #include "nengine/editor/selection.hpp"
+#include "nengine/render/sprite_animation.hpp"
 
 namespace nengine::editor {
 
@@ -76,6 +77,9 @@ public:
 
     bool can_edit() const noexcept { return !play_session_.is_playing(); }
 
+    void tick_runtime(
+        double elapsed_seconds);
+
     void mark_scene_saved() noexcept {
         saved_scene_state_id_ =
             commands_.state_id();
@@ -99,6 +103,8 @@ private:
     EditorLayoutState layout_{};
     ProjectSession project_{};
     PropertyAccessRegistry property_access_{};
+    render::SpriteAnimationClipCache
+        sprite_animation_cache_{};
     std::uint64_t saved_scene_state_id_{0};
 };
 

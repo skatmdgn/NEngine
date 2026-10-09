@@ -112,4 +112,53 @@ EditorModel::EditorModel() {
         "EditorModel initialized.");
 }
 
+
+void EditorModel::tick_runtime(
+    double elapsed_seconds) {
+
+    auto* runtime =
+        play_session_.runtime_world();
+
+    if (!runtime) {
+        return;
+    }
+
+    const auto steps =
+        play_session_
+            .consume_simulation_steps(
+                elapsed_seconds);
+
+    if (steps == 0u) {
+        return;
+    }
+
+    std::string animation_error;
+
+    for (std::uint32_t step = 0u;
+         step < steps;
+         ++step) {
+
+        render::update_sprite_animators(
+            *runtime,
+            static_cast<float>(
+                play_session_
+                    .fixed_delta_seconds()),
+            sprite_animation_cache_,
+            [this](
+                assets::AssetGuid guid) {
+                return project_
+                    .cached_artifacts(
+                        guid);
+            },
+            &animation_error);
+    }
+
+    if (!animation_error.empty()) {
+        console_.warning(
+            "Animation",
+            std::move(
+                animation_error));
+    }
+}
+
 } // namespace nengine::editor
