@@ -316,6 +316,7 @@ struct Win32EditorShell::Impl {
     std::vector<nengine::assets::AssetRecord> asset_rows{};
     std::filesystem::path current_scene_path{};
     ULONGLONG next_asset_poll_tick{0};
+    ULONGLONG last_runtime_tick{0};
 
     std::unique_ptr<
         nengine::render::VulkanContext>
@@ -1119,6 +1120,28 @@ struct Win32EditorShell::Impl {
             return;
         }
 
+        const ULONGLONG now =
+            GetTickCount64();
+
+        double runtime_elapsed_seconds =
+            0.0;
+
+        if (last_runtime_tick != 0ull &&
+            now >= last_runtime_tick) {
+
+            runtime_elapsed_seconds =
+                static_cast<double>(
+                    now -
+                    last_runtime_tick) /
+                1000.0;
+        }
+
+        last_runtime_tick =
+            now;
+
+        editor.tick_runtime(
+            runtime_elapsed_seconds);
+
         RECT rect{};
         if (!GetClientRect(parent, &rect)) {
             return;
@@ -1180,7 +1203,6 @@ struct Win32EditorShell::Impl {
             }
         }
 
-        const ULONGLONG now = GetTickCount64();
         if (now >= next_asset_poll_tick) {
             next_asset_poll_tick = now + 1000ull;
 
