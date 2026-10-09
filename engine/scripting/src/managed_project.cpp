@@ -168,7 +168,7 @@ namespace NEngine.Internal
 
     public static class NativeBridge
     {
-        public const int AbiVersion = 6;
+        public const int AbiVersion = 7;
 
         private static readonly Dictionary<long, NEngine.Behaviour> Instances = new();
         private static long _nextHandle = 1;
@@ -183,6 +183,9 @@ namespace NEngine.Internal
         private struct NativeWorldCallbacks
         {
             public nint context;
+            public nint create;
+            public nint destroy;
+            public nint find;
             public nint isAlive;
             public nint copyNameUtf8;
             public nint setNameUtf8;
