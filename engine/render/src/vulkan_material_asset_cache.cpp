@@ -327,6 +327,8 @@ VulkanMaterialAssetCache::load(
         material_artifacts.fingerprint;
     entry.texture_guids =
         texture_guids;
+    entry.material_data =
+        resolved->material;
 
     if (!entry.material.create_textured_set(
             *device_,
@@ -372,6 +374,21 @@ VulkanMaterialAssetCache::find(
         it != entries_.end() &&
         it->second.material.valid()
         ? &it->second.material
+        : nullptr;
+}
+
+const MaterialAssetData*
+VulkanMaterialAssetCache::find_material_data(
+    assets::AssetGuid material_guid) const noexcept {
+
+    const auto it =
+        entries_.find(
+            material_guid);
+
+    return it !=
+            entries_.end() &&
+        it->second.material.valid()
+        ? &it->second.material_data
         : nullptr;
 }
 

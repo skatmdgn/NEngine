@@ -10,6 +10,7 @@
 
 #include "nengine/assets/asset_guid.hpp"
 #include "nengine/assets/import_pipeline.hpp"
+#include "nengine/render/material_asset.hpp"
 #include "nengine/render/vulkan_device.hpp"
 #include "nengine/render/vulkan_instance.hpp"
 #include "nengine/render/vulkan_loader.hpp"
@@ -48,6 +49,9 @@ public:
         std::string* error = nullptr);
 
     const VulkanMaterialResource* find(
+        assets::AssetGuid material_guid) const noexcept;
+
+    const MaterialAssetData* find_material_data(
         assets::AssetGuid material_guid) const noexcept;
 
     // Direct sampled-texture material path for Sprite/UI style renderers that
@@ -107,6 +111,7 @@ private:
         std::array<
             assets::AssetGuid,
             5u> texture_guids{};
+        MaterialAssetData material_data{};
         VulkanMaterialResource material{};
     };
 
