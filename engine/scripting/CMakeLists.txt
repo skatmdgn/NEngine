@@ -3,6 +3,7 @@ add_library(NEngineScripting STATIC
   src/managed_build.cpp
   src/managed_project.cpp
   src/managed_runtime.cpp
+  src/registration.cpp
 )
 
 target_include_directories(NEngineScripting
@@ -10,6 +11,7 @@ target_include_directories(NEngineScripting
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+target_link_libraries(NEngineScripting PUBLIC NEngineCore)
 target_compile_features(NEngineScripting PUBLIC cxx_std_20)
 
 if(MSVC)
