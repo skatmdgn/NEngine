@@ -97,6 +97,11 @@ int main() {
 
     check(
         std::filesystem::exists(
+            output.bridge_project_path),
+        "dedicated NEngine Bridge csproj generated");
+
+    check(
+        std::filesystem::exists(
             output.bridge_path),
         "NEngine managed native ABI bridge generated");
 
@@ -135,6 +140,9 @@ int main() {
             "NEngine.API.csproj") !=
                 std::string::npos &&
         project.find(
+            "NEngine.Bridge.csproj") !=
+                std::string::npos &&
+        project.find(
             "<Compile Include=\"NEngine.API.cs\"") ==
                 std::string::npos &&
         project.find(
@@ -155,6 +163,22 @@ int main() {
                 std::string::npos,
         "dedicated NEngine API project builds only the generated authoring API assembly");
 
+    const auto bridge_project =
+        read_all(
+            output.bridge_project_path);
+
+    check(
+        bridge_project.find(
+            "<AssemblyName>NEngine.Bridge</AssemblyName>") !=
+                std::string::npos &&
+        bridge_project.find(
+            "NEngine.ManagedBridge.cs") !=
+                std::string::npos &&
+        bridge_project.find(
+            "NEngine.API.csproj") !=
+                std::string::npos,
+        "dedicated managed Bridge project builds stable ABI host against NEngine API");
+
     const auto solution =
         read_all(
             output.solution_path);
@@ -165,8 +189,14 @@ int main() {
                 std::string::npos &&
         solution.find(
             "NEngine.API.csproj") !=
+                std::string::npos &&
+        solution.find(
+            "\"NEngine.Bridge\"") !=
+                std::string::npos &&
+        solution.find(
+            "NEngine.Bridge.csproj") !=
                 std::string::npos,
-        "solution includes dedicated NEngine API project");
+        "solution includes dedicated NEngine API and Bridge projects");
 
     const auto api =
         read_all(output.api_stub_path);
@@ -183,9 +213,9 @@ int main() {
         api.find("GetComponent<T>") !=
             std::string::npos &&
         api.find(
-            "InternalsVisibleTo(\"GameScripts\")") !=
+            "InternalsVisibleTo(\"NEngine.Bridge\")") !=
                 std::string::npos,
-        "managed API stub exposes familiar authoring types and grants bridge assembly internal access");
+        "managed API stub exposes familiar authoring types and grants stable Bridge assembly internal access");
 
 
     const auto bridge =
@@ -200,7 +230,16 @@ int main() {
             "GetAbiVersion") !=
                 std::string::npos &&
         bridge.find(
-            "AbiVersion = 4") !=
+            "AbiVersion = 5") !=
+                std::string::npos &&
+        bridge.find(
+            "GameplayLoadContext") !=
+                std::string::npos &&
+        bridge.find(
+            "LoadGameplayAssembly") !=
+                std::string::npos &&
+        bridge.find(
+            "UnloadGameplayAssembly") !=
                 std::string::npos &&
         bridge.find(
             "SetGameObjectState") !=
@@ -211,7 +250,7 @@ int main() {
         bridge.find(
             "CopyGameObjectNameUtf8") !=
                 std::string::npos,
-        "managed bridge exposes lifecycle Transform and GameObject ABI v4 entries");
+        "managed bridge exposes collectible gameplay lifecycle Transform and GameObject ABI v5 entries");
 
     const auto runtime_config =
         read_all(
@@ -522,8 +561,12 @@ int main() {
                 std::filesystem::exists(
                     integration_build
                         .output_directory /
-                    "NEngine.API.dll"),
-                "real dotnet SDK builds gameplay assembly plus dedicated NEngine API dependency into deterministic output");
+                    "NEngine.API.dll") &&
+                std::filesystem::exists(
+                    integration_build
+                        .output_directory /
+                    "NEngine.Bridge.dll"),
+                "real dotnet SDK builds gameplay assembly plus dedicated API and stable Bridge dependencies into deterministic output");
 
 
             if (build.success) {
@@ -809,6 +852,127 @@ int main() {
                                 script_system.instance_count() == 0u &&
                                 managed_runtime.instance_count() == 0,
                                 "inactive native GameObject stops ScriptBehaviour and releases current managed instance");
+
+                            {
+                                std::ofstream script(
+                                    integration_root /
+                                        "Assets" /
+                                        "Scripts" /
+                                        "Example.cs",
+                                    std::ios::binary |
+                                        std::ios::trunc);
+
+                                script
+                                    << "using NEngine;\n"
+                                    << "public class Example : Behaviour {\n"
+                                    << "    private void Update() { transform.localPosition = transform.localPosition + new Vector3(10, 0, 0); gameObject.name = \"Reloaded\"; }\n"
+                                    << "}\n";
+                            }
+
+                            ManagedBuildConfig
+                                reload_build =
+                                    integration_build;
+
+                            reload_build.output_directory =
+                                integration_root /
+                                "Library" /
+                                "ManagedBuild" /
+                                "Reload";
+
+                            const auto rebuilt =
+                                run_managed_build(
+                                    reload_build);
+
+                            check(
+                                rebuilt.success &&
+                                std::filesystem::exists(
+                                    rebuilt.plan
+                                        .assembly_path),
+                                "second gameplay build succeeds into independent hot-reload output");
+
+                            if (rebuilt.success) {
+                                check(
+                                    managed_runtime.reload_gameplay(
+                                        rebuilt.plan
+                                            .assembly_path,
+                                        "IntegrationScripts") &&
+                                    managed_runtime
+                                        .gameplay_loaded(),
+                                    "ManagedRuntime reloads gameplay DLL through stable collectible Bridge without restarting hostfxr");
+
+                                const auto reload_entity =
+                                    script_world.create(
+                                        "Reload Target");
+
+                                auto* reload_script =
+                                    script_world.add_component<
+                                        ScriptBehaviour>(
+                                            reload_entity,
+                                            script_behaviour_type());
+
+                                if (reload_script) {
+                                    reload_script->type_name =
+                                        "Example";
+                                }
+
+                                auto* reload_transform =
+                                    script_world.transform(
+                                        reload_entity);
+
+                                if (reload_transform) {
+                                    reload_transform
+                                        ->local_position = {
+                                            1.0f,
+                                            2.0f,
+                                            3.0f
+                                        };
+                                }
+
+                                const auto reload_tick =
+                                    script_system.update(
+                                        script_world,
+                                        1.0f / 60.0f,
+                                        &system_error);
+
+                                check(
+                                    reload_script &&
+                                    reload_tick.created == 1u &&
+                                    reload_tick.started == 1u &&
+                                    reload_tick.updated == 1u &&
+                                    reload_tick.unresolved == 0u &&
+                                    reload_transform &&
+                                    reload_transform
+                                        ->local_position.x ==
+                                        11.0f &&
+                                    reload_transform
+                                        ->local_position.y ==
+                                        2.0f &&
+                                    reload_transform
+                                        ->local_position.z ==
+                                        3.0f &&
+                                    script_world.name(
+                                        reload_entity) ==
+                                        "Reloaded",
+                                    "hot-reloaded gameplay assembly executes new C# Behaviour code against existing native runtime");
+
+                                script_world.destroy(
+                                    reload_entity);
+
+                                script_system.update(
+                                    script_world,
+                                    0.0f,
+                                    &system_error);
+
+                                check(
+                                    script_system
+                                        .instance_count() ==
+                                        0u &&
+                                    managed_runtime
+                                        .instance_count() ==
+                                        0,
+                                    "hot-reload test releases all managed instances before runtime shutdown");
+                            }
+
 
                         }
                     }
