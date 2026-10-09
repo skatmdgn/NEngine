@@ -124,8 +124,8 @@ VersionKey version_key(
                     key.text[i] - '0');
 
             if (value >
-                (std::numeric_limits<
-                    unsigned long long>::max() -
+                ((std::numeric_limits<
+                    unsigned long long>::max)() -
                  digit) /
                     10u) {
 
@@ -164,7 +164,7 @@ bool newer_version(
     const VersionKey& right) {
 
     const auto count =
-        std::max(
+        (std::max)(
             left.parts.size(),
             right.parts.size());
 
