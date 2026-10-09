@@ -2,6 +2,7 @@
 
 #include "nengine/core/component_registry.hpp"
 #include "nengine/core/component_serialization.hpp"
+#include "nengine/editor/component_factory.hpp"
 #include "nengine/editor/property_access.hpp"
 
 namespace nengine::editor {
@@ -10,5 +11,8 @@ bool register_render_integration(
     core::ComponentRegistry& components,
     core::ComponentSerializationRegistry& serialization,
     PropertyAccessRegistry& properties);
+
+bool register_render_component_factories(
+    ComponentFactoryRegistry& factories);
 
 } // namespace nengine::editor

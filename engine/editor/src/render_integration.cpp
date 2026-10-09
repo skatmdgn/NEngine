@@ -940,4 +940,83 @@ bool register_render_integration(
     return ok;
 }
 
+
+bool register_render_component_factories(
+    ComponentFactoryRegistry& factories) {
+
+    bool ok = true;
+
+    ok =
+        factories.register_factory(
+            render::camera_type(),
+            [](core::World& world,
+               core::Entity entity) {
+                return
+                    world.add_component<
+                        render::Camera>(
+                            entity,
+                            render::camera_type()) !=
+                    nullptr;
+            }) &&
+        ok;
+
+    ok =
+        factories.register_factory(
+            render::light_type(),
+            [](core::World& world,
+               core::Entity entity) {
+                return
+                    world.add_component<
+                        render::Light>(
+                            entity,
+                            render::light_type()) !=
+                    nullptr;
+            }) &&
+        ok;
+
+    ok =
+        factories.register_factory(
+            render::mesh_renderer_type(),
+            [](core::World& world,
+               core::Entity entity) {
+                return
+                    world.add_component<
+                        render::MeshRenderer>(
+                            entity,
+                            render::mesh_renderer_type()) !=
+                    nullptr;
+            }) &&
+        ok;
+
+    ok =
+        factories.register_factory(
+            render::sprite_renderer_type(),
+            [](core::World& world,
+               core::Entity entity) {
+                return
+                    world.add_component<
+                        render::SpriteRenderer>(
+                            entity,
+                            render::sprite_renderer_type()) !=
+                    nullptr;
+            }) &&
+        ok;
+
+    ok =
+        factories.register_factory(
+            render::sprite_animator_type(),
+            [](core::World& world,
+               core::Entity entity) {
+                return
+                    world.add_component<
+                        render::SpriteAnimator>(
+                            entity,
+                            render::sprite_animator_type()) !=
+                    nullptr;
+            }) &&
+        ok;
+
+    return ok;
+}
+
 } // namespace nengine::editor
