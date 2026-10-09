@@ -215,8 +215,8 @@ int main() {
 
         check(
             imported.success &&
-            imported.subassets.size() == 2u,
-            "ProjectSession model import indexes generated material and texture subassets");
+            imported.subassets.size() == 3u,
+            "ProjectSession model import indexes generated PBR material base-color and metallic-roughness subassets");
 
         const auto material_cache =
             model.project()
