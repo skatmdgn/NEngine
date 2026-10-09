@@ -91,8 +91,10 @@ int main() {
         metadata.find(
             render::light_type()) != nullptr &&
         metadata.find(
-            render::mesh_renderer_type()) != nullptr,
-        "render component descriptors are discoverable");
+            render::mesh_renderer_type()) != nullptr &&
+        metadata.find(
+            render::sprite_renderer_type()) != nullptr,
+        "render component descriptors including SpriteRenderer are discoverable");
 
     core::World world;
 
@@ -179,6 +181,35 @@ int main() {
             false;
     }
 
+    const auto sprite_entity =
+        world.create("Sprite");
+
+    world.transform(sprite_entity)
+        ->local_position =
+        {-2.0f, 1.0f, 0.0f};
+
+    auto* sprite_renderer =
+        world.add_component<
+            render::SpriteRenderer>(
+                sprite_entity,
+                render::sprite_renderer_type());
+
+    check(
+        sprite_renderer != nullptr,
+        "sprite renderer component attaches");
+
+    const auto sprite_texture_guid =
+        assets::AssetGuid::generate();
+
+    if (sprite_renderer) {
+        sprite_renderer->texture =
+            sprite_texture_guid;
+        sprite_renderer->pixels_per_unit =
+            64.0f;
+        sprite_renderer->sort_order = 7;
+        sprite_renderer->flip_x = true;
+    }
+
     const auto hidden_entity =
         world.create("Hidden");
 
@@ -205,6 +236,16 @@ int main() {
     check(
         snapshot.meshes.size() == 1,
         "render snapshot excludes inactive mesh entity");
+
+    check(
+        snapshot.sprites.size() == 1 &&
+        snapshot.sprites[0].renderer.texture ==
+            sprite_texture_guid &&
+        snapshot.sprites[0].renderer.pixels_per_unit ==
+            64.0f &&
+        snapshot.sprites[0].renderer.sort_order == 7 &&
+        snapshot.sprites[0].renderer.flip_x,
+        "render snapshot extracts active SpriteRenderer values");
 
     check(
         snapshot.meshes.size() == 1 &&
@@ -270,6 +311,9 @@ int main() {
     core::Entity restored_mesh =
         core::Entity::invalid();
 
+    core::Entity restored_sprite =
+        core::Entity::invalid();
+
     for (const auto entity :
          restored.entities()) {
 
@@ -282,6 +326,12 @@ int main() {
         if (restored.name(entity) ==
             "Renderable") {
             restored_mesh =
+                entity;
+        }
+
+        if (restored.name(entity) ==
+            "Sprite") {
+            restored_sprite =
                 entity;
         }
     }
@@ -318,6 +368,25 @@ int main() {
         !restored_mesh_component
             ->receive_shadows,
         "MeshRenderer AssetReferences survive Scene roundtrip");
+
+    const auto* restored_sprite_component =
+        restored_sprite.valid()
+            ? restored.get_component<
+                render::SpriteRenderer>(
+                    restored_sprite,
+                    render::sprite_renderer_type())
+            : nullptr;
+
+    check(
+        restored_sprite_component &&
+        restored_sprite_component->texture ==
+            sprite_texture_guid &&
+        restored_sprite_component->pixels_per_unit ==
+            64.0f &&
+        restored_sprite_component->sort_order == 7 &&
+        restored_sprite_component->flip_x &&
+        !restored_sprite_component->flip_y,
+        "SpriteRenderer texture PPU sort and flip values survive Scene roundtrip");
 
     {
         std::stringstream texture_descriptor;
