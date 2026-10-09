@@ -71,6 +71,9 @@ constexpr std::uint32_t
 VK_POLYGON_MODE_FILL = 0;
 
 constexpr std::uint32_t
+VK_CULL_MODE_NONE = 0u;
+
+constexpr std::uint32_t
 VK_CULL_MODE_BACK_BIT = 0x00000002u;
 
 constexpr std::uint32_t
@@ -81,6 +84,21 @@ VK_SAMPLE_COUNT_1_BIT = 0x00000001u;
 
 constexpr std::uint32_t
 VK_COMPARE_OP_LESS = 1u;
+
+constexpr std::uint32_t
+VK_BLEND_FACTOR_ZERO = 0u;
+
+constexpr std::uint32_t
+VK_BLEND_FACTOR_ONE = 1u;
+
+constexpr std::uint32_t
+VK_BLEND_FACTOR_SRC_ALPHA = 6u;
+
+constexpr std::uint32_t
+VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA = 7u;
+
+constexpr std::uint32_t
+VK_BLEND_OP_ADD = 0u;
 
 constexpr std::uint32_t
 VK_COLOR_COMPONENT_R_BIT = 0x00000001u;
@@ -361,7 +379,8 @@ bool VulkanGraphicsPipeline::create(
         render_pass,
         vertex_shader,
         fragment_shader,
-        nullptr);
+        nullptr,
+        VulkanGraphicsPipelineOptions{});
 }
 
 bool VulkanGraphicsPipeline::create(
@@ -378,13 +397,38 @@ bool VulkanGraphicsPipeline::create(
         return false;
     }
 
+    return create(
+        device,
+        render_pass,
+        vertex_shader,
+        fragment_shader,
+        material,
+        VulkanGraphicsPipelineOptions{});
+}
+
+bool VulkanGraphicsPipeline::create(
+    const VulkanDevice& device,
+    const VulkanRenderPass& render_pass,
+    const VulkanShaderModule& vertex_shader,
+    const VulkanShaderModule& fragment_shader,
+    const VulkanMaterialResource& material,
+    const VulkanGraphicsPipelineOptions& options) {
+
+    if (!material.valid()) {
+        destroy();
+        diagnostic_ =
+            "valid Vulkan material is required";
+        return false;
+    }
+
     return create_internal(
         device,
         render_pass,
         vertex_shader,
         fragment_shader,
         material
-            .native_descriptor_set_layout());
+            .native_descriptor_set_layout(),
+        options);
 }
 
 bool VulkanGraphicsPipeline::create_internal(
@@ -392,7 +436,8 @@ bool VulkanGraphicsPipeline::create_internal(
     const VulkanRenderPass& render_pass,
     const VulkanShaderModule& vertex_shader,
     const VulkanShaderModule& fragment_shader,
-    void* descriptor_set_layout) {
+    void* descriptor_set_layout,
+    const VulkanGraphicsPipelineOptions& options) {
 
     destroy();
     diagnostic_.clear();
@@ -572,7 +617,9 @@ bool VulkanGraphicsPipeline::create_internal(
         0,
         0,
         VK_POLYGON_MODE_FILL,
-        VK_CULL_MODE_BACK_BIT,
+        options.back_face_culling
+            ? VK_CULL_MODE_BACK_BIT
+            : VK_CULL_MODE_NONE,
         VK_FRONT_FACE_COUNTER_CLOCKWISE,
         0,
         0.0f,
@@ -598,10 +645,12 @@ bool VulkanGraphicsPipeline::create_internal(
             VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
             nullptr,
             0,
-            render_pass.has_depth()
+            render_pass.has_depth() &&
+                    options.depth_test
                 ? 1u
                 : 0u,
-            render_pass.has_depth()
+            render_pass.has_depth() &&
+                    options.depth_write
                 ? 1u
                 : 0u,
             VK_COMPARE_OP_LESS,
@@ -615,13 +664,23 @@ bool VulkanGraphicsPipeline::create_internal(
 
     const VkPipelineColorBlendAttachmentState
         color_attachment{
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
+            options.alpha_blend
+                ? 1u
+                : 0u,
+            options.alpha_blend
+                ? VK_BLEND_FACTOR_SRC_ALPHA
+                : VK_BLEND_FACTOR_ZERO,
+            options.alpha_blend
+                ? VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA
+                : VK_BLEND_FACTOR_ZERO,
+            VK_BLEND_OP_ADD,
+            options.alpha_blend
+                ? VK_BLEND_FACTOR_ONE
+                : VK_BLEND_FACTOR_ZERO,
+            options.alpha_blend
+                ? VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA
+                : VK_BLEND_FACTOR_ZERO,
+            VK_BLEND_OP_ADD,
             VK_COLOR_COMPONENT_R_BIT |
                 VK_COLOR_COMPONENT_G_BIT |
                 VK_COLOR_COMPONENT_B_BIT |

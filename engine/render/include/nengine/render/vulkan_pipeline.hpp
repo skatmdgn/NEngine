@@ -10,6 +10,13 @@
 
 namespace nengine::render {
 
+struct VulkanGraphicsPipelineOptions {
+    bool depth_test{true};
+    bool depth_write{true};
+    bool alpha_blend{false};
+    bool back_face_culling{true};
+};
+
 class VulkanGraphicsPipeline {
 public:
     VulkanGraphicsPipeline() = default;
@@ -40,6 +47,14 @@ public:
         const VulkanShaderModule& fragment_shader,
         const VulkanMaterialResource& material);
 
+    bool create(
+        const VulkanDevice& device,
+        const VulkanRenderPass& render_pass,
+        const VulkanShaderModule& vertex_shader,
+        const VulkanShaderModule& fragment_shader,
+        const VulkanMaterialResource& material,
+        const VulkanGraphicsPipelineOptions& options);
+
     void destroy() noexcept;
 
     bool valid() const noexcept {
@@ -69,7 +84,8 @@ private:
         const VulkanRenderPass& render_pass,
         const VulkanShaderModule& vertex_shader,
         const VulkanShaderModule& fragment_shader,
-        void* descriptor_set_layout);
+        void* descriptor_set_layout,
+        const VulkanGraphicsPipelineOptions& options);
 
     const VulkanDevice* device_api_{nullptr};
     void* device_{nullptr};
