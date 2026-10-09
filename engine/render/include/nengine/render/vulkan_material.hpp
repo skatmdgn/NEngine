@@ -1,5 +1,6 @@
 #pragma once
 
+#include <span>
 #include <string>
 
 #include "nengine/render/vulkan_device.hpp"
@@ -27,6 +28,12 @@ public:
     bool create_textured(
         const VulkanDevice& device,
         const VulkanTextureResource& texture);
+
+    bool create_textured_set(
+        const VulkanDevice& device,
+        std::span<
+            const VulkanTextureResource* const>
+            textures);
 
     void destroy() noexcept;
 

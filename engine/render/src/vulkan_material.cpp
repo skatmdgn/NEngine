@@ -1,9 +1,11 @@
 #include "nengine/render/vulkan_material.hpp"
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace nengine::render {
 namespace {
@@ -227,15 +229,46 @@ bool VulkanMaterialResource::create_textured(
     const VulkanDevice& device,
     const VulkanTextureResource& texture) {
 
+    const std::array<
+        const VulkanTextureResource*,
+        1u>
+        textures{
+            &texture
+        };
+
+    return create_textured_set(
+        device,
+        textures);
+}
+
+bool VulkanMaterialResource::create_textured_set(
+    const VulkanDevice& device,
+    std::span<
+        const VulkanTextureResource* const>
+        textures) {
+
     destroy();
     diagnostic_.clear();
 
     if (!device.valid() ||
-        !texture.valid()) {
+        textures.empty() ||
+        textures.size() > 16u) {
 
         diagnostic_ =
-            "valid Vulkan device and texture are required";
+            "valid Vulkan device and 1-16 textures are required";
         return false;
+    }
+
+    for (const auto* texture :
+         textures) {
+
+        if (!texture ||
+            !texture->valid()) {
+
+            diagnostic_ =
+                "all Vulkan material textures must be valid";
+            return false;
+        }
     }
 
     const auto create_layout =
@@ -280,21 +313,35 @@ bool VulkanMaterialResource::create_textured(
         return false;
     }
 
-    const VkDescriptorSetLayoutBinding binding{
-        0,
-        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        1,
-        VK_SHADER_STAGE_FRAGMENT_BIT,
-        nullptr
-    };
+    std::vector<
+        VkDescriptorSetLayoutBinding>
+        bindings;
+
+    bindings.reserve(
+        textures.size());
+
+    for (std::size_t index = 0u;
+         index < textures.size();
+         ++index) {
+
+        bindings.push_back({
+            static_cast<std::uint32_t>(
+                index),
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            1u,
+            VK_SHADER_STAGE_FRAGMENT_BIT,
+            nullptr
+        });
+    }
 
     const VkDescriptorSetLayoutCreateInfo
         layout_info{
             VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
             nullptr,
             0,
-            1,
-            &binding
+            static_cast<std::uint32_t>(
+                bindings.size()),
+            bindings.data()
         };
 
     void* layout = nullptr;
@@ -318,7 +365,8 @@ bool VulkanMaterialResource::create_textured(
 
     const VkDescriptorPoolSize pool_size{
         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        1
+        static_cast<std::uint32_t>(
+            textures.size())
     };
 
     const VkDescriptorPoolCreateInfo pool_info{
@@ -395,29 +443,52 @@ bool VulkanMaterialResource::create_textured(
         return false;
     }
 
-    const VkDescriptorImageInfo image_info{
-        texture.native_sampler(),
-        texture.native_view(),
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-    };
+    std::vector<VkDescriptorImageInfo>
+        image_infos;
 
-    const VkWriteDescriptorSet write{
-        VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-        nullptr,
-        descriptor_set,
-        0,
-        0,
-        1,
-        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        &image_info,
-        nullptr,
-        nullptr
-    };
+    image_infos.reserve(
+        textures.size());
+
+    for (const auto* texture :
+         textures) {
+
+        image_infos.push_back({
+            texture->native_sampler(),
+            texture->native_view(),
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        });
+    }
+
+    std::vector<VkWriteDescriptorSet>
+        writes;
+
+    writes.reserve(
+        textures.size());
+
+    for (std::size_t index = 0u;
+         index < textures.size();
+         ++index) {
+
+        writes.push_back({
+            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            nullptr,
+            descriptor_set,
+            static_cast<std::uint32_t>(
+                index),
+            0,
+            1,
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            &image_infos[index],
+            nullptr,
+            nullptr
+        });
+    }
 
     update_sets(
         device.native_device(),
-        1,
-        &write,
+        static_cast<std::uint32_t>(
+            writes.size()),
+        writes.data(),
         0,
         nullptr);
 
@@ -432,7 +503,10 @@ bool VulkanMaterialResource::create_textured(
         descriptor_set;
 
     diagnostic_ =
-        "Vulkan textured material descriptor set created";
+        "Vulkan material descriptor set created with " +
+        std::to_string(
+            textures.size()) +
+        " sampled texture binding(s)";
 
     return true;
 }
