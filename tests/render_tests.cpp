@@ -1156,6 +1156,125 @@ int main() {
                 resolved_png.guid,
             "renderer resolves nmat Material AssetGuid to base-color texture GUID");
 
+
+        const auto material_v2_source =
+            root / "pbr_v2.nmat";
+
+        const auto normal_guid =
+            assets::AssetGuid::generate();
+
+        const auto metallic_roughness_guid =
+            assets::AssetGuid::generate();
+
+        const auto emissive_guid =
+            assets::AssetGuid::generate();
+
+        const auto occlusion_guid =
+            assets::AssetGuid::generate();
+
+        {
+            std::ofstream output(
+                material_v2_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output
+                << "NENGINE_MATERIAL 2\n"
+                << "BASE_COLOR_TEXTURE \""
+                << resolved_png.guid.to_string()
+                << "\"\n"
+                << "NORMAL_TEXTURE \""
+                << normal_guid.to_string()
+                << "\"\n"
+                << "METALLIC_ROUGHNESS_TEXTURE \""
+                << metallic_roughness_guid.to_string()
+                << "\"\n"
+                << "EMISSIVE_TEXTURE \""
+                << emissive_guid.to_string()
+                << "\"\n"
+                << "OCCLUSION_TEXTURE \""
+                << occlusion_guid.to_string()
+                << "\"\n"
+                << "METALLIC_FACTOR 0.25\n"
+                << "ROUGHNESS_FACTOR 0.75\n"
+                << "EMISSIVE_FACTOR 0.1 0.2 0.3\n"
+                << "ALPHA_MODE \"MASK\"\n"
+                << "ALPHA_CUTOFF 0.4\n"
+                << "DOUBLE_SIDED 1\n"
+                << "END_MATERIAL\n";
+        }
+
+        assets::CachedArtifactSet
+            material_v2_cached;
+
+        material_v2_cached.fingerprint =
+            "nmat-v2";
+
+        material_v2_cached.importer_id =
+            "NEngine.Material";
+
+        material_v2_cached.artifacts.push_back({
+            material_v2_source,
+            "source"
+        });
+
+        const auto material_v2_guid =
+            assets::AssetGuid::generate();
+
+        const auto resolved_material_v2 =
+            render::resolve_material_asset(
+                material_v2_guid,
+                material_v2_cached,
+                &resolve_error);
+
+        check(
+            resolved_material_v2 &&
+            resolved_material_v2->material
+                .base_color_texture ==
+                resolved_png.guid &&
+            resolved_material_v2->material
+                .normal_texture ==
+                normal_guid &&
+            resolved_material_v2->material
+                .metallic_roughness_texture ==
+                metallic_roughness_guid &&
+            resolved_material_v2->material
+                .emissive_texture ==
+                emissive_guid &&
+            resolved_material_v2->material
+                .occlusion_texture ==
+                occlusion_guid &&
+            std::abs(
+                resolved_material_v2->material
+                    .metallic_factor -
+                    0.25f) < 0.0001f &&
+            std::abs(
+                resolved_material_v2->material
+                    .roughness_factor -
+                    0.75f) < 0.0001f &&
+            std::abs(
+                resolved_material_v2->material
+                    .emissive_factor.x -
+                    0.1f) < 0.0001f &&
+            std::abs(
+                resolved_material_v2->material
+                    .emissive_factor.y -
+                    0.2f) < 0.0001f &&
+            std::abs(
+                resolved_material_v2->material
+                    .emissive_factor.z -
+                    0.3f) < 0.0001f &&
+            resolved_material_v2->material
+                .alpha_mode ==
+                render::MaterialAlphaMode::Mask &&
+            std::abs(
+                resolved_material_v2->material
+                    .alpha_cutoff -
+                    0.4f) < 0.0001f &&
+            resolved_material_v2->material
+                .double_sided,
+            "Material v2 parses five PBR texture slots factors alpha mode and double-sided state");
+
         const auto gltf_source =
             root / "triangle.gltf";
 
@@ -3688,6 +3807,118 @@ int main() {
                                 imported_gpu_material &&
                             gpu_material_asset_cache.size() == 1u,
                             "nmat resolves texture artifacts into a real Vulkan sampled material descriptor");
+
+
+                        const auto pbr_normal_guid =
+                            assets::AssetGuid::generate();
+
+                        const auto pbr_mr_guid =
+                            assets::AssetGuid::generate();
+
+                        const auto pbr_emissive_guid =
+                            assets::AssetGuid::generate();
+
+                        const auto pbr_occlusion_guid =
+                            assets::AssetGuid::generate();
+
+                        const auto pbr_material_guid =
+                            assets::AssetGuid::generate();
+
+                        const auto pbr_material_source =
+                            material_gpu_root /
+                            "pbr_v2.nmat";
+
+                        {
+                            std::ofstream output(
+                                pbr_material_source,
+                                std::ios::binary |
+                                    std::ios::trunc);
+
+                            output
+                                << "NENGINE_MATERIAL 2\n"
+                                << "BASE_COLOR_TEXTURE \""
+                                << material_texture_guid
+                                    .to_string()
+                                << "\"\n"
+                                << "NORMAL_TEXTURE \""
+                                << pbr_normal_guid
+                                    .to_string()
+                                << "\"\n"
+                                << "METALLIC_ROUGHNESS_TEXTURE \""
+                                << pbr_mr_guid
+                                    .to_string()
+                                << "\"\n"
+                                << "EMISSIVE_TEXTURE \""
+                                << pbr_emissive_guid
+                                    .to_string()
+                                << "\"\n"
+                                << "OCCLUSION_TEXTURE \""
+                                << pbr_occlusion_guid
+                                    .to_string()
+                                << "\"\n"
+                                << "METALLIC_FACTOR 0.6\n"
+                                << "ROUGHNESS_FACTOR 0.3\n"
+                                << "EMISSIVE_FACTOR 0.1 0.2 0.3\n"
+                                << "ALPHA_MODE \"OPAQUE\"\n"
+                                << "ALPHA_CUTOFF 0.5\n"
+                                << "DOUBLE_SIDED 0\n"
+                                << "END_MATERIAL\n";
+                        }
+
+                        assets::CachedArtifactSet
+                            pbr_material_cached;
+
+                        pbr_material_cached.fingerprint =
+                            "material-v2-five-textures";
+
+                        pbr_material_cached.importer_id =
+                            "NEngine.Material";
+
+                        pbr_material_cached.artifacts.push_back({
+                            pbr_material_source,
+                            "source"
+                        });
+
+                        const auto pbr_dependency_resolver =
+                            [&](
+                                assets::AssetGuid guid)
+                                -> std::optional<
+                                    assets::CachedArtifactSet> {
+
+                                if (guid ==
+                                        material_texture_guid ||
+                                    guid ==
+                                        pbr_normal_guid ||
+                                    guid ==
+                                        pbr_mr_guid ||
+                                    guid ==
+                                        pbr_emissive_guid ||
+                                    guid ==
+                                        pbr_occlusion_guid) {
+
+                                    return
+                                        material_texture_cached;
+                                }
+
+                                return std::nullopt;
+                            };
+
+                        const auto* pbr_gpu_material =
+                            gpu_material_asset_cache.load(
+                                pbr_material_guid,
+                                pbr_material_cached,
+                                pbr_dependency_resolver,
+                                &material_asset_error);
+
+                        check(
+                            pbr_gpu_material &&
+                            pbr_gpu_material->valid() &&
+                            gpu_material_asset_cache.find(
+                                pbr_material_guid) ==
+                                pbr_gpu_material &&
+                            gpu_material_asset_cache.size() ==
+                                2u,
+                            "Material v2 resolves five independent texture GUIDs into one fixed-layout Vulkan descriptor set");
 
                         // Full automatic model material path: model cache
                         // metadata -> glTF PBR image URI -> PNG decode ->
