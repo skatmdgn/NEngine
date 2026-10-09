@@ -7,6 +7,7 @@
 #include <sstream>
 #include <string>
 
+#include "nengine/input/input_state.hpp"
 #include "nengine/scripting/components.hpp"
 #include "nengine/scripting/dotnet_host.hpp"
 #include "nengine/scripting/managed_build.hpp"
@@ -223,6 +224,14 @@ int main() {
             std::string::npos &&
         api.find("class NativeWorld") !=
             std::string::npos &&
+        api.find("enum KeyCode") !=
+            std::string::npos &&
+        api.find("class Input") !=
+            std::string::npos &&
+        api.find("GetKeyDown") !=
+            std::string::npos &&
+        api.find("mousePosition") !=
+            std::string::npos &&
         api.find(
             "InternalsVisibleTo(\"NEngine.Bridge\")") !=
                 std::string::npos,
@@ -263,6 +272,9 @@ int main() {
                 std::string::npos &&
         bridge.find(
             "ConfigureNativeWorldCallbacks") !=
+                std::string::npos &&
+        bridge.find(
+            "ConfigureNativeInputCallbacks") !=
                 std::string::npos,
         "managed bridge exposes collectible gameplay lifecycle and native World callback ABI v6 entries");
 
@@ -530,6 +542,20 @@ int main() {
                 << "        p.gameObject.name = \"Managed Parent\";\n"
                 << "        p.localPosition = p.localPosition + new Vector3(2, 0, 0);\n"
                 << "        transform.parent = null;\n"
+                << "    }\n"
+                << "}\n                << "public class InputProbe : Behaviour {\n"
+                << "    private int frame;\n"
+                << "    private void Update() {\n"
+                << "        if (frame == 0) {\n"
+                << "            if (!Input.GetKey(KeyCode.A) || !Input.GetKeyDown(KeyCode.A) || Input.GetKeyUp(KeyCode.A)) throw new System.Exception(\"input press mismatch\");\n"
+                << "            Vector2 p = Input.mousePosition; Vector2 d = Input.mouseDelta; Vector2 w = Input.mouseScrollDelta;\n"
+                << "            if (p.x != 104 || p.y != 97 || d.x != 4 || d.y != -3 || w.y != 1.5f) throw new System.Exception(\"pointer mismatch\");\n"
+                << "            transform.localPosition = new Vector3(d.x, d.y, w.y);\n"
+                << "        } else {\n"
+                << "            if (Input.GetKey(KeyCode.A) || Input.GetKeyDown(KeyCode.A) || !Input.GetKeyUp(KeyCode.A)) throw new System.Exception(\"input release mismatch\");\n"
+                << "            gameObject.name = \"Input Passed\";\n"
+                << "        }\n"
+                << "        frame++;\n"
                 << "    }\n"
                 << "}\n";
         }
@@ -966,6 +992,104 @@ int main() {
                                 script_system.instance_count() == 0u &&
                                 managed_runtime.instance_count() == 0,
                                 "hierarchy callback fixture releases managed instance before hot reload");
+
+                            nengine::input::InputState
+                                managed_input;
+
+                            managed_input.set_pointer_position(
+                                100.0f,
+                                100.0f);
+
+                            managed_input.begin_frame();
+
+                            managed_input.set_pointer_position(
+                                104.0f,
+                                97.0f);
+
+                            managed_input.add_wheel(
+                                1.5f);
+
+                            managed_input.set_key(
+                                nengine::input::Key::A,
+                                true);
+
+                            managed_runtime.bind_input(
+                                &managed_input);
+
+                            const auto input_entity =
+                                script_world.create(
+                                    "Input Target");
+
+                            auto* input_script =
+                                script_world.add_component<
+                                    ScriptBehaviour>(
+                                        input_entity,
+                                        script_behaviour_type());
+
+                            if (input_script) {
+                                input_script->type_name =
+                                    "InputProbe";
+                            }
+
+                            auto* input_transform =
+                                script_world.transform(
+                                    input_entity);
+
+                            const auto input_press_tick =
+                                script_system.update(
+                                    script_world,
+                                    1.0f / 60.0f,
+                                    &system_error);
+
+                            check(
+                                input_script &&
+                                input_press_tick.created == 1u &&
+                                input_press_tick.started == 1u &&
+                                input_press_tick.updated == 1u &&
+                                input_press_tick.unresolved == 0u &&
+                                input_transform &&
+                                input_transform
+                                    ->local_position.x == 4.0f &&
+                                input_transform
+                                    ->local_position.y == -3.0f &&
+                                input_transform
+                                    ->local_position.z == 1.5f,
+                                "managed Input API exposes key-down pointer delta and wheel from native InputState");
+
+                            managed_input.begin_frame();
+
+                            managed_input.set_key(
+                                nengine::input::Key::A,
+                                false);
+
+                            const auto input_release_tick =
+                                script_system.update(
+                                    script_world,
+                                    1.0f / 60.0f,
+                                    &system_error);
+
+                            check(
+                                input_release_tick.updated == 1u &&
+                                input_release_tick.unresolved == 0u &&
+                                script_world.name(
+                                    input_entity) ==
+                                    "Input Passed",
+                                "managed Input API exposes key-up transition on following frame");
+
+                            script_world.destroy(
+                                input_entity);
+
+                            const auto input_cleanup =
+                                script_system.update(
+                                    script_world,
+                                    0.0f,
+                                    &system_error);
+
+                            check(
+                                input_cleanup.destroyed == 1u &&
+                                script_system.instance_count() == 0u &&
+                                managed_runtime.instance_count() == 0,
+                                "managed Input fixture releases instance before hot reload");
 
                             {
                                 std::ofstream script(
