@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <functional>
 #include <istream>
 #include <optional>
 #include <string>
@@ -9,6 +10,7 @@
 
 #include "nengine/assets/asset_guid.hpp"
 #include "nengine/assets/import_pipeline.hpp"
+#include "nengine/core/world.hpp"
 
 namespace nengine::render {
 
@@ -67,5 +69,23 @@ private:
         Entry,
         assets::AssetGuidHash> entries_{};
 };
+
+using SpriteAnimationArtifactResolver =
+    std::function<
+        std::optional<assets::CachedArtifactSet>(
+            assets::AssetGuid)>;
+
+struct SpriteAnimationUpdateStats {
+    std::size_t advanced{0};
+    std::size_t sampled{0};
+    std::size_t unresolved{0};
+};
+
+SpriteAnimationUpdateStats update_sprite_animators(
+    core::World& world,
+    float delta_seconds,
+    SpriteAnimationClipCache& cache,
+    const SpriteAnimationArtifactResolver& resolver,
+    std::string* error = nullptr);
 
 } // namespace nengine::render

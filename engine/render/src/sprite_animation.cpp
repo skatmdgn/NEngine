@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "nengine/assets/builtin_processors.hpp"
+#include "nengine/render/components.hpp"
 
 namespace nengine::render {
 namespace {
@@ -415,6 +416,146 @@ SpriteAnimationClipCache::find(
 
 void SpriteAnimationClipCache::clear() noexcept {
     entries_.clear();
+}
+
+SpriteAnimationUpdateStats update_sprite_animators(
+    core::World& world,
+    float delta_seconds,
+    SpriteAnimationClipCache& cache,
+    const SpriteAnimationArtifactResolver& resolver,
+    std::string* error) {
+
+    SpriteAnimationUpdateStats stats;
+
+    if (!std::isfinite(delta_seconds) ||
+        delta_seconds < 0.0f) {
+
+        set_error(
+            error,
+            "sprite animation delta must be finite and non-negative");
+        return stats;
+    }
+
+    for (const auto entity :
+         world.entities()) {
+
+        if (!world.active(entity)) {
+            continue;
+        }
+
+        auto* animator =
+            world.get_component<SpriteAnimator>(
+                entity,
+                sprite_animator_type());
+
+        auto* renderer =
+            world.get_component<SpriteRenderer>(
+                entity,
+                sprite_renderer_type());
+
+        if (!animator ||
+            !renderer ||
+            !animator->enabled ||
+            !renderer->enabled ||
+            !animator->clip.valid()) {
+            continue;
+        }
+
+        const SpriteAnimationClip* clip =
+            cache.find(
+                animator->clip);
+
+        if (!clip) {
+            if (!resolver) {
+                ++stats.unresolved;
+                continue;
+            }
+
+            const auto artifacts =
+                resolver(
+                    animator->clip);
+
+            if (!artifacts) {
+                ++stats.unresolved;
+                continue;
+            }
+
+            std::string clip_error;
+
+            clip =
+                cache.load(
+                    animator->clip,
+                    *artifacts,
+                    &clip_error);
+
+            if (!clip) {
+                ++stats.unresolved;
+
+                if (error &&
+                    !clip_error.empty()) {
+                    *error =
+                        std::move(
+                            clip_error);
+                }
+
+                continue;
+            }
+        }
+
+        if (animator->playing &&
+            animator->speed > 0.0f &&
+            delta_seconds > 0.0f) {
+
+            const double advanced =
+                static_cast<double>(
+                    animator->time_seconds) +
+                static_cast<double>(
+                    delta_seconds) *
+                static_cast<double>(
+                    animator->speed);
+
+            animator->time_seconds =
+                static_cast<float>(
+                    std::min(
+                        advanced,
+                        static_cast<double>(
+                            std::numeric_limits<
+                                float>::max())));
+
+            ++stats.advanced;
+        }
+
+        const auto frame_index =
+            sample_sprite_animation_frame(
+                *clip,
+                animator->time_seconds,
+                animator->loop);
+
+        if (!frame_index) {
+            ++stats.unresolved;
+            continue;
+        }
+
+        renderer->texture =
+            clip->frames[
+                *frame_index]
+                .texture;
+
+        ++stats.sampled;
+
+        if (!animator->loop &&
+            animator->playing &&
+            animator->time_seconds >=
+                clip->duration_seconds()) {
+
+            animator->time_seconds =
+                clip->duration_seconds();
+            animator->playing =
+                false;
+        }
+    }
+
+    return stats;
 }
 
 } // namespace nengine::render
