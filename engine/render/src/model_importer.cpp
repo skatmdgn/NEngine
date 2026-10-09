@@ -724,6 +724,12 @@ bool append_cooked_gltf_pbr_material(
         << "ROUGHNESS_FACTOR "
         << pbr.roughness_factor
         << "\n"
+        << "NORMAL_SCALE "
+        << pbr.normal_scale
+        << "\n"
+        << "OCCLUSION_STRENGTH "
+        << pbr.occlusion_strength
+        << "\n"
         << "EMISSIVE_FACTOR "
         << pbr.emissive_factor.x
         << " "
