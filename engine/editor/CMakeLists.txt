@@ -13,6 +13,7 @@ add_library(NEngineEditorModel STATIC
   src/presentation.cpp
   src/render_integration.cpp
   src/scene_interaction.cpp
+  src/scripting_integration.cpp
 )
 
 target_include_directories(NEngineEditorModel
@@ -20,7 +21,7 @@ target_include_directories(NEngineEditorModel
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(NEngineEditorModel PUBLIC NEngineCore NEngineAssets NEngineRender)
+target_link_libraries(NEngineEditorModel PUBLIC NEngineCore NEngineAssets NEngineRender NEngineScripting)
 target_compile_features(NEngineEditorModel PUBLIC cxx_std_20)
 
 if(MSVC)
