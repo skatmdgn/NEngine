@@ -174,6 +174,43 @@ bool EditorModel::initialize_managed_runtime(
     return true;
 }
 
+bool EditorModel::reload_managed_runtime(
+    const std::filesystem::path& assembly_path,
+    std::string_view assembly_name,
+    std::string* error) {
+
+    if (!managed_runtime_.valid()) {
+        if (error) {
+            *error =
+                "managed runtime is not initialized";
+        }
+
+        return false;
+    }
+
+    // Managed instances hold types from the collectible gameplay context.
+    // Destroy them before requesting unload; Play Mode World state remains.
+    managed_script_system_.clear();
+
+    if (!managed_runtime_.reload_gameplay(
+            assembly_path,
+            assembly_name)) {
+
+        if (error) {
+            *error =
+                managed_runtime_
+                    .diagnostic();
+        }
+
+        return false;
+    }
+
+    managed_script_system_.bind(
+        &managed_runtime_);
+
+    return true;
+}
+
 void EditorModel::shutdown_managed_runtime()
     noexcept {
 

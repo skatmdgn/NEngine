@@ -101,6 +101,11 @@ public:
         std::string_view assembly_name,
         std::string* error = nullptr);
 
+    bool reload_managed_runtime(
+        const std::filesystem::path& assembly_path,
+        std::string_view assembly_name,
+        std::string* error = nullptr);
+
     void shutdown_managed_runtime() noexcept;
 
     bool managed_runtime_ready() const noexcept {
