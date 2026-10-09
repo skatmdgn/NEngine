@@ -2,6 +2,7 @@ add_library(NEngineScripting STATIC
   src/dotnet_host.cpp
   src/managed_build.cpp
   src/managed_project.cpp
+  src/managed_runtime.cpp
 )
 
 target_include_directories(NEngineScripting
