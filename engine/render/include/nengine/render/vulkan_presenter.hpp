@@ -19,10 +19,10 @@ struct VulkanMeshDraw {
     const VulkanGraphicsPipeline* pipeline{nullptr};
     const VulkanMeshResource* mesh{nullptr};
     Mat4 mvp{};
-    Mat4 model_view{Mat4::identity()};
     const VulkanMaterialResource* material{nullptr};
     std::uint32_t first_index{0};
     std::uint32_t index_count{0};
+    Mat4 model_view{Mat4::identity()};
 };
 
 class VulkanClearPresenter {
