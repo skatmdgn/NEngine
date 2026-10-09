@@ -4,6 +4,7 @@ add_library(NEngineScripting STATIC
   src/managed_project.cpp
   src/managed_runtime.cpp
   src/registration.cpp
+  src/script_system.cpp
 )
 
 target_include_directories(NEngineScripting
