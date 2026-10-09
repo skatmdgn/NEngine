@@ -702,56 +702,181 @@ ImportResult material_source_importer(
     }
 
     std::string token;
-    std::uint32_t version = 0;
+    std::uint32_t version = 0u;
 
     if (!(input >> token >> version) ||
         token != "NENGINE_MATERIAL" ||
-        version != 1u) {
+        (version != 1u &&
+         version != 2u)) {
 
         result.message =
             "invalid material header";
         return result;
     }
 
-    std::string texture_guid;
+    const auto parse_dependency =
+        [&](std::string_view field)
+            -> std::optional<AssetGuid> {
+
+            std::string guid_text;
+
+            if (!(input >>
+                    std::quoted(
+                        guid_text))) {
+
+                result.message =
+                    "material " +
+                    std::string{field} +
+                    " GUID is missing";
+                return std::nullopt;
+            }
+
+            const auto guid =
+                AssetGuid::parse(
+                    guid_text);
+
+            if (!guid ||
+                !guid->valid()) {
+
+                result.message =
+                    "material " +
+                    std::string{field} +
+                    " GUID is invalid";
+                return std::nullopt;
+            }
+
+            return *guid;
+        };
 
     if (!(input >> token) ||
-        token != "BASE_COLOR_TEXTURE" ||
-        !(input >> std::quoted(
-            texture_guid))) {
+        token != "BASE_COLOR_TEXTURE") {
 
         result.message =
             "material BASE_COLOR_TEXTURE is missing";
         return result;
     }
 
-    const auto dependency =
-        AssetGuid::parse(
-            texture_guid);
+    const auto base =
+        parse_dependency(
+            token);
 
-    if (!dependency ||
-        !dependency->valid()) {
-
-        result.message =
-            "material BASE_COLOR_TEXTURE GUID is invalid";
-        return result;
-    }
-
-    if (!(input >> token) ||
-        token != "END_MATERIAL") {
-
-        result.message =
-            "material terminator is missing";
+    if (!base) {
         return result;
     }
 
     result.dependencies.push_back(
-        *dependency);
+        *base);
 
-    result.success = true;
+    if (version == 1u) {
+        if (!(input >> token) ||
+            token != "END_MATERIAL") {
+
+            result.message =
+                "material terminator is missing";
+            return result;
+        }
+
+        result.success = true;
+        result.message =
+            "material staged with base-color texture dependency";
+        return result;
+    }
+
+    while (input >> token) {
+        if (token == "END_MATERIAL") {
+            result.success = true;
+            result.message =
+                "material v2 staged with " +
+                std::to_string(
+                    result.dependencies.size()) +
+                " texture dependency/dependencies";
+            return result;
+        }
+
+        if (token == "NORMAL_TEXTURE" ||
+            token ==
+                "METALLIC_ROUGHNESS_TEXTURE" ||
+            token == "EMISSIVE_TEXTURE" ||
+            token == "OCCLUSION_TEXTURE") {
+
+            const auto dependency =
+                parse_dependency(
+                    token);
+
+            if (!dependency) {
+                return result;
+            }
+
+            result.dependencies.push_back(
+                *dependency);
+            continue;
+        }
+
+        if (token == "METALLIC_FACTOR" ||
+            token == "ROUGHNESS_FACTOR" ||
+            token == "ALPHA_CUTOFF") {
+
+            float ignored = 0.0f;
+
+            if (!(input >> ignored)) {
+                result.message =
+                    "material numeric factor is invalid";
+                return result;
+            }
+
+            continue;
+        }
+
+        if (token == "EMISSIVE_FACTOR") {
+            float x = 0.0f;
+            float y = 0.0f;
+            float z = 0.0f;
+
+            if (!(input >> x >> y >> z)) {
+                result.message =
+                    "material EMISSIVE_FACTOR is invalid";
+                return result;
+            }
+
+            continue;
+        }
+
+        if (token == "ALPHA_MODE") {
+            std::string ignored;
+
+            if (!(input >>
+                    std::quoted(
+                        ignored))) {
+                result.message =
+                    "material ALPHA_MODE is invalid";
+                return result;
+            }
+
+            continue;
+        }
+
+        if (token == "DOUBLE_SIDED") {
+            std::uint32_t ignored = 0u;
+
+            if (!(input >> ignored) ||
+                ignored > 1u) {
+
+                result.message =
+                    "material DOUBLE_SIDED must be 0 or 1";
+                return result;
+            }
+
+            continue;
+        }
+
+        result.message =
+            "unknown material v2 field: " +
+            token;
+        return result;
+    }
+
     result.message =
-        "material staged with base-color texture dependency";
-
+        "material terminator is missing";
     return result;
 }
 
