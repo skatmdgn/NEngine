@@ -127,14 +127,18 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Dedicated generated NEngine.API + stable NEngine.Bridge assemblies
 - [x] Safe collectible AssemblyLoadContext gameplay hot reload/unload
 - [x] Native World callback ABI v6 for GameObject name/active, Transform hierarchy/TRS and component presence
-- [ ] Wider render/input/physics/audio managed component/property bindings
+- [x] Managed keyboard/mouse Input API over native callback table
+- [ ] Wider render/physics/audio managed component/property bindings
 - [ ] Visual Studio attach/debug symbols
 - [ ] coroutine/timer scheduler
 
 ## 0.6 — Physics, input, audio
 - [ ] 3D physics backend integration
 - [ ] 2D physics backend integration
-- [ ] keyboard/mouse/gamepad/touch actions
+- [x] Keyboard/mouse InputState transitions + Win32 message capture
+- [x] Named action-map binding/query foundation
+- [x] Managed KeyCode/GetKey/GetKeyDown/GetKeyUp + mouse position/delta/wheel
+- [ ] Gamepad/touch input backends and production action-map persistence
 - [ ] audio source/listener/mixer basics
 
 ## 0.7 — Animation/UI/navigation

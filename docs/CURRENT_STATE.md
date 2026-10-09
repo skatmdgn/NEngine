@@ -275,9 +275,23 @@ Implemented vocabulary/contracts:
 
 The concrete Vulkan backend currently grows beneath this contract. The long-term public renderer should not expose raw Vulkan objects to gameplay/editor systems.
 
+## Input foundation
+- Cross-platform InputState tracks held/pressed/released key and mouse-button transitions per frame.
+- Pointer state tracks position, delta and vertical wheel accumulation.
+- Win32 platform event polling feeds keyboard, mouse buttons, focus-loss releases and cursor position into InputState.
+- ActionMap can bind multiple keys/buttons to named actions and query held/pressed/released aggregation.
+- EditorModel receives the platform InputState every frame.
+- Managed ABI v6 has a separate native Input callback table; generated C# exposes Unity-familiar KeyCode, Input.GetKey/GetKeyDown/GetKeyUp, mousePosition, mouseDelta and mouseScrollDelta.
+- Cross-platform tests cover same-frame press/release, focus loss, pointer accumulation, action bindings and real managed C# Input callbacks.
+
+Not yet implemented:
+- Gamepad and touch device backends.
+- Persistent project Input Action asset/editor.
+- Analog axes/composites/rebinding.
+
 ## Immediate next work
 
-1. Extend the now-stable ABI v6 managed/native callback boundary into input and richer component APIs; collectible hot reload and hierarchy/GameObject callbacks are implemented.
+1. Continue the now-stable ABI v6 boundary into richer render/physics/audio component APIs; keyboard/mouse managed Input and hierarchy/GameObject callbacks are implemented.
 2. Finish production PBR validation: sampler state, lights/shadows and remaining material behavior.
 3. Decide and implement the explicit policy for remote/nonlocal or outside-directory glTF resources while preserving sandbox safety.
 4. Add WebP decoding plus texture compression/transcoding policy; mipmap generation/upload is already implemented.
