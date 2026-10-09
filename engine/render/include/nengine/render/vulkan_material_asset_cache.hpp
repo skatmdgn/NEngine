@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -103,9 +104,13 @@ public:
 private:
     struct Entry {
         std::string fingerprint{};
-        assets::AssetGuid texture_guid{};
+        std::array<
+            assets::AssetGuid,
+            5u> texture_guids{};
+        VulkanMaterialResource material{};
     };
 
+    const VulkanDevice* device_{nullptr};
     VulkanTextureAssetCache texture_cache_{};
 
     std::unordered_map<
