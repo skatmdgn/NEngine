@@ -153,6 +153,9 @@ bool write_rgba8_tga(
     return output.good();
 }
 
+std::string lower_extension(
+    const std::filesystem::path& path);
+
 double srgb_to_linear(
     std::uint8_t value) noexcept {
 
