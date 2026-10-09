@@ -77,6 +77,22 @@ public:
         std::string& name,
         bool& active);
 
+    bool reload_gameplay(
+        const std::filesystem::path& assembly_path,
+        std::string_view assembly_name);
+
+    bool unload_gameplay();
+
+    bool gameplay_loaded() const noexcept {
+        return is_gameplay_loaded_ &&
+            is_gameplay_loaded_() > 0;
+    }
+
+    bool previous_load_context_alive() const noexcept {
+        return previous_context_alive_ &&
+            previous_context_alive_() > 0;
+    }
+
     int instance_count() const;
 
     bool valid() const noexcept {
@@ -90,7 +106,12 @@ public:
             set_game_object_ != nullptr &&
             get_game_object_ != nullptr &&
             copy_game_object_name_ != nullptr &&
-            count_ != nullptr;
+            load_gameplay_ != nullptr &&
+            unload_gameplay_ != nullptr &&
+            is_gameplay_loaded_ != nullptr &&
+            previous_context_alive_ != nullptr &&
+            count_ != nullptr &&
+            gameplay_loaded();
     }
 
     const std::string& diagnostic()
@@ -156,6 +177,14 @@ private:
             char*,
             int);
 
+    using LoadGameplayFn =
+        int (*)(
+            const char*,
+            const char*);
+
+    using SimpleFn =
+        int (*)();
+
     using CountFn =
         int (*)();
 
@@ -169,6 +198,10 @@ private:
     SetGameObjectFn set_game_object_{nullptr};
     GetGameObjectFn get_game_object_{nullptr};
     CopyGameObjectNameFn copy_game_object_name_{nullptr};
+    LoadGameplayFn load_gameplay_{nullptr};
+    SimpleFn unload_gameplay_{nullptr};
+    SimpleFn is_gameplay_loaded_{nullptr};
+    SimpleFn previous_context_alive_{nullptr};
     CountFn count_{nullptr};
     std::string diagnostic_{};
 };

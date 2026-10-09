@@ -1,6 +1,7 @@
 #include "nengine/scripting/managed_runtime.hpp"
 
 #include <cmath>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -19,6 +20,18 @@ Function load_entry(
             assembly_path,
             bridge_type,
             method));
+}
+
+std::string path_utf8(
+    const std::filesystem::path& path) {
+
+    const auto encoded =
+        path.u8string();
+
+    return std::string{
+        reinterpret_cast<const char*>(
+            encoded.data()),
+        encoded.size()};
 }
 
 } // namespace
@@ -67,6 +80,22 @@ ManagedRuntime::ManagedRuntime(
       copy_game_object_name_(
           std::exchange(
               other.copy_game_object_name_,
+              nullptr)),
+      load_gameplay_(
+          std::exchange(
+              other.load_gameplay_,
+              nullptr)),
+      unload_gameplay_(
+          std::exchange(
+              other.unload_gameplay_,
+              nullptr)),
+      is_gameplay_loaded_(
+          std::exchange(
+              other.is_gameplay_loaded_,
+              nullptr)),
+      previous_context_alive_(
+          std::exchange(
+              other.previous_context_alive_,
               nullptr)),
       count_(
           std::exchange(
@@ -135,6 +164,26 @@ ManagedRuntime::operator=(
             other.copy_game_object_name_,
             nullptr);
 
+    load_gameplay_ =
+        std::exchange(
+            other.load_gameplay_,
+            nullptr);
+
+    unload_gameplay_ =
+        std::exchange(
+            other.unload_gameplay_,
+            nullptr);
+
+    is_gameplay_loaded_ =
+        std::exchange(
+            other.is_gameplay_loaded_,
+            nullptr);
+
+    previous_context_alive_ =
+        std::exchange(
+            other.previous_context_alive_,
+            nullptr);
+
     count_ =
         std::exchange(
             other.count_,
@@ -177,10 +226,27 @@ bool ManagedRuntime::initialize(
         return false;
     }
 
+    const auto bridge_assembly_path =
+        assembly_path.parent_path() /
+        "NEngine.Bridge.dll";
+
+    std::error_code bridge_error;
+
+    if (!std::filesystem::is_regular_file(
+            bridge_assembly_path,
+            bridge_error) ||
+        bridge_error) {
+
+        diagnostic_ =
+            "managed bridge assembly is missing beside gameplay assembly: " +
+            bridge_assembly_path.generic_string();
+
+        shutdown();
+        return false;
+    }
+
     const std::string bridge_type =
-        "NEngine.Internal.NativeBridge, " +
-        std::string{
-            assembly_name};
+        "NEngine.Internal.NativeBridge, NEngine.Bridge";
 
     using AbiFn =
         int (*)();
@@ -188,7 +254,7 @@ bool ManagedRuntime::initialize(
     const auto abi =
         load_entry<AbiFn>(
             host_,
-            assembly_path,
+            bridge_assembly_path,
             bridge_type,
             "GetAbiVersion");
 
@@ -202,9 +268,9 @@ bool ManagedRuntime::initialize(
     const int abi_version =
         abi();
 
-    if (abi_version != 4) {
+    if (abi_version != 5) {
         diagnostic_ =
-            "managed bridge ABI mismatch: expected 4, got " +
+            "managed bridge ABI mismatch: expected 5, got " +
             std::to_string(
                 abi_version);
         shutdown();
@@ -214,82 +280,147 @@ bool ManagedRuntime::initialize(
     create_ =
         load_entry<CreateFn>(
             host_,
-            assembly_path,
+            bridge_assembly_path,
             bridge_type,
             "CreateBehaviour");
 
     start_ =
         load_entry<InvokeFn>(
             host_,
-            assembly_path,
+            bridge_assembly_path,
             bridge_type,
             "InvokeStart");
 
     update_ =
         load_entry<UpdateFn>(
             host_,
-            assembly_path,
+            bridge_assembly_path,
             bridge_type,
             "InvokeUpdate");
 
     destroy_ =
         load_entry<InvokeFn>(
             host_,
-            assembly_path,
+            bridge_assembly_path,
             bridge_type,
             "DestroyBehaviour");
 
     set_transform_ =
         load_entry<TransformFn>(
             host_,
-            assembly_path,
+            bridge_assembly_path,
             bridge_type,
             "SetTransformState");
 
     get_transform_ =
         load_entry<TransformFn>(
             host_,
-            assembly_path,
+            bridge_assembly_path,
             bridge_type,
             "GetTransformState");
 
     set_game_object_ =
         load_entry<SetGameObjectFn>(
             host_,
-            assembly_path,
+            bridge_assembly_path,
             bridge_type,
             "SetGameObjectState");
 
     get_game_object_ =
         load_entry<GetGameObjectFn>(
             host_,
-            assembly_path,
+            bridge_assembly_path,
             bridge_type,
             "GetGameObjectState");
 
     copy_game_object_name_ =
         load_entry<CopyGameObjectNameFn>(
             host_,
-            assembly_path,
+            bridge_assembly_path,
             bridge_type,
             "CopyGameObjectNameUtf8");
+
+    load_gameplay_ =
+        load_entry<LoadGameplayFn>(
+            host_,
+            bridge_assembly_path,
+            bridge_type,
+            "LoadGameplayAssembly");
+
+    unload_gameplay_ =
+        load_entry<SimpleFn>(
+            host_,
+            bridge_assembly_path,
+            bridge_type,
+            "UnloadGameplayAssembly");
+
+    is_gameplay_loaded_ =
+        load_entry<SimpleFn>(
+            host_,
+            bridge_assembly_path,
+            bridge_type,
+            "IsGameplayAssemblyLoaded");
+
+    previous_context_alive_ =
+        load_entry<SimpleFn>(
+            host_,
+            bridge_assembly_path,
+            bridge_type,
+            "IsPreviousLoadContextAlive");
 
     count_ =
         load_entry<CountFn>(
             host_,
-            assembly_path,
+            bridge_assembly_path,
             bridge_type,
             "GetInstanceCount");
 
-    if (!valid()) {
+    if (!create_ ||
+        !start_ ||
+        !update_ ||
+        !destroy_ ||
+        !set_transform_ ||
+        !get_transform_ ||
+        !set_game_object_ ||
+        !get_game_object_ ||
+        !copy_game_object_name_ ||
+        !load_gameplay_ ||
+        !unload_gameplay_ ||
+        !is_gameplay_loaded_ ||
+        !previous_context_alive_ ||
+        !count_) {
+
         diagnostic_ =
-            "managed bridge is missing one or more lifecycle entry points";
+            "managed bridge is missing one or more ABI v5 entry points";
+        shutdown();
+        return false;
+    }
+
+    const auto gameplay_path =
+        path_utf8(
+            std::filesystem::absolute(
+                assembly_path));
+
+    std::string terminated_name{
+        assembly_name};
+
+    const int load_result =
+        load_gameplay_(
+            gameplay_path.c_str(),
+            terminated_name.c_str());
+
+    if (load_result < 0 ||
+        !gameplay_loaded()) {
+
+        diagnostic_ =
+            "managed bridge could not load collectible gameplay assembly";
+
         shutdown();
         return false;
     }
 
     diagnostic_ =
-        "managed gameplay runtime initialized; ABI v4 lifecycle Transform and GameObject sync ready";
+        "managed gameplay runtime initialized; ABI v5 collectible gameplay lifecycle Transform and GameObject sync ready";
 
     return true;
 }
@@ -566,6 +697,91 @@ bool ManagedRuntime::get_game_object(
     return true;
 }
 
+bool ManagedRuntime::unload_gameplay() {
+
+    if (!host_.ready() ||
+        !unload_gameplay_ ||
+        !is_gameplay_loaded_) {
+        return false;
+    }
+
+    if (count_ &&
+        count_() != 0) {
+
+        diagnostic_ =
+            "cannot unload gameplay assembly while managed Behaviour instances are alive";
+        return false;
+    }
+
+    if (!gameplay_loaded()) {
+        return true;
+    }
+
+    const int result =
+        unload_gameplay_();
+
+    if (result < 0 ||
+        gameplay_loaded()) {
+
+        diagnostic_ =
+            "collectible gameplay assembly unload request failed";
+        return false;
+    }
+
+    diagnostic_ =
+        previous_load_context_alive()
+            ? "gameplay assembly unloaded; collectible context is awaiting GC"
+            : "gameplay assembly and collectible context unloaded";
+
+    return true;
+}
+
+bool ManagedRuntime::reload_gameplay(
+    const std::filesystem::path& assembly_path,
+    std::string_view assembly_name) {
+
+    if (!host_.ready() ||
+        !load_gameplay_ ||
+        !unload_gameplay_ ||
+        assembly_path.empty() ||
+        assembly_name.empty()) {
+
+        diagnostic_ =
+            "managed runtime bridge is not ready for gameplay reload";
+        return false;
+    }
+
+    if (!unload_gameplay()) {
+        return false;
+    }
+
+    const auto gameplay_path =
+        path_utf8(
+            std::filesystem::absolute(
+                assembly_path));
+
+    std::string terminated_name{
+        assembly_name};
+
+    const int result =
+        load_gameplay_(
+            gameplay_path.c_str(),
+            terminated_name.c_str());
+
+    if (result < 0 ||
+        !gameplay_loaded()) {
+
+        diagnostic_ =
+            "collectible gameplay assembly reload failed";
+        return false;
+    }
+
+    diagnostic_ =
+        "collectible gameplay assembly reloaded";
+
+    return true;
+}
+
 int ManagedRuntime::instance_count()
     const {
 
@@ -583,7 +799,20 @@ void ManagedRuntime::shutdown() noexcept {
     get_transform_ = nullptr;
     set_game_object_ = nullptr;
     get_game_object_ = nullptr;
+    if (unload_gameplay_ &&
+        is_gameplay_loaded_ &&
+        count_ &&
+        count_() == 0 &&
+        gameplay_loaded()) {
+
+        unload_gameplay_();
+    }
+
     copy_game_object_name_ = nullptr;
+    load_gameplay_ = nullptr;
+    unload_gameplay_ = nullptr;
+    is_gameplay_loaded_ = nullptr;
+    previous_context_alive_ = nullptr;
     count_ = nullptr;
     host_.shutdown();
 }
