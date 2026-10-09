@@ -16,6 +16,7 @@
 #include "nengine/editor/scene_interaction.hpp"
 #include "nengine/render/builtin_assets.hpp"
 #include "nengine/render/components.hpp"
+#include "nengine/scripting/components.hpp"
 
 namespace {
 
@@ -1089,6 +1090,73 @@ int main() {
 
     model.commands().clear();
 
+
+    check(
+        model.component_factories().contains(
+            scripting::script_behaviour_type()),
+        "EditorModel registers ScriptBehaviour Add Component factory");
+
+    const auto script_entity =
+        world.create(
+            "Script Entity");
+
+    check(
+        model.commands().execute(
+            world,
+            std::make_unique<
+                editor::AddComponentCommand>(
+                    script_entity,
+                    scripting::script_behaviour_type(),
+                    &model.component_factories())),
+        "AddComponentCommand creates ScriptBehaviour through generic factory registry");
+
+    auto* script_behaviour =
+        world.get_component<
+            scripting::ScriptBehaviour>(
+                script_entity,
+                scripting::script_behaviour_type());
+
+    check(
+        script_behaviour != nullptr,
+        "ScriptBehaviour native component exists after Add Component");
+
+    check(
+        model.commands().execute(
+            world,
+            std::make_unique<
+                editor::SetPropertyCommand>(
+                    &model.property_access(),
+                    script_entity,
+                    scripting::script_behaviour_type(),
+                    "Type Name",
+                    core::PropertyValue{
+                        std::string{
+                            "Game.PlayerController"}})),
+        "generic property command edits ScriptBehaviour Type Name");
+
+    check(
+        script_behaviour &&
+        script_behaviour->type_name ==
+            "Game.PlayerController",
+        "ScriptBehaviour Type Name edit reaches native scripting component");
+
+    check(
+        model.property_access().write(
+            world,
+            script_entity,
+            scripting::script_behaviour_type(),
+            "Enabled",
+            core::PropertyValue{
+                false}),
+        "generic property access edits ScriptBehaviour Enabled");
+
+    check(
+        script_behaviour &&
+        !script_behaviour->enabled,
+        "ScriptBehaviour Enabled edit reaches native scripting component");
+
+    model.commands().clear();
+
     check(
         world.destroy(
             factory_entity),
@@ -1618,6 +1686,39 @@ int main() {
     check(
         restored_health_entity.valid(),
         "Scene v2 restored custom component owner");
+
+
+    core::Entity restored_script_entity =
+        core::Entity::invalid();
+
+    for (const auto entity :
+         component_restored.entities()) {
+
+        if (component_restored.name(entity) ==
+            "Script Entity") {
+
+            restored_script_entity =
+                entity;
+            break;
+        }
+    }
+
+    const auto* restored_script =
+        restored_script_entity.valid()
+            ? component_restored
+                .get_component<
+                    scripting::ScriptBehaviour>(
+                        restored_script_entity,
+                        scripting::
+                            script_behaviour_type())
+            : nullptr;
+
+    check(
+        restored_script &&
+        restored_script->type_name ==
+            "Game.PlayerController" &&
+        !restored_script->enabled,
+        "Scene v2 roundtrip preserves ScriptBehaviour Type Name and Enabled");
 
     const auto* restored_health =
         component_restored.get_component<
