@@ -870,12 +870,14 @@ namespace NEngine
             set
             {
                 string next = value ?? string.Empty;
+                _name = next;
 
-                if (!_nativeBound ||
-                    !NativeWorld.available ||
-                    NativeWorld.SetName(_instanceId, next))
+                if (_nativeBound &&
+                    NativeWorld.available)
                 {
-                    _name = next;
+                    NativeWorld.SetName(
+                        _instanceId,
+                        next);
                 }
             }
         }
@@ -943,11 +945,14 @@ namespace NEngine
 
         public void SetActive(bool active)
         {
-            if (!_nativeBound ||
-                !NativeWorld.available ||
-                NativeWorld.SetActive(_instanceId, active))
+            _activeSelf = active;
+
+            if (_nativeBound &&
+                NativeWorld.available)
             {
-                _activeSelf = active;
+                NativeWorld.SetActive(
+                    _instanceId,
+                    active);
             }
         }
 
