@@ -353,6 +353,74 @@ bool register_component_metadata(
 
     ok =
         registry.register_type(
+            "NEngine.SpriteRenderer",
+            "Rendering",
+            true,
+            false) &&
+        ok;
+
+    ok =
+        registry.register_property(
+            sprite_renderer_type(),
+            {
+                "Enabled",
+                core::PropertyKind::Boolean,
+                core::PropertyFlags::Serializable |
+                    core::PropertyFlags::Editable
+            }) && ok;
+
+    ok =
+        registry.register_property(
+            sprite_renderer_type(),
+            {
+                "Texture",
+                core::PropertyKind::AssetReference,
+                core::PropertyFlags::Serializable |
+                    core::PropertyFlags::Editable
+            }) && ok;
+
+    ok =
+        registry.register_property(
+            sprite_renderer_type(),
+            {
+                "Pixels Per Unit",
+                core::PropertyKind::Float,
+                core::PropertyFlags::Serializable |
+                    core::PropertyFlags::Editable
+            }) && ok;
+
+    ok =
+        registry.register_property(
+            sprite_renderer_type(),
+            {
+                "Sort Order",
+                core::PropertyKind::Integer,
+                core::PropertyFlags::Serializable |
+                    core::PropertyFlags::Editable
+            }) && ok;
+
+    ok =
+        registry.register_property(
+            sprite_renderer_type(),
+            {
+                "Flip X",
+                core::PropertyKind::Boolean,
+                core::PropertyFlags::Serializable |
+                    core::PropertyFlags::Editable
+            }) && ok;
+
+    ok =
+        registry.register_property(
+            sprite_renderer_type(),
+            {
+                "Flip Y",
+                core::PropertyKind::Boolean,
+                core::PropertyFlags::Serializable |
+                    core::PropertyFlags::Editable
+            }) && ok;
+
+    ok =
+        registry.register_type(
             "NEngine.MeshRenderer",
             "Rendering",
             true,
@@ -655,6 +723,108 @@ bool register_component_serializers(
 
                 if (!light) return false;
                 *light = value;
+                return true;
+            }
+        }) && ok;
+
+    ok =
+        registry.register_codec({
+            sprite_renderer_type(),
+            1,
+            "NEngine.SpriteRenderer",
+            [](const core::World& world,
+               core::Entity entity)
+                -> std::optional<
+                    core::SerializedComponentData> {
+
+                const auto* renderer =
+                    world.get_component<SpriteRenderer>(
+                        entity,
+                        sprite_renderer_type());
+
+                if (!renderer) {
+                    return std::nullopt;
+                }
+
+                core::SerializedComponentData data;
+                data.properties = {
+                    boolean_property(
+                        "Enabled",
+                        renderer->enabled),
+                    asset_property(
+                        "Texture",
+                        renderer->texture),
+                    float_property(
+                        "Pixels Per Unit",
+                        renderer->pixels_per_unit),
+                    integer_property(
+                        "Sort Order",
+                        renderer->sort_order),
+                    boolean_property(
+                        "Flip X",
+                        renderer->flip_x),
+                    boolean_property(
+                        "Flip Y",
+                        renderer->flip_y)
+                };
+
+                return data;
+            },
+            [](core::World& world,
+               core::Entity entity,
+               const core::SerializedComponentData& data,
+               std::string* error) {
+
+                SpriteRenderer value;
+
+                if (!read_bool(
+                        data,
+                        "Enabled",
+                        value.enabled) ||
+                    !read_asset(
+                        data,
+                        "Texture",
+                        value.texture) ||
+                    !read_float(
+                        data,
+                        "Pixels Per Unit",
+                        value.pixels_per_unit) ||
+                    !read_i64(
+                        data,
+                        "Sort Order",
+                        value.sort_order) ||
+                    !read_bool(
+                        data,
+                        "Flip X",
+                        value.flip_x) ||
+                    !read_bool(
+                        data,
+                        "Flip Y",
+                        value.flip_y) ||
+                    value.pixels_per_unit <=
+                        0.0f) {
+
+                    if (error) {
+                        *error =
+                            "malformed NEngine.SpriteRenderer data";
+                    }
+                    return false;
+                }
+
+                auto* renderer =
+                    world.get_component<SpriteRenderer>(
+                        entity,
+                        sprite_renderer_type());
+
+                if (!renderer) {
+                    renderer =
+                        world.add_component<SpriteRenderer>(
+                            entity,
+                            sprite_renderer_type());
+                }
+
+                if (!renderer) return false;
+                *renderer = value;
                 return true;
             }
         }) && ok;
