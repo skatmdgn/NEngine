@@ -200,6 +200,21 @@ private:
         const input::InputState* input{nullptr};
     };
 
+    using WorldCreateFn =
+        std::uint64_t (*)(
+            void*,
+            const char*);
+
+    using WorldDestroyFn =
+        int (*)(
+            void*,
+            std::uint64_t);
+
+    using WorldFindFn =
+        std::uint64_t (*)(
+            void*,
+            const char*);
+
     using WorldIsAliveFn =
         int (*)(
             void*,
@@ -265,6 +280,9 @@ private:
 
     struct NativeWorldCallbacks {
         void* context{nullptr};
+        WorldCreateFn create{nullptr};
+        WorldDestroyFn destroy{nullptr};
+        WorldFindFn find{nullptr};
         WorldIsAliveFn is_alive{nullptr};
         WorldNameFn copy_name_utf8{nullptr};
         WorldSetNameFn set_name_utf8{nullptr};
@@ -282,6 +300,18 @@ private:
     using ConfigureWorldCallbacksFn =
         int (*)(
             const NativeWorldCallbacks*);
+
+    static std::uint64_t callback_create(
+        void* context,
+        const char* name);
+
+    static int callback_destroy(
+        void* context,
+        std::uint64_t entity_id);
+
+    static std::uint64_t callback_find(
+        void* context,
+        const char* name);
 
     static int callback_is_alive(
         void* context,
