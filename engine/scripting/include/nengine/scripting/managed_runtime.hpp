@@ -2,12 +2,17 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <string_view>
 
 #include "nengine/core/entity.hpp"
 #include "nengine/core/transform.hpp"
 #include "nengine/scripting/dotnet_host.hpp"
+
+namespace nengine::core {
+class World;
+}
 
 namespace nengine::scripting {
 
@@ -81,6 +86,9 @@ public:
         const std::filesystem::path& assembly_path,
         std::string_view assembly_name);
 
+    void bind_world(
+        core::World* world) noexcept;
+
     bool unload_gameplay();
 
     bool gameplay_loaded() const noexcept {
@@ -106,6 +114,8 @@ public:
             set_game_object_ != nullptr &&
             get_game_object_ != nullptr &&
             copy_game_object_name_ != nullptr &&
+            configure_world_callbacks_ != nullptr &&
+            world_context_ != nullptr &&
             load_gameplay_ != nullptr &&
             unload_gameplay_ != nullptr &&
             is_gameplay_loaded_ != nullptr &&
@@ -177,6 +187,150 @@ private:
             char*,
             int);
 
+    struct NativeWorldContext {
+        core::World* world{nullptr};
+    };
+
+    using WorldIsAliveFn =
+        int (*)(
+            void*,
+            std::uint64_t);
+
+    using WorldNameFn =
+        int (*)(
+            void*,
+            std::uint64_t,
+            char*,
+            int);
+
+    using WorldSetNameFn =
+        int (*)(
+            void*,
+            std::uint64_t,
+            const char*);
+
+    using WorldActiveFn =
+        int (*)(
+            void*,
+            std::uint64_t);
+
+    using WorldSetActiveFn =
+        int (*)(
+            void*,
+            std::uint64_t,
+            int);
+
+    using WorldTransformFn =
+        int (*)(
+            void*,
+            std::uint64_t,
+            NativeTransformState*);
+
+    using WorldParentFn =
+        std::uint64_t (*)(
+            void*,
+            std::uint64_t);
+
+    using WorldSetParentFn =
+        int (*)(
+            void*,
+            std::uint64_t,
+            std::uint64_t);
+
+    using WorldChildCountFn =
+        int (*)(
+            void*,
+            std::uint64_t);
+
+    using WorldChildAtFn =
+        std::uint64_t (*)(
+            void*,
+            std::uint64_t,
+            int);
+
+    using WorldHasComponentFn =
+        int (*)(
+            void*,
+            std::uint64_t,
+            const char*);
+
+    struct NativeWorldCallbacks {
+        void* context{nullptr};
+        WorldIsAliveFn is_alive{nullptr};
+        WorldNameFn copy_name_utf8{nullptr};
+        WorldSetNameFn set_name_utf8{nullptr};
+        WorldActiveFn get_active{nullptr};
+        WorldSetActiveFn set_active{nullptr};
+        WorldTransformFn get_transform{nullptr};
+        WorldTransformFn set_transform{nullptr};
+        WorldParentFn get_parent{nullptr};
+        WorldSetParentFn set_parent{nullptr};
+        WorldChildCountFn get_child_count{nullptr};
+        WorldChildAtFn get_child_at{nullptr};
+        WorldHasComponentFn has_component{nullptr};
+    };
+
+    using ConfigureWorldCallbacksFn =
+        int (*)(
+            const NativeWorldCallbacks*);
+
+    static int callback_is_alive(
+        void* context,
+        std::uint64_t entity_id);
+
+    static int callback_copy_name_utf8(
+        void* context,
+        std::uint64_t entity_id,
+        char* buffer,
+        int capacity);
+
+    static int callback_set_name_utf8(
+        void* context,
+        std::uint64_t entity_id,
+        const char* name);
+
+    static int callback_get_active(
+        void* context,
+        std::uint64_t entity_id);
+
+    static int callback_set_active(
+        void* context,
+        std::uint64_t entity_id,
+        int active);
+
+    static int callback_get_transform(
+        void* context,
+        std::uint64_t entity_id,
+        NativeTransformState* state);
+
+    static int callback_set_transform(
+        void* context,
+        std::uint64_t entity_id,
+        NativeTransformState* state);
+
+    static std::uint64_t callback_get_parent(
+        void* context,
+        std::uint64_t entity_id);
+
+    static int callback_set_parent(
+        void* context,
+        std::uint64_t child_id,
+        std::uint64_t parent_id);
+
+    static int callback_get_child_count(
+        void* context,
+        std::uint64_t entity_id);
+
+    static std::uint64_t callback_get_child_at(
+        void* context,
+        std::uint64_t entity_id,
+        int index);
+
+    static int callback_has_component(
+        void* context,
+        std::uint64_t entity_id,
+        const char* type_name);
+
     using LoadGameplayFn =
         int (*)(
             const char*,
@@ -198,6 +352,8 @@ private:
     SetGameObjectFn set_game_object_{nullptr};
     GetGameObjectFn get_game_object_{nullptr};
     CopyGameObjectNameFn copy_game_object_name_{nullptr};
+    ConfigureWorldCallbacksFn configure_world_callbacks_{nullptr};
+    std::unique_ptr<NativeWorldContext> world_context_{};
     LoadGameplayFn load_gameplay_{nullptr};
     SimpleFn unload_gameplay_{nullptr};
     SimpleFn is_gameplay_loaded_{nullptr};
