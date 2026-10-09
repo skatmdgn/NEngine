@@ -193,6 +193,28 @@ bool read_material_asset(
             continue;
         }
 
+        if (token == "NORMAL_SCALE") {
+            if (!(input >>
+                    parsed.normal_scale)) {
+                set_error(
+                    error,
+                    "material NORMAL_SCALE is invalid");
+                return false;
+            }
+            continue;
+        }
+
+        if (token == "OCCLUSION_STRENGTH") {
+            if (!(input >>
+                    parsed.occlusion_strength)) {
+                set_error(
+                    error,
+                    "material OCCLUSION_STRENGTH is invalid");
+                return false;
+            }
+            continue;
+        }
+
         if (token == "EMISSIVE_FACTOR") {
             if (!(input >>
                     parsed.emissive_factor.x >>

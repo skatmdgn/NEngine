@@ -26,6 +26,8 @@ struct MaterialAssetData {
 
     float metallic_factor{1.0f};
     float roughness_factor{1.0f};
+    float normal_scale{1.0f};
+    float occlusion_strength{1.0f};
     core::Vec3 emissive_factor{};
     MaterialAlphaMode alpha_mode{
         MaterialAlphaMode::Opaque};
@@ -39,6 +41,9 @@ struct MaterialAssetData {
             metallic_factor <= 1.0f &&
             roughness_factor >= 0.0f &&
             roughness_factor <= 1.0f &&
+            normal_scale >= 0.0f &&
+            occlusion_strength >= 0.0f &&
+            occlusion_strength <= 1.0f &&
             alpha_cutoff >= 0.0f &&
             alpha_cutoff <= 1.0f;
     }
