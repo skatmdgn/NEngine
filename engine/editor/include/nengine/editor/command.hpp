@@ -11,6 +11,7 @@
 
 #include "nengine/core/transform.hpp"
 #include "nengine/core/world.hpp"
+#include "nengine/editor/component_factory.hpp"
 
 namespace nengine::editor {
 
@@ -116,6 +117,30 @@ private:
     bool old_value_{true};
     bool new_value_{true};
     bool captured_{false};
+};
+
+class AddComponentCommand final : public EditorCommand {
+public:
+    AddComponentCommand(
+        core::Entity entity,
+        core::ComponentTypeId type,
+        const ComponentFactoryRegistry* factories)
+        : entity_(entity),
+          type_(type),
+          factories_(factories) {}
+
+    bool execute(core::World& world) override;
+    void undo(core::World& world) override;
+    std::string_view name() const noexcept override {
+        return "Add Component";
+    }
+
+private:
+    core::Entity entity_{core::Entity::invalid()};
+    core::ComponentTypeId type_{
+        core::ComponentRegistry::invalid_type};
+    const ComponentFactoryRegistry*
+        factories_{nullptr};
 };
 
 class SetTransformCommand final : public EditorCommand {
