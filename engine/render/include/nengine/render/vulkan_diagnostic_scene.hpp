@@ -65,7 +65,8 @@ public:
             imported_material_cache_.ready() &&
             texture_.valid() &&
             material_.valid() &&
-            pipeline_.valid();
+            pipeline_.valid() &&
+            sprite_pipeline_.valid();
     }
 
     const std::string& diagnostic() const noexcept {
@@ -93,6 +94,7 @@ private:
     VulkanTextureResource texture_{};
     VulkanMaterialResource material_{};
     VulkanGraphicsPipeline pipeline_{};
+    VulkanGraphicsPipeline sprite_pipeline_{};
     std::string diagnostic_{};
 };
 

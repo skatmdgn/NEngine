@@ -1,5 +1,6 @@
 #include "nengine/render/vulkan_diagnostic_scene.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <span>
 #include <utility>
@@ -143,6 +144,31 @@ bool VulkanDiagnosticScene::initialize(
         diagnostic_ =
             "diagnostic textured graphics pipeline failed: " +
             pipeline_.diagnostic();
+
+        shutdown();
+        return false;
+    }
+
+    VulkanGraphicsPipelineOptions
+        sprite_options;
+
+    sprite_options.depth_test = false;
+    sprite_options.depth_write = false;
+    sprite_options.alpha_blend = true;
+    sprite_options.back_face_culling = false;
+
+    if (!sprite_pipeline_.create(
+            context.device(),
+            context.render_targets()
+                .render_pass_resource(),
+            vertex_shader_,
+            fragment_shader_,
+            material_,
+            sprite_options)) {
+
+        diagnostic_ =
+            "sprite alpha-blended graphics pipeline failed: " +
+            sprite_pipeline_.diagnostic();
 
         shutdown();
         return false;
@@ -643,6 +669,7 @@ bool VulkanDiagnosticScene::present_world(
 }
 
 void VulkanDiagnosticScene::shutdown() noexcept {
+    sprite_pipeline_.destroy();
     pipeline_.destroy();
     material_.destroy();
     texture_.destroy();
