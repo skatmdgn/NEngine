@@ -689,7 +689,9 @@ bool VulkanClearPresenter::present_frame(
         if (!draw.pipeline ||
             !draw.mesh ||
             !draw.pipeline->valid() ||
-            !draw.mesh->valid()) {
+            !draw.mesh->valid() ||
+            (draw.pipeline->push_constant_bytes() != 64u &&
+             draw.pipeline->push_constant_bytes() != 128u)) {
 
             diagnostic_ =
                 "all Vulkan mesh draws require valid pipeline mesh and MVP";
@@ -1126,17 +1128,41 @@ bool VulkanClearPresenter::present_frame(
                 0,
                 VK_INDEX_TYPE_UINT32);
 
-            push_constants(
-                command,
-                draw.pipeline
-                    ->native_layout(),
-                VK_SHADER_STAGE_VERTEX_BIT,
-                0,
-                static_cast<std::uint32_t>(
-                    sizeof(Mat4)),
-                draw.mvp
-                    .value
-                    .data());
+            if (draw.pipeline
+                    ->push_constant_bytes() ==
+                128u) {
+
+                struct ExtendedPushConstants {
+                    Mat4 mvp{};
+                    Mat4 model_view{};
+                };
+
+                const ExtendedPushConstants
+                    constants{
+                        draw.mvp,
+                        draw.model_view
+                    };
+
+                push_constants(
+                    command,
+                    draw.pipeline
+                        ->native_layout(),
+                    VK_SHADER_STAGE_VERTEX_BIT,
+                    0,
+                    128u,
+                    &constants);
+            } else {
+                push_constants(
+                    command,
+                    draw.pipeline
+                        ->native_layout(),
+                    VK_SHADER_STAGE_VERTEX_BIT,
+                    0,
+                    64u,
+                    draw.mvp
+                        .value
+                        .data());
+            }
 
             const auto index_count =
                 draw.index_count != 0u
