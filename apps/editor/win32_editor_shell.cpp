@@ -72,6 +72,8 @@ enum ControlId : int {
     IdGenericProperties,
     IdGenericValue,
     IdApplyProperty,
+    IdAddComponentList,
+    IdAddComponent,
     IdAssets,
     IdConsole,
     IdSplitHierarchy,
@@ -301,8 +303,12 @@ struct Win32EditorShell::Impl {
     HWND generic_properties{nullptr};
     HWND generic_value{nullptr};
     HWND apply_property{nullptr};
+    HWND add_component_list{nullptr};
+    HWND add_component{nullptr};
     std::vector<GenericPropertyBinding>
         generic_property_rows{};
+    std::vector<nengine::core::ComponentTypeId>
+        add_component_rows{};
     nengine::core::Entity generic_property_entity{
         nengine::core::Entity::invalid()};
 
@@ -862,6 +868,20 @@ struct Win32EditorShell::Impl {
             BS_PUSHBUTTON,
             IdApplyProperty);
 
+        add_component_list = create_control(
+            host,
+            L"COMBOBOX",
+            L"",
+            CBS_DROPDOWNLIST | WS_VSCROLL,
+            IdAddComponentList);
+
+        add_component = create_control(
+            host,
+            L"BUTTON",
+            L"Add Component",
+            BS_PUSHBUTTON,
+            IdAddComponent);
+
         if (!inspector_title || !label_name || !name || !active ||
             !label_position || !position[0] || !position[1] || !position[2] ||
             !label_rotation || !rotation[0] || !rotation[1] ||
@@ -871,7 +891,9 @@ struct Win32EditorShell::Impl {
             !generic_title ||
             !generic_properties ||
             !generic_value ||
-            !apply_property) {
+            !apply_property ||
+            !add_component_list ||
+            !add_component) {
             shell_log("attach failed: inspector control creation");
             return false;
         }
@@ -1751,7 +1773,7 @@ struct Win32EditorShell::Impl {
                 60,
                 inspector_bottom -
                     iy -
-                    62);
+                    96);
 
         MoveWindow(
             generic_properties,
@@ -1777,6 +1799,37 @@ struct Win32EditorShell::Impl {
             iy,
             iw,
             27,
+            TRUE);
+        iy += 34;
+
+        const int add_button_width =
+            std::min(
+                110,
+                iw / 3);
+
+        const int add_combo_width =
+            std::max(
+                40,
+                iw -
+                    add_button_width -
+                    4);
+
+        MoveWindow(
+            add_component_list,
+            ix,
+            iy,
+            add_combo_width,
+            120,
+            TRUE);
+
+        MoveWindow(
+            add_component,
+            ix +
+                add_combo_width +
+                4,
+            iy,
+            add_button_width,
+            24,
             TRUE);
 
         const int bottom_y =
