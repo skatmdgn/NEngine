@@ -2490,6 +2490,345 @@ int main() {
                 cached_obj,
             "OBJ model artifacts resolve through common AssetGuid decoded mesh cache");
 
+        const auto obj_cook_root =
+            root / "obj_mtl_cook";
+
+        const auto obj_cook_source =
+            obj_cook_root / "model.obj";
+
+        const auto obj_cook_mtl =
+            obj_cook_root /
+            "mats" /
+            "materials.mtl";
+
+        const auto obj_cook_texture =
+            obj_cook_root /
+            "tex" /
+            "white.tga";
+
+        std::filesystem::create_directories(
+            obj_cook_mtl.parent_path());
+
+        std::filesystem::create_directories(
+            obj_cook_texture.parent_path());
+
+        {
+            std::ofstream output(
+                obj_cook_source,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output
+                << "mtllib mats/materials.mtl\n"
+                << "v 0 0 0\n"
+                << "v 1 0 0\n"
+                << "v 0 1 0\n"
+                << "v 1 1 0\n"
+                << "vt 0 0\n"
+                << "vt 1 0\n"
+                << "vt 0 1\n"
+                << "vt 1 1\n"
+                << "usemtl ColorOnly\n"
+                << "f 1/1 2/2 3/3\n"
+                << "usemtl Textured\n"
+                << "f 2/2 4/4 3/3\n";
+        }
+
+        {
+            std::ofstream output(
+                obj_cook_mtl,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output
+                << "newmtl ColorOnly\n"
+                << "Kd 0.25 0.5 1\n"
+                << "d 0.5\n"
+                << "newmtl Textured\n"
+                << "Kd 1 1 1\n"
+                << "map_Kd ../tex/white.tga\n";
+        }
+
+        {
+            std::array<std::uint8_t, 22>
+                tga{};
+
+            tga[2] = 2u;
+            tga[12] = 1u;
+            tga[14] = 1u;
+            tga[16] = 32u;
+            tga[17] = 0x28u;
+            tga[18] = 30u;
+            tga[19] = 20u;
+            tga[20] = 10u;
+            tga[21] = 200u;
+
+            std::ofstream output(
+                obj_cook_texture,
+                std::ios::binary |
+                    std::ios::trunc);
+
+            output.write(
+                reinterpret_cast<const char*>(
+                    tga.data()),
+                static_cast<std::streamsize>(
+                    tga.size()));
+        }
+
+        const auto obj_cook_cache =
+            root / "obj_mtl_cache";
+
+        std::filesystem::create_directories(
+            obj_cook_cache);
+
+        assets::AssetRecord
+            obj_cook_record;
+
+        obj_cook_record.guid =
+            assets::AssetGuid::generate();
+        obj_cook_record.source_path =
+            obj_cook_source;
+        obj_cook_record.relative_path =
+            "obj_mtl_cook/model.obj";
+        obj_cook_record.importer_id =
+            "NEngine.Model";
+        obj_cook_record.file_size =
+            std::filesystem::file_size(
+                obj_cook_source);
+
+        assets::ImporterDescriptor
+            obj_cook_importer{
+                "NEngine.Model",
+                1u,
+                {".obj"},
+                false
+            };
+
+        const assets::ImportContext
+            obj_cook_context{
+                &obj_cook_record,
+                &obj_cook_importer,
+                obj_cook_cache
+            };
+
+        const auto obj_cooked =
+            render::model_asset_importer(
+                obj_cook_context);
+
+        const auto obj_color_material =
+            assets::derive_subasset_guid(
+                obj_cook_record.guid,
+                "obj-material",
+                0u);
+
+        const auto obj_textured_material =
+            assets::derive_subasset_guid(
+                obj_cook_record.guid,
+                "obj-material",
+                1u);
+
+        const auto obj_color_texture =
+            assets::derive_subasset_guid(
+                obj_cook_record.guid,
+                "obj-base-color",
+                0u);
+
+        const auto obj_textured_texture =
+            assets::derive_subasset_guid(
+                obj_cook_record.guid,
+                "obj-base-color",
+                1u);
+
+        assets::CachedArtifactSet
+            obj_parent_artifacts;
+
+        obj_parent_artifacts.fingerprint =
+            "obj-cooked";
+        obj_parent_artifacts.importer_id =
+            "NEngine.Model";
+        obj_parent_artifacts.importer_version =
+            1u;
+        obj_parent_artifacts.artifacts =
+            obj_cooked.artifacts;
+
+        check(
+            obj_cooked.success &&
+            obj_cooked.subassets.size() == 4u &&
+            render::find_cooked_model_material(
+                obj_parent_artifacts,
+                0u) ==
+                std::optional<
+                    assets::AssetGuid>{
+                        obj_color_material} &&
+            render::find_cooked_model_material(
+                obj_parent_artifacts,
+                1u) ==
+                std::optional<
+                    assets::AssetGuid>{
+                        obj_textured_material},
+            "OBJ MTL cooker emits stable generated materials and slot map for color-only and map_Kd materials");
+
+        const auto find_obj_subasset =
+            [&](assets::AssetGuid guid)
+                -> const assets::GeneratedSubasset* {
+
+                const auto it =
+                    std::find_if(
+                        obj_cooked.subassets.begin(),
+                        obj_cooked.subassets.end(),
+                        [&](const auto& subasset) {
+                            return
+                                subasset.guid ==
+                                guid;
+                        });
+
+                return it ==
+                    obj_cooked.subassets.end()
+                    ? nullptr
+                    : &*it;
+            };
+
+        const auto* obj_color_material_subasset =
+            find_obj_subasset(
+                obj_color_material);
+
+        const auto* obj_textured_material_subasset =
+            find_obj_subasset(
+                obj_textured_material);
+
+        const auto* obj_color_texture_subasset =
+            find_obj_subasset(
+                obj_color_texture);
+
+        const auto* obj_textured_texture_subasset =
+            find_obj_subasset(
+                obj_textured_texture);
+
+        check(
+            obj_color_material_subasset &&
+            obj_textured_material_subasset &&
+            obj_color_texture_subasset &&
+            obj_textured_texture_subasset,
+            "OBJ MTL generated material and texture GUIDs are independently addressable");
+
+        if (obj_color_texture_subasset &&
+            obj_textured_texture_subasset) {
+
+            assets::CachedArtifactSet
+                color_texture_artifacts;
+
+            color_texture_artifacts.fingerprint =
+                "obj-color-texture";
+            color_texture_artifacts.importer_id =
+                "NEngine.Texture";
+            color_texture_artifacts.importer_version =
+                1u;
+            color_texture_artifacts.artifacts =
+                obj_color_texture_subasset
+                    ->artifacts;
+
+            assets::CachedArtifactSet
+                textured_texture_artifacts =
+                    color_texture_artifacts;
+
+            textured_texture_artifacts
+                .fingerprint =
+                "obj-textured-texture";
+            textured_texture_artifacts
+                .artifacts =
+                obj_textured_texture_subasset
+                    ->artifacts;
+
+            const auto color_resolved =
+                render::resolve_texture_asset(
+                    obj_color_texture,
+                    color_texture_artifacts,
+                    &obj_error);
+
+            const auto textured_resolved =
+                render::resolve_texture_asset(
+                    obj_textured_texture,
+                    textured_texture_artifacts,
+                    &obj_error);
+
+            render::DecodedTextureData
+                color_pixels;
+
+            render::DecodedTextureData
+                textured_pixels;
+
+            check(
+                color_resolved &&
+                textured_resolved &&
+                render::decode_texture_rgba8(
+                    *color_resolved,
+                    color_pixels,
+                    &obj_error) &&
+                render::decode_texture_rgba8(
+                    *textured_resolved,
+                    textured_pixels,
+                    &obj_error) &&
+                color_pixels.rgba8 ==
+                    std::vector<std::uint8_t>{
+                        137u, 188u, 255u, 128u} &&
+                textured_pixels.rgba8 ==
+                    std::vector<std::uint8_t>{
+                        10u, 20u, 30u, 200u},
+                "OBJ MTL cooker bakes linear Kd/d color and preserves decoded map_Kd RGBA pixels");
+        }
+
+        if (obj_color_material_subasset &&
+            obj_textured_material_subasset) {
+
+            assets::CachedArtifactSet
+                color_material_artifacts;
+
+            color_material_artifacts.fingerprint =
+                "obj-color-material";
+            color_material_artifacts.importer_id =
+                "NEngine.Material";
+            color_material_artifacts.importer_version =
+                1u;
+            color_material_artifacts.artifacts =
+                obj_color_material_subasset
+                    ->artifacts;
+
+            assets::CachedArtifactSet
+                textured_material_artifacts =
+                    color_material_artifacts;
+
+            textured_material_artifacts
+                .fingerprint =
+                "obj-textured-material";
+            textured_material_artifacts
+                .artifacts =
+                obj_textured_material_subasset
+                    ->artifacts;
+
+            const auto color_material =
+                render::resolve_material_asset(
+                    obj_color_material,
+                    color_material_artifacts,
+                    &obj_error);
+
+            const auto textured_material =
+                render::resolve_material_asset(
+                    obj_textured_material,
+                    textured_material_artifacts,
+                    &obj_error);
+
+            check(
+                color_material &&
+                textured_material &&
+                color_material->material
+                    .base_color_texture ==
+                    obj_color_texture &&
+                textured_material->material
+                    .base_color_texture ==
+                    obj_textured_texture,
+                "OBJ cooked .nmat subassets reference deterministic generated base-color textures");
+        }
+
         const auto shader_source =
             root / "source.vert.spv";
 
