@@ -236,6 +236,47 @@ namespace NEngine.Internal
         }
 
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativeInputCallbacks
+        {
+            public nint context;
+            public nint held;
+            public nint pressed;
+            public nint released;
+            public nint pointer;
+        }
+
+        [UnmanagedCallersOnly]
+        public static int ConfigureNativeInputCallbacks(nint callbacksPtr)
+        {
+            try
+            {
+                if (callbacksPtr == 0)
+                {
+                    NEngine.NativeInput.Clear();
+                    return 1;
+                }
+
+                NativeInputCallbacks callbacks =
+                    Marshal.PtrToStructure<NativeInputCallbacks>(callbacksPtr);
+
+                NEngine.NativeInput.Configure(
+                    callbacks.context,
+                    callbacks.held,
+                    callbacks.pressed,
+                    callbacks.released,
+                    callbacks.pointer);
+
+                return 1;
+            }
+            catch
+            {
+                NEngine.NativeInput.Clear();
+                return -1;
+            }
+        }
+
+
         [UnmanagedCallersOnly]
         public static int LoadGameplayAssembly(nint assemblyPathUtf8, nint assemblyNameUtf8)
         {
@@ -827,6 +868,69 @@ std::string api_stub(
         }
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativePointerState
+    {
+        public float x;
+        public float y;
+        public float deltaX;
+        public float deltaY;
+        public float wheelY;
+    }
+
+    internal static class NativeInput
+    {
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int KeyFn(nint context, uint key);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int PointerFn(nint context, ref NativePointerState state);
+
+        private static nint _context;
+        private static KeyFn? _held;
+        private static KeyFn? _pressed;
+        private static KeyFn? _released;
+        private static PointerFn? _pointer;
+
+        internal static void Configure(
+            nint context,
+            nint held,
+            nint pressed,
+            nint released,
+            nint pointer)
+        {
+            _context = context;
+            _held = Marshal.GetDelegateForFunctionPointer<KeyFn>(held);
+            _pressed = Marshal.GetDelegateForFunctionPointer<KeyFn>(pressed);
+            _released = Marshal.GetDelegateForFunctionPointer<KeyFn>(released);
+            _pointer = Marshal.GetDelegateForFunctionPointer<PointerFn>(pointer);
+        }
+
+        internal static void Clear()
+        {
+            _context = 0;
+            _held = null;
+            _pressed = null;
+            _released = null;
+            _pointer = null;
+        }
+
+        internal static bool GetKey(uint key) =>
+            _held?.Invoke(_context, key) > 0;
+
+        internal static bool GetKeyDown(uint key) =>
+            _pressed?.Invoke(_context, key) > 0;
+
+        internal static bool GetKeyUp(uint key) =>
+            _released?.Invoke(_context, key) > 0;
+
+        internal static bool TryGetPointer(out NativePointerState state)
+        {
+            state = new NativePointerState();
+            return _pointer?.Invoke(_context, ref state) > 0;
+        }
+    }
+
     public abstract class Component
     {
         public GameObject gameObject { get; internal set; } = null!;
@@ -1195,6 +1299,105 @@ std::string api_stub(
         }
 
         public Vector3 forward => Vector3.forward;
+    }
+
+    public enum KeyCode : uint
+    {
+        None = 0,
+        A = 1, B = 2, C = 3, D = 4, E = 5, F = 6, G = 7,
+        H = 8, I = 9, J = 10, K = 11, L = 12, M = 13,
+        N = 14, O = 15, P = 16, Q = 17, R = 18, S = 19,
+        T = 20, U = 21, V = 22, W = 23, X = 24, Y = 25, Z = 26,
+        Alpha0 = 27, Alpha1 = 28, Alpha2 = 29, Alpha3 = 30, Alpha4 = 31,
+        Alpha5 = 32, Alpha6 = 33, Alpha7 = 34, Alpha8 = 35, Alpha9 = 36,
+        Space = 37,
+        Return = 38,
+        Escape = 39,
+        Tab = 40,
+        Backspace = 41,
+        UpArrow = 42,
+        DownArrow = 43,
+        LeftArrow = 44,
+        RightArrow = 45,
+        LeftShift = 46,
+        RightShift = 47,
+        LeftControl = 48,
+        RightControl = 49,
+        LeftAlt = 50,
+        RightAlt = 51,
+        Mouse0 = 52,
+        Mouse1 = 53,
+        Mouse2 = 54
+    }
+
+    public readonly struct Vector2
+    {
+        public readonly float x;
+        public readonly float y;
+
+        public Vector2(float x, float y)
+        {
+            this.x = x;
+            this.y = y;
+        }
+
+        public static Vector2 zero =>
+            new Vector2(0, 0);
+
+        public static Vector2 operator +(Vector2 a, Vector2 b) =>
+            new Vector2(a.x + b.x, a.y + b.y);
+
+        public static Vector2 operator *(Vector2 a, float b) =>
+            new Vector2(a.x * b, a.y * b);
+    }
+
+    public static class Input
+    {
+        public static bool GetKey(KeyCode key) =>
+            NativeInput.GetKey((uint)key);
+
+        public static bool GetKeyDown(KeyCode key) =>
+            NativeInput.GetKeyDown((uint)key);
+
+        public static bool GetKeyUp(KeyCode key) =>
+            NativeInput.GetKeyUp((uint)key);
+
+        private static NativePointerState Pointer
+        {
+            get
+            {
+                NativeInput.TryGetPointer(
+                    out NativePointerState state);
+                return state;
+            }
+        }
+
+        public static Vector2 mousePosition
+        {
+            get
+            {
+                NativePointerState state = Pointer;
+                return new Vector2(state.x, state.y);
+            }
+        }
+
+        public static Vector2 mouseDelta
+        {
+            get
+            {
+                NativePointerState state = Pointer;
+                return new Vector2(state.deltaX, state.deltaY);
+            }
+        }
+
+        public static Vector2 mouseScrollDelta
+        {
+            get
+            {
+                NativePointerState state = Pointer;
+                return new Vector2(0, state.wheelY);
+            }
+        }
     }
 
     public readonly struct Vector3
