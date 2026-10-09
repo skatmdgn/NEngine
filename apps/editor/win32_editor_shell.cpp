@@ -3169,7 +3169,7 @@ struct Win32EditorShell::Impl {
 
         editor.console().info(
             "Scripting",
-            "Managed gameplay DLL loaded through hostfxr; ABI v2 lifecycle is ready for Play Mode ScriptBehaviour components.");
+            "Managed gameplay DLL loaded through hostfxr; ABI v3 lifecycle and Transform sync are ready for Play Mode ScriptBehaviour components.");
 
         refresh_console();
         return true;
