@@ -4376,6 +4376,63 @@ bool decode_gltf_pbr_material(
         return false;
     }
 
+    if (const auto* normal_info =
+            member(
+                json_material,
+                "normalTexture")) {
+
+        if (const auto* scale =
+                member(
+                    *normal_info,
+                    "scale")) {
+
+            if (scale->kind !=
+                    JsonValue::Kind::Number ||
+                !std::isfinite(
+                    scale->number) ||
+                scale->number < 0.0) {
+
+                set_error(
+                    error,
+                    "glTF normalTexture scale must be finite and nonnegative");
+                return false;
+            }
+
+            material.normal_scale =
+                static_cast<float>(
+                    scale->number);
+        }
+    }
+
+    if (const auto* occlusion_info =
+            member(
+                json_material,
+                "occlusionTexture")) {
+
+        if (const auto* strength =
+                member(
+                    *occlusion_info,
+                    "strength")) {
+
+            if (strength->kind !=
+                    JsonValue::Kind::Number ||
+                !std::isfinite(
+                    strength->number) ||
+                strength->number < 0.0 ||
+                strength->number > 1.0) {
+
+                set_error(
+                    error,
+                    "glTF occlusionTexture strength is outside [0,1]");
+                return false;
+            }
+
+            material.occlusion_strength =
+                static_cast<float>(
+                    strength->number);
+        }
+    }
+
     if (const auto* emissive =
             member(
                 json_material,
