@@ -318,7 +318,7 @@ int main() {
 #if defined(_WIN32)
         "fake-dotnet.exe";
 #else
-        "fake-dotnet";
+        "fake-dotnet-command";
 #endif
 
     {
