@@ -87,9 +87,13 @@ int main() {
 
     check(
         std::filesystem::exists(
+            output.api_project_path),
+        "dedicated NEngine API csproj generated");
+
+    check(
+        std::filesystem::exists(
             output.api_stub_path),
         "NEngine managed API stub generated");
-
 
     check(
         std::filesystem::exists(
@@ -128,9 +132,41 @@ int main() {
             "NEngine.ManagedBridge.cs") !=
                 std::string::npos &&
         project.find(
+            "NEngine.API.csproj") !=
+                std::string::npos &&
+        project.find(
+            "<Compile Include=\"NEngine.API.cs\"") ==
+                std::string::npos &&
+        project.find(
             "GenerateRuntimeConfigurationFiles") !=
                 std::string::npos,
-        "csproj targets hostable net8 and compiles managed bridge");
+        "gameplay csproj targets hostable net8 and references dedicated NEngine API project");
+
+    const auto api_project =
+        read_all(
+            output.api_project_path);
+
+    check(
+        api_project.find(
+            "<AssemblyName>NEngine.API</AssemblyName>") !=
+                std::string::npos &&
+        api_project.find(
+            "<Compile Include=\"NEngine.API.cs\"") !=
+                std::string::npos,
+        "dedicated NEngine API project builds only the generated authoring API assembly");
+
+    const auto solution =
+        read_all(
+            output.solution_path);
+
+    check(
+        solution.find(
+            "\"NEngine.API\"") !=
+                std::string::npos &&
+        solution.find(
+            "NEngine.API.csproj") !=
+                std::string::npos,
+        "solution includes dedicated NEngine API project");
 
     const auto api =
         read_all(output.api_stub_path);
@@ -145,8 +181,11 @@ int main() {
         api.find("GetInstanceID") !=
             std::string::npos &&
         api.find("GetComponent<T>") !=
-            std::string::npos,
-        "managed API stub exposes familiar authoring types and GameObject identity/component access");
+            std::string::npos &&
+        api.find(
+            "InternalsVisibleTo(\"GameScripts\")") !=
+                std::string::npos,
+        "managed API stub exposes familiar authoring types and grants bridge assembly internal access");
 
 
     const auto bridge =
@@ -479,8 +518,12 @@ int main() {
                     build.plan.assembly_path) &&
                 build.plan.assembly_path
                     .filename() ==
-                    "IntegrationScripts.dll",
-                "real dotnet SDK builds generated gameplay assembly into deterministic output");
+                    "IntegrationScripts.dll" &&
+                std::filesystem::exists(
+                    integration_build
+                        .output_directory /
+                    "NEngine.API.dll"),
+                "real dotnet SDK builds gameplay assembly plus dedicated NEngine API dependency into deterministic output");
 
 
             if (build.success) {
