@@ -58,7 +58,7 @@ public:
     int instance_count() const;
 
     bool valid() const noexcept {
-        return host_.valid() &&
+        return host_.ready() &&
             create_ != nullptr &&
             start_ != nullptr &&
             update_ != nullptr &&
