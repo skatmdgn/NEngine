@@ -568,12 +568,326 @@ const char* alpha_mode_text(
     return "OPAQUE";
 }
 
+
+void bake_base_alpha(
+    DecodedTextureData& texture,
+    MaterialAlphaMode mode,
+    float cutoff) {
+
+    if (!texture.valid()) {
+        return;
+    }
+
+    for (std::size_t pixel = 0u;
+         pixel < texture.rgba8.size();
+         pixel += 4u) {
+
+        auto& alpha =
+            texture.rgba8[
+                pixel + 3u];
+
+        if (mode ==
+            MaterialAlphaMode::Opaque) {
+
+            alpha = 255u;
+        } else if (mode ==
+                   MaterialAlphaMode::Mask) {
+
+            const float value =
+                static_cast<float>(
+                    alpha) /
+                255.0f;
+
+            alpha =
+                value >= cutoff
+                    ? 255u
+                    : 0u;
+        }
+    }
+}
+
+void bake_normal_scale(
+    DecodedTextureData& texture,
+    float scale) {
+
+    if (!texture.valid()) {
+        return;
+    }
+
+    for (std::size_t pixel = 0u;
+         pixel < texture.rgba8.size();
+         pixel += 4u) {
+
+        float x =
+            (static_cast<float>(
+                texture.rgba8[
+                    pixel + 0u]) /
+                255.0f *
+                2.0f -
+             1.0f) *
+            scale;
+
+        float y =
+            (static_cast<float>(
+                texture.rgba8[
+                    pixel + 1u]) /
+                255.0f *
+                2.0f -
+             1.0f) *
+            scale;
+
+        float z =
+            static_cast<float>(
+                texture.rgba8[
+                    pixel + 2u]) /
+                255.0f *
+                2.0f -
+            1.0f;
+
+        const float length =
+            std::sqrt(
+                x * x +
+                y * y +
+                z * z);
+
+        if (length > 1.0e-8f) {
+            x /= length;
+            y /= length;
+            z /= length;
+        } else {
+            x = 0.0f;
+            y = 0.0f;
+            z = 1.0f;
+        }
+
+        const auto encode =
+            [](float value) {
+                return static_cast<std::uint8_t>(
+                    std::lround(
+                        std::clamp(
+                            value * 0.5f +
+                                0.5f,
+                            0.0f,
+                            1.0f) *
+                        255.0f));
+            };
+
+        texture.rgba8[
+            pixel + 0u] =
+            encode(x);
+
+        texture.rgba8[
+            pixel + 1u] =
+            encode(y);
+
+        texture.rgba8[
+            pixel + 2u] =
+            encode(z);
+    }
+}
+
+DecodedTextureData
+baked_metallic_roughness(
+    const GltfPbrMaterialCookData& pbr) {
+
+    DecodedTextureData texture;
+
+    if (pbr.metallic_roughness) {
+        texture =
+            *pbr.metallic_roughness;
+    } else {
+        texture.width = 1u;
+        texture.height = 1u;
+        texture.color_space =
+            DecodedTextureColorSpace::Linear;
+        texture.rgba8 = {
+            255u, 255u, 255u, 255u
+        };
+    }
+
+    for (std::size_t pixel = 0u;
+         pixel < texture.rgba8.size();
+         pixel += 4u) {
+
+        const float roughness =
+            static_cast<float>(
+                texture.rgba8[
+                    pixel + 1u]) /
+            255.0f *
+            pbr.roughness_factor;
+
+        const float metallic =
+            static_cast<float>(
+                texture.rgba8[
+                    pixel + 2u]) /
+            255.0f *
+            pbr.metallic_factor;
+
+        texture.rgba8[
+            pixel + 1u] =
+            static_cast<std::uint8_t>(
+                std::lround(
+                    std::clamp(
+                        roughness,
+                        0.0f,
+                        1.0f) *
+                    255.0f));
+
+        texture.rgba8[
+            pixel + 2u] =
+            static_cast<std::uint8_t>(
+                std::lround(
+                    std::clamp(
+                        metallic,
+                        0.0f,
+                        1.0f) *
+                    255.0f));
+    }
+
+    return texture;
+}
+
+std::optional<DecodedTextureData>
+baked_emissive(
+    const GltfPbrMaterialCookData& pbr) {
+
+    const bool has_factor =
+        pbr.emissive_factor.x >
+            0.0f ||
+        pbr.emissive_factor.y >
+            0.0f ||
+        pbr.emissive_factor.z >
+            0.0f;
+
+    if (!pbr.emissive &&
+        !has_factor) {
+
+        return std::nullopt;
+    }
+
+    DecodedTextureData texture;
+
+    if (pbr.emissive) {
+        texture =
+            *pbr.emissive;
+    } else {
+        texture.width = 1u;
+        texture.height = 1u;
+        texture.color_space =
+            DecodedTextureColorSpace::SRgb;
+        texture.rgba8 = {
+            255u, 255u, 255u, 255u
+        };
+    }
+
+    const float factors[] = {
+        pbr.emissive_factor.x,
+        pbr.emissive_factor.y,
+        pbr.emissive_factor.z
+    };
+
+    for (std::size_t pixel = 0u;
+         pixel < texture.rgba8.size();
+         pixel += 4u) {
+
+        for (std::size_t channel = 0u;
+             channel < 3u;
+             ++channel) {
+
+            const double linear =
+                srgb_to_linear(
+                    texture.rgba8[
+                        pixel +
+                        channel]) *
+                static_cast<double>(
+                    factors[channel]);
+
+            texture.rgba8[
+                pixel +
+                channel] =
+                linear_to_srgb(
+                    linear);
+        }
+    }
+
+    return texture;
+}
+
+std::optional<DecodedTextureData>
+baked_occlusion(
+    const GltfPbrMaterialCookData& pbr) {
+
+    if (!pbr.occlusion) {
+        return std::nullopt;
+    }
+
+    auto texture =
+        *pbr.occlusion;
+
+    for (std::size_t pixel = 0u;
+         pixel < texture.rgba8.size();
+         pixel += 4u) {
+
+        const float source =
+            static_cast<float>(
+                texture.rgba8[
+                    pixel + 0u]) /
+            255.0f;
+
+        const float value =
+            1.0f +
+            pbr.occlusion_strength *
+                (source - 1.0f);
+
+        texture.rgba8[
+            pixel + 0u] =
+            static_cast<std::uint8_t>(
+                std::lround(
+                    std::clamp(
+                        value,
+                        0.0f,
+                        1.0f) *
+                    255.0f));
+    }
+
+    return texture;
+}
+
 bool append_cooked_gltf_pbr_material(
     const assets::ImportContext& context,
     assets::ImportResult& result,
     std::uint32_t slot,
     const GltfPbrMaterialCookData& pbr,
     std::vector<CookedMapping>& mappings) {
+
+    auto base_color =
+        pbr.base_color;
+
+    bake_base_alpha(
+        base_color,
+        pbr.alpha_mode,
+        pbr.alpha_cutoff);
+
+    auto normal =
+        pbr.normal;
+
+    if (normal) {
+        bake_normal_scale(
+            *normal,
+            pbr.normal_scale);
+    }
+
+    const auto metallic_roughness =
+        baked_metallic_roughness(
+            pbr);
+
+    const auto emissive =
+        baked_emissive(
+            pbr);
+
+    const auto occlusion =
+        baked_occlusion(
+            pbr);
 
     assets::AssetGuid base_color_guid;
 
@@ -585,7 +899,7 @@ bool append_cooked_gltf_pbr_material(
             "base_color",
             "glTF Base Color " +
                 std::to_string(slot),
-            pbr.base_color,
+            base_color,
             base_color_guid)) {
 
         return false;
@@ -596,7 +910,7 @@ bool append_cooked_gltf_pbr_material(
     assets::AssetGuid emissive_guid;
     assets::AssetGuid occlusion_guid;
 
-    if (pbr.normal &&
+    if (normal &&
         !append_generated_texture(
             context,
             result,
@@ -605,14 +919,13 @@ bool append_cooked_gltf_pbr_material(
             "normal",
             "glTF Normal " +
                 std::to_string(slot),
-            *pbr.normal,
+            *normal,
             normal_guid)) {
 
         return false;
     }
 
-    if (pbr.metallic_roughness &&
-        !append_generated_texture(
+    if (!append_generated_texture(
             context,
             result,
             slot,
@@ -620,13 +933,13 @@ bool append_cooked_gltf_pbr_material(
             "metallic_roughness",
             "glTF Metallic Roughness " +
                 std::to_string(slot),
-            *pbr.metallic_roughness,
+            metallic_roughness,
             metallic_roughness_guid)) {
 
         return false;
     }
 
-    if (pbr.emissive &&
+    if (emissive &&
         !append_generated_texture(
             context,
             result,
@@ -635,13 +948,13 @@ bool append_cooked_gltf_pbr_material(
             "emissive",
             "glTF Emissive " +
                 std::to_string(slot),
-            *pbr.emissive,
+            *emissive,
             emissive_guid)) {
 
         return false;
     }
 
-    if (pbr.occlusion &&
+    if (occlusion &&
         !append_generated_texture(
             context,
             result,
@@ -650,7 +963,7 @@ bool append_cooked_gltf_pbr_material(
             "occlusion",
             "glTF Occlusion " +
                 std::to_string(slot),
-            *pbr.occlusion,
+            *occlusion,
             occlusion_guid)) {
 
         return false;
