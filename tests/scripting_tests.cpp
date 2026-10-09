@@ -529,7 +529,6 @@ int main() {
                                 managed_runtime.instance_count() == 0,
                                 "managed lifecycle invokes OnDestroy path and releases instance handle");
                         }
-                    }
 
                         ManagedScriptSystem
                             script_system;
@@ -537,7 +536,7 @@ int main() {
                         script_system.bind(
                             &managed_runtime);
 
-                        core::World
+                        nengine::core::World
                             script_world;
 
                         const auto script_entity =
