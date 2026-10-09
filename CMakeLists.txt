@@ -18,6 +18,7 @@ option(NENGINE_BUILD_TESTS "Build NEngine tests" ON)
 option(NENGINE_BUILD_EDITOR "Build the editor bootstrap" ON)
 
 add_subdirectory(engine/core)
+add_subdirectory(engine/input)
 add_subdirectory(engine/platform)
 add_subdirectory(engine/assets)
 add_subdirectory(engine/render)
