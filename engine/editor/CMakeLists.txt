@@ -21,7 +21,7 @@ target_include_directories(NEngineEditorModel
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(NEngineEditorModel PUBLIC NEngineCore NEngineAssets NEngineRender NEngineScripting)
+target_link_libraries(NEngineEditorModel PUBLIC NEngineCore NEngineAssets NEngineRender NEngineScripting NEngineInput)
 target_compile_features(NEngineEditorModel PUBLIC cxx_std_20)
 
 if(MSVC)

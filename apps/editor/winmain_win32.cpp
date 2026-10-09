@@ -309,6 +309,9 @@ int run_editor() {
         "STEP: entering Win32 event loop");
 
     while (window.poll_events()) {
+        editor.set_input_state(
+            window.input_state());
+
         shell.tick();
 
         std::this_thread::sleep_for(
