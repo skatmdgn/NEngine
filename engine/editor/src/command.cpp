@@ -164,6 +164,30 @@ void SetActiveCommand::undo(core::World& world) {
     if (captured_ && world.is_alive(entity_)) world.set_active(entity_, old_value_);
 }
 
+bool AddComponentCommand::execute(
+    core::World& world) {
+
+    return factories_ &&
+        factories_->add(
+            world,
+            entity_,
+            type_);
+}
+
+void AddComponentCommand::undo(
+    core::World& world) {
+
+    if (world.is_alive(entity_) &&
+        world.has_component(
+            entity_,
+            type_)) {
+
+        world.remove_component(
+            entity_,
+            type_);
+    }
+}
+
 bool SetTransformCommand::execute(core::World& world) {
     auto* transform = world.transform(entity_);
     if (!transform) return false;
