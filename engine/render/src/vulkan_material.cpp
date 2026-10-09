@@ -229,10 +229,18 @@ bool VulkanMaterialResource::create_textured(
     const VulkanDevice& device,
     const VulkanTextureResource& texture) {
 
+    // Keep every sampled material descriptor-set layout compatible
+    // with the renderer's fixed five PBR texture bindings. Legacy/Sprite
+    // materials only use binding 0 today; duplicating the source texture in
+    // the unused slots preserves pipeline-layout compatibility.
     const std::array<
         const VulkanTextureResource*,
-        1u>
+        5u>
         textures{
+            &texture,
+            &texture,
+            &texture,
+            &texture,
             &texture
         };
 
