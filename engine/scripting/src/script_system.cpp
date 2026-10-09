@@ -1,6 +1,7 @@
 #include "nengine/scripting/script_system.hpp"
 
 #include <cmath>
+#include <string>
 #include <unordered_set>
 #include <utility>
 
@@ -53,6 +54,98 @@ ManagedScriptSystem::update(
 
         return stats;
     }
+
+    const auto push_native_state =
+        [&](core::Entity entity,
+            ManagedBehaviourHandle handle) {
+
+            const auto* transform =
+                world.transform(
+                    entity);
+
+            if (!transform ||
+                !runtime_->set_transform(
+                    handle,
+                    *transform) ||
+                !runtime_->set_game_object(
+                    handle,
+                    entity,
+                    world.name(entity),
+                    world.active(entity))) {
+
+                if (error) {
+                    *error =
+                        runtime_->diagnostic();
+                }
+
+                return false;
+            }
+
+            return true;
+        };
+
+    const auto pull_managed_state =
+        [&](core::Entity entity,
+            ManagedBehaviourHandle handle) {
+
+            auto* transform =
+                world.transform(
+                    entity);
+
+            if (!transform ||
+                !runtime_->get_transform(
+                    handle,
+                    *transform)) {
+
+                if (error) {
+                    *error =
+                        runtime_->diagnostic();
+                }
+
+                return false;
+            }
+
+            core::Entity
+                managed_entity =
+                    core::Entity::invalid();
+
+            std::string managed_name;
+            bool managed_active = true;
+
+            if (!runtime_->get_game_object(
+                    handle,
+                    managed_entity,
+                    managed_name,
+                    managed_active)) {
+
+                if (error) {
+                    *error =
+                        runtime_->diagnostic();
+                }
+
+                return false;
+            }
+
+            if (managed_entity != entity ||
+                managed_name.empty() ||
+                !world.set_name(
+                    entity,
+                    std::move(
+                        managed_name)) ||
+                !world.set_active(
+                    entity,
+                    managed_active)) {
+
+                if (error) {
+                    *error =
+                        "managed GameObject state is invalid for native World entity";
+                }
+
+                return false;
+            }
+
+            return true;
+        };
 
     std::unordered_set<
         core::Entity::value_type>
@@ -135,21 +228,11 @@ ManagedScriptSystem::update(
 
             ++stats.created;
 
-            auto* native_transform =
-                world.transform(
-                    entity);
-
-            if (!native_transform ||
-                !runtime_->set_transform(
-                    created->second.handle,
-                    *native_transform)) {
+            if (!push_native_state(
+                    entity,
+                    created->second.handle)) {
 
                 ++stats.unresolved;
-
-                if (error) {
-                    *error =
-                        runtime_->diagnostic();
-                }
 
                 runtime_->destroy(
                     created->second.handle);
@@ -181,42 +264,31 @@ ManagedScriptSystem::update(
 
             ++stats.started;
 
-            if (!runtime_->get_transform(
-                    created->second.handle,
-                    *native_transform)) {
+            if (!pull_managed_state(
+                    entity,
+                    created->second.handle)) {
 
                 ++stats.unresolved;
-
-                if (error) {
-                    *error =
-                        runtime_->diagnostic();
-                }
             }
 
             existing =
                 instances_.find(
                     entity.value);
+
+            if (!world.active(
+                    entity)) {
+                continue;
+            }
         }
 
         if (existing !=
                 instances_.end()) {
 
-            auto* native_transform =
-                world.transform(
-                    entity);
-
-            if (!native_transform ||
-                !runtime_->set_transform(
-                    existing->second.handle,
-                    *native_transform)) {
+            if (!push_native_state(
+                    entity,
+                    existing->second.handle)) {
 
                 ++stats.unresolved;
-
-                if (error) {
-                    *error =
-                        runtime_->diagnostic();
-                }
-
                 continue;
             }
 
@@ -226,16 +298,11 @@ ManagedScriptSystem::update(
 
                 ++stats.updated;
 
-                if (!runtime_->get_transform(
-                        existing->second.handle,
-                        *native_transform)) {
+                if (!pull_managed_state(
+                        entity,
+                        existing->second.handle)) {
 
                     ++stats.unresolved;
-
-                    if (error) {
-                        *error =
-                            runtime_->diagnostic();
-                    }
                 }
             } else {
                 ++stats.unresolved;
