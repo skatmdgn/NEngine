@@ -215,6 +215,14 @@ int main() {
             std::string::npos &&
         api.find("GetComponent<T>") !=
             std::string::npos &&
+        api.find("HasComponent<T>") !=
+            std::string::npos &&
+        api.find("childCount") !=
+            std::string::npos &&
+        api.find("GetChild") !=
+            std::string::npos &&
+        api.find("class NativeWorld") !=
+            std::string::npos &&
         api.find(
             "InternalsVisibleTo(\"NEngine.Bridge\")") !=
                 std::string::npos,
@@ -233,7 +241,7 @@ int main() {
             "GetAbiVersion") !=
                 std::string::npos &&
         bridge.find(
-            "AbiVersion = 5") !=
+            "AbiVersion = 6") !=
                 std::string::npos &&
         bridge.find(
             "GameplayLoadContext") !=
@@ -252,8 +260,11 @@ int main() {
                 std::string::npos &&
         bridge.find(
             "CopyGameObjectNameUtf8") !=
+                std::string::npos &&
+        bridge.find(
+            "ConfigureNativeWorldCallbacks") !=
                 std::string::npos,
-        "managed bridge exposes collectible gameplay lifecycle Transform and GameObject ABI v5 entries");
+        "managed bridge exposes collectible gameplay lifecycle and native World callback ABI v6 entries");
 
     const auto runtime_config =
         read_all(
@@ -507,6 +518,19 @@ int main() {
                 << "}\n"
                 << "public class DeactivateOnce : Behaviour {\n"
                 << "    private void Update() { gameObject.SetActive(false); }\n"
+                << "}\n"
+                << "public class HierarchyProbe : Behaviour {\n"
+                << "    private void Update() {\n"
+                << "        Transform? p = transform.parent;\n"
+                << "        if (p == null) throw new System.Exception(\"parent missing\");\n"
+                << "        if (!p.gameObject.HasComponent<Transform>()) throw new System.Exception(\"native transform missing\");\n"
+                << "        if (p.childCount != 1) throw new System.Exception(\"child count mismatch\");\n"
+                << "        Transform c = p.GetChild(0);\n"
+                << "        if (c.gameObject.GetInstanceID() != gameObject.GetInstanceID()) throw new System.Exception(\"child identity mismatch\");\n"
+                << "        p.gameObject.name = \"Managed Parent\";\n"
+                << "        p.localPosition = p.localPosition + new Vector3(2, 0, 0);\n"
+                << "        transform.parent = null;\n"
+                << "    }\n"
                 << "}\n";
         }
 
@@ -855,6 +879,93 @@ int main() {
                                 script_system.instance_count() == 0u &&
                                 managed_runtime.instance_count() == 0,
                                 "inactive native GameObject stops ScriptBehaviour and releases current managed instance");
+
+                            const auto hierarchy_parent =
+                                script_world.create(
+                                    "Hierarchy Parent");
+
+                            const auto hierarchy_child =
+                                script_world.create(
+                                    "Hierarchy Child");
+
+                            check(
+                                script_world.set_parent(
+                                    hierarchy_child,
+                                    hierarchy_parent),
+                                "native hierarchy fixture parents managed script entity");
+
+                            auto* hierarchy_parent_transform =
+                                script_world.transform(
+                                    hierarchy_parent);
+
+                            if (hierarchy_parent_transform) {
+                                hierarchy_parent_transform
+                                    ->local_position = {
+                                        3.0f,
+                                        4.0f,
+                                        5.0f
+                                    };
+                            }
+
+                            auto* hierarchy_script =
+                                script_world.add_component<
+                                    ScriptBehaviour>(
+                                        hierarchy_child,
+                                        script_behaviour_type());
+
+                            if (hierarchy_script) {
+                                hierarchy_script->type_name =
+                                    "HierarchyProbe";
+                            }
+
+                            const auto hierarchy_tick =
+                                script_system.update(
+                                    script_world,
+                                    1.0f / 60.0f,
+                                    &system_error);
+
+                            const auto* hierarchy_child_transform =
+                                script_world.transform(
+                                    hierarchy_child);
+
+                            check(
+                                hierarchy_script &&
+                                hierarchy_tick.created == 1u &&
+                                hierarchy_tick.started == 1u &&
+                                hierarchy_tick.updated == 1u &&
+                                hierarchy_tick.unresolved == 0u &&
+                                hierarchy_parent_transform &&
+                                hierarchy_parent_transform
+                                    ->local_position.x == 5.0f &&
+                                hierarchy_parent_transform
+                                    ->local_position.y == 4.0f &&
+                                hierarchy_parent_transform
+                                    ->local_position.z == 5.0f &&
+                                script_world.name(
+                                    hierarchy_parent) ==
+                                    "Managed Parent" &&
+                                hierarchy_child_transform &&
+                                !hierarchy_child_transform
+                                    ->parent.valid() &&
+                                script_world.children(
+                                    hierarchy_parent)
+                                    .empty(),
+                                "managed ABI v6 callbacks mutate parent GameObject Transform and hierarchy immediately in native World");
+
+                            script_world.destroy(
+                                hierarchy_child);
+
+                            const auto hierarchy_cleanup =
+                                script_system.update(
+                                    script_world,
+                                    0.0f,
+                                    &system_error);
+
+                            check(
+                                hierarchy_cleanup.destroyed == 1u &&
+                                script_system.instance_count() == 0u &&
+                                managed_runtime.instance_count() == 0,
+                                "hierarchy callback fixture releases managed instance before hot reload");
 
                             {
                                 std::ofstream script(
