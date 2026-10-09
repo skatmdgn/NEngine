@@ -107,6 +107,14 @@ EditorModel::EditorModel() {
             "Render component integration was only partially registered.");
     }
 
+    if (!register_render_component_factories(
+            component_factories_)) {
+
+        console_.warning(
+            "Editor",
+            "Render component factories were only partially registered.");
+    }
+
     console_.info(
         "Editor",
         "EditorModel initialized.");

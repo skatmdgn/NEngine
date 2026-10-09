@@ -4,6 +4,7 @@
 #include "nengine/core/component_serialization.hpp"
 #include "nengine/core/world.hpp"
 #include "nengine/editor/command.hpp"
+#include "nengine/editor/component_factory.hpp"
 #include "nengine/editor/console_model.hpp"
 #include "nengine/editor/editor_layout.hpp"
 #include "nengine/editor/play_session.hpp"
@@ -55,6 +56,16 @@ public:
     CommandStack& commands() noexcept { return commands_; }
     const CommandStack& commands() const noexcept { return commands_; }
 
+    ComponentFactoryRegistry&
+    component_factories() noexcept {
+        return component_factories_;
+    }
+
+    const ComponentFactoryRegistry&
+    component_factories() const noexcept {
+        return component_factories_;
+    }
+
     PlaySession& play_session() noexcept { return play_session_; }
     const PlaySession& play_session() const noexcept { return play_session_; }
 
@@ -102,6 +113,7 @@ private:
     core::ComponentSerializationRegistry component_serialization_{};
     Selection selection_{};
     CommandStack commands_{};
+    ComponentFactoryRegistry component_factories_{};
     PlaySession play_session_{};
     ConsoleModel console_{};
     EditorLayoutState layout_{};
