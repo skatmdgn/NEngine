@@ -31,10 +31,18 @@ struct MeshItem {
     MeshRenderer renderer{};
 };
 
+struct SpriteItem {
+    core::Entity entity{core::Entity::invalid()};
+    core::Transform transform{};
+    Mat4 world{};
+    SpriteRenderer renderer{};
+};
+
 struct RenderSnapshot {
     std::vector<CameraItem> cameras{};
     std::vector<LightItem> lights{};
     std::vector<MeshItem> meshes{};
+    std::vector<SpriteItem> sprites{};
 };
 
 RenderSnapshot build_render_snapshot(

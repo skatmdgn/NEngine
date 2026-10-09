@@ -68,6 +68,22 @@ RenderSnapshot build_render_snapshot(
                 *renderer
             });
         }
+
+        if (const auto* renderer =
+                world.get_component<SpriteRenderer>(
+                    entity,
+                    sprite_renderer_type());
+            renderer && renderer->enabled) {
+
+            result.sprites.push_back({
+                entity,
+                *transform,
+                world_matrix(
+                    world,
+                    entity),
+                *renderer
+            });
+        }
     }
 
     return result;
