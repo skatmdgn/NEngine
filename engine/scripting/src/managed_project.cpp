@@ -86,7 +86,7 @@ std::string managed_bridge(
         << "{\n"
         << "    public static class NativeBridge\n"
         << "    {\n"
-        << "        public const int AbiVersion = 2;\n"
+        << "        public const int AbiVersion = 3;\n"
         << "        private static readonly Dictionary<long, NEngine.Behaviour> Instances = new();\n"
         << "        private static long _nextHandle = 1;\n\n"
         << "        [UnmanagedCallersOnly]\n"
@@ -145,7 +145,54 @@ std::string managed_bridge(
         << "            return invoked < 0 ? invoked : 1;\n"
         << "        }\n\n"
         << "        [UnmanagedCallersOnly]\n"
-        << "        public static int GetInstanceCount() => Instances.Count;\n\n"
+        << "        public static int GetInstanceCount() => Instances.Count;\n\n"        << "        [StructLayout(LayoutKind.Sequential)]\n"
+        << "        private struct NativeTransformState\n"
+        << "        {\n"
+        << "            public float px, py, pz;\n"
+        << "            public float rx, ry, rz, rw;\n"
+        << "            public float sx, sy, sz;\n"
+        << "        }\n\n"
+        << "        [UnmanagedCallersOnly]\n"
+        << "        public static int SetTransformState(long handle, nint statePtr)\n"
+        << "        {\n"
+        << "            if (statePtr == 0 || !Instances.TryGetValue(handle, out var instance)) return -1;\n"
+        << "            try\n"
+        << "            {\n"
+        << "                NativeTransformState state = Marshal.PtrToStructure<NativeTransformState>(statePtr);\n"
+        << "                var transform = instance.transform;\n"
+        << "                transform.localPosition = new NEngine.Vector3(state.px, state.py, state.pz);\n"
+        << "                transform.localRotation = new NEngine.Quaternion(state.rx, state.ry, state.rz, state.rw);\n"
+        << "                transform.localScale = new NEngine.Vector3(state.sx, state.sy, state.sz);\n"
+        << "                return 1;\n"
+        << "            }\n"
+        << "            catch { return -2; }\n"
+        << "        }\n\n"
+        << "        [UnmanagedCallersOnly]\n"
+        << "        public static int GetTransformState(long handle, nint statePtr)\n"
+        << "        {\n"
+        << "            if (statePtr == 0 || !Instances.TryGetValue(handle, out var instance)) return -1;\n"
+        << "            try\n"
+        << "            {\n"
+        << "                var transform = instance.transform;\n"
+        << "                NativeTransformState state = new NativeTransformState\n"
+        << "                {\n"
+        << "                    px = transform.localPosition.x,\n"
+        << "                    py = transform.localPosition.y,\n"
+        << "                    pz = transform.localPosition.z,\n"
+        << "                    rx = transform.localRotation.x,\n"
+        << "                    ry = transform.localRotation.y,\n"
+        << "                    rz = transform.localRotation.z,\n"
+        << "                    rw = transform.localRotation.w,\n"
+        << "                    sx = transform.localScale.x,\n"
+        << "                    sy = transform.localScale.y,\n"
+        << "                    sz = transform.localScale.z\n"
+        << "                };\n"
+        << "                Marshal.StructureToPtr(state, statePtr, false);\n"
+        << "                return 1;\n"
+        << "            }\n"
+        << "            catch { return -2; }\n"
+        << "        }\n\n"
+
         << "        public static string AssemblyName => \""
         << assembly_name
         << "\";\n"
@@ -197,8 +244,12 @@ namespace NEngine
 
     public sealed class Transform : Component
     {
-        public Vector3 position { get; set; }
         public Vector3 localPosition { get; set; }
+        public Vector3 position
+        {
+            get => localPosition;
+            set => localPosition = value;
+        }
         public Vector3 localScale { get; set; } = Vector3.one;
         public Quaternion localRotation { get; set; } = Quaternion.identity;
         public Vector3 forward => Vector3.forward;
