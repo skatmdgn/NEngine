@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <utility>
+#include <vector>
 
 namespace nengine::scripting {
 namespace {
@@ -55,6 +56,18 @@ ManagedRuntime::ManagedRuntime(
           std::exchange(
               other.get_transform_,
               nullptr)),
+      set_game_object_(
+          std::exchange(
+              other.set_game_object_,
+              nullptr)),
+      get_game_object_(
+          std::exchange(
+              other.get_game_object_,
+              nullptr)),
+      copy_game_object_name_(
+          std::exchange(
+              other.copy_game_object_name_,
+              nullptr)),
       count_(
           std::exchange(
               other.count_,
@@ -105,6 +118,21 @@ ManagedRuntime::operator=(
     get_transform_ =
         std::exchange(
             other.get_transform_,
+            nullptr);
+
+    set_game_object_ =
+        std::exchange(
+            other.set_game_object_,
+            nullptr);
+
+    get_game_object_ =
+        std::exchange(
+            other.get_game_object_,
+            nullptr);
+
+    copy_game_object_name_ =
+        std::exchange(
+            other.copy_game_object_name_,
             nullptr);
 
     count_ =
@@ -174,9 +202,9 @@ bool ManagedRuntime::initialize(
     const int abi_version =
         abi();
 
-    if (abi_version != 3) {
+    if (abi_version != 4) {
         diagnostic_ =
-            "managed bridge ABI mismatch: expected 3, got " +
+            "managed bridge ABI mismatch: expected 4, got " +
             std::to_string(
                 abi_version);
         shutdown();
@@ -225,6 +253,27 @@ bool ManagedRuntime::initialize(
             bridge_type,
             "GetTransformState");
 
+    set_game_object_ =
+        load_entry<SetGameObjectFn>(
+            host_,
+            assembly_path,
+            bridge_type,
+            "SetGameObjectState");
+
+    get_game_object_ =
+        load_entry<GetGameObjectFn>(
+            host_,
+            assembly_path,
+            bridge_type,
+            "GetGameObjectState");
+
+    copy_game_object_name_ =
+        load_entry<CopyGameObjectNameFn>(
+            host_,
+            assembly_path,
+            bridge_type,
+            "CopyGameObjectNameUtf8");
+
     count_ =
         load_entry<CountFn>(
             host_,
@@ -240,7 +289,7 @@ bool ManagedRuntime::initialize(
     }
 
     diagnostic_ =
-        "managed gameplay runtime initialized; ABI v3 lifecycle and Transform sync ready";
+        "managed gameplay runtime initialized; ABI v4 lifecycle Transform and GameObject sync ready";
 
     return true;
 }
@@ -424,6 +473,99 @@ bool ManagedRuntime::get_transform(
     return true;
 }
 
+bool ManagedRuntime::set_game_object(
+    ManagedBehaviourHandle handle,
+    core::Entity entity,
+    std::string_view name,
+    bool active) {
+
+    if (!valid() ||
+        !handle.valid() ||
+        !entity.valid()) {
+        return false;
+    }
+
+    std::string terminated{
+        name};
+
+    const int result =
+        set_game_object_(
+            handle.value,
+            entity.value,
+            active ? 1 : 0,
+            terminated.c_str());
+
+    if (result < 0) {
+        diagnostic_ =
+            "managed GameObject push failed";
+        return false;
+    }
+
+    return true;
+}
+
+bool ManagedRuntime::get_game_object(
+    ManagedBehaviourHandle handle,
+    core::Entity& entity,
+    std::string& name,
+    bool& active) {
+
+    if (!valid() ||
+        !handle.valid()) {
+        return false;
+    }
+
+    NativeGameObjectState state;
+
+    const int state_result =
+        get_game_object_(
+            handle.value,
+            &state);
+
+    if (state_result < 0 ||
+        state.name_bytes <= 0 ||
+        state.name_bytes >
+            1024 * 1024) {
+
+        diagnostic_ =
+            "managed GameObject state pull failed";
+        return false;
+    }
+
+    std::vector<char> buffer(
+        static_cast<std::size_t>(
+            state.name_bytes),
+        '\0');
+
+    const int copied =
+        copy_game_object_name_(
+            handle.value,
+            buffer.data(),
+            state.name_bytes);
+
+    if (copied !=
+            state.name_bytes ||
+        buffer.empty() ||
+        buffer.back() != '\0') {
+
+        diagnostic_ =
+            "managed GameObject name pull failed";
+        return false;
+    }
+
+    entity.value =
+        state.entity_id;
+
+    active =
+        state.active != 0;
+
+    name.assign(
+        buffer.data(),
+        buffer.size() - 1u);
+
+    return true;
+}
+
 int ManagedRuntime::instance_count()
     const {
 
@@ -439,6 +581,9 @@ void ManagedRuntime::shutdown() noexcept {
     destroy_ = nullptr;
     set_transform_ = nullptr;
     get_transform_ = nullptr;
+    set_game_object_ = nullptr;
+    get_game_object_ = nullptr;
+    copy_game_object_name_ = nullptr;
     count_ = nullptr;
     host_.shutdown();
 }

@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 
+#include "nengine/core/entity.hpp"
 #include "nengine/core/transform.hpp"
 #include "nengine/scripting/dotnet_host.hpp"
 
@@ -64,6 +65,18 @@ public:
         ManagedBehaviourHandle handle,
         core::Transform& transform);
 
+    bool set_game_object(
+        ManagedBehaviourHandle handle,
+        core::Entity entity,
+        std::string_view name,
+        bool active);
+
+    bool get_game_object(
+        ManagedBehaviourHandle handle,
+        core::Entity& entity,
+        std::string& name,
+        bool& active);
+
     int instance_count() const;
 
     bool valid() const noexcept {
@@ -74,6 +87,9 @@ public:
             destroy_ != nullptr &&
             set_transform_ != nullptr &&
             get_transform_ != nullptr &&
+            set_game_object_ != nullptr &&
+            get_game_object_ != nullptr &&
+            copy_game_object_name_ != nullptr &&
             count_ != nullptr;
     }
 
@@ -116,6 +132,30 @@ private:
             std::int64_t,
             NativeTransformState*);
 
+    struct NativeGameObjectState {
+        std::uint64_t entity_id{0};
+        std::int32_t active{1};
+        std::int32_t name_bytes{1};
+    };
+
+    using SetGameObjectFn =
+        int (*)(
+            std::int64_t,
+            std::uint64_t,
+            int,
+            const char*);
+
+    using GetGameObjectFn =
+        int (*)(
+            std::int64_t,
+            NativeGameObjectState*);
+
+    using CopyGameObjectNameFn =
+        int (*)(
+            std::int64_t,
+            char*,
+            int);
+
     using CountFn =
         int (*)();
 
@@ -126,6 +166,9 @@ private:
     InvokeFn destroy_{nullptr};
     TransformFn set_transform_{nullptr};
     TransformFn get_transform_{nullptr};
+    SetGameObjectFn set_game_object_{nullptr};
+    GetGameObjectFn get_game_object_{nullptr};
+    CopyGameObjectNameFn copy_game_object_name_{nullptr};
     CountFn count_{nullptr};
     std::string diagnostic_{};
 };
