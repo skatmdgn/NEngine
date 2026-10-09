@@ -2,6 +2,7 @@
 
 #include "nengine/core/component_registry.hpp"
 #include "nengine/core/world.hpp"
+#include "nengine/input/input_state.hpp"
 
 #include <cmath>
 #include <cstring>
@@ -424,6 +425,118 @@ void ManagedRuntime::bind_world(
         world;
 }
 
+void ManagedRuntime::bind_input(
+    const input::InputState*
+        input_state) noexcept {
+
+    if (!world_context_) {
+        world_context_ =
+            std::make_unique<
+                NativeWorldContext>();
+    }
+
+    world_context_->input =
+        input_state;
+}
+
+int ManagedRuntime::callback_input_held(
+    void* context,
+    std::uint32_t key) {
+
+    const auto* state =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!state ||
+        !state->input ||
+        key >=
+            static_cast<std::uint32_t>(
+                input::Key::Count)) {
+        return -1;
+    }
+
+    return state->input->held(
+        static_cast<input::Key>(
+            key))
+        ? 1
+        : 0;
+}
+
+int ManagedRuntime::callback_input_pressed(
+    void* context,
+    std::uint32_t key) {
+
+    const auto* state =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!state ||
+        !state->input ||
+        key >=
+            static_cast<std::uint32_t>(
+                input::Key::Count)) {
+        return -1;
+    }
+
+    return state->input->pressed(
+        static_cast<input::Key>(
+            key))
+        ? 1
+        : 0;
+}
+
+int ManagedRuntime::callback_input_released(
+    void* context,
+    std::uint32_t key) {
+
+    const auto* state =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!state ||
+        !state->input ||
+        key >=
+            static_cast<std::uint32_t>(
+                input::Key::Count)) {
+        return -1;
+    }
+
+    return state->input->released(
+        static_cast<input::Key>(
+            key))
+        ? 1
+        : 0;
+}
+
+int ManagedRuntime::callback_input_pointer(
+    void* context,
+    NativePointerState* output) {
+
+    const auto* state =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!state ||
+        !state->input ||
+        !output) {
+        return -1;
+    }
+
+    const auto& pointer =
+        state->input->pointer();
+
+    output->x = pointer.x;
+    output->y = pointer.y;
+    output->delta_x =
+        pointer.delta_x;
+    output->delta_y =
+        pointer.delta_y;
+    output->wheel_y =
+        pointer.wheel_y;
+
+    return 1;
+}
+
 ManagedRuntime::~ManagedRuntime() {
     shutdown();
 }
@@ -472,6 +585,10 @@ ManagedRuntime::ManagedRuntime(
       configure_world_callbacks_(
           std::exchange(
               other.configure_world_callbacks_,
+              nullptr)),
+      configure_input_callbacks_(
+          std::exchange(
+              other.configure_input_callbacks_,
               nullptr)),
       world_context_(
           std::move(
@@ -562,6 +679,11 @@ ManagedRuntime::operator=(
     configure_world_callbacks_ =
         std::exchange(
             other.configure_world_callbacks_,
+            nullptr);
+
+    configure_input_callbacks_ =
+        std::exchange(
+            other.configure_input_callbacks_,
             nullptr);
 
     world_context_ =
@@ -751,6 +873,13 @@ bool ManagedRuntime::initialize(
             bridge_type,
             "ConfigureNativeWorldCallbacks");
 
+    configure_input_callbacks_ =
+        load_entry<ConfigureInputCallbacksFn>(
+            host_,
+            bridge_assembly_path,
+            bridge_type,
+            "ConfigureNativeInputCallbacks");
+
     load_gameplay_ =
         load_entry<LoadGameplayFn>(
             host_,
@@ -796,6 +925,7 @@ bool ManagedRuntime::initialize(
         !get_game_object_ ||
         !copy_game_object_name_ ||
         !configure_world_callbacks_ ||
+        !configure_input_callbacks_ ||
         !load_gameplay_ ||
         !unload_gameplay_ ||
         !is_gameplay_loaded_ ||
@@ -847,6 +977,30 @@ bool ManagedRuntime::initialize(
 
         diagnostic_ =
             "managed Bridge rejected native World callback table";
+
+        shutdown();
+        return false;
+    }
+
+    NativeInputCallbacks
+        input_callbacks;
+
+    input_callbacks.context =
+        world_context_.get();
+    input_callbacks.held =
+        &ManagedRuntime::callback_input_held;
+    input_callbacks.pressed =
+        &ManagedRuntime::callback_input_pressed;
+    input_callbacks.released =
+        &ManagedRuntime::callback_input_released;
+    input_callbacks.pointer =
+        &ManagedRuntime::callback_input_pointer;
+
+    if (configure_input_callbacks_(
+            &input_callbacks) <= 0) {
+
+        diagnostic_ =
+            "managed Bridge rejected native Input callback table";
 
         shutdown();
         return false;
@@ -1247,6 +1401,11 @@ int ManagedRuntime::instance_count()
 }
 
 void ManagedRuntime::shutdown() noexcept {
+    if (configure_input_callbacks_) {
+        configure_input_callbacks_(
+            nullptr);
+    }
+
     if (configure_world_callbacks_) {
         configure_world_callbacks_(
             nullptr);
@@ -1254,6 +1413,8 @@ void ManagedRuntime::shutdown() noexcept {
 
     if (world_context_) {
         world_context_->world =
+            nullptr;
+        world_context_->input =
             nullptr;
     }
 
@@ -1276,6 +1437,7 @@ void ManagedRuntime::shutdown() noexcept {
 
     copy_game_object_name_ = nullptr;
     configure_world_callbacks_ = nullptr;
+    configure_input_callbacks_ = nullptr;
     world_context_.reset();
     load_gameplay_ = nullptr;
     unload_gameplay_ = nullptr;
