@@ -1501,6 +1501,11 @@ int main() {
     runtime->set_name(child, "Runtime Only");
     check(world.name(child) == "Renamed", "runtime mutations do not alter editor world");
 
+    check(
+        model.play_session().consume_simulation_steps(
+            0.034) == 2u,
+        "playing PlaySession converts host time into bounded 60 Hz fixed steps");
+
     const auto runtime_inspector = editor::build_inspector(model);
     check(runtime_inspector.name == "Runtime Only", "inspector presents runtime world while playing");
 
@@ -1509,6 +1514,11 @@ int main() {
     check(toolbar.can_resume && toolbar.can_step, "toolbar exposes resume and step while paused");
     check(model.play_session().step(), "paused session accepts a step request");
     check(model.play_session().requested_steps() == 1, "step request is counted");
+    check(
+        model.play_session().consume_simulation_steps(
+            0.0) == 1u &&
+        model.play_session().requested_steps() == 0u,
+        "paused PlaySession consumes Step as exactly one fixed simulation frame");
     check(model.play_session().resume(), "play session resumes");
     check(model.play_session().stop(), "play session stops");
     check(model.play_session().runtime_world() == nullptr, "runtime world discarded on stop");
