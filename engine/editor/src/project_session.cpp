@@ -11,6 +11,7 @@
 #include "nengine/render/builtin_assets.hpp"
 #include "nengine/render/components.hpp"
 #include "nengine/render/registration.hpp"
+#include "nengine/render/sprite_animation.hpp"
 #include "nengine/render/material_asset.hpp"
 #include "nengine/render/model_importer.hpp"
 #include <system_error>
@@ -36,6 +37,10 @@ ProjectSession::ProjectSession() {
     import_pipeline_.register_processor(
         "NEngine.Material",
         assets::material_source_importer);
+
+    import_pipeline_.register_processor(
+        "NEngine.SpriteAnimation",
+        render::sprite_animation_source_importer);
 
     import_pipeline_.register_processor(
         "NEngine.Model",
@@ -72,6 +77,12 @@ void ProjectSession::register_builtin_importers() {
     importers_.register_importer({
         "NEngine.Material", 1,
         {".nmat"},
+        false
+    });
+
+    importers_.register_importer({
+        "NEngine.SpriteAnimation", 1,
+        {".nspriteanim"},
         false
     });
 
