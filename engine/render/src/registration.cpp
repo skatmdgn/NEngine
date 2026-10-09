@@ -421,6 +421,64 @@ bool register_component_metadata(
 
     ok =
         registry.register_type(
+            "NEngine.SpriteAnimator",
+            "Rendering",
+            true,
+            false) &&
+        ok;
+
+    ok =
+        registry.register_property(
+            sprite_animator_type(),
+            {
+                "Enabled",
+                core::PropertyKind::Boolean,
+                core::PropertyFlags::Serializable |
+                    core::PropertyFlags::Editable
+            }) && ok;
+
+    ok =
+        registry.register_property(
+            sprite_animator_type(),
+            {
+                "Clip",
+                core::PropertyKind::AssetReference,
+                core::PropertyFlags::Serializable |
+                    core::PropertyFlags::Editable
+            }) && ok;
+
+    ok =
+        registry.register_property(
+            sprite_animator_type(),
+            {
+                "Playing",
+                core::PropertyKind::Boolean,
+                core::PropertyFlags::Serializable |
+                    core::PropertyFlags::Editable
+            }) && ok;
+
+    ok =
+        registry.register_property(
+            sprite_animator_type(),
+            {
+                "Loop",
+                core::PropertyKind::Boolean,
+                core::PropertyFlags::Serializable |
+                    core::PropertyFlags::Editable
+            }) && ok;
+
+    ok =
+        registry.register_property(
+            sprite_animator_type(),
+            {
+                "Speed",
+                core::PropertyKind::Float,
+                core::PropertyFlags::Serializable |
+                    core::PropertyFlags::Editable
+            }) && ok;
+
+    ok =
+        registry.register_type(
             "NEngine.MeshRenderer",
             "Rendering",
             true,
@@ -825,6 +883,102 @@ bool register_component_serializers(
 
                 if (!renderer) return false;
                 *renderer = value;
+                return true;
+            }
+        }) && ok;
+
+    ok =
+        registry.register_codec({
+            sprite_animator_type(),
+            1,
+            "NEngine.SpriteAnimator",
+            [](const core::World& world,
+               core::Entity entity)
+                -> std::optional<
+                    core::SerializedComponentData> {
+
+                const auto* animator =
+                    world.get_component<SpriteAnimator>(
+                        entity,
+                        sprite_animator_type());
+
+                if (!animator) {
+                    return std::nullopt;
+                }
+
+                core::SerializedComponentData data;
+                data.properties = {
+                    boolean_property(
+                        "Enabled",
+                        animator->enabled),
+                    asset_property(
+                        "Clip",
+                        animator->clip),
+                    boolean_property(
+                        "Playing",
+                        animator->playing),
+                    boolean_property(
+                        "Loop",
+                        animator->loop),
+                    float_property(
+                        "Speed",
+                        animator->speed)
+                };
+
+                return data;
+            },
+            [](core::World& world,
+               core::Entity entity,
+               const core::SerializedComponentData& data,
+               std::string* error) {
+
+                SpriteAnimator value;
+
+                if (!read_bool(
+                        data,
+                        "Enabled",
+                        value.enabled) ||
+                    !read_asset(
+                        data,
+                        "Clip",
+                        value.clip) ||
+                    !read_bool(
+                        data,
+                        "Playing",
+                        value.playing) ||
+                    !read_bool(
+                        data,
+                        "Loop",
+                        value.loop) ||
+                    !read_float(
+                        data,
+                        "Speed",
+                        value.speed) ||
+                    value.speed < 0.0f) {
+
+                    if (error) {
+                        *error =
+                            "malformed NEngine.SpriteAnimator data";
+                    }
+                    return false;
+                }
+
+                value.time_seconds = 0.0f;
+
+                auto* animator =
+                    world.get_component<SpriteAnimator>(
+                        entity,
+                        sprite_animator_type());
+
+                if (!animator) {
+                    animator =
+                        world.add_component<SpriteAnimator>(
+                            entity,
+                            sprite_animator_type());
+                }
+
+                if (!animator) return false;
+                *animator = value;
                 return true;
             }
         }) && ok;
