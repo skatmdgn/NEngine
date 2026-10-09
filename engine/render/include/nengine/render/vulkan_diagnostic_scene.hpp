@@ -66,6 +66,9 @@ public:
             texture_.valid() &&
             material_.valid() &&
             pipeline_.valid() &&
+            double_sided_pipeline_.valid() &&
+            blend_pipeline_.valid() &&
+            blend_double_sided_pipeline_.valid() &&
             sprite_pipeline_.valid();
     }
 
@@ -94,6 +97,9 @@ private:
     VulkanTextureResource texture_{};
     VulkanMaterialResource material_{};
     VulkanGraphicsPipeline pipeline_{};
+    VulkanGraphicsPipeline double_sided_pipeline_{};
+    VulkanGraphicsPipeline blend_pipeline_{};
+    VulkanGraphicsPipeline blend_double_sided_pipeline_{};
     VulkanGraphicsPipeline sprite_pipeline_{};
     std::string diagnostic_{};
 };
