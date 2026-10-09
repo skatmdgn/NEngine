@@ -141,8 +141,12 @@ int main() {
         api.find("class GameObject") !=
             std::string::npos &&
         api.find("class Transform") !=
+            std::string::npos &&
+        api.find("GetInstanceID") !=
+            std::string::npos &&
+        api.find("GetComponent<T>") !=
             std::string::npos,
-        "managed API stub exposes familiar authoring types");
+        "managed API stub exposes familiar authoring types and GameObject identity/component access");
 
 
     const auto bridge =
@@ -157,9 +161,18 @@ int main() {
             "GetAbiVersion") !=
                 std::string::npos &&
         bridge.find(
-            "AbiVersion = 3") !=
+            "AbiVersion = 4") !=
+                std::string::npos &&
+        bridge.find(
+            "SetGameObjectState") !=
+                std::string::npos &&
+        bridge.find(
+            "GetGameObjectState") !=
+                std::string::npos &&
+        bridge.find(
+            "CopyGameObjectNameUtf8") !=
                 std::string::npos,
-        "managed bridge exposes lifecycle and Transform ABI v3 entry");
+        "managed bridge exposes lifecycle Transform and GameObject ABI v4 entries");
 
     const auto runtime_config =
         read_all(
@@ -408,8 +421,11 @@ int main() {
                 << "public class Example : Behaviour {\n"
                 << "    public int starts;\n"
                 << "    public int updates;\n"
-                << "    private void Start() { starts++; }\n"
-                << "    private void Update() { updates++; transform.localPosition = transform.localPosition + new Vector3(1, 2, 3); }\n"
+                << "    private void Start() { starts++; gameObject.name = \"Managed Renamed\"; }\n"
+                << "    private void Update() { updates++; var t = GetComponent<Transform>(); if (t == null) throw new System.Exception(\"Transform missing\"); t.localPosition = t.localPosition + new Vector3(1, 2, 3); }\n"
+                << "}\n"
+                << "public class DeactivateOnce : Behaviour {\n"
+                << "    private void Update() { gameObject.SetActive(false); }\n"
                 << "}\n";
         }
 
@@ -512,6 +528,41 @@ int main() {
                             "managed lifecycle creates Behaviour instance by C# type name");
 
                         if (behaviour.valid()) {
+                            const auto runtime_entity =
+                                nengine::core::Entity::make(
+                                    7u,
+                                    3u);
+
+                            check(
+                                managed_runtime.set_game_object(
+                                    behaviour,
+                                    runtime_entity,
+                                    "Runtime Object",
+                                    false),
+                                "managed runtime pushes native GameObject identity name and active state");
+
+                            nengine::core::Entity
+                                pulled_entity =
+                                    nengine::core::Entity::invalid();
+
+                            std::string
+                                pulled_name;
+
+                            bool pulled_active = true;
+
+                            check(
+                                managed_runtime.get_game_object(
+                                    behaviour,
+                                    pulled_entity,
+                                    pulled_name,
+                                    pulled_active) &&
+                                pulled_entity ==
+                                    runtime_entity &&
+                                pulled_name ==
+                                    "Runtime Object" &&
+                                !pulled_active,
+                                "managed runtime pulls GameObject identity name and active state without loss");
+
                             check(
                                 managed_runtime.start(
                                     behaviour),
@@ -593,6 +644,12 @@ int main() {
                                 native_transform->local_position.z == 3.0f,
                                 "managed Update writes localPosition back into native World Transform");
 
+                            check(
+                                script_world.name(
+                                    script_entity) ==
+                                    "Managed Renamed",
+                                "managed Start writes GameObject.name back into native World");
+
                             const auto second_tick =
                                 script_system.update(
                                     script_world,
@@ -665,6 +722,51 @@ int main() {
                                 script_system.instance_count() == 0u &&
                                 managed_runtime.instance_count() == 0,
                                 "destroying ScriptBehaviour entity invokes managed OnDestroy and releases handle");
+
+                            const auto active_entity =
+                                script_world.create(
+                                    "Deactivate Target");
+
+                            auto* active_script =
+                                script_world.add_component<
+                                    ScriptBehaviour>(
+                                        active_entity,
+                                        script_behaviour_type());
+
+                            if (active_script) {
+                                active_script->type_name =
+                                    "DeactivateOnce";
+                            }
+
+                            const auto deactivate_tick =
+                                script_system.update(
+                                    script_world,
+                                    1.0f / 60.0f,
+                                    &system_error);
+
+                            check(
+                                active_script &&
+                                deactivate_tick.created == 1u &&
+                                deactivate_tick.started == 1u &&
+                                deactivate_tick.updated == 1u &&
+                                deactivate_tick.unresolved == 0u &&
+                                !script_world.active(
+                                    active_entity) &&
+                                script_system.instance_count() == 1u,
+                                "managed GameObject.SetActive(false) writes back into native World after Update");
+
+                            const auto inactive_tick =
+                                script_system.update(
+                                    script_world,
+                                    1.0f / 60.0f,
+                                    &system_error);
+
+                            check(
+                                inactive_tick.destroyed == 1u &&
+                                script_system.instance_count() == 0u &&
+                                managed_runtime.instance_count() == 0,
+                                "inactive native GameObject stops ScriptBehaviour and releases current managed instance");
+
                         }
                     }
                 }
