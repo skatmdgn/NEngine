@@ -1,6 +1,11 @@
 #include "nengine/scripting/managed_runtime.hpp"
 
+#include "nengine/core/component_registry.hpp"
+#include "nengine/core/world.hpp"
+
 #include <cmath>
+#include <cstring>
+#include <limits>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -35,6 +40,389 @@ std::string path_utf8(
 }
 
 } // namespace
+
+int ManagedRuntime::callback_is_alive(
+    void* context,
+    std::uint64_t entity_id) {
+
+    const auto* state =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!state ||
+        !state->world) {
+        return -1;
+    }
+
+    return state->world->is_alive(
+        core::Entity{entity_id})
+        ? 1
+        : 0;
+}
+
+int ManagedRuntime::callback_copy_name_utf8(
+    void* context,
+    std::uint64_t entity_id,
+    char* buffer,
+    int capacity) {
+
+    const auto* state =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!state ||
+        !state->world) {
+        return -1;
+    }
+
+    const core::Entity entity{
+        entity_id};
+
+    if (!state->world->is_alive(
+            entity)) {
+        return -1;
+    }
+
+    const auto name =
+        state->world->name(entity);
+
+    if (name.size() >=
+        static_cast<std::size_t>(
+            std::numeric_limits<int>::max())) {
+        return -1;
+    }
+
+    const int required =
+        static_cast<int>(
+            name.size() + 1u);
+
+    if (!buffer ||
+        capacity < required) {
+        return -required;
+    }
+
+    if (!name.empty()) {
+        std::memcpy(
+            buffer,
+            name.data(),
+            name.size());
+    }
+
+    buffer[name.size()] = '\0';
+    return required;
+}
+
+int ManagedRuntime::callback_set_name_utf8(
+    void* context,
+    std::uint64_t entity_id,
+    const char* name) {
+
+    const auto* state =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!state ||
+        !state->world ||
+        !name) {
+        return -1;
+    }
+
+    return state->world->set_name(
+        core::Entity{entity_id},
+        std::string{name})
+        ? 1
+        : -1;
+}
+
+int ManagedRuntime::callback_get_active(
+    void* context,
+    std::uint64_t entity_id) {
+
+    const auto* state =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!state ||
+        !state->world) {
+        return -1;
+    }
+
+    const core::Entity entity{
+        entity_id};
+
+    if (!state->world->is_alive(
+            entity)) {
+        return -1;
+    }
+
+    return state->world->active(
+        entity)
+        ? 1
+        : 0;
+}
+
+int ManagedRuntime::callback_set_active(
+    void* context,
+    std::uint64_t entity_id,
+    int active) {
+
+    const auto* state =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!state ||
+        !state->world) {
+        return -1;
+    }
+
+    return state->world->set_active(
+        core::Entity{entity_id},
+        active != 0)
+        ? 1
+        : -1;
+}
+
+int ManagedRuntime::callback_get_transform(
+    void* context,
+    std::uint64_t entity_id,
+    NativeTransformState* output) {
+
+    const auto* state =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!state ||
+        !state->world ||
+        !output) {
+        return -1;
+    }
+
+    const auto* transform =
+        state->world->transform(
+            core::Entity{entity_id});
+
+    if (!transform) {
+        return -1;
+    }
+
+    output->px = transform->local_position.x;
+    output->py = transform->local_position.y;
+    output->pz = transform->local_position.z;
+    output->rx = transform->local_rotation.x;
+    output->ry = transform->local_rotation.y;
+    output->rz = transform->local_rotation.z;
+    output->rw = transform->local_rotation.w;
+    output->sx = transform->local_scale.x;
+    output->sy = transform->local_scale.y;
+    output->sz = transform->local_scale.z;
+
+    return 1;
+}
+
+int ManagedRuntime::callback_set_transform(
+    void* context,
+    std::uint64_t entity_id,
+    NativeTransformState* input) {
+
+    const auto* state =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!state ||
+        !state->world ||
+        !input) {
+        return -1;
+    }
+
+    auto* transform =
+        state->world->transform(
+            core::Entity{entity_id});
+
+    if (!transform) {
+        return -1;
+    }
+
+    const float values[] = {
+        input->px, input->py, input->pz,
+        input->rx, input->ry, input->rz, input->rw,
+        input->sx, input->sy, input->sz
+    };
+
+    for (const float value : values) {
+        if (!std::isfinite(value)) {
+            return -1;
+        }
+    }
+
+    transform->local_position = {
+        input->px, input->py, input->pz};
+
+    transform->local_rotation = {
+        input->rx, input->ry, input->rz, input->rw};
+
+    transform->local_scale = {
+        input->sx, input->sy, input->sz};
+
+    return 1;
+}
+
+std::uint64_t ManagedRuntime::callback_get_parent(
+    void* context,
+    std::uint64_t entity_id) {
+
+    const auto* state =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!state ||
+        !state->world) {
+        return core::Entity::invalid_value;
+    }
+
+    const auto* transform =
+        state->world->transform(
+            core::Entity{entity_id});
+
+    return transform
+        ? transform->parent.value
+        : core::Entity::invalid_value;
+}
+
+int ManagedRuntime::callback_set_parent(
+    void* context,
+    std::uint64_t child_id,
+    std::uint64_t parent_id) {
+
+    const auto* state =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!state ||
+        !state->world) {
+        return -1;
+    }
+
+    return state->world->set_parent(
+        core::Entity{child_id},
+        core::Entity{parent_id})
+        ? 1
+        : -1;
+}
+
+int ManagedRuntime::callback_get_child_count(
+    void* context,
+    std::uint64_t entity_id) {
+
+    const auto* state =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!state ||
+        !state->world ||
+        !state->world->is_alive(
+            core::Entity{entity_id})) {
+        return -1;
+    }
+
+    const auto children =
+        state->world->children(
+            core::Entity{entity_id});
+
+    if (children.size() >
+        static_cast<std::size_t>(
+            std::numeric_limits<int>::max())) {
+        return -1;
+    }
+
+    return static_cast<int>(
+        children.size());
+}
+
+std::uint64_t ManagedRuntime::callback_get_child_at(
+    void* context,
+    std::uint64_t entity_id,
+    int index) {
+
+    const auto* state =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!state ||
+        !state->world ||
+        index < 0) {
+        return core::Entity::invalid_value;
+    }
+
+    const auto children =
+        state->world->children(
+            core::Entity{entity_id});
+
+    if (static_cast<std::size_t>(
+            index) >=
+        children.size()) {
+        return core::Entity::invalid_value;
+    }
+
+    return children[
+        static_cast<std::size_t>(
+            index)].value;
+}
+
+int ManagedRuntime::callback_has_component(
+    void* context,
+    std::uint64_t entity_id,
+    const char* type_name) {
+
+    const auto* state =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!state ||
+        !state->world ||
+        !type_name ||
+        *type_name == '\0') {
+        return -1;
+    }
+
+    const core::Entity entity{
+        entity_id};
+
+    if (!state->world->is_alive(
+            entity)) {
+        return -1;
+    }
+
+    const auto type =
+        core::ComponentRegistry::stable_id(
+            type_name);
+
+    if (type ==
+        core::World::transform_type) {
+        return state->world->transform(
+            entity)
+            ? 1
+            : 0;
+    }
+
+    return state->world->has_component(
+        entity,
+        type)
+        ? 1
+        : 0;
+}
+
+void ManagedRuntime::bind_world(
+    core::World* world) noexcept {
+
+    if (!world_context_) {
+        world_context_ =
+            std::make_unique<
+                NativeWorldContext>();
+    }
+
+    world_context_->world =
+        world;
+}
 
 ManagedRuntime::~ManagedRuntime() {
     shutdown();
@@ -81,6 +469,13 @@ ManagedRuntime::ManagedRuntime(
           std::exchange(
               other.copy_game_object_name_,
               nullptr)),
+      configure_world_callbacks_(
+          std::exchange(
+              other.configure_world_callbacks_,
+              nullptr)),
+      world_context_(
+          std::move(
+              other.world_context_)),
       load_gameplay_(
           std::exchange(
               other.load_gameplay_,
@@ -163,6 +558,15 @@ ManagedRuntime::operator=(
         std::exchange(
             other.copy_game_object_name_,
             nullptr);
+
+    configure_world_callbacks_ =
+        std::exchange(
+            other.configure_world_callbacks_,
+            nullptr);
+
+    world_context_ =
+        std::move(
+            other.world_context_);
 
     load_gameplay_ =
         std::exchange(
@@ -268,9 +672,9 @@ bool ManagedRuntime::initialize(
     const int abi_version =
         abi();
 
-    if (abi_version != 5) {
+    if (abi_version != 6) {
         diagnostic_ =
-            "managed bridge ABI mismatch: expected 5, got " +
+            "managed bridge ABI mismatch: expected 6, got " +
             std::to_string(
                 abi_version);
         shutdown();
@@ -340,6 +744,13 @@ bool ManagedRuntime::initialize(
             bridge_type,
             "CopyGameObjectNameUtf8");
 
+    configure_world_callbacks_ =
+        load_entry<ConfigureWorldCallbacksFn>(
+            host_,
+            bridge_assembly_path,
+            bridge_type,
+            "ConfigureNativeWorldCallbacks");
+
     load_gameplay_ =
         load_entry<LoadGameplayFn>(
             host_,
@@ -384,6 +795,7 @@ bool ManagedRuntime::initialize(
         !set_game_object_ ||
         !get_game_object_ ||
         !copy_game_object_name_ ||
+        !configure_world_callbacks_ ||
         !load_gameplay_ ||
         !unload_gameplay_ ||
         !is_gameplay_loaded_ ||
@@ -391,7 +803,51 @@ bool ManagedRuntime::initialize(
         !count_) {
 
         diagnostic_ =
-            "managed bridge is missing one or more ABI v5 entry points";
+            "managed bridge is missing one or more ABI v6 entry points";
+        shutdown();
+        return false;
+    }
+
+    if (!world_context_) {
+        world_context_ =
+            std::make_unique<
+                NativeWorldContext>();
+    }
+
+    NativeWorldCallbacks callbacks;
+    callbacks.context =
+        world_context_.get();
+    callbacks.is_alive =
+        &ManagedRuntime::callback_is_alive;
+    callbacks.copy_name_utf8 =
+        &ManagedRuntime::callback_copy_name_utf8;
+    callbacks.set_name_utf8 =
+        &ManagedRuntime::callback_set_name_utf8;
+    callbacks.get_active =
+        &ManagedRuntime::callback_get_active;
+    callbacks.set_active =
+        &ManagedRuntime::callback_set_active;
+    callbacks.get_transform =
+        &ManagedRuntime::callback_get_transform;
+    callbacks.set_transform =
+        &ManagedRuntime::callback_set_transform;
+    callbacks.get_parent =
+        &ManagedRuntime::callback_get_parent;
+    callbacks.set_parent =
+        &ManagedRuntime::callback_set_parent;
+    callbacks.get_child_count =
+        &ManagedRuntime::callback_get_child_count;
+    callbacks.get_child_at =
+        &ManagedRuntime::callback_get_child_at;
+    callbacks.has_component =
+        &ManagedRuntime::callback_has_component;
+
+    if (configure_world_callbacks_(
+            &callbacks) <= 0) {
+
+        diagnostic_ =
+            "managed Bridge rejected native World callback table";
+
         shutdown();
         return false;
     }
@@ -420,7 +876,7 @@ bool ManagedRuntime::initialize(
     }
 
     diagnostic_ =
-        "managed gameplay runtime initialized; ABI v5 collectible gameplay lifecycle Transform and GameObject sync ready";
+        "managed gameplay runtime initialized; ABI v6 collectible gameplay lifecycle and native World callbacks ready";
 
     return true;
 }
@@ -791,6 +1247,16 @@ int ManagedRuntime::instance_count()
 }
 
 void ManagedRuntime::shutdown() noexcept {
+    if (configure_world_callbacks_) {
+        configure_world_callbacks_(
+            nullptr);
+    }
+
+    if (world_context_) {
+        world_context_->world =
+            nullptr;
+    }
+
     create_ = nullptr;
     start_ = nullptr;
     update_ = nullptr;
@@ -809,6 +1275,8 @@ void ManagedRuntime::shutdown() noexcept {
     }
 
     copy_game_object_name_ = nullptr;
+    configure_world_callbacks_ = nullptr;
+    world_context_.reset();
     load_gameplay_ = nullptr;
     unload_gameplay_ = nullptr;
     is_gameplay_loaded_ = nullptr;
