@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -7,6 +8,7 @@
 #include <string>
 
 #include "nengine/scripting/dotnet_host.hpp"
+#include "nengine/scripting/managed_build.hpp"
 #include "nengine/scripting/managed_project.hpp"
 
 namespace {
@@ -309,6 +311,153 @@ int main() {
             << "# id version\n"
             << "Newtonsoft.Json 13.0.3\n"
             << "Example.Package 1.2.3\n";
+    }
+
+    const auto explicit_dotnet =
+        root /
+#if defined(_WIN32)
+        "fake-dotnet.exe";
+#else
+        "fake-dotnet";
+#endif
+
+    {
+        std::ofstream fake(
+            explicit_dotnet,
+            std::ios::binary |
+                std::ios::trunc);
+
+        fake << "placeholder";
+    }
+
+    const auto explicit_discovered =
+        discover_dotnet_executable(
+            explicit_dotnet);
+
+    check(
+        explicit_discovered &&
+        *explicit_discovered ==
+            std::filesystem::absolute(
+                explicit_dotnet),
+        "managed build discovery accepts explicit dotnet executable path");
+
+    ManagedBuildConfig plan_config;
+    plan_config.project_path =
+        output.project_path;
+    plan_config.output_directory =
+        root /
+        "Library" /
+        "ManagedBuild" /
+        "Debug";
+    plan_config.dotnet_executable =
+        explicit_dotnet;
+    plan_config.configuration =
+        "Debug";
+    plan_config.restore = false;
+
+    std::string build_error;
+
+    const auto build_plan =
+        make_managed_build_plan(
+            plan_config,
+            &build_error);
+
+    check(
+        build_plan &&
+        build_plan->valid() &&
+        build_plan->assembly_path ==
+            plan_config.output_directory /
+            "GameScripts.dll" &&
+        build_plan->pdb_path ==
+            plan_config.output_directory /
+            "GameScripts.pdb" &&
+        std::find(
+            build_plan->arguments.begin(),
+            build_plan->arguments.end(),
+            "--no-restore") !=
+                build_plan->arguments.end(),
+        "managed build plan selects deterministic DLL/PDB output and no-restore flag");
+
+    const auto real_dotnet =
+        discover_dotnet_executable();
+
+    if (real_dotnet) {
+        const auto integration_root =
+            root /
+            "integration";
+
+        std::filesystem::create_directories(
+            integration_root /
+            "Assets" /
+            "Scripts");
+
+        {
+            std::ofstream script(
+                integration_root /
+                    "Assets" /
+                    "Scripts" /
+                    "Example.cs",
+                std::ios::binary |
+                    std::ios::trunc);
+
+            script
+                << "using NEngine;\n"
+                << "public class Example : Behaviour {}\n";
+        }
+
+        ManagedProjectConfig
+            integration_project;
+
+        integration_project.project_name =
+            "IntegrationScripts";
+        integration_project.project_root =
+            integration_root;
+
+        ManagedProjectOutput
+            integration_output;
+
+        std::string integration_error;
+
+        const bool generated =
+            ManagedProjectGenerator::generate(
+                integration_project,
+                integration_output,
+                &integration_error);
+
+        check(
+            generated,
+            "managed build integration project generation succeeds");
+
+        if (generated) {
+            ManagedBuildConfig
+                integration_build;
+
+            integration_build.project_path =
+                integration_output.project_path;
+            integration_build.output_directory =
+                integration_root /
+                "Library" /
+                "ManagedBuild" /
+                "Debug";
+            integration_build.dotnet_executable =
+                *real_dotnet;
+            integration_build.configuration =
+                "Debug";
+
+            const auto build =
+                run_managed_build(
+                    integration_build);
+
+            check(
+                build.success &&
+                build.exit_code == 0 &&
+                std::filesystem::exists(
+                    build.plan.assembly_path) &&
+                build.plan.assembly_path
+                    .filename() ==
+                    "IntegrationScripts.dll",
+                "real dotnet SDK builds generated gameplay assembly into deterministic output");
+        }
     }
 
     const auto loaded =
