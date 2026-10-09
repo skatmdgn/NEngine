@@ -3696,6 +3696,33 @@ int main() {
                                 .supports_material_descriptors(),
                             "texture-sampling SPIR-V creates a material-compatible Vulkan graphics pipeline");
 
+                        render::VulkanGraphicsPipeline
+                            sprite_pipeline;
+
+                        render::VulkanGraphicsPipelineOptions
+                            sprite_options;
+
+                        sprite_options.depth_test = false;
+                        sprite_options.depth_write = false;
+                        sprite_options.alpha_blend = true;
+                        sprite_options.back_face_culling = false;
+
+                        check(
+                            headless_render_pass.valid() &&
+                            gpu_material.valid() &&
+                            diagnostic_textured_vertex.valid() &&
+                            diagnostic_textured_fragment.valid() &&
+                            sprite_pipeline.create(
+                                device,
+                                headless_render_pass,
+                                diagnostic_textured_vertex,
+                                diagnostic_textured_fragment,
+                                gpu_material,
+                                sprite_options) &&
+                            sprite_pipeline
+                                .supports_material_descriptors(),
+                            "SpriteRenderer alpha-blended depthless material pipeline creates on headless Vulkan device");
+
                         render::VulkanDepthTarget
                             headless_depth;
 
@@ -3736,6 +3763,7 @@ int main() {
                         depth_pipeline.destroy();
                         depth_render_pass.destroy();
                         headless_depth.destroy();
+                        sprite_pipeline.destroy();
                         textured_pipeline.destroy();
                         headless_pipeline.destroy();
                         headless_render_pass.destroy();
