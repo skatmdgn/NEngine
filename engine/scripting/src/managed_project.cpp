@@ -168,7 +168,7 @@ namespace NEngine.Internal
 
     public static class NativeBridge
     {
-        public const int AbiVersion = 5;
+        public const int AbiVersion = 6;
 
         private static readonly Dictionary<long, NEngine.Behaviour> Instances = new();
         private static long _nextHandle = 1;
@@ -179,6 +179,62 @@ namespace NEngine.Internal
 
         [UnmanagedCallersOnly]
         public static int GetAbiVersion() => AbiVersion;
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativeWorldCallbacks
+        {
+            public nint context;
+            public nint isAlive;
+            public nint copyNameUtf8;
+            public nint setNameUtf8;
+            public nint getActive;
+            public nint setActive;
+            public nint getTransform;
+            public nint setTransform;
+            public nint getParent;
+            public nint setParent;
+            public nint getChildCount;
+            public nint getChildAt;
+            public nint hasComponent;
+        }
+
+        [UnmanagedCallersOnly]
+        public static int ConfigureNativeWorldCallbacks(nint callbacksPtr)
+        {
+            try
+            {
+                if (callbacksPtr == 0)
+                {
+                    NEngine.NativeWorld.Clear();
+                    return 1;
+                }
+
+                NativeWorldCallbacks callbacks =
+                    Marshal.PtrToStructure<NativeWorldCallbacks>(callbacksPtr);
+
+                NEngine.NativeWorld.Configure(
+                    callbacks.context,
+                    callbacks.isAlive,
+                    callbacks.copyNameUtf8,
+                    callbacks.setNameUtf8,
+                    callbacks.getActive,
+                    callbacks.setActive,
+                    callbacks.getTransform,
+                    callbacks.setTransform,
+                    callbacks.getParent,
+                    callbacks.setParent,
+                    callbacks.getChildCount,
+                    callbacks.getChildAt,
+                    callbacks.hasComponent);
+
+                return 1;
+            }
+            catch
+            {
+                NEngine.NativeWorld.Clear();
+                return -1;
+            }
+        }
+
 
         [UnmanagedCallersOnly]
         public static int LoadGameplayAssembly(nint assemblyPathUtf8, nint assemblyNameUtf8)
@@ -384,13 +440,10 @@ namespace NEngine.Internal
                 NativeTransformState state =
                     Marshal.PtrToStructure<NativeTransformState>(statePtr);
 
-                var transform = instance.transform;
-                transform.localPosition =
-                    new NEngine.Vector3(state.px, state.py, state.pz);
-                transform.localRotation =
-                    new NEngine.Quaternion(state.rx, state.ry, state.rz, state.rw);
-                transform.localScale =
-                    new NEngine.Vector3(state.sx, state.sy, state.sz);
+                instance.transform.SetNativeState(
+                    new NEngine.Vector3(state.px, state.py, state.pz),
+                    new NEngine.Quaternion(state.rx, state.ry, state.rz, state.rw),
+                    new NEngine.Vector3(state.sx, state.sy, state.sz));
                 return 1;
             }
             catch
@@ -410,20 +463,23 @@ namespace NEngine.Internal
 
             try
             {
-                var transform = instance.transform;
+                instance.transform.GetCachedState(
+                    out NEngine.Vector3 position,
+                    out NEngine.Quaternion rotation,
+                    out NEngine.Vector3 scale);
 
                 NativeTransformState state = new NativeTransformState
                 {
-                    px = transform.localPosition.x,
-                    py = transform.localPosition.y,
-                    pz = transform.localPosition.z,
-                    rx = transform.localRotation.x,
-                    ry = transform.localRotation.y,
-                    rz = transform.localRotation.z,
-                    rw = transform.localRotation.w,
-                    sx = transform.localScale.x,
-                    sy = transform.localScale.y,
-                    sz = transform.localScale.z
+                    px = position.x,
+                    py = position.y,
+                    pz = position.z,
+                    rx = rotation.x,
+                    ry = rotation.y,
+                    rz = rotation.z,
+                    rw = rotation.w,
+                    sx = scale.x,
+                    sy = scale.y,
+                    sz = scale.z
                 };
 
                 Marshal.StructureToPtr(state, statePtr, false);
@@ -553,8 +609,225 @@ std::string api_stub(
         << "[assembly: System.Runtime.CompilerServices.InternalsVisibleTo(\""
         << csharp_escape(friend_assembly)
         << "\")]\n\n"
-        << R"CS(namespace NEngine
+        << R"CS(using System.Runtime.InteropServices;
+using System.Text;
+
+namespace NEngine
 {
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativeTransformState
+    {
+        public float px, py, pz;
+        public float rx, ry, rz, rw;
+        public float sx, sy, sz;
+    }
+
+    internal static class NativeWorld
+    {
+        internal const ulong InvalidEntity = ulong.MaxValue;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int IsAliveFn(nint context, ulong entityId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int CopyNameFn(nint context, ulong entityId, nint buffer, int capacity);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int SetNameFn(nint context, ulong entityId, nint nameUtf8);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int GetActiveFn(nint context, ulong entityId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int SetActiveFn(nint context, ulong entityId, int active);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int TransformFn(nint context, ulong entityId, ref NativeTransformState state);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate ulong GetParentFn(nint context, ulong entityId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int SetParentFn(nint context, ulong childId, ulong parentId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int GetChildCountFn(nint context, ulong entityId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate ulong GetChildAtFn(nint context, ulong entityId, int index);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int HasComponentFn(nint context, ulong entityId, nint typeNameUtf8);
+
+        private static nint _context;
+        private static IsAliveFn? _isAlive;
+        private static CopyNameFn? _copyName;
+        private static SetNameFn? _setName;
+        private static GetActiveFn? _getActive;
+        private static SetActiveFn? _setActive;
+        private static TransformFn? _getTransform;
+        private static TransformFn? _setTransform;
+        private static GetParentFn? _getParent;
+        private static SetParentFn? _setParent;
+        private static GetChildCountFn? _getChildCount;
+        private static GetChildAtFn? _getChildAt;
+        private static HasComponentFn? _hasComponent;
+
+        internal static bool available =>
+            _context != 0 &&
+            _isAlive != null;
+
+        internal static void Configure(
+            nint context,
+            nint isAlive,
+            nint copyName,
+            nint setName,
+            nint getActive,
+            nint setActive,
+            nint getTransform,
+            nint setTransform,
+            nint getParent,
+            nint setParent,
+            nint getChildCount,
+            nint getChildAt,
+            nint hasComponent)
+        {
+            _context = context;
+            _isAlive = Marshal.GetDelegateForFunctionPointer<IsAliveFn>(isAlive);
+            _copyName = Marshal.GetDelegateForFunctionPointer<CopyNameFn>(copyName);
+            _setName = Marshal.GetDelegateForFunctionPointer<SetNameFn>(setName);
+            _getActive = Marshal.GetDelegateForFunctionPointer<GetActiveFn>(getActive);
+            _setActive = Marshal.GetDelegateForFunctionPointer<SetActiveFn>(setActive);
+            _getTransform = Marshal.GetDelegateForFunctionPointer<TransformFn>(getTransform);
+            _setTransform = Marshal.GetDelegateForFunctionPointer<TransformFn>(setTransform);
+            _getParent = Marshal.GetDelegateForFunctionPointer<GetParentFn>(getParent);
+            _setParent = Marshal.GetDelegateForFunctionPointer<SetParentFn>(setParent);
+            _getChildCount = Marshal.GetDelegateForFunctionPointer<GetChildCountFn>(getChildCount);
+            _getChildAt = Marshal.GetDelegateForFunctionPointer<GetChildAtFn>(getChildAt);
+            _hasComponent = Marshal.GetDelegateForFunctionPointer<HasComponentFn>(hasComponent);
+        }
+
+        internal static void Clear()
+        {
+            _context = 0;
+            _isAlive = null;
+            _copyName = null;
+            _setName = null;
+            _getActive = null;
+            _setActive = null;
+            _getTransform = null;
+            _setTransform = null;
+            _getParent = null;
+            _setParent = null;
+            _getChildCount = null;
+            _getChildAt = null;
+            _hasComponent = null;
+        }
+
+        internal static bool IsAlive(ulong entityId) =>
+            _isAlive?.Invoke(_context, entityId) > 0;
+
+        internal static bool TryGetName(ulong entityId, out string name)
+        {
+            name = string.Empty;
+            if (_copyName == null) return false;
+
+            int first = _copyName(_context, entityId, 0, 0);
+            if (first >= 0) return false;
+
+            int required = -first;
+            if (required <= 0 || required > 1024 * 1024) return false;
+
+            nint buffer = Marshal.AllocHGlobal(required);
+            try
+            {
+                int copied = _copyName(_context, entityId, buffer, required);
+                if (copied <= 0) return false;
+
+                name = Marshal.PtrToStringUTF8(buffer) ?? string.Empty;
+                return true;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+
+        private static bool WithUtf8(string value, Func<nint, bool> invoke)
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes((value ?? string.Empty) + "\0");
+            nint buffer = Marshal.AllocHGlobal(bytes.Length);
+
+            try
+            {
+                Marshal.Copy(bytes, 0, buffer, bytes.Length);
+                return invoke(buffer);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+
+        internal static bool SetName(ulong entityId, string value) =>
+            _setName != null &&
+            WithUtf8(value, ptr => _setName(_context, entityId, ptr) > 0);
+
+        internal static bool TryGetActive(ulong entityId, out bool active)
+        {
+            active = false;
+            if (_getActive == null) return false;
+
+            int value = _getActive(_context, entityId);
+            if (value < 0) return false;
+
+            active = value != 0;
+            return true;
+        }
+
+        internal static bool SetActive(ulong entityId, bool active) =>
+            _setActive?.Invoke(_context, entityId, active ? 1 : 0) > 0;
+
+        internal static bool TryGetTransform(
+            ulong entityId,
+            out NativeTransformState state)
+        {
+            state = new NativeTransformState();
+            return _getTransform?.Invoke(_context, entityId, ref state) > 0;
+        }
+
+        internal static bool SetTransform(
+            ulong entityId,
+            ref NativeTransformState state) =>
+            _setTransform?.Invoke(_context, entityId, ref state) > 0;
+
+        internal static ulong GetParent(ulong entityId) =>
+            _getParent?.Invoke(_context, entityId) ?? InvalidEntity;
+
+        internal static bool SetParent(ulong childId, ulong parentId) =>
+            _setParent?.Invoke(_context, childId, parentId) > 0;
+
+        internal static int GetChildCount(ulong entityId) =>
+            _getChildCount?.Invoke(_context, entityId) ?? -1;
+
+        internal static ulong GetChildAt(ulong entityId, int index) =>
+            _getChildAt?.Invoke(_context, entityId, index) ?? InvalidEntity;
+
+        internal static bool HasComponent(ulong entityId, string typeName) =>
+            _hasComponent != null &&
+            WithUtf8(typeName, ptr => _hasComponent(_context, entityId, ptr) > 0);
+
+        internal static string? NativeComponentName(Type type)
+        {
+            if (type == typeof(Transform)) return "NEngine.Transform";
+            if (type == typeof(Camera)) return "NEngine.Camera";
+            if (type == typeof(Light)) return "NEngine.Light";
+            if (type == typeof(MeshRenderer)) return "NEngine.MeshRenderer";
+            if (type == typeof(SpriteRenderer)) return "NEngine.SpriteRenderer";
+            return null;
+        }
+    }
+
     public abstract class Component
     {
         public GameObject gameObject { get; internal set; } = null!;
@@ -567,20 +840,60 @@ std::string api_stub(
         public bool enabled { get; set; } = true;
     }
 
+    public sealed class Camera : Component { }
+    public sealed class Light : Component { }
+    public sealed class MeshRenderer : Component { }
+    public sealed class SpriteRenderer : Component { }
+
     public sealed class GameObject
     {
         private readonly System.Collections.Generic.List<Component> _components = new();
         private string _name = "GameObject";
         private bool _activeSelf = true;
         private ulong _instanceId;
+        private bool _nativeBound;
+
+        internal bool nativeBound => _nativeBound;
 
         public string name
         {
-            get => _name;
-            set => _name = value ?? string.Empty;
+            get
+            {
+                if (_nativeBound &&
+                    NativeWorld.TryGetName(_instanceId, out string current))
+                {
+                    _name = current;
+                }
+
+                return _name;
+            }
+            set
+            {
+                string next = value ?? string.Empty;
+
+                if (!_nativeBound ||
+                    !NativeWorld.available ||
+                    NativeWorld.SetName(_instanceId, next))
+                {
+                    _name = next;
+                }
+            }
         }
 
-        public bool activeSelf => _activeSelf;
+        public bool activeSelf
+        {
+            get
+            {
+                if (_nativeBound &&
+                    NativeWorld.TryGetActive(_instanceId, out bool current))
+                {
+                    _activeSelf = current;
+                }
+
+                return _activeSelf;
+            }
+        }
+
         public ulong instanceId => _instanceId;
         public Transform transform { get; }
 
@@ -588,6 +901,23 @@ std::string api_stub(
         {
             transform = new Transform();
             Attach(transform);
+        }
+
+        internal static GameObject? FromNative(ulong entityId)
+        {
+            if (entityId == NativeWorld.InvalidEntity ||
+                !NativeWorld.IsAlive(entityId))
+            {
+                return null;
+            }
+
+            var result = new GameObject();
+            string currentName = string.Empty;
+            bool currentActive = true;
+            NativeWorld.TryGetName(entityId, out currentName);
+            NativeWorld.TryGetActive(entityId, out currentActive);
+            result.SetNativeState(entityId, currentName, currentActive);
+            return result;
         }
 
         internal void Attach(Component component)
@@ -606,12 +936,20 @@ std::string api_stub(
             _instanceId = instanceId;
             _name = name ?? string.Empty;
             _activeSelf = active;
+            _nativeBound = true;
         }
 
         public ulong GetInstanceID() => _instanceId;
 
-        public void SetActive(bool active) =>
-            _activeSelf = active;
+        public void SetActive(bool active)
+        {
+            if (!_nativeBound ||
+                !NativeWorld.available ||
+                NativeWorld.SetActive(_instanceId, active))
+            {
+                _activeSelf = active;
+            }
+        }
 
         public T? GetComponent<T>() where T : Component
         {
@@ -619,7 +957,27 @@ std::string api_stub(
                 if (component is T typed)
                     return typed;
 
-            return null;
+            if (!_nativeBound ||
+                !NativeWorld.available ||
+                typeof(Behaviour).IsAssignableFrom(typeof(T)))
+            {
+                return null;
+            }
+
+            string? nativeType =
+                NativeWorld.NativeComponentName(typeof(T));
+
+            if (nativeType == null ||
+                !NativeWorld.HasComponent(_instanceId, nativeType))
+            {
+                return null;
+            }
+
+            if (Activator.CreateInstance(typeof(T), nonPublic: true) is not T proxy)
+                return null;
+
+            Attach(proxy);
+            return proxy;
         }
 
         public T AddComponent<T>() where T : Component, new()
@@ -632,14 +990,187 @@ std::string api_stub(
 
     public sealed class Transform : Component
     {
-        public Vector3 localPosition { get; set; }
+        private Vector3 _localPosition;
+        private Vector3 _localScale = Vector3.one;
+        private Quaternion _localRotation = Quaternion.identity;
+
+        private void RefreshNative()
+        {
+            if (!gameObject.nativeBound ||
+                !NativeWorld.TryGetTransform(
+                    gameObject.instanceId,
+                    out NativeTransformState state))
+            {
+                return;
+            }
+
+            _localPosition =
+                new Vector3(state.px, state.py, state.pz);
+            _localRotation =
+                new Quaternion(state.rx, state.ry, state.rz, state.rw);
+            _localScale =
+                new Vector3(state.sx, state.sy, state.sz);
+        }
+
+        private void PushNative()
+        {
+            if (!gameObject.nativeBound ||
+                !NativeWorld.available)
+            {
+                return;
+            }
+
+            NativeTransformState state = new NativeTransformState
+            {
+                px = _localPosition.x,
+                py = _localPosition.y,
+                pz = _localPosition.z,
+                rx = _localRotation.x,
+                ry = _localRotation.y,
+                rz = _localRotation.z,
+                rw = _localRotation.w,
+                sx = _localScale.x,
+                sy = _localScale.y,
+                sz = _localScale.z
+            };
+
+            NativeWorld.SetTransform(
+                gameObject.instanceId,
+                ref state);
+        }
+
+        internal void SetNativeState(
+            Vector3 position,
+            Quaternion rotation,
+            Vector3 scale)
+        {
+            _localPosition = position;
+            _localRotation = rotation;
+            _localScale = scale;
+        }
+
+        internal void GetCachedState(
+            out Vector3 position,
+            out Quaternion rotation,
+            out Vector3 scale)
+        {
+            position = _localPosition;
+            rotation = _localRotation;
+            scale = _localScale;
+        }
+
+        public Vector3 localPosition
+        {
+            get
+            {
+                RefreshNative();
+                return _localPosition;
+            }
+            set
+            {
+                _localPosition = value;
+                PushNative();
+            }
+        }
+
         public Vector3 position
         {
             get => localPosition;
             set => localPosition = value;
         }
-        public Vector3 localScale { get; set; } = Vector3.one;
-        public Quaternion localRotation { get; set; } = Quaternion.identity;
+
+        public Vector3 localScale
+        {
+            get
+            {
+                RefreshNative();
+                return _localScale;
+            }
+            set
+            {
+                _localScale = value;
+                PushNative();
+            }
+        }
+
+        public Quaternion localRotation
+        {
+            get
+            {
+                RefreshNative();
+                return _localRotation;
+            }
+            set
+            {
+                _localRotation = value;
+                PushNative();
+            }
+        }
+
+        public Transform? parent
+        {
+            get
+            {
+                if (!gameObject.nativeBound)
+                    return null;
+
+                ulong parentId =
+                    NativeWorld.GetParent(
+                        gameObject.instanceId);
+
+                return GameObject
+                    .FromNative(parentId)?
+                    .transform;
+            }
+            set
+            {
+                if (!gameObject.nativeBound ||
+                    !NativeWorld.available)
+                {
+                    return;
+                }
+
+                ulong parentId =
+                    value?.gameObject.instanceId ??
+                    NativeWorld.InvalidEntity;
+
+                NativeWorld.SetParent(
+                    gameObject.instanceId,
+                    parentId);
+            }
+        }
+
+        public int childCount
+        {
+            get
+            {
+                if (!gameObject.nativeBound)
+                    return 0;
+
+                return Math.Max(
+                    0,
+                    NativeWorld.GetChildCount(
+                        gameObject.instanceId));
+            }
+        }
+
+        public Transform GetChild(int index)
+        {
+            if (index < 0)
+                throw new ArgumentOutOfRangeException(nameof(index));
+
+            ulong childId =
+                NativeWorld.GetChildAt(
+                    gameObject.instanceId,
+                    index);
+
+            GameObject? child =
+                GameObject.FromNative(childId);
+
+            return child?.transform ??
+                throw new ArgumentOutOfRangeException(nameof(index));
+        }
+
         public Vector3 forward => Vector3.forward;
     }
 
