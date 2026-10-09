@@ -1215,6 +1215,8 @@ struct Win32EditorShell::Impl {
                         ->invalidate_imported_assets();
                 }
 
+                editor.invalidate_runtime_asset_caches();
+
                 editor.console().info(
                     "Assets",
                     "Detected " +

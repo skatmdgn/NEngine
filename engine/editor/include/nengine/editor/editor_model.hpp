@@ -80,6 +80,10 @@ public:
     void tick_runtime(
         double elapsed_seconds);
 
+    void invalidate_runtime_asset_caches() noexcept {
+        sprite_animation_cache_.clear();
+    }
+
     void mark_scene_saved() noexcept {
         saved_scene_state_id_ =
             commands_.state_id();
