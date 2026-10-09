@@ -1,4 +1,5 @@
 add_library(NEngineScripting STATIC
+  src/dotnet_host.cpp
   src/managed_project.cpp
 )
 
@@ -13,4 +14,8 @@ if(MSVC)
   target_compile_options(NEngineScripting PRIVATE /W4 /permissive-)
 else()
   target_compile_options(NEngineScripting PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+if(UNIX AND NOT APPLE)
+  target_link_libraries(NEngineScripting PRIVATE dl)
 endif()
