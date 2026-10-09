@@ -7,15 +7,40 @@
 
 #include "nengine/assets/asset_guid.hpp"
 #include "nengine/assets/import_pipeline.hpp"
+#include "nengine/core/math.hpp"
 
 namespace nengine::render {
 
+enum class MaterialAlphaMode {
+    Opaque,
+    Mask,
+    Blend
+};
+
 struct MaterialAssetData {
     assets::AssetGuid base_color_texture{};
+    assets::AssetGuid normal_texture{};
+    assets::AssetGuid metallic_roughness_texture{};
+    assets::AssetGuid emissive_texture{};
+    assets::AssetGuid occlusion_texture{};
+
+    float metallic_factor{1.0f};
+    float roughness_factor{1.0f};
+    core::Vec3 emissive_factor{};
+    MaterialAlphaMode alpha_mode{
+        MaterialAlphaMode::Opaque};
+    float alpha_cutoff{0.5f};
+    bool double_sided{false};
 
     bool valid() const noexcept {
         return
-            base_color_texture.valid();
+            base_color_texture.valid() &&
+            metallic_factor >= 0.0f &&
+            metallic_factor <= 1.0f &&
+            roughness_factor >= 0.0f &&
+            roughness_factor <= 1.0f &&
+            alpha_cutoff >= 0.0f &&
+            alpha_cutoff <= 1.0f;
     }
 };
 
