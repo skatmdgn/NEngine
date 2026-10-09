@@ -71,6 +71,7 @@ enum ControlId : int {
     IdApplyTransform,
     IdGenericProperties,
     IdGenericValue,
+    IdAssignAsset,
     IdApplyProperty,
     IdAddComponentList,
     IdAddComponent,
@@ -302,6 +303,7 @@ struct Win32EditorShell::Impl {
     HWND generic_title{nullptr};
     HWND generic_properties{nullptr};
     HWND generic_value{nullptr};
+    HWND assign_asset{nullptr};
     HWND apply_property{nullptr};
     HWND add_component_list{nullptr};
     HWND add_component{nullptr};
@@ -861,6 +863,13 @@ struct Win32EditorShell::Impl {
             WS_BORDER | ES_AUTOHSCROLL,
             IdGenericValue);
 
+        assign_asset = create_control(
+            host,
+            L"BUTTON",
+            L"Assign Asset",
+            BS_PUSHBUTTON,
+            IdAssignAsset);
+
         apply_property = create_control(
             host,
             L"BUTTON",
@@ -891,6 +900,7 @@ struct Win32EditorShell::Impl {
             !generic_title ||
             !generic_properties ||
             !generic_value ||
+            !assign_asset ||
             !apply_property ||
             !add_component_list ||
             !add_component) {
@@ -1784,11 +1794,33 @@ struct Win32EditorShell::Impl {
             TRUE);
         iy += generic_list_height + 4;
 
+        const int assign_asset_width =
+            std::min(
+                96,
+                iw / 3);
+
+        const int generic_value_width =
+            std::max(
+                40,
+                iw -
+                    assign_asset_width -
+                    4);
+
         MoveWindow(
             generic_value,
             ix,
             iy,
-            iw,
+            generic_value_width,
+            24,
+            TRUE);
+
+        MoveWindow(
+            assign_asset,
+            ix +
+                generic_value_width +
+                4,
+            iy,
+            assign_asset_width,
             24,
             TRUE);
         iy += 28;
