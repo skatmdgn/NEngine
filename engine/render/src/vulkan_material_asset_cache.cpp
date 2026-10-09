@@ -71,8 +71,9 @@ neutral_material_texture(
     case 2u:
         decoded.color_space =
             DecodedTextureColorSpace::Linear;
+        // glTF metallic-roughness convention: G=roughness, B=metallic.
         decoded.rgba8 = {
-            255u, 255u, 255u, 255u
+            255u, 255u, 0u, 255u
         };
         break;
 
@@ -80,7 +81,7 @@ neutral_material_texture(
         decoded.color_space =
             DecodedTextureColorSpace::SRgb;
         decoded.rgba8 = {
-            255u, 255u, 255u, 255u
+            0u, 0u, 0u, 255u
         };
         break;
 
