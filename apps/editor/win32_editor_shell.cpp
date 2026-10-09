@@ -29,6 +29,7 @@
 #include "nengine/scripting/dotnet_host.hpp"
 #include "nengine/scripting/managed_build.hpp"
 #include "nengine/scripting/managed_project.hpp"
+#include "nengine/scripting/managed_runtime.hpp"
 #include "nengine/render/vulkan_context.hpp"
 #include "nengine/render/vulkan_diagnostic_scene.hpp"
 
@@ -3147,56 +3148,25 @@ struct Win32EditorShell::Impl {
         }
 
         nengine::scripting::
-            DotnetHost dotnet_host;
+            ManagedRuntime runtime;
 
-        if (!dotnet_host.initialize(
+        if (!runtime.initialize(
                 host_info->hostfxr_path,
-                generated.runtime_config_path)) {
-
-            editor.console().error(
-                "Scripting",
-                "C# build succeeded, but CLR initialization failed: " +
-                    dotnet_host.diagnostic());
-            refresh_console();
-            return false;
-        }
-
-        void* raw_entry =
-            dotnet_host.load_unmanaged_entry(
+                generated.runtime_config_path,
                 build.plan.assembly_path,
-                "NEngine.Internal.NativeBridge, GameScripts",
-                "GetAbiVersion");
+                "GameScripts")) {
 
-        if (!raw_entry) {
             editor.console().error(
                 "Scripting",
-                "Gameplay assembly load failed: " +
-                    dotnet_host.diagnostic());
-            refresh_console();
-            return false;
-        }
-
-        using AbiVersionFn =
-            int (*)();
-
-        const auto abi_version =
-            reinterpret_cast<
-                AbiVersionFn>(
-                    raw_entry)();
-
-        if (abi_version != 1) {
-            editor.console().error(
-                "Scripting",
-                "Managed bridge ABI mismatch: expected 1, got " +
-                    std::to_string(
-                        abi_version));
+                "C# build succeeded, but managed runtime initialization failed: " +
+                    runtime.diagnostic());
             refresh_console();
             return false;
         }
 
         editor.console().info(
             "Scripting",
-            "Managed gameplay DLL loaded through hostfxr; ABI v1 verified.");
+            "Managed gameplay DLL loaded through hostfxr; ABI v2 lifecycle verified.");
 
         refresh_console();
         return true;
