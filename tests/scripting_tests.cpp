@@ -7,10 +7,12 @@
 #include <sstream>
 #include <string>
 
+#include "nengine/scripting/components.hpp"
 #include "nengine/scripting/dotnet_host.hpp"
 #include "nengine/scripting/managed_build.hpp"
 #include "nengine/scripting/managed_project.hpp"
 #include "nengine/scripting/managed_runtime.hpp"
+#include "nengine/scripting/script_system.hpp"
 
 namespace {
 int failures = 0;
@@ -526,6 +528,111 @@ int main() {
                                     behaviour) &&
                                 managed_runtime.instance_count() == 0,
                                 "managed lifecycle invokes OnDestroy path and releases instance handle");
+                        }
+                    }
+
+                        ManagedScriptSystem
+                            script_system;
+
+                        script_system.bind(
+                            &managed_runtime);
+
+                        core::World
+                            script_world;
+
+                        const auto script_entity =
+                            script_world.create(
+                                "Managed Example");
+
+                        auto* script_component =
+                            script_world.add_component<
+                                ScriptBehaviour>(
+                                    script_entity,
+                                    script_behaviour_type());
+
+                        check(
+                            script_component != nullptr,
+                            "ScriptBehaviour component attaches to World entity for lifecycle test");
+
+                        if (script_component) {
+                            script_component->type_name =
+                                "Example";
+
+                            std::string system_error;
+
+                            const auto first_tick =
+                                script_system.update(
+                                    script_world,
+                                    1.0f / 60.0f,
+                                    &system_error);
+
+                            check(
+                                first_tick.created == 1u &&
+                                first_tick.started == 1u &&
+                                first_tick.updated == 1u &&
+                                first_tick.unresolved == 0u &&
+                                script_system.instance_count() == 1u &&
+                                managed_runtime.instance_count() == 1,
+                                "ScriptBehaviour first World tick creates starts and updates managed instance");
+
+                            const auto second_tick =
+                                script_system.update(
+                                    script_world,
+                                    1.0f / 30.0f,
+                                    &system_error);
+
+                            check(
+                                second_tick.created == 0u &&
+                                second_tick.started == 0u &&
+                                second_tick.updated == 1u &&
+                                second_tick.unresolved == 0u,
+                                "ScriptBehaviour subsequent World tick reuses managed instance and only updates");
+
+                            script_component->enabled =
+                                false;
+
+                            const auto disabled_tick =
+                                script_system.update(
+                                    script_world,
+                                    1.0f / 60.0f,
+                                    &system_error);
+
+                            check(
+                                disabled_tick.destroyed == 1u &&
+                                script_system.instance_count() == 0u &&
+                                managed_runtime.instance_count() == 0,
+                                "disabling ScriptBehaviour destroys managed instance");
+
+                            script_component->enabled =
+                                true;
+
+                            const auto reenabled_tick =
+                                script_system.update(
+                                    script_world,
+                                    1.0f / 60.0f,
+                                    &system_error);
+
+                            check(
+                                reenabled_tick.created == 1u &&
+                                reenabled_tick.started == 1u &&
+                                reenabled_tick.updated == 1u &&
+                                managed_runtime.instance_count() == 1,
+                                "reenabling ScriptBehaviour recreates and restarts managed instance");
+
+                            script_world.destroy(
+                                script_entity);
+
+                            const auto destroyed_tick =
+                                script_system.update(
+                                    script_world,
+                                    1.0f / 60.0f,
+                                    &system_error);
+
+                            check(
+                                destroyed_tick.destroyed == 1u &&
+                                script_system.instance_count() == 0u &&
+                                managed_runtime.instance_count() == 0,
+                                "destroying ScriptBehaviour entity invokes managed OnDestroy and releases handle");
                         }
                     }
                 }
