@@ -956,6 +956,25 @@ namespace NEngine
             }
         }
 
+        public bool HasComponent<T>() where T : Component
+        {
+            if (_nativeBound &&
+                NativeWorld.available)
+            {
+                string? nativeType =
+                    NativeWorld.NativeComponentName(typeof(T));
+
+                if (nativeType != null)
+                    return NativeWorld.HasComponent(_instanceId, nativeType);
+            }
+
+            foreach (var component in _components)
+                if (component is T)
+                    return true;
+
+            return false;
+        }
+
         public T? GetComponent<T>() where T : Component
         {
             foreach (var component in _components)
