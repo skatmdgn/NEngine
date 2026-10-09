@@ -4,6 +4,8 @@
 #include <memory>
 #include <string>
 
+#include "nengine/input/input_state.hpp"
+
 namespace nengine::platform {
 
 struct WindowDesc {
@@ -32,6 +34,9 @@ public:
     std::uint32_t client_width() const noexcept;
     std::uint32_t client_height() const noexcept;
     void* native_handle() const noexcept;
+
+    input::InputState& input_state() noexcept;
+    const input::InputState& input_state() const noexcept;
 
 private:
     struct Impl;

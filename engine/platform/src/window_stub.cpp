@@ -9,6 +9,7 @@ struct Window::Impl {
     WindowDesc desc;
     bool open{false};
     bool close_requested{false};
+    input::InputState input_state{};
 };
 
 Window::Window(WindowDesc desc) : impl_(std::make_unique<Impl>(std::move(desc))) {}
@@ -27,6 +28,7 @@ void Window::close() {
 }
 
 bool Window::poll_events() {
+    impl_->input_state.begin_frame();
     return impl_->open && !impl_->close_requested;
 }
 
@@ -35,5 +37,13 @@ bool Window::close_requested() const noexcept { return impl_->close_requested; }
 std::uint32_t Window::client_width() const noexcept { return impl_->desc.width; }
 std::uint32_t Window::client_height() const noexcept { return impl_->desc.height; }
 void* Window::native_handle() const noexcept { return nullptr; }
+
+input::InputState& Window::input_state() noexcept {
+    return impl_->input_state;
+}
+
+const input::InputState& Window::input_state() const noexcept {
+    return impl_->input_state;
+}
 
 } // namespace nengine::platform

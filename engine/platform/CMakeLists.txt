@@ -7,6 +7,8 @@ target_include_directories(NEnginePlatform
 
 target_compile_features(NEnginePlatform PUBLIC cxx_std_20)
 
+target_link_libraries(NEnginePlatform PUBLIC NEngineInput)
+
 if(WIN32)
   target_sources(NEnginePlatform PRIVATE src/window_win32.cpp)
   target_compile_definitions(NEnginePlatform PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
