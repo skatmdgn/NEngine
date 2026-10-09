@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 #include "nengine/render/vulkan_device.hpp"
@@ -15,6 +16,7 @@ struct VulkanGraphicsPipelineOptions {
     bool depth_write{true};
     bool alpha_blend{false};
     bool back_face_culling{true};
+    std::uint32_t push_constant_bytes{64u};
 };
 
 class VulkanGraphicsPipeline {
@@ -74,6 +76,10 @@ public:
         return material_descriptor_layout_;
     }
 
+    std::uint32_t push_constant_bytes() const noexcept {
+        return push_constant_bytes_;
+    }
+
     const std::string& diagnostic() const noexcept {
         return diagnostic_;
     }
@@ -92,6 +98,7 @@ private:
     void* layout_{nullptr};
     void* pipeline_{nullptr};
     bool material_descriptor_layout_{false};
+    std::uint32_t push_constant_bytes_{0u};
     std::string diagnostic_{};
 };
 

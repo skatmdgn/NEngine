@@ -446,6 +446,9 @@ bool VulkanGraphicsPipeline::create_internal(
         !render_pass.valid() ||
         !vertex_shader.valid() ||
         !fragment_shader.valid() ||
+        options.push_constant_bytes == 0u ||
+        options.push_constant_bytes > 128u ||
+        (options.push_constant_bytes % 4u) != 0u ||
         vertex_shader.stage() !=
             VulkanShaderStage::Vertex ||
         fragment_shader.stage() !=
@@ -483,8 +486,7 @@ bool VulkanGraphicsPipeline::create_internal(
     const VkPushConstantRange push_constant{
         VK_SHADER_STAGE_VERTEX_BIT,
         0,
-        static_cast<std::uint32_t>(
-            sizeof(Mat4))
+        options.push_constant_bytes
     };
 
     void* descriptor_set_layouts[] = {
@@ -769,6 +771,8 @@ bool VulkanGraphicsPipeline::create_internal(
     pipeline_ = pipeline;
     material_descriptor_layout_ =
         descriptor_set_layout != nullptr;
+    push_constant_bytes_ =
+        options.push_constant_bytes;
 
     diagnostic_ =
         descriptor_set_layout
@@ -816,6 +820,7 @@ void VulkanGraphicsPipeline::destroy() noexcept {
     layout_ = nullptr;
     pipeline_ = nullptr;
     material_descriptor_layout_ = false;
+    push_constant_bytes_ = 0u;
 }
 
 } // namespace nengine::render
