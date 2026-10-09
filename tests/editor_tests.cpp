@@ -1010,6 +1010,11 @@ int main() {
 
     model.commands().clear();
 
+    check(
+        world.destroy(
+            factory_entity),
+        "factory command test entity cleans up before hierarchy assertions");
+
     const auto sprite_entity =
         world.create("Render Sprite");
 
