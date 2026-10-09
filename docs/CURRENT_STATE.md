@@ -130,15 +130,17 @@ Implemented:
 - Visual Studio/Rider/default .sln association open path.
 - hostfxr discovery/dynamic loading with generated runtimeconfig.
 - dotnet SDK discovery, deterministic gameplay DLL/PDB build output and Editor **Build C#** action.
-- Managed ABI v3 lifecycle bridge: Behaviour Create / Start / Update / OnDestroy.
+- Managed ABI v6 lifecycle bridge: Behaviour Create / Start / Update / OnDestroy plus a native World callback table shared through stable NEngine.API/NEngine.Bridge assemblies.
 - Native ScriptBehaviour component with Scene serialization, Add Component and generic Inspector editing.
 - Play Mode ScriptBehaviour instance management against the cloned runtime World.
 - Native <-> managed local Transform position/rotation/scale synchronization around Start/Update.
+- Generated NEngine.API, stable NEngine.Bridge and gameplay projects are separate assemblies; collectible gameplay AssemblyLoadContext reloads user code without restarting hostfxr.
+- Managed GameObject name/active state can mutate the native World immediately during lifecycle calls.
+- Managed Transform hierarchy uses native callbacks for parent, childCount, GetChild and reparent/unparent; proxy GameObjects can query native name/active/TRS and built-in component presence.
 
 Not yet implemented:
-- Safe unload/hot reload with a collectible AssemblyLoadContext or equivalent.
-- Dedicated packaged NEngine managed API assembly (current API/bridge sources are generated into the gameplay project).
-- Broader GameObject/component/input/physics/audio managed bindings.
+- Distribution as a packaged/versioned NEngine managed API (the dedicated generated API/Bridge assemblies are implemented).
+- Broader render component property APIs plus input/physics/audio managed bindings.
 - debugger attach integration.
 
 ## Renderer 0.4
@@ -275,7 +277,7 @@ The concrete Vulkan backend currently grows beneath this contract. The long-term
 
 ## Immediate next work
 
-1. Stabilize C# ScriptBehaviour lifecycle/Transform sync, then add wider native GameObject/component API bindings and safe hot reload.
+1. Extend the now-stable ABI v6 managed/native callback boundary into input and richer component APIs; collectible hot reload and hierarchy/GameObject callbacks are implemented.
 2. Finish production PBR validation: sampler state, lights/shadows and remaining material behavior.
 3. Decide and implement the explicit policy for remote/nonlocal or outside-directory glTF resources while preserving sandbox safety.
 4. Add WebP decoding plus texture compression/transcoding policy; mipmap generation/upload is already implemented.

@@ -124,9 +124,10 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Managed Behaviour Create/Start/Update/OnDestroy lifecycle bridge
 - [x] Play Mode ScriptBehaviour execution on cloned World
 - [x] Native <-> managed Transform local position/rotation/scale synchronization
-- [ ] Dedicated NEngine managed API assembly/package (current API is generated stub)
-- [ ] Safe collectible AssemblyLoadContext hot reload/unload
-- [ ] Wider GameObject/component/input/physics/audio managed bindings
+- [x] Dedicated generated NEngine.API + stable NEngine.Bridge assemblies
+- [x] Safe collectible AssemblyLoadContext gameplay hot reload/unload
+- [x] Native World callback ABI v6 for GameObject name/active, Transform hierarchy/TRS and component presence
+- [ ] Wider render/input/physics/audio managed component/property bindings
 - [ ] Visual Studio attach/debug symbols
 - [ ] coroutine/timer scheduler
 
