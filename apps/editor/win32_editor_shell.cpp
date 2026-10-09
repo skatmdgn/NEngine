@@ -2405,6 +2405,10 @@ struct Win32EditorShell::Impl {
                 apply_property,
                 FALSE);
 
+            EnableWindow(
+                assign_asset,
+                FALSE);
+
             return;
         }
 
@@ -2474,6 +2478,31 @@ struct Win32EditorShell::Impl {
         EnableWindow(
             apply_property,
             editable);
+
+        const int asset_index =
+            assets_list
+                ? static_cast<int>(
+                    SendMessageW(
+                        assets_list,
+                        LB_GETCURSEL,
+                        0,
+                        0))
+                : -1;
+
+        const bool can_assign_asset =
+            editable &&
+            binding.kind ==
+                nengine::core::
+                    PropertyKind::
+                        AssetReference &&
+            asset_index >= 0 &&
+            static_cast<std::size_t>(
+                asset_index) <
+                asset_rows.size();
+
+        EnableWindow(
+            assign_asset,
+            can_assign_asset);
     }
 
     bool apply_generic_property_edit() {
@@ -2559,6 +2588,102 @@ struct Win32EditorShell::Impl {
                 binding.property);
 
         return true;
+    }
+
+    bool assign_selected_asset_to_property() {
+        if (!editor.can_edit() ||
+            !generic_properties ||
+            !assets_list) {
+            return false;
+        }
+
+        const int property_index =
+            static_cast<int>(
+                SendMessageW(
+                    generic_properties,
+                    LB_GETCURSEL,
+                    0,
+                    0));
+
+        const int asset_index =
+            static_cast<int>(
+                SendMessageW(
+                    assets_list,
+                    LB_GETCURSEL,
+                    0,
+                    0));
+
+        if (property_index < 0 ||
+            asset_index < 0 ||
+            static_cast<std::size_t>(
+                property_index) >=
+                generic_property_rows
+                    .size() ||
+            static_cast<std::size_t>(
+                asset_index) >=
+                asset_rows.size()) {
+            return false;
+        }
+
+        const auto binding =
+            generic_property_rows[
+                static_cast<std::size_t>(
+                    property_index)];
+
+        if (!binding.editable ||
+            binding.kind !=
+                nengine::core::
+                    PropertyKind::
+                        AssetReference) {
+            return false;
+        }
+
+        const auto entity =
+            editor.selection()
+                .active();
+
+        if (!editor.world()
+                .is_alive(
+                    entity)) {
+            return false;
+        }
+
+        const auto& asset =
+            asset_rows[
+                static_cast<std::size_t>(
+                    asset_index)];
+
+        const bool assigned =
+            editor.commands().execute(
+                editor.world(),
+                std::make_unique<
+                    nengine::editor::
+                        SetPropertyCommand>(
+                            &editor
+                                .property_access(),
+                            entity,
+                            binding.component,
+                            binding.property,
+                            nengine::core::
+                                PropertyValue{
+                                    asset.guid
+                                        .to_string()}));
+
+        if (assigned) {
+            editor.console().info(
+                "Inspector",
+                "Assigned " +
+                    asset.relative_path
+                        .generic_string() +
+                    " to " +
+                    binding.property);
+        } else {
+            editor.console().warning(
+                "Inspector",
+                "Selected asset could not be assigned.");
+        }
+
+        return assigned;
     }
 
     void refresh_add_component_options(
@@ -2715,6 +2840,10 @@ struct Win32EditorShell::Impl {
 
             EnableWindow(
                 apply_property,
+                FALSE);
+
+            EnableWindow(
+                assign_asset,
                 FALSE);
 
             refresh_add_component_options(
@@ -3247,6 +3376,11 @@ struct Win32EditorShell::Impl {
             break;
 
         case IdAssets:
+            if (notification == LBN_SELCHANGE) {
+                refresh_generic_property_value();
+                return true;
+            }
+
             if (notification != LBN_DBLCLK) return false;
             {
                 const int index =
@@ -3323,6 +3457,15 @@ struct Win32EditorShell::Impl {
             }
 
             apply_generic_property_edit();
+            handled = true;
+            break;
+
+        case IdAssignAsset:
+            if (notification != BN_CLICKED) {
+                return false;
+            }
+
+            assign_selected_asset_to_property();
             handled = true;
             break;
 
