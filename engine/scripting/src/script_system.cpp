@@ -8,6 +8,38 @@
 #include "nengine/scripting/components.hpp"
 
 namespace nengine::scripting {
+namespace {
+
+class RuntimeWorldBinding {
+public:
+    RuntimeWorldBinding(
+        ManagedRuntime* runtime,
+        core::World* world) noexcept
+        : runtime_(runtime) {
+
+        if (runtime_) {
+            runtime_->bind_world(
+                world);
+        }
+    }
+
+    ~RuntimeWorldBinding() {
+        if (runtime_) {
+            runtime_->bind_world(
+                nullptr);
+        }
+    }
+
+    RuntimeWorldBinding(
+        const RuntimeWorldBinding&) = delete;
+    RuntimeWorldBinding& operator=(
+        const RuntimeWorldBinding&) = delete;
+
+private:
+    ManagedRuntime* runtime_{nullptr};
+};
+
+} // namespace
 
 ManagedScriptSystem::~ManagedScriptSystem() {
     clear();
@@ -54,6 +86,11 @@ ManagedScriptSystem::update(
 
         return stats;
     }
+
+    RuntimeWorldBinding world_binding{
+        runtime_,
+        &world
+    };
 
     const auto push_native_state =
         [&](core::Entity entity,
