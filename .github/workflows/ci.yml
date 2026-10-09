@@ -20,6 +20,26 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Install GLSL compiler
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y glslang-tools
+
+      - name: Compile PBR shader fixtures
+        if: runner.os == 'Linux'
+        run: |
+          python3 tools/compile_shader.py engine/render/shaders/pbr.vert.glsl build/shaders/pbr.vert.spv
+          python3 tools/compile_shader.py engine/render/shaders/pbr.frag.glsl build/shaders/pbr.frag.spv
+          python3 tools/embed_spirv.py build/shaders/pbr.vert.spv --symbol pbr_vertex_words > build/shaders/pbr.vert.inc
+          python3 tools/embed_spirv.py build/shaders/pbr.frag.spv --symbol pbr_fragment_words > build/shaders/pbr.frag.inc
+          echo "=== NENGINE_PBR_VERTEX_SPIRV_BEGIN ==="
+          cat build/shaders/pbr.vert.inc
+          echo "=== NENGINE_PBR_VERTEX_SPIRV_END ==="
+          echo "=== NENGINE_PBR_FRAGMENT_SPIRV_BEGIN ==="
+          cat build/shaders/pbr.frag.inc
+          echo "=== NENGINE_PBR_FRAGMENT_SPIRV_END ==="
+
       - name: Configure
         run: cmake -S . -B build -DNENGINE_BUILD_TESTS=ON -DNENGINE_BUILD_EDITOR=ON
 
