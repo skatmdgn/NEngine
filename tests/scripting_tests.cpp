@@ -157,9 +157,9 @@ int main() {
             "GetAbiVersion") !=
                 std::string::npos &&
         bridge.find(
-            "AbiVersion = 2") !=
+            "AbiVersion = 3") !=
                 std::string::npos,
-        "managed bridge exposes managed lifecycle ABI v2 entry");
+        "managed bridge exposes lifecycle and Transform ABI v3 entry");
 
     const auto runtime_config =
         read_all(
@@ -409,7 +409,7 @@ int main() {
                 << "    public int starts;\n"
                 << "    public int updates;\n"
                 << "    private void Start() { starts++; }\n"
-                << "    private void Update() { updates++; }\n"
+                << "    private void Update() { updates++; transform.localPosition = transform.localPosition + new Vector3(1, 2, 3); }\n"
                 << "}\n";
         }
 
@@ -557,6 +557,18 @@ int main() {
                             script_component->type_name =
                                 "Example";
 
+                            auto* native_transform =
+                                script_world.transform(
+                                    script_entity);
+
+                            if (native_transform) {
+                                native_transform->local_position = {
+                                    5.0f,
+                                    0.0f,
+                                    0.0f
+                                };
+                            }
+
                             std::string system_error;
 
                             const auto first_tick =
@@ -574,6 +586,13 @@ int main() {
                                 managed_runtime.instance_count() == 1,
                                 "ScriptBehaviour first World tick creates starts and updates managed instance");
 
+                            check(
+                                native_transform &&
+                                native_transform->local_position.x == 6.0f &&
+                                native_transform->local_position.y == 2.0f &&
+                                native_transform->local_position.z == 3.0f,
+                                "managed Update writes localPosition back into native World Transform");
+
                             const auto second_tick =
                                 script_system.update(
                                     script_world,
@@ -586,6 +605,13 @@ int main() {
                                 second_tick.updated == 1u &&
                                 second_tick.unresolved == 0u,
                                 "ScriptBehaviour subsequent World tick reuses managed instance and only updates");
+
+                            check(
+                                native_transform &&
+                                native_transform->local_position.x == 7.0f &&
+                                native_transform->local_position.y == 4.0f &&
+                                native_transform->local_position.z == 6.0f,
+                                "managed Transform synchronization accumulates across World ticks");
 
                             script_component->enabled =
                                 false;
@@ -617,6 +643,13 @@ int main() {
                                 reenabled_tick.updated == 1u &&
                                 managed_runtime.instance_count() == 1,
                                 "reenabling ScriptBehaviour recreates and restarts managed instance");
+
+                            check(
+                                native_transform &&
+                                native_transform->local_position.x == 8.0f &&
+                                native_transform->local_position.y == 6.0f &&
+                                native_transform->local_position.z == 9.0f,
+                                "recreated managed Behaviour receives current native Transform before Update");
 
                             script_world.destroy(
                                 script_entity);
