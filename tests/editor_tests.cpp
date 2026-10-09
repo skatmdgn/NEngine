@@ -1159,6 +1159,11 @@ int main() {
 
     check(
         world.destroy(
+            script_entity),
+        "ScriptBehaviour test entity cleans up before hierarchy assertions");
+
+    check(
+        world.destroy(
             factory_entity),
         "factory command test entity cleans up before hierarchy assertions");
 
