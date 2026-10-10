@@ -288,7 +288,7 @@ The concrete Vulkan backend currently grows beneath this contract. The long-term
 Implemented:
 - Dedicated NEnginePhysics module.
 - Native Rigidbody / BoxCollider / SphereCollider / CapsuleCollider and Rigidbody2D / BoxCollider2D / CircleCollider2D / CapsuleCollider2D components.
-- Reflection metadata and Scene serialization for mass, gravity, velocity, Rigidbody sleep enable/threshold, trigger, collider layer/collision-mask, friction/restitution, center, box size and radial radius state, with legacy Scene defaults for sleep, filter and contact-material fields; runtime sleep state/timers are intentionally transient.
+- Reflection metadata and Scene serialization for mass, gravity, velocity, Rigidbody sleep enable/threshold, trigger, collider layer/collision-mask, friction/restitution, center, box size, radial radius, Capsule radius/height/direction and Capsule2D size/direction state, with legacy Scene defaults for sleep, filter and contact-material fields; runtime sleep state/timers are intentionally transient.
 - Editor Add Component, Inspector and generic PropertyAccess integration for all eight physics components.
 - Managed Rigidbody / BoxCollider / SphereCollider / CapsuleCollider / Rigidbody2D / BoxCollider2D / CircleCollider2D / CapsuleCollider2D proxies over ABI v15, including Unity-familiar velocity/useGravity/isKinematic naming and CapsuleDirection2D.
 - Fixed-step rigidbody foundation runs after managed FixedUpdate so script velocity changes affect the same simulation step; sleeping bodies skip gravity/integration until velocity, impact or support changes wake them.

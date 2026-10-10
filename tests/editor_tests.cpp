@@ -17,6 +17,7 @@
 #include "nengine/editor/scene_interaction.hpp"
 #include "nengine/render/builtin_assets.hpp"
 #include "nengine/render/components.hpp"
+#include "nengine/physics/components.hpp"
 #include "nengine/scripting/components.hpp"
 
 namespace {
@@ -1098,6 +1099,81 @@ int main() {
         "AddComponentCommand redo recreates the component");
 
     model.commands().clear();
+
+    const auto capsule_property_entity =
+        world.create(
+            "Capsule Property Validation");
+
+    auto* capsule_property =
+        world.add_component<
+            physics::CapsuleCollider>(
+                capsule_property_entity,
+                physics::capsule_collider_type());
+
+    check(
+        capsule_property != nullptr,
+        "CapsuleCollider attaches for PropertyAccess validation");
+
+    check(
+        !model.property_access().write(
+            world,
+            capsule_property_entity,
+            physics::capsule_collider_type(),
+            "Height",
+            core::PropertyValue{
+                0.75
+            }) &&
+        capsule_property &&
+        capsule_property->height ==
+            2.0f &&
+        capsule_property->radius ==
+            0.5f,
+        "CapsuleCollider rejects invalid height without mutating native state");
+
+    check(
+        !model.property_access().write(
+            world,
+            capsule_property_entity,
+            physics::capsule_collider_type(),
+            "Radius",
+            core::PropertyValue{
+                1.25
+            }) &&
+        capsule_property &&
+        capsule_property->height ==
+            2.0f &&
+        capsule_property->radius ==
+            0.5f,
+        "CapsuleCollider rejects radius above half height without mutating native state");
+
+    check(
+        model.property_access().write(
+            world,
+            capsule_property_entity,
+            physics::capsule_collider_type(),
+            "Height",
+            core::PropertyValue{
+                3.0
+            }) &&
+        model.property_access().write(
+            world,
+            capsule_property_entity,
+            physics::capsule_collider_type(),
+            "Radius",
+            core::PropertyValue{
+                1.25
+            }) &&
+        capsule_property &&
+        capsule_property->height ==
+            3.0f &&
+        capsule_property->radius ==
+            1.25f,
+        "CapsuleCollider valid height and radius edits commit atomically");
+
+    check(
+        world.destroy(
+            capsule_property_entity),
+        "CapsuleCollider PropertyAccess validation entity cleans up");
 
 
     check(

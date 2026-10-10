@@ -971,14 +971,36 @@ bool register_capsule_properties(
                                     const core::PropertyValue& raw) {
                                     const auto* typed =
                                         std::get_if<double>(&raw);
+
                                     if (!typed ||
                                         *typed <= 0.0) {
                                         return false;
                                     }
+
+                                    const float candidate =
+                                        static_cast<float>(
+                                            *typed);
+
+                                    const float radius =
+                                        member ==
+                                            &physics::CapsuleCollider::radius
+                                            ? candidate
+                                            : component.radius;
+
+                                    const float height =
+                                        member ==
+                                            &physics::CapsuleCollider::height
+                                            ? candidate
+                                            : component.height;
+
+                                    if (height <
+                                        radius * 2.0f) {
+                                        return false;
+                                    }
+
                                     component.*member =
-                                        static_cast<float>(*typed);
-                                    return component.height >=
-                                        component.radius * 2.0f;
+                                        candidate;
+                                    return true;
                                 });
                     }) &&
                 ok;
