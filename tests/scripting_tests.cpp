@@ -1236,6 +1236,10 @@ int main() {
             std::string::npos &&
         api.find("panStereo") !=
             std::string::npos &&
+        api.find("minDistance") !=
+            std::string::npos &&
+        api.find("maxDistance") !=
+            std::string::npos &&
         api.find("sealed class Collision") !=
             std::string::npos &&
         api.find("sealed class Collision2D") !=

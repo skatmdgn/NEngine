@@ -2365,6 +2365,18 @@ std::string api_stub(
             set => SetNativeFloat("Pan Stereo", value);
         }
 
+        public float minDistance
+        {
+            get => NativeFloat("Min Distance", 1);
+            set => SetNativeFloat("Min Distance", value);
+        }
+
+        public float maxDistance
+        {
+            get => NativeFloat("Max Distance", 500);
+            set => SetNativeFloat("Max Distance", value);
+        }
+
         public bool isPlaying =>
             NativeBool("Playing", false);
 

@@ -14,6 +14,8 @@ struct AudioSource {
     float volume{1.0f};
     float pitch{1.0f};
     float pan_stereo{0.0f};
+    float min_distance{1.0f};
+    float max_distance{500.0f};
 
     // Runtime-only playback state.
     bool playing{false};

@@ -188,6 +188,8 @@ int main() {
         source->volume = 0.75f;
         source->pitch = 1.25f;
         source->pan_stereo = -0.5f;
+        source->min_distance = 2.0f;
+        source->max_distance = 50.0f;
         source->playing = true;
         source->time_seconds = 12.0f;
     }
@@ -263,6 +265,12 @@ int main() {
         std::abs(
             restored_source->pan_stereo +
             0.5f) < 0.0001f &&
+        std::abs(
+            restored_source->min_distance -
+            2.0f) < 0.0001f &&
+        std::abs(
+            restored_source->max_distance -
+            50.0f) < 0.0001f &&
         !restored_source->playing &&
         restored_source->time_seconds == 0.0f &&
         restored_listener &&
@@ -287,6 +295,22 @@ int main() {
                 invalid,
                 &error),
             "AudioSource codec rejects pan outside -1..1");
+
+        invalid =
+            *captured_source;
+
+        set_property(
+            invalid,
+            "Max Distance",
+            core::PropertyValue{1.0});
+
+        check(
+            !serialization.restore(
+                restored,
+                restored_entity,
+                invalid,
+                &error),
+            "AudioSource codec rejects max distance below min distance");
     }
 
     if (captured_listener) {
@@ -360,6 +384,10 @@ int main() {
             true;
         mix_source->volume =
             1.0f;
+        mix_source->min_distance =
+            0.5f;
+        mix_source->max_distance =
+            1.5f;
         mix_source->playing =
             true;
         mix_source->time_seconds =

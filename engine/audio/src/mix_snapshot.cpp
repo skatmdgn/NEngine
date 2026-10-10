@@ -165,7 +165,9 @@ WorldTransform resolve_world_transform(
 
 float distance_gain(
     core::Vec3 source,
-    core::Vec3 listener) noexcept {
+    core::Vec3 listener,
+    float min_distance,
+    float max_distance) noexcept {
 
     const float dx =
         source.x - listener.x;
@@ -180,8 +182,33 @@ float distance_gain(
             dy * dy +
             dz * dz);
 
-    return 1.0f /
-        (1.0f + distance);
+    const float minimum =
+        std::max(
+            min_distance,
+            0.0001f);
+
+    const float maximum =
+        std::max(
+            max_distance,
+            minimum);
+
+    if (distance <= minimum) {
+        return 1.0f;
+    }
+
+    if (distance >= maximum) {
+        return 0.0f;
+    }
+
+    if (maximum <= minimum +
+        0.000001f) {
+        return 0.0f;
+    }
+
+    return clamp_unit(
+        1.0f -
+        (distance - minimum) /
+            (maximum - minimum));
 }
 
 float spatial_pan(
@@ -332,7 +359,9 @@ AudioMixSnapshot build_mix_snapshot(
             gain *=
                 distance_gain(
                     world_transform.position,
-                    listener_position);
+                    listener_position,
+                    source->min_distance,
+                    source->max_distance);
 
             pan =
                 clamp_pan(

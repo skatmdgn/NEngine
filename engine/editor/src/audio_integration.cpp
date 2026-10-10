@@ -277,6 +277,101 @@ bool register_source_properties(
         -1.0f,
         1.0f);
 
+    ok =
+        properties.register_property(
+            type,
+            "Min Distance",
+            core::PropertyKind::Float,
+            [type](
+                const core::World& world,
+                core::Entity entity) {
+                return read_component_property<
+                    audio::AudioSource>(
+                        world,
+                        entity,
+                        type,
+                        [](const audio::AudioSource& source) {
+                            return core::PropertyValue{
+                                static_cast<double>(
+                                    source.min_distance)};
+                        });
+            },
+            [type](
+                core::World& world,
+                core::Entity entity,
+                const core::PropertyValue& value) {
+                return write_component_property<
+                    audio::AudioSource>(
+                        world,
+                        entity,
+                        type,
+                        value,
+                        [](audio::AudioSource& source,
+                           const core::PropertyValue& raw) {
+                            const auto* typed =
+                                std::get_if<double>(
+                                    &raw);
+                            if (!typed ||
+                                *typed <= 0.0 ||
+                                *typed >
+                                    source.max_distance) {
+                                return false;
+                            }
+                            source.min_distance =
+                                static_cast<float>(
+                                    *typed);
+                            return true;
+                        });
+            }) &&
+        ok;
+
+    ok =
+        properties.register_property(
+            type,
+            "Max Distance",
+            core::PropertyKind::Float,
+            [type](
+                const core::World& world,
+                core::Entity entity) {
+                return read_component_property<
+                    audio::AudioSource>(
+                        world,
+                        entity,
+                        type,
+                        [](const audio::AudioSource& source) {
+                            return core::PropertyValue{
+                                static_cast<double>(
+                                    source.max_distance)};
+                        });
+            },
+            [type](
+                core::World& world,
+                core::Entity entity,
+                const core::PropertyValue& value) {
+                return write_component_property<
+                    audio::AudioSource>(
+                        world,
+                        entity,
+                        type,
+                        value,
+                        [](audio::AudioSource& source,
+                           const core::PropertyValue& raw) {
+                            const auto* typed =
+                                std::get_if<double>(
+                                    &raw);
+                            if (!typed ||
+                                *typed <
+                                    source.min_distance) {
+                                return false;
+                            }
+                            source.max_distance =
+                                static_cast<float>(
+                                    *typed);
+                            return true;
+                        });
+            }) &&
+        ok;
+
     float_property(
         "Time",
         &audio::AudioSource::time_seconds,

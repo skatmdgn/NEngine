@@ -157,7 +157,10 @@ bool valid_source(
            value.volume <= 1.0f &&
            value.pitch >= 0.0f &&
            value.pan_stereo >= -1.0f &&
-           value.pan_stereo <= 1.0f;
+           value.pan_stereo <= 1.0f &&
+           value.min_distance > 0.0f &&
+           value.max_distance >=
+               value.min_distance;
 }
 
 bool valid_listener(
@@ -215,6 +218,14 @@ bool register_component_metadata(
                 flags},
             core::PropertyDescriptor{
                 "Pan Stereo",
+                core::PropertyKind::Float,
+                flags},
+            core::PropertyDescriptor{
+                "Min Distance",
+                core::PropertyKind::Float,
+                flags},
+            core::PropertyDescriptor{
+                "Max Distance",
                 core::PropertyKind::Float,
                 flags}}) {
 
@@ -306,7 +317,13 @@ bool register_component_serializers(
                         source->pitch),
                     float_property(
                         "Pan Stereo",
-                        source->pan_stereo)
+                        source->pan_stereo),
+                    float_property(
+                        "Min Distance",
+                        source->min_distance),
+                    float_property(
+                        "Max Distance",
+                        source->max_distance)
                 };
 
                 return data;
@@ -350,6 +367,14 @@ bool register_component_serializers(
                         data,
                         "Pan Stereo",
                         value.pan_stereo) ||
+                    !read_float(
+                        data,
+                        "Min Distance",
+                        value.min_distance) ||
+                    !read_float(
+                        data,
+                        "Max Distance",
+                        value.max_distance) ||
                     !valid_source(value)) {
 
                     if (error) {
