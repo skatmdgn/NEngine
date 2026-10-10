@@ -66,24 +66,19 @@ ManagedScriptSystem::update(
 
     if (!runtime_ ||
         !runtime_->valid()) {
-
         if (error) {
             *error =
                 "managed script system has no valid runtime";
         }
-
         return stats;
     }
 
-    if (!std::isfinite(
-            delta_seconds) ||
+    if (!std::isfinite(delta_seconds) ||
         delta_seconds < 0.0f) {
-
         if (error) {
             *error =
                 "managed script delta must be finite and non-negative";
         }
-
         return stats;
     }
 
@@ -92,42 +87,37 @@ ManagedScriptSystem::update(
         &world
     };
 
-    if (!runtime_->advance_frame(
-            delta_seconds)) {
-
+    if (!runtime_->advance_frame(delta_seconds)) {
         ++stats.unresolved;
-
         if (error) {
-            *error =
-                runtime_->diagnostic();
+            *error = runtime_->diagnostic();
         }
-
         return stats;
     }
+
+    const auto runtime_error =
+        [&]() {
+            if (error) {
+                *error = runtime_->diagnostic();
+            }
+        };
 
     const auto push_native_state =
         [&](core::Entity entity,
             ManagedBehaviourHandle handle) {
 
             const auto* transform =
-                world.transform(
-                    entity);
+                world.transform(entity);
 
             if (!transform ||
-                !runtime_->set_transform(
-                    handle,
-                    *transform) ||
+                !runtime_->set_transform(handle, *transform) ||
                 !runtime_->set_game_object(
                     handle,
                     entity,
                     world.name(entity),
                     world.active(entity))) {
 
-                if (error) {
-                    *error =
-                        runtime_->diagnostic();
-                }
-
+                runtime_error();
                 return false;
             }
 
@@ -139,26 +129,16 @@ ManagedScriptSystem::update(
             ManagedBehaviourHandle handle) {
 
             auto* transform =
-                world.transform(
-                    entity);
+                world.transform(entity);
 
             if (!transform ||
-                !runtime_->get_transform(
-                    handle,
-                    *transform)) {
-
-                if (error) {
-                    *error =
-                        runtime_->diagnostic();
-                }
-
+                !runtime_->get_transform(handle, *transform)) {
+                runtime_error();
                 return false;
             }
 
-            core::Entity
-                managed_entity =
-                    core::Entity::invalid();
-
+            core::Entity managed_entity =
+                core::Entity::invalid();
             std::string managed_name;
             bool managed_active = true;
 
@@ -167,30 +147,95 @@ ManagedScriptSystem::update(
                     managed_entity,
                     managed_name,
                     managed_active)) {
-
-                if (error) {
-                    *error =
-                        runtime_->diagnostic();
-                }
-
+                runtime_error();
                 return false;
             }
 
             if (managed_entity != entity ||
                 managed_name.empty() ||
-                !world.set_name(
-                    entity,
-                    std::move(
-                        managed_name)) ||
-                !world.set_active(
-                    entity,
-                    managed_active)) {
+                !world.set_name(entity, std::move(managed_name)) ||
+                !world.set_active(entity, managed_active)) {
 
                 if (error) {
                     *error =
                         "managed GameObject state is invalid for native World entity";
                 }
+                return false;
+            }
 
+            return true;
+        };
+
+    const auto push_enabled =
+        [&](core::Entity entity,
+            ManagedBehaviourHandle handle) {
+
+            const auto* behaviour =
+                world.get_component<ScriptBehaviour>(
+                    entity,
+                    script_behaviour_type());
+
+            if (!behaviour ||
+                !runtime_->set_behaviour_enabled(
+                    handle,
+                    behaviour->enabled)) {
+                runtime_error();
+                return false;
+            }
+
+            return true;
+        };
+
+    const auto pull_enabled =
+        [&](core::Entity entity,
+            ManagedBehaviourHandle handle) {
+
+            auto* behaviour =
+                world.get_component<ScriptBehaviour>(
+                    entity,
+                    script_behaviour_type());
+            bool managed_enabled = false;
+
+            if (!behaviour ||
+                !runtime_->get_behaviour_enabled(
+                    handle,
+                    managed_enabled)) {
+                runtime_error();
+                return false;
+            }
+
+            behaviour->enabled =
+                managed_enabled;
+            return true;
+        };
+
+    const auto pull_all =
+        [&](core::Entity entity,
+            ManagedBehaviourHandle handle) {
+            return pull_managed_state(entity, handle) &&
+                   pull_enabled(entity, handle);
+        };
+
+    const auto invoke_disable =
+        [&](core::Entity entity,
+            Instance& instance) {
+
+            if (!instance.active) {
+                return true;
+            }
+
+            if (!runtime_->on_disable(instance.handle)) {
+                ++stats.unresolved;
+                runtime_error();
+                return false;
+            }
+
+            ++stats.disabled;
+            instance.active = false;
+
+            if (world.is_alive(entity) &&
+                !pull_all(entity, instance.handle)) {
+                ++stats.unresolved;
                 return false;
             }
 
@@ -199,224 +244,308 @@ ManagedScriptSystem::update(
 
     std::unordered_set<
         core::Entity::value_type>
-        active;
+        present;
 
     for (const auto entity :
          world.entities()) {
 
-        const auto* behaviour =
-            world.get_component<
-                ScriptBehaviour>(
-                    entity,
-                    script_behaviour_type());
+        auto* behaviour =
+            world.get_component<ScriptBehaviour>(
+                entity,
+                script_behaviour_type());
 
         if (!behaviour ||
-            !behaviour->enabled ||
-            behaviour->type_name.empty() ||
-            !world.active(
-                entity)) {
+            behaviour->type_name.empty()) {
             continue;
         }
 
-        active.insert(
-            entity.value);
+        present.insert(entity.value);
+        const std::string type_name =
+            behaviour->type_name;
 
         auto existing =
-            instances_.find(
-                entity.value);
+            instances_.find(entity.value);
 
-        if (existing !=
-                instances_.end() &&
-            existing->second.type_name !=
-                behaviour->type_name) {
+        if (existing != instances_.end() &&
+            existing->second.type_name != type_name) {
 
-            if (runtime_->destroy(
-                    existing->second.handle)) {
+            invoke_disable(entity, existing->second);
+
+            if (runtime_->destroy(existing->second.handle)) {
                 ++stats.destroyed;
             } else {
                 ++stats.unresolved;
+                runtime_error();
             }
 
-            instances_.erase(
-                existing);
-
-            existing =
-                instances_.end();
+            instances_.erase(existing);
+            existing = instances_.end();
         }
 
-        if (existing ==
-            instances_.end()) {
-
+        if (existing == instances_.end()) {
             const auto handle =
-                runtime_->create_behaviour(
-                    behaviour->type_name);
+                runtime_->create_behaviour(type_name);
 
             if (!handle.valid()) {
                 ++stats.unresolved;
-
-                if (error) {
-                    *error =
-                        runtime_->diagnostic();
-                }
-
+                runtime_error();
                 continue;
             }
 
             Instance instance;
-            instance.handle =
-                handle;
-            instance.type_name =
-                behaviour->type_name;
+            instance.handle = handle;
+            instance.type_name = type_name;
 
             const auto [created, inserted] =
                 instances_.emplace(
                     entity.value,
-                    std::move(
-                        instance));
-
+                    std::move(instance));
             (void)inserted;
-
             ++stats.created;
 
-            if (!push_native_state(
+            if (!push_native_state(entity, created->second.handle) ||
+                !push_enabled(entity, created->second.handle) ||
+                !runtime_->awake(created->second.handle)) {
+
+                ++stats.unresolved;
+                runtime_error();
+                runtime_->destroy(created->second.handle);
+                instances_.erase(created);
+                continue;
+            }
+
+            ++stats.awoken;
+
+            if (!pull_all(entity, created->second.handle)) {
+                ++stats.unresolved;
+                runtime_->destroy(created->second.handle);
+                instances_.erase(created);
+                continue;
+            }
+
+            existing = instances_.find(entity.value);
+        }
+
+        if (existing == instances_.end() ||
+            !world.is_alive(entity)) {
+            continue;
+        }
+
+        behaviour =
+            world.get_component<ScriptBehaviour>(
+                entity,
+                script_behaviour_type());
+
+        if (!behaviour) {
+            continue;
+        }
+
+        auto& instance =
+            existing->second;
+
+        if (!runtime_->set_behaviour_enabled(
+                instance.handle,
+                behaviour->enabled)) {
+            ++stats.unresolved;
+            runtime_error();
+            continue;
+        }
+
+        bool should_be_active =
+            world.active(entity) &&
+            behaviour->enabled;
+
+        if (should_be_active &&
+            !instance.active) {
+
+            if (!push_native_state(entity, instance.handle) ||
+                !runtime_->on_enable(instance.handle)) {
+                ++stats.unresolved;
+                runtime_error();
+                continue;
+            }
+
+            ++stats.enabled;
+            instance.active = true;
+
+            if (!pull_all(entity, instance.handle)) {
+                ++stats.unresolved;
+                continue;
+            }
+
+            behaviour =
+                world.get_component<ScriptBehaviour>(
                     entity,
-                    created->second.handle)) {
+                    script_behaviour_type());
 
+            should_be_active =
+                behaviour &&
+                behaviour->enabled &&
+                world.active(entity);
+
+            if (!should_be_active) {
+                invoke_disable(entity, instance);
+                continue;
+            }
+        } else if (!should_be_active &&
+                   instance.active) {
+            invoke_disable(entity, instance);
+            continue;
+        }
+
+        if (!instance.active) {
+            continue;
+        }
+
+        if (!instance.started) {
+            if (!push_native_state(entity, instance.handle) ||
+                !push_enabled(entity, instance.handle) ||
+                !runtime_->start(instance.handle)) {
                 ++stats.unresolved;
-
-                runtime_->destroy(
-                    created->second.handle);
-
-                instances_.erase(
-                    created);
-
+                runtime_error();
                 continue;
             }
 
-            if (!runtime_->start(
-                    created->second.handle)) {
-
-                ++stats.unresolved;
-
-                if (error) {
-                    *error =
-                        runtime_->diagnostic();
-                }
-
-                runtime_->destroy(
-                    created->second.handle);
-
-                instances_.erase(
-                    created);
-
-                continue;
-            }
-
+            instance.started = true;
             ++stats.started;
 
-            if (!pull_managed_state(
-                    entity,
-                    created->second.handle)) {
-
+            if (!pull_all(entity, instance.handle)) {
                 ++stats.unresolved;
+                continue;
             }
 
-            existing =
-                instances_.find(
-                    entity.value);
+            behaviour =
+                world.get_component<ScriptBehaviour>(
+                    entity,
+                    script_behaviour_type());
 
-            if (!world.active(
-                    entity)) {
+            should_be_active =
+                behaviour &&
+                behaviour->enabled &&
+                world.active(entity);
+
+            if (!should_be_active) {
+                invoke_disable(entity, instance);
                 continue;
             }
         }
 
-        if (existing !=
-                instances_.end()) {
+        if (!push_native_state(entity, instance.handle) ||
+            !push_enabled(entity, instance.handle)) {
+            ++stats.unresolved;
+            continue;
+        }
 
-            if (!push_native_state(
-                    entity,
-                    existing->second.handle)) {
+        if (runtime_->update(
+                instance.handle,
+                delta_seconds)) {
+            ++stats.updated;
 
+            if (!pull_all(entity, instance.handle)) {
                 ++stats.unresolved;
                 continue;
             }
 
-            if (runtime_->update(
-                    existing->second.handle,
-                    delta_seconds)) {
+            behaviour =
+                world.get_component<ScriptBehaviour>(
+                    entity,
+                    script_behaviour_type());
 
-                ++stats.updated;
+            should_be_active =
+                behaviour &&
+                behaviour->enabled &&
+                world.active(entity);
 
-                if (!pull_managed_state(
-                        entity,
-                        existing->second.handle)) {
-
-                    ++stats.unresolved;
-                }
-            } else {
-                ++stats.unresolved;
-
-                if (error) {
-                    *error =
-                        runtime_->diagnostic();
-                }
+            if (!should_be_active) {
+                invoke_disable(entity, instance);
             }
+        } else {
+            ++stats.unresolved;
+            runtime_error();
         }
     }
 
-    if (!runtime_
-            ->flush_world_destroys()) {
+    const auto pending_destroy =
+        runtime_->pending_world_destroys();
 
+    for (const auto entity :
+         pending_destroy) {
+
+        auto existing =
+            instances_.find(entity.value);
+
+        if (existing == instances_.end()) {
+            continue;
+        }
+
+        invoke_disable(entity, existing->second);
+
+        if (runtime_->destroy(existing->second.handle)) {
+            ++stats.destroyed;
+        } else {
+            ++stats.unresolved;
+            runtime_error();
+        }
+
+        instances_.erase(existing);
+    }
+
+    if (!runtime_->flush_world_destroys()) {
         ++stats.unresolved;
-
-        if (error) {
-            *error =
-                runtime_->diagnostic();
-        }
+        runtime_error();
     }
 
-    for (auto it =
-             instances_.begin();
+    for (auto it = instances_.begin();
          it != instances_.end();) {
 
-        const core::Entity
-            instance_entity{
-                it->first};
+        const core::Entity instance_entity{
+            it->first};
 
-        if (active.contains(
-                it->first) &&
-            world.is_alive(
-                instance_entity)) {
+        if (present.contains(it->first) &&
+            world.is_alive(instance_entity)) {
             ++it;
             continue;
         }
 
-        if (runtime_->destroy(
-                it->second.handle)) {
+        invoke_disable(instance_entity, it->second);
 
+        if (runtime_->destroy(it->second.handle)) {
             ++stats.destroyed;
         } else {
             ++stats.unresolved;
+            runtime_error();
         }
 
-        it =
-            instances_.erase(
-                it);
+        it = instances_.erase(it);
     }
 
     return stats;
 }
 
-void ManagedScriptSystem::clear() noexcept {
+void ManagedScriptSystem::clear(
+    core::World* world) noexcept {
+
     if (runtime_ &&
         runtime_->valid()) {
 
-        for (const auto& [_, instance] :
+        RuntimeWorldBinding world_binding{
+            runtime_,
+            world
+        };
+
+        for (auto& [_, instance] :
              instances_) {
 
-            runtime_->destroy(
-                instance.handle);
+            if (instance.active) {
+                runtime_->on_disable(instance.handle);
+                instance.active = false;
+            }
+
+            runtime_->destroy(instance.handle);
+        }
+
+        if (world) {
+            runtime_->flush_world_destroys();
         }
     }
 

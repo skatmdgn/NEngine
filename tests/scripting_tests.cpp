@@ -260,7 +260,7 @@ int main() {
             "GetAbiVersion") !=
                 std::string::npos &&
         bridge.find(
-            "AbiVersion = 7") !=
+            "AbiVersion = 8") !=
                 std::string::npos &&
         bridge.find(
             "GameplayLoadContext") !=
@@ -291,8 +291,23 @@ int main() {
                 std::string::npos &&
         bridge.find(
             "ResetFrameClock") !=
+                std::string::npos &&
+        bridge.find(
+            "InvokeAwake") !=
+                std::string::npos &&
+        bridge.find(
+            "InvokeEnable") !=
+                std::string::npos &&
+        bridge.find(
+            "InvokeDisable") !=
+                std::string::npos &&
+        bridge.find(
+            "SetBehaviourEnabled") !=
+                std::string::npos &&
+        bridge.find(
+            "GetBehaviourEnabled") !=
                 std::string::npos,
-        "managed bridge exposes collectible gameplay lifecycle native World input and frame-clock ABI v7 entries");
+        "managed bridge exposes activation lifecycle native World input and frame-clock ABI v8 entries");
 
     const auto runtime_config =
         read_all(
@@ -549,6 +564,18 @@ int main() {
                 << "public class DeactivateOnce : Behaviour {\n"
                 << "    private void Update() { gameObject.SetActive(false); }\n"
                 << "}\n"
+                << "public class LifecycleProbe : Behaviour {\n"
+                << "    private void Awake() { transform.localPosition = transform.localPosition + new Vector3(1, 0, 0); }\n"
+                << "    private void OnEnable() { transform.localPosition = transform.localPosition + new Vector3(10, 0, 0); }\n"
+                << "    private void Start() { transform.localPosition = transform.localPosition + new Vector3(100, 0, 0); }\n"
+                << "    private void Update() { transform.localPosition = transform.localPosition + new Vector3(1000, 0, 0); }\n"
+                << "    private void OnDisable() { transform.localPosition = transform.localPosition + new Vector3(10000, 0, 0); }\n"
+                << "    private void OnDestroy() { _ = new GameObject(\"Lifecycle Destroyed\"); }\n"
+                << "}\n"
+                << "public class DisableSelf : Behaviour {\n"
+                << "    private void Update() { enabled = false; }\n"
+                << "    private void OnDisable() { gameObject.name = \"Self Disabled\"; }\n"
+                << "}\n"
                 << "public class HierarchyProbe : Behaviour {\n"
                 << "    private void Update() {\n"
                 << "        Transform? p = transform.parent;\n"
@@ -749,9 +776,11 @@ int main() {
                                 "managed runtime pulls GameObject identity name and active state without loss");
 
                             check(
+                                managed_runtime.awake(
+                                    behaviour) &&
                                 managed_runtime.start(
                                     behaviour),
-                                "managed lifecycle invokes Awake before Start");
+                                "managed lifecycle invokes explicit Awake before Start");
 
                             check(
                                 managed_runtime.update(
@@ -1039,10 +1068,12 @@ int main() {
                                     &system_error);
 
                             check(
-                                disabled_tick.destroyed == 1u &&
-                                script_system.instance_count() == 0u &&
-                                managed_runtime.instance_count() == 0,
-                                "disabling ScriptBehaviour destroys managed instance");
+                                disabled_tick.disabled == 1u &&
+                                disabled_tick.destroyed == 0u &&
+                                disabled_tick.updated == 0u &&
+                                script_system.instance_count() == 1u &&
+                                managed_runtime.instance_count() == 1,
+                                "disabling ScriptBehaviour invokes OnDisable while preserving managed instance");
 
                             script_component->enabled =
                                 true;
@@ -1054,18 +1085,19 @@ int main() {
                                     &system_error);
 
                             check(
-                                reenabled_tick.created == 1u &&
-                                reenabled_tick.started == 1u &&
+                                reenabled_tick.created == 0u &&
+                                reenabled_tick.enabled == 1u &&
+                                reenabled_tick.started == 0u &&
                                 reenabled_tick.updated == 1u &&
                                 managed_runtime.instance_count() == 1,
-                                "reenabling ScriptBehaviour recreates and restarts managed instance");
+                                "reenabling ScriptBehaviour invokes OnEnable and reuses the already-started managed instance");
 
                             check(
                                 native_transform &&
                                 native_transform->local_position.x == 8.0f &&
                                 native_transform->local_position.y == 6.0f &&
                                 native_transform->local_position.z == 9.0f,
-                                "recreated managed Behaviour receives current native Transform before Update");
+                                "reenabled managed Behaviour keeps state and receives current native Transform before Update");
 
                             script_world.destroy(
                                 script_entity);
@@ -1081,6 +1113,157 @@ int main() {
                                 script_system.instance_count() == 0u &&
                                 managed_runtime.instance_count() == 0,
                                 "destroying ScriptBehaviour entity invokes managed OnDestroy and releases handle");
+
+                            const auto lifecycle_entity =
+                                script_world.create(
+                                    "Lifecycle Target");
+
+                            auto* lifecycle_script =
+                                script_world.add_component<
+                                    ScriptBehaviour>(
+                                        lifecycle_entity,
+                                        script_behaviour_type());
+
+                            if (lifecycle_script) {
+                                lifecycle_script->type_name =
+                                    "LifecycleProbe";
+                            }
+
+                            auto* lifecycle_transform =
+                                script_world.transform(
+                                    lifecycle_entity);
+
+                            const auto lifecycle_first =
+                                script_system.update(
+                                    script_world,
+                                    1.0f / 60.0f,
+                                    &system_error);
+
+                            check(
+                                lifecycle_script &&
+                                lifecycle_first.created == 1u &&
+                                lifecycle_first.awoken == 1u &&
+                                lifecycle_first.enabled == 1u &&
+                                lifecycle_first.started == 1u &&
+                                lifecycle_first.updated == 1u &&
+                                lifecycle_first.unresolved == 0u &&
+                                lifecycle_transform &&
+                                lifecycle_transform->local_position.x == 1111.0f,
+                                "managed lifecycle runs Awake OnEnable Start Update in order on first activation");
+
+                            lifecycle_script->enabled =
+                                false;
+
+                            const auto lifecycle_disabled =
+                                script_system.update(
+                                    script_world,
+                                    1.0f / 60.0f,
+                                    &system_error);
+
+                            check(
+                                lifecycle_disabled.disabled == 1u &&
+                                lifecycle_disabled.updated == 0u &&
+                                lifecycle_disabled.destroyed == 0u &&
+                                lifecycle_transform &&
+                                lifecycle_transform->local_position.x == 11111.0f &&
+                                script_system.instance_count() == 1u,
+                                "native ScriptBehaviour disable invokes OnDisable without destroying managed instance");
+
+                            lifecycle_script->enabled =
+                                true;
+
+                            const auto lifecycle_reenabled =
+                                script_system.update(
+                                    script_world,
+                                    1.0f / 60.0f,
+                                    &system_error);
+
+                            check(
+                                lifecycle_reenabled.enabled == 1u &&
+                                lifecycle_reenabled.started == 0u &&
+                                lifecycle_reenabled.updated == 1u &&
+                                lifecycle_transform &&
+                                lifecycle_transform->local_position.x == 12121.0f &&
+                                script_system.instance_count() == 1u,
+                                "reenable invokes OnEnable without repeating Awake or Start");
+
+                            script_world.destroy(
+                                lifecycle_entity);
+
+                            const auto lifecycle_destroyed =
+                                script_system.update(
+                                    script_world,
+                                    0.0f,
+                                    &system_error);
+
+                            bool lifecycle_destroy_marker = false;
+
+                            for (const auto candidate :
+                                 script_world.entities()) {
+                                if (script_world.name(candidate) ==
+                                    "Lifecycle Destroyed") {
+                                    lifecycle_destroy_marker = true;
+                                    script_world.destroy(candidate);
+                                    break;
+                                }
+                            }
+
+                            check(
+                                lifecycle_destroyed.disabled == 1u &&
+                                lifecycle_destroyed.destroyed == 1u &&
+                                lifecycle_destroyed.unresolved == 0u &&
+                                lifecycle_destroy_marker &&
+                                script_system.instance_count() == 0u,
+                                "entity removal invokes OnDisable then OnDestroy while World callbacks remain bound");
+
+                            const auto self_disable_entity =
+                                script_world.create(
+                                    "Self Disable Target");
+
+                            auto* self_disable_script =
+                                script_world.add_component<
+                                    ScriptBehaviour>(
+                                        self_disable_entity,
+                                        script_behaviour_type());
+
+                            if (self_disable_script) {
+                                self_disable_script->type_name =
+                                    "DisableSelf";
+                            }
+
+                            const auto self_disable_tick =
+                                script_system.update(
+                                    script_world,
+                                    1.0f / 60.0f,
+                                    &system_error);
+
+                            check(
+                                self_disable_script &&
+                                !self_disable_script->enabled &&
+                                self_disable_tick.created == 1u &&
+                                self_disable_tick.awoken == 1u &&
+                                self_disable_tick.enabled == 1u &&
+                                self_disable_tick.started == 1u &&
+                                self_disable_tick.updated == 1u &&
+                                self_disable_tick.disabled == 1u &&
+                                script_world.name(self_disable_entity) ==
+                                    "Self Disabled" &&
+                                script_system.instance_count() == 1u,
+                                "managed Behaviour.enabled false synchronizes to native ScriptBehaviour and invokes OnDisable");
+
+                            script_world.destroy(
+                                self_disable_entity);
+
+                            const auto self_disable_cleanup =
+                                script_system.update(
+                                    script_world,
+                                    0.0f,
+                                    &system_error);
+
+                            check(
+                                self_disable_cleanup.destroyed == 1u &&
+                                script_system.instance_count() == 0u,
+                                "self-disabled Behaviour remains alive until its native entity is destroyed");
 
                             const auto active_entity =
                                 script_world.create(
@@ -1121,10 +1304,26 @@ int main() {
                                     &system_error);
 
                             check(
-                                inactive_tick.destroyed == 1u &&
+                                inactive_tick.destroyed == 0u &&
+                                inactive_tick.updated == 0u &&
+                                script_system.instance_count() == 1u &&
+                                managed_runtime.instance_count() == 1,
+                                "inactive native GameObject preserves disabled managed instance without Update");
+
+                            script_world.destroy(
+                                active_entity);
+
+                            const auto inactive_cleanup =
+                                script_system.update(
+                                    script_world,
+                                    0.0f,
+                                    &system_error);
+
+                            check(
+                                inactive_cleanup.destroyed == 1u &&
                                 script_system.instance_count() == 0u &&
                                 managed_runtime.instance_count() == 0,
-                                "inactive native GameObject stops ScriptBehaviour and releases current managed instance");
+                                "destroying inactive ScriptBehaviour entity releases preserved managed instance");
 
                             const auto hierarchy_parent =
                                 script_world.create(
@@ -1196,7 +1395,7 @@ int main() {
                                 script_world.children(
                                     hierarchy_parent)
                                     .empty(),
-                                "managed ABI v6 callbacks mutate parent GameObject Transform and hierarchy immediately in native World");
+                                "managed ABI v8 callbacks mutate parent GameObject Transform and hierarchy immediately in native World");
 
                             script_world.destroy(
                                 hierarchy_child);

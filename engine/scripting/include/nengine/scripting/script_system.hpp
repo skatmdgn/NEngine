@@ -12,8 +12,11 @@ namespace nengine::scripting {
 
 struct ManagedScriptUpdateStats {
     std::size_t created{0};
+    std::size_t awoken{0};
+    std::size_t enabled{0};
     std::size_t started{0};
     std::size_t updated{0};
+    std::size_t disabled{0};
     std::size_t destroyed{0};
     std::size_t unresolved{0};
 };
@@ -36,7 +39,8 @@ public:
         float delta_seconds,
         std::string* error = nullptr);
 
-    void clear() noexcept;
+    void clear(
+        core::World* world = nullptr) noexcept;
 
     std::size_t instance_count()
         const noexcept {
@@ -47,6 +51,8 @@ private:
     struct Instance {
         ManagedBehaviourHandle handle{};
         std::string type_name{};
+        bool active{false};
+        bool started{false};
     };
 
     ManagedRuntime* runtime_{nullptr};

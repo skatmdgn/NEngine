@@ -516,6 +516,18 @@ void ManagedRuntime::bind_world(
         world;
 }
 
+std::vector<core::Entity>
+ManagedRuntime::pending_world_destroys()
+    const {
+
+    if (!world_context_) {
+        return {};
+    }
+
+    return world_context_
+        ->pending_destroy;
+}
+
 bool ManagedRuntime::flush_world_destroys() {
     if (!world_context_ ||
         !world_context_->world) {
@@ -693,6 +705,18 @@ ManagedRuntime::ManagedRuntime(
           std::exchange(
               other.create_,
               nullptr)),
+      awake_(
+          std::exchange(
+              other.awake_,
+              nullptr)),
+      on_enable_(
+          std::exchange(
+              other.on_enable_,
+              nullptr)),
+      on_disable_(
+          std::exchange(
+              other.on_disable_,
+              nullptr)),
       start_(
           std::exchange(
               other.start_,
@@ -708,6 +732,14 @@ ManagedRuntime::ManagedRuntime(
       reset_time_(
           std::exchange(
               other.reset_time_,
+              nullptr)),
+      set_behaviour_enabled_(
+          std::exchange(
+              other.set_behaviour_enabled_,
+              nullptr)),
+      get_behaviour_enabled_(
+          std::exchange(
+              other.get_behaviour_enabled_,
               nullptr)),
       destroy_(
           std::exchange(
@@ -787,6 +819,21 @@ ManagedRuntime::operator=(
             other.create_,
             nullptr);
 
+    awake_ =
+        std::exchange(
+            other.awake_,
+            nullptr);
+
+    on_enable_ =
+        std::exchange(
+            other.on_enable_,
+            nullptr);
+
+    on_disable_ =
+        std::exchange(
+            other.on_disable_,
+            nullptr);
+
     start_ =
         std::exchange(
             other.start_,
@@ -805,6 +852,16 @@ ManagedRuntime::operator=(
     reset_time_ =
         std::exchange(
             other.reset_time_,
+            nullptr);
+
+    set_behaviour_enabled_ =
+        std::exchange(
+            other.set_behaviour_enabled_,
+            nullptr);
+
+    get_behaviour_enabled_ =
+        std::exchange(
+            other.get_behaviour_enabled_,
             nullptr);
 
     destroy_ =
@@ -955,9 +1012,9 @@ bool ManagedRuntime::initialize(
     const int abi_version =
         abi();
 
-    if (abi_version != 7) {
+    if (abi_version != 8) {
         diagnostic_ =
-            "managed bridge ABI mismatch: expected 7, got " +
+            "managed bridge ABI mismatch: expected 8, got " +
             std::to_string(
                 abi_version);
         shutdown();
@@ -970,6 +1027,27 @@ bool ManagedRuntime::initialize(
             bridge_assembly_path,
             bridge_type,
             "CreateBehaviour");
+
+    awake_ =
+        load_entry<InvokeFn>(
+            host_,
+            bridge_assembly_path,
+            bridge_type,
+            "InvokeAwake");
+
+    on_enable_ =
+        load_entry<InvokeFn>(
+            host_,
+            bridge_assembly_path,
+            bridge_type,
+            "InvokeEnable");
+
+    on_disable_ =
+        load_entry<InvokeFn>(
+            host_,
+            bridge_assembly_path,
+            bridge_type,
+            "InvokeDisable");
 
     start_ =
         load_entry<InvokeFn>(
@@ -998,6 +1076,20 @@ bool ManagedRuntime::initialize(
             bridge_assembly_path,
             bridge_type,
             "ResetFrameClock");
+
+    set_behaviour_enabled_ =
+        load_entry<SetEnabledFn>(
+            host_,
+            bridge_assembly_path,
+            bridge_type,
+            "SetBehaviourEnabled");
+
+    get_behaviour_enabled_ =
+        load_entry<InvokeFn>(
+            host_,
+            bridge_assembly_path,
+            bridge_type,
+            "GetBehaviourEnabled");
 
     destroy_ =
         load_entry<InvokeFn>(
@@ -1091,10 +1183,15 @@ bool ManagedRuntime::initialize(
             "GetInstanceCount");
 
     if (!create_ ||
+        !awake_ ||
+        !on_enable_ ||
+        !on_disable_ ||
         !start_ ||
         !update_ ||
         !advance_frame_ ||
         !reset_time_ ||
+        !set_behaviour_enabled_ ||
+        !get_behaviour_enabled_ ||
         !destroy_ ||
         !set_transform_ ||
         !get_transform_ ||
@@ -1110,7 +1207,7 @@ bool ManagedRuntime::initialize(
         !count_) {
 
         diagnostic_ =
-            "managed bridge is missing one or more ABI v7 entry points";
+            "managed bridge is missing one or more ABI v8 entry points";
         shutdown();
         return false;
     }
@@ -1213,7 +1310,7 @@ bool ManagedRuntime::initialize(
     }
 
     diagnostic_ =
-        "managed gameplay runtime initialized; ABI v7 collectible gameplay lifecycle native World lifetime and input callbacks ready";
+        "managed gameplay runtime initialized; ABI v8 activation lifecycle native World lifetime input and coroutine callbacks ready";
 
     return true;
 }
@@ -1247,6 +1344,69 @@ ManagedRuntime::create_behaviour(
 
     return {
         value};
+}
+
+bool ManagedRuntime::awake(
+    ManagedBehaviourHandle handle) {
+
+    if (!valid() ||
+        !handle.valid()) {
+        return false;
+    }
+
+    const int result =
+        awake_(
+            handle.value);
+
+    if (result < 0) {
+        diagnostic_ =
+            "managed Behaviour Awake invocation failed";
+        return false;
+    }
+
+    return true;
+}
+
+bool ManagedRuntime::on_enable(
+    ManagedBehaviourHandle handle) {
+
+    if (!valid() ||
+        !handle.valid()) {
+        return false;
+    }
+
+    const int result =
+        on_enable_(
+            handle.value);
+
+    if (result < 0) {
+        diagnostic_ =
+            "managed Behaviour OnEnable invocation failed";
+        return false;
+    }
+
+    return true;
+}
+
+bool ManagedRuntime::on_disable(
+    ManagedBehaviourHandle handle) {
+
+    if (!valid() ||
+        !handle.valid()) {
+        return false;
+    }
+
+    const int result =
+        on_disable_(
+            handle.value);
+
+    if (result < 0) {
+        diagnostic_ =
+            "managed Behaviour OnDisable invocation failed";
+        return false;
+    }
+
+    return true;
 }
 
 bool ManagedRuntime::start(
@@ -1335,6 +1495,54 @@ bool ManagedRuntime::update(
             "managed Behaviour Update invocation failed";
         return false;
     }
+
+    return true;
+}
+
+bool ManagedRuntime::set_behaviour_enabled(
+    ManagedBehaviourHandle handle,
+    bool enabled) {
+
+    if (!valid() ||
+        !handle.valid()) {
+        return false;
+    }
+
+    const int result =
+        set_behaviour_enabled_(
+            handle.value,
+            enabled ? 1 : 0);
+
+    if (result < 0) {
+        diagnostic_ =
+            "managed Behaviour enabled-state push failed";
+        return false;
+    }
+
+    return true;
+}
+
+bool ManagedRuntime::get_behaviour_enabled(
+    ManagedBehaviourHandle handle,
+    bool& enabled) {
+
+    if (!valid() ||
+        !handle.valid()) {
+        return false;
+    }
+
+    const int result =
+        get_behaviour_enabled_(
+            handle.value);
+
+    if (result < 0) {
+        diagnostic_ =
+            "managed Behaviour enabled-state pull failed";
+        return false;
+    }
+
+    enabled =
+        result != 0;
 
     return true;
 }
@@ -1644,10 +1852,15 @@ void ManagedRuntime::shutdown() noexcept {
     }
 
     create_ = nullptr;
+    awake_ = nullptr;
+    on_enable_ = nullptr;
+    on_disable_ = nullptr;
     start_ = nullptr;
     update_ = nullptr;
     advance_frame_ = nullptr;
     reset_time_ = nullptr;
+    set_behaviour_enabled_ = nullptr;
+    get_behaviour_enabled_ = nullptr;
     destroy_ = nullptr;
     set_transform_ = nullptr;
     get_transform_ = nullptr;

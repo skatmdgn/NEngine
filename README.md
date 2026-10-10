@@ -29,9 +29,9 @@ The repository currently includes:
 - texture/audio/model descriptors and validated SPIR-V shader import
 - generated C# solution/project and NuGet manifest foundation
 - hostfxr-based .NET runtime loading plus deterministic gameplay DLL/PDB builds
-- ScriptBehaviour lifecycle execution in the cloned Play Mode World
+- ScriptBehaviour Awake/OnEnable/Start/Update/OnDisable/OnDestroy execution in the cloned Play Mode World
 - dedicated NEngine.API and stable NEngine.Bridge assemblies with collectible gameplay hot reload
-- managed GameObject name/active/Transform hierarchy access plus native create/find/deferred-destroy through ABI v7
+- managed GameObject name/active/Transform hierarchy access plus native create/find/deferred-destroy through ABI v8
 - managed keyboard/mouse Input, global Time frame clock, coroutines and WaitForSeconds
 - Camera/Light/MeshRenderer components
 - RenderSnapshot with resolved world matrices

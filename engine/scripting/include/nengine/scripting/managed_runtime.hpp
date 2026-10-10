@@ -57,6 +57,15 @@ public:
     ManagedBehaviourHandle create_behaviour(
         std::string_view type_name);
 
+    bool awake(
+        ManagedBehaviourHandle handle);
+
+    bool on_enable(
+        ManagedBehaviourHandle handle);
+
+    bool on_disable(
+        ManagedBehaviourHandle handle);
+
     bool start(
         ManagedBehaviourHandle handle);
 
@@ -68,6 +77,14 @@ public:
         float delta_seconds);
 
     bool reset_time();
+
+    bool set_behaviour_enabled(
+        ManagedBehaviourHandle handle,
+        bool enabled);
+
+    bool get_behaviour_enabled(
+        ManagedBehaviourHandle handle,
+        bool& enabled);
 
     bool destroy(
         ManagedBehaviourHandle handle);
@@ -99,6 +116,9 @@ public:
     void bind_world(
         core::World* world) noexcept;
 
+    std::vector<core::Entity>
+    pending_world_destroys() const;
+
     bool flush_world_destroys();
 
     void bind_input(
@@ -121,10 +141,15 @@ public:
     bool valid() const noexcept {
         return host_.ready() &&
             create_ != nullptr &&
+            awake_ != nullptr &&
+            on_enable_ != nullptr &&
+            on_disable_ != nullptr &&
             start_ != nullptr &&
             update_ != nullptr &&
             advance_frame_ != nullptr &&
             reset_time_ != nullptr &&
+            set_behaviour_enabled_ != nullptr &&
+            get_behaviour_enabled_ != nullptr &&
             destroy_ != nullptr &&
             set_transform_ != nullptr &&
             get_transform_ != nullptr &&
@@ -166,6 +191,11 @@ private:
     using FrameFn =
         int (*)(
             float);
+
+    using SetEnabledFn =
+        int (*)(
+            std::int64_t,
+            int);
 
     struct NativeTransformState {
         float px{0.0f};
@@ -444,10 +474,15 @@ private:
 
     DotnetHost host_{};
     CreateFn create_{nullptr};
+    InvokeFn awake_{nullptr};
+    InvokeFn on_enable_{nullptr};
+    InvokeFn on_disable_{nullptr};
     InvokeFn start_{nullptr};
     UpdateFn update_{nullptr};
     FrameFn advance_frame_{nullptr};
     SimpleFn reset_time_{nullptr};
+    SetEnabledFn set_behaviour_enabled_{nullptr};
+    InvokeFn get_behaviour_enabled_{nullptr};
     InvokeFn destroy_{nullptr};
     TransformFn set_transform_{nullptr};
     TransformFn get_transform_{nullptr};

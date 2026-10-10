@@ -385,7 +385,7 @@ Implemented foundation:
 - generated NEngine.API / NEngine.Bridge / gameplay projects and solution.
 - deterministic dotnet gameplay DLL/PDB build.
 - ScriptBehaviour Scene/Inspector integration and Play Mode execution.
-- stable ABI v7 native World callback table.
+- stable ABI v8 native World callback table.
 - GameObject name/active, Transform hierarchy/TRS and component presence.
 - native-backed GameObject create/find plus deferred destroy.
 - collectible gameplay AssemblyLoadContext reload without restarting hostfxr.
@@ -394,7 +394,7 @@ Implemented foundation:
 - coroutine scheduling including WaitForSeconds.
 
 Remaining major work:
-- Awake/OnEnable/OnDisable/FixedUpdate/LateUpdate lifecycle coverage.
+- FixedUpdate/LateUpdate lifecycle coverage and fixed-step/host-frame scheduling split.
 - broader render/physics/audio managed component APIs.
 - packaged/versioned managed API distribution.
 - debugger symbols/attach workflow.
@@ -453,7 +453,7 @@ The active development line is currently **0.5 — C# scripting + IDE**. The 0.3
 
 The immediate sequence is:
 
-`lifecycle completeness -> richer native component/property API -> debugger/IDE polish -> physics/audio scripting boundary`
+`FixedUpdate/Update/LateUpdate scheduling -> richer native component/property API -> debugger/IDE polish -> physics/audio scripting boundary`
 
 Renderer work continues as a secondary line around production PBR, Scene/Game Vulkan presentation, WebP/transcoding, HLSL/reflection and Android Vulkan support.
 

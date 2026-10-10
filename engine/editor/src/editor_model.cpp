@@ -149,7 +149,7 @@ bool EditorModel::begin_play_mode() {
         return false;
     }
 
-    managed_script_system_.clear();
+    managed_script_system_.clear(play_session_.runtime_world());
 
     if (managed_runtime_.valid() &&
         !managed_runtime_.reset_time()) {
@@ -163,7 +163,7 @@ bool EditorModel::begin_play_mode() {
 }
 
 bool EditorModel::stop_play_mode() {
-    managed_script_system_.clear();
+    managed_script_system_.clear(play_session_.runtime_world());
     return play_session_.stop();
 }
 
@@ -174,7 +174,7 @@ bool EditorModel::initialize_managed_runtime(
     std::string_view assembly_name,
     std::string* error) {
 
-    managed_script_system_.clear();
+    managed_script_system_.clear(play_session_.runtime_world());
     managed_runtime_.shutdown();
 
     if (!managed_runtime_.initialize(
@@ -217,7 +217,7 @@ bool EditorModel::reload_managed_runtime(
 
     // Managed instances hold types from the collectible gameplay context.
     // Destroy them before requesting unload; Play Mode World state remains.
-    managed_script_system_.clear();
+    managed_script_system_.clear(play_session_.runtime_world());
 
     if (!managed_runtime_.reload_gameplay(
             assembly_path,
@@ -244,7 +244,7 @@ bool EditorModel::reload_managed_runtime(
 void EditorModel::shutdown_managed_runtime()
     noexcept {
 
-    managed_script_system_.clear();
+    managed_script_system_.clear(play_session_.runtime_world());
     managed_runtime_.shutdown();
 }
 
@@ -255,7 +255,7 @@ void EditorModel::tick_runtime(
         play_session_.runtime_world();
 
     if (!runtime) {
-        managed_script_system_.clear();
+        managed_script_system_.clear(play_session_.runtime_world());
         return;
     }
 

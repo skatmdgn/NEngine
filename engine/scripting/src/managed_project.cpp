@@ -168,7 +168,7 @@ namespace NEngine.Internal
 
     public static class NativeBridge
     {
-        public const int AbiVersion = 7;
+        public const int AbiVersion = 8;
 
         private static readonly Dictionary<long, NEngine.Behaviour> Instances = new();
         private static long _nextHandle = 1;
@@ -416,6 +416,7 @@ namespace NEngine.Internal
             if (!Instances.TryGetValue(handle, out var instance)) return -1;
             if (!instance.enabled &&
                 methodName != "Awake" &&
+                methodName != "OnDisable" &&
                 methodName != "OnDestroy") return 0;
 
             try
@@ -441,13 +442,20 @@ namespace NEngine.Internal
         }
 
         [UnmanagedCallersOnly]
-        public static int InvokeStart(long handle)
-        {
-            int awakened = Invoke(handle, "Awake");
-            if (awakened < 0) return awakened;
+        public static int InvokeAwake(long handle) =>
+            Invoke(handle, "Awake");
 
-            return Invoke(handle, "Start");
-        }
+        [UnmanagedCallersOnly]
+        public static int InvokeEnable(long handle) =>
+            Invoke(handle, "OnEnable");
+
+        [UnmanagedCallersOnly]
+        public static int InvokeDisable(long handle) =>
+            Invoke(handle, "OnDisable");
+
+        [UnmanagedCallersOnly]
+        public static int InvokeStart(long handle) =>
+            Invoke(handle, "Start");
 
         [UnmanagedCallersOnly]
         public static int AdvanceFrameClock(float deltaTime)
@@ -476,6 +484,31 @@ namespace NEngine.Internal
                 instance.AdvanceCoroutines(deltaTime);
 
             return invoked;
+        }
+
+        [UnmanagedCallersOnly]
+        public static int SetBehaviourEnabled(
+            long handle,
+            int enabled)
+        {
+            if (!Instances.TryGetValue(handle, out var instance))
+                return -1;
+
+            instance.enabled =
+                enabled != 0;
+
+            return 1;
+        }
+
+        [UnmanagedCallersOnly]
+        public static int GetBehaviourEnabled(long handle)
+        {
+            if (!Instances.TryGetValue(handle, out var instance))
+                return -1;
+
+            return instance.enabled
+                ? 1
+                : 0;
         }
 
         [UnmanagedCallersOnly]
