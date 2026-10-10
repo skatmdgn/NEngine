@@ -12,6 +12,7 @@ namespace nengine::audio {
 struct AudioDeviceInfo {
     bool open{false};
     std::string backend{};
+    std::string diagnostic{};
     std::uint32_t sample_rate{0};
     std::uint16_t channels{0};
     std::size_t buffer_frames{0};

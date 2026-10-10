@@ -1,6 +1,5 @@
 add_library(NEngineAudio STATIC
   src/audio_clip.cpp
-  src/audio_device_null.cpp
   src/audio_renderer.cpp
   src/clip_cache.cpp
   src/mix_snapshot.cpp
@@ -20,6 +19,14 @@ target_link_libraries(NEngineAudio
 )
 
 target_compile_features(NEngineAudio PUBLIC cxx_std_20)
+
+if(WIN32)
+  target_sources(NEngineAudio PRIVATE src/audio_device_win32.cpp)
+  target_compile_definitions(NEngineAudio PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+  target_link_libraries(NEngineAudio PRIVATE ole32 uuid)
+else()
+  target_sources(NEngineAudio PRIVATE src/audio_device_null.cpp)
+endif()
 
 if(MSVC)
   target_compile_options(NEngineAudio PRIVATE /W4 /permissive-)
