@@ -1136,6 +1136,18 @@ int main() {
                 clipped_incident,
                 physics::box_collider_type());
 
+    clipped_reference_box =
+        clipped_manifold_world.get_component<
+            physics::BoxCollider>(
+                clipped_reference,
+                physics::box_collider_type());
+
+    clipped_incident_box =
+        clipped_manifold_world.get_component<
+            physics::BoxCollider>(
+                clipped_incident,
+                physics::box_collider_type());
+
     if (clipped_reference_box) {
         clipped_reference_box->size =
             {4.0f, 1.0f, 4.0f};
@@ -1229,6 +1241,20 @@ int main() {
     auto* clipped_incident_box_2d =
         clipped_manifold_2d_world
             .add_component<
+                physics::BoxCollider2D>(
+                    clipped_incident_2d,
+                    physics::box_collider2d_type());
+
+    clipped_reference_box_2d =
+        clipped_manifold_2d_world
+            .get_component<
+                physics::BoxCollider2D>(
+                    clipped_reference_2d,
+                    physics::box_collider2d_type());
+
+    clipped_incident_box_2d =
+        clipped_manifold_2d_world
+            .get_component<
                 physics::BoxCollider2D>(
                     clipped_incident_2d,
                     physics::box_collider2d_type());
