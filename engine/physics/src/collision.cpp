@@ -402,7 +402,6 @@ ColliderBounds make_bounds(
 }
 
 bool layer_enabled(
-bool layer_enabled(
     std::uint32_t mask,
     std::uint32_t layer) noexcept {
 
@@ -945,7 +944,6 @@ bool overlap_box_radial(
     return penetration > 0.0f;
 }
 
-bool overlap_pair(
 bool overlap_pair(
     const ColliderBounds& a,
     const ColliderBounds& b,
