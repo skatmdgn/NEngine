@@ -9,6 +9,7 @@
 #include "nengine/audio/audio_clip.hpp"
 #include "nengine/audio/components.hpp"
 #include "nengine/audio/mix_snapshot.hpp"
+#include "nengine/audio/playback.hpp"
 #include "nengine/audio/registration.hpp"
 #include "nengine/core/component_registry.hpp"
 #include "nengine/core/component_serialization.hpp"
@@ -425,6 +426,107 @@ int main() {
             &wav_error) &&
         !wav_error.empty(),
         "WAV decoder rejects malformed non-WAVE data with diagnostics");
+
+    core::World playback_world;
+
+    const auto playback_entity =
+        playback_world.create(
+            "Playback Source");
+
+    auto* playback_source =
+        playback_world.add_component<
+            audio::AudioSource>(
+                playback_entity,
+                audio::audio_source_type());
+
+    if (playback_source &&
+        mix_clip) {
+        playback_source->clip =
+            *mix_clip;
+        playback_source->play_on_awake =
+            true;
+        playback_source->pitch =
+            2.0f;
+        playback_source->loop =
+            false;
+    }
+
+    audio::AudioPlaybackSystem
+        playback_system;
+
+    const auto duration_resolver =
+        [](assets::AssetGuid)
+            -> std::optional<float> {
+            return 1.0f;
+        };
+
+    const auto playback_first =
+        playback_system.update(
+            playback_world,
+            0.25f,
+            duration_resolver);
+
+    playback_source =
+        playback_world.get_component<
+            audio::AudioSource>(
+                playback_entity,
+                audio::audio_source_type());
+
+    check(
+        playback_source &&
+        playback_first.started == 1u &&
+        playback_first.advanced == 1u &&
+        playback_source->playing &&
+        std::abs(
+            playback_source->time_seconds -
+            0.5f) < 0.0001f,
+        "audio playback starts play-on-awake sources and advances time by pitch");
+
+    const auto playback_second =
+        playback_system.update(
+            playback_world,
+            0.25f,
+            duration_resolver);
+
+    check(
+        playback_source &&
+        playback_second.stopped == 1u &&
+        !playback_source->playing &&
+        std::abs(
+            playback_source->time_seconds -
+            1.0f) < 0.0001f,
+        "audio playback stops non-looping sources at clip duration");
+
+    if (playback_source) {
+        playback_source->loop = true;
+        playback_source->playing = true;
+        playback_source->pitch = 1.0f;
+        playback_source->time_seconds =
+            0.75f;
+    }
+
+    const auto playback_loop =
+        playback_system.update(
+            playback_world,
+            0.5f,
+            duration_resolver);
+
+    check(
+        playback_source &&
+        playback_loop.looped == 1u &&
+        playback_source->playing &&
+        std::abs(
+            playback_source->time_seconds -
+            0.25f) < 0.0001f,
+        "audio playback wraps looping sources at clip duration");
+
+    playback_system.reset();
+
+    check(
+        playback_system
+            .initialized_source_count() ==
+            0u,
+        "audio playback reset clears play-on-awake state");
 
     if (failures == 0) {
         std::cout
