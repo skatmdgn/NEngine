@@ -1058,6 +1058,14 @@ int main() {
             std::string::npos &&
         api.find("BoxCollider2D") !=
             std::string::npos &&
+        api.find("sealed class AudioSource") !=
+            std::string::npos &&
+        api.find("sealed class AudioListener") !=
+            std::string::npos &&
+        api.find("playOnAwake") !=
+            std::string::npos &&
+        api.find("panStereo") !=
+            std::string::npos &&
         api.find("sealed class Collision") !=
             std::string::npos &&
         api.find("sealed class Collision2D") !=

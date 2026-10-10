@@ -1452,6 +1452,8 @@ std::string api_stub(
             if (type == typeof(BoxCollider)) return "NEngine.BoxCollider";
             if (type == typeof(Rigidbody2D)) return "NEngine.Rigidbody2D";
             if (type == typeof(BoxCollider2D)) return "NEngine.BoxCollider2D";
+            if (type == typeof(AudioSource)) return "NEngine.AudioSource";
+            if (type == typeof(AudioListener)) return "NEngine.AudioListener";
             return null;
         }
     }
@@ -2310,6 +2312,72 @@ std::string api_stub(
             set => SetNativeVector2(
                 "Size",
                 value);
+        }
+    }
+
+    public sealed class AudioSource : Component
+    {
+        public bool enabled
+        {
+            get => NativeBool("Enabled", true);
+            set => SetNativeBool("Enabled", value);
+        }
+
+        public AssetGuid clip
+        {
+            get => NativeAssetGuid("Clip");
+            set => SetNativeAssetGuid("Clip", value);
+        }
+
+        public bool playOnAwake
+        {
+            get => NativeBool("Play On Awake", true);
+            set => SetNativeBool("Play On Awake", value);
+        }
+
+        public bool loop
+        {
+            get => NativeBool("Loop", false);
+            set => SetNativeBool("Loop", value);
+        }
+
+        public bool spatialize
+        {
+            get => NativeBool("Spatialize", false);
+            set => SetNativeBool("Spatialize", value);
+        }
+
+        public float volume
+        {
+            get => NativeFloat("Volume", 1);
+            set => SetNativeFloat("Volume", value);
+        }
+
+        public float pitch
+        {
+            get => NativeFloat("Pitch", 1);
+            set => SetNativeFloat("Pitch", value);
+        }
+
+        public float panStereo
+        {
+            get => NativeFloat("Pan Stereo", 0);
+            set => SetNativeFloat("Pan Stereo", value);
+        }
+    }
+
+    public sealed class AudioListener : Component
+    {
+        public bool enabled
+        {
+            get => NativeBool("Enabled", true);
+            set => SetNativeBool("Enabled", value);
+        }
+
+        public float volume
+        {
+            get => NativeFloat("Volume", 1);
+            set => SetNativeFloat("Volume", value);
         }
     }
 
