@@ -3491,19 +3491,496 @@ ContactMaterial contact_material_2d(
 
 } // namespace
 
+namespace {
+
+constexpr std::size_t
+    velocity_solver_iterations = 8u;
+
+struct VelocityConstraint3D {
+    const BoxOverlap* overlap{nullptr};
+    Rigidbody* first_body{nullptr};
+    Rigidbody* second_body{nullptr};
+    float first_inverse_mass{0.0f};
+    float second_inverse_mass{0.0f};
+    float inverse_mass_sum{0.0f};
+    float restitution_target{0.0f};
+    float friction{0.0f};
+    float accumulated_normal_impulse{0.0f};
+    core::Vec3 accumulated_tangent_impulse{};
+};
+
+struct VelocityConstraint2D {
+    const BoxOverlap* overlap{nullptr};
+    Rigidbody2D* first_body{nullptr};
+    Rigidbody2D* second_body{nullptr};
+    float first_inverse_mass{0.0f};
+    float second_inverse_mass{0.0f};
+    float inverse_mass_sum{0.0f};
+    float restitution_target{0.0f};
+    float friction{0.0f};
+    float accumulated_normal_impulse{0.0f};
+    core::Vec3 accumulated_tangent_impulse{};
+};
+
+float dot3(
+    core::Vec3 a,
+    core::Vec3 b) noexcept {
+
+    return a.x * b.x +
+        a.y * b.y +
+        a.z * b.z;
+}
+
+float dot2(
+    core::Vec3 a,
+    core::Vec3 b) noexcept {
+
+    return a.x * b.x +
+        a.y * b.y;
+}
+
+void apply_impulse_3d(
+    VelocityConstraint3D& constraint,
+    core::Vec3 impulse) noexcept {
+
+    if (constraint.first_body &&
+        constraint.first_inverse_mass >
+            0.0f) {
+
+        constraint.first_body
+            ->linear_velocity.x -=
+            impulse.x *
+            constraint.first_inverse_mass;
+
+        constraint.first_body
+            ->linear_velocity.y -=
+            impulse.y *
+            constraint.first_inverse_mass;
+
+        constraint.first_body
+            ->linear_velocity.z -=
+            impulse.z *
+            constraint.first_inverse_mass;
+    }
+
+    if (constraint.second_body &&
+        constraint.second_inverse_mass >
+            0.0f) {
+
+        constraint.second_body
+            ->linear_velocity.x +=
+            impulse.x *
+            constraint.second_inverse_mass;
+
+        constraint.second_body
+            ->linear_velocity.y +=
+            impulse.y *
+            constraint.second_inverse_mass;
+
+        constraint.second_body
+            ->linear_velocity.z +=
+            impulse.z *
+            constraint.second_inverse_mass;
+    }
+}
+
+void apply_impulse_2d(
+    VelocityConstraint2D& constraint,
+    core::Vec3 impulse) noexcept {
+
+    impulse.z = 0.0f;
+
+    if (constraint.first_body &&
+        constraint.first_inverse_mass >
+            0.0f) {
+
+        constraint.first_body
+            ->linear_velocity.x -=
+            impulse.x *
+            constraint.first_inverse_mass;
+
+        constraint.first_body
+            ->linear_velocity.y -=
+            impulse.y *
+            constraint.first_inverse_mass;
+
+        constraint.first_body
+            ->linear_velocity.z =
+            0.0f;
+    }
+
+    if (constraint.second_body &&
+        constraint.second_inverse_mass >
+            0.0f) {
+
+        constraint.second_body
+            ->linear_velocity.x +=
+            impulse.x *
+            constraint.second_inverse_mass;
+
+        constraint.second_body
+            ->linear_velocity.y +=
+            impulse.y *
+            constraint.second_inverse_mass;
+
+        constraint.second_body
+            ->linear_velocity.z =
+            0.0f;
+    }
+}
+
+core::Vec3 relative_velocity_3d(
+    const VelocityConstraint3D& constraint) noexcept {
+
+    const core::Vec3 first =
+        constraint.first_body &&
+                constraint.first_inverse_mass >
+                    0.0f
+            ? constraint.first_body
+                  ->linear_velocity
+            : core::Vec3{};
+
+    const core::Vec3 second =
+        constraint.second_body &&
+                constraint.second_inverse_mass >
+                    0.0f
+            ? constraint.second_body
+                  ->linear_velocity
+            : core::Vec3{};
+
+    return {
+        second.x - first.x,
+        second.y - first.y,
+        second.z - first.z
+    };
+}
+
+core::Vec3 relative_velocity_2d(
+    const VelocityConstraint2D& constraint) noexcept {
+
+    const core::Vec3 first =
+        constraint.first_body &&
+                constraint.first_inverse_mass >
+                    0.0f
+            ? constraint.first_body
+                  ->linear_velocity
+            : core::Vec3{};
+
+    const core::Vec3 second =
+        constraint.second_body &&
+                constraint.second_inverse_mass >
+                    0.0f
+            ? constraint.second_body
+                  ->linear_velocity
+            : core::Vec3{};
+
+    return {
+        second.x - first.x,
+        second.y - first.y,
+        0.0f
+    };
+}
+
+bool solve_velocity_constraint_3d(
+    VelocityConstraint3D& constraint) noexcept {
+
+    if (!constraint.overlap ||
+        constraint.inverse_mass_sum <=
+            0.0f) {
+        return false;
+    }
+
+    const auto normal =
+        constraint.overlap->normal;
+
+    auto relative =
+        relative_velocity_3d(
+            constraint);
+
+    const float normal_speed =
+        dot3(
+            relative,
+            normal);
+
+    const float requested_normal =
+        (constraint.restitution_target -
+         normal_speed) /
+        constraint.inverse_mass_sum;
+
+    const float next_normal =
+        std::max(
+            0.0f,
+            constraint
+                    .accumulated_normal_impulse +
+                requested_normal);
+
+    const float applied_normal =
+        next_normal -
+        constraint
+            .accumulated_normal_impulse;
+
+    constraint.accumulated_normal_impulse =
+        next_normal;
+
+    bool changed =
+        std::abs(applied_normal) >
+        0.0000001f;
+
+    if (changed) {
+        apply_impulse_3d(
+            constraint,
+            scaled(
+                normal,
+                applied_normal));
+    }
+
+    relative =
+        relative_velocity_3d(
+            constraint);
+
+    const float post_normal_speed =
+        dot3(
+            relative,
+            normal);
+
+    core::Vec3 tangent_velocity{
+        relative.x -
+            normal.x *
+                post_normal_speed,
+        relative.y -
+            normal.y *
+                post_normal_speed,
+        relative.z -
+            normal.z *
+                post_normal_speed
+    };
+
+    core::Vec3 candidate_tangent{
+        constraint
+                .accumulated_tangent_impulse.x -
+            tangent_velocity.x /
+                constraint.inverse_mass_sum,
+        constraint
+                .accumulated_tangent_impulse.y -
+            tangent_velocity.y /
+                constraint.inverse_mass_sum,
+        constraint
+                .accumulated_tangent_impulse.z -
+            tangent_velocity.z /
+                constraint.inverse_mass_sum
+    };
+
+    const float tangent_limit =
+        constraint.friction *
+        constraint
+            .accumulated_normal_impulse;
+
+    const float tangent_squared =
+        dot3(
+            candidate_tangent,
+            candidate_tangent);
+
+    if (tangent_limit <= 0.0f) {
+        candidate_tangent = {};
+    } else if (
+        tangent_squared >
+        tangent_limit *
+            tangent_limit) {
+
+        const float inverse =
+            tangent_limit /
+            std::sqrt(
+                tangent_squared);
+
+        candidate_tangent =
+            scaled(
+                candidate_tangent,
+                inverse);
+    }
+
+    const core::Vec3 applied_tangent{
+        candidate_tangent.x -
+            constraint
+                .accumulated_tangent_impulse.x,
+        candidate_tangent.y -
+            constraint
+                .accumulated_tangent_impulse.y,
+        candidate_tangent.z -
+            constraint
+                .accumulated_tangent_impulse.z
+    };
+
+    constraint.accumulated_tangent_impulse =
+        candidate_tangent;
+
+    if (dot3(
+            applied_tangent,
+            applied_tangent) >
+        0.00000000000001f) {
+
+        apply_impulse_3d(
+            constraint,
+            applied_tangent);
+
+        changed = true;
+    }
+
+    return changed;
+}
+
+bool solve_velocity_constraint_2d(
+    VelocityConstraint2D& constraint) noexcept {
+
+    if (!constraint.overlap ||
+        constraint.inverse_mass_sum <=
+            0.0f) {
+        return false;
+    }
+
+    const auto normal =
+        constraint.overlap->normal;
+
+    auto relative =
+        relative_velocity_2d(
+            constraint);
+
+    const float normal_speed =
+        dot2(
+            relative,
+            normal);
+
+    const float requested_normal =
+        (constraint.restitution_target -
+         normal_speed) /
+        constraint.inverse_mass_sum;
+
+    const float next_normal =
+        std::max(
+            0.0f,
+            constraint
+                    .accumulated_normal_impulse +
+                requested_normal);
+
+    const float applied_normal =
+        next_normal -
+        constraint
+            .accumulated_normal_impulse;
+
+    constraint.accumulated_normal_impulse =
+        next_normal;
+
+    bool changed =
+        std::abs(applied_normal) >
+        0.0000001f;
+
+    if (changed) {
+        apply_impulse_2d(
+            constraint,
+            scaled(
+                normal,
+                applied_normal));
+    }
+
+    relative =
+        relative_velocity_2d(
+            constraint);
+
+    const float post_normal_speed =
+        dot2(
+            relative,
+            normal);
+
+    core::Vec3 tangent_velocity{
+        relative.x -
+            normal.x *
+                post_normal_speed,
+        relative.y -
+            normal.y *
+                post_normal_speed,
+        0.0f
+    };
+
+    core::Vec3 candidate_tangent{
+        constraint
+                .accumulated_tangent_impulse.x -
+            tangent_velocity.x /
+                constraint.inverse_mass_sum,
+        constraint
+                .accumulated_tangent_impulse.y -
+            tangent_velocity.y /
+                constraint.inverse_mass_sum,
+        0.0f
+    };
+
+    const float tangent_limit =
+        constraint.friction *
+        constraint
+            .accumulated_normal_impulse;
+
+    const float tangent_squared =
+        dot2(
+            candidate_tangent,
+            candidate_tangent);
+
+    if (tangent_limit <= 0.0f) {
+        candidate_tangent = {};
+    } else if (
+        tangent_squared >
+        tangent_limit *
+            tangent_limit) {
+
+        const float inverse =
+            tangent_limit /
+            std::sqrt(
+                tangent_squared);
+
+        candidate_tangent.x *=
+            inverse;
+        candidate_tangent.y *=
+            inverse;
+    }
+
+    const core::Vec3 applied_tangent{
+        candidate_tangent.x -
+            constraint
+                .accumulated_tangent_impulse.x,
+        candidate_tangent.y -
+            constraint
+                .accumulated_tangent_impulse.y,
+        0.0f
+    };
+
+    constraint.accumulated_tangent_impulse =
+        candidate_tangent;
+
+    if (dot2(
+            applied_tangent,
+            applied_tangent) >
+        0.00000000000001f) {
+
+        apply_impulse_2d(
+            constraint,
+            applied_tangent);
+
+        changed = true;
+    }
+
+    return changed;
+}
+
+} // namespace
+
 CollisionResolutionStats resolve_box_contacts_3d(
     core::World& world,
     const std::vector<BoxOverlap>& overlaps) {
 
     CollisionResolutionStats stats;
 
-    const auto dot3 =
-        [](core::Vec3 a,
-           core::Vec3 b) noexcept {
-            return a.x * b.x +
-                a.y * b.y +
-                a.z * b.z;
-        };
+    std::vector<VelocityConstraint3D>
+        constraints;
+
+    constraints.reserve(
+        overlaps.size());
 
     for (const auto& overlap :
          overlaps) {
@@ -3524,18 +4001,29 @@ CollisionResolutionStats resolve_box_contacts_3d(
                 overlap.second,
                 rigidbody_type());
 
-        const bool first_dynamic =
+        const float first_inverse_mass =
             first_body &&
-            first_body->enabled &&
-            !first_body->is_kinematic;
+                    first_body->enabled &&
+                    !first_body->is_kinematic &&
+                    first_body->mass > 0.0f
+                ? 1.0f /
+                    first_body->mass
+                : 0.0f;
 
-        const bool second_dynamic =
+        const float second_inverse_mass =
             second_body &&
-            second_body->enabled &&
-            !second_body->is_kinematic;
+                    second_body->enabled &&
+                    !second_body->is_kinematic &&
+                    second_body->mass > 0.0f
+                ? 1.0f /
+                    second_body->mass
+                : 0.0f;
 
-        if (!first_dynamic &&
-            !second_dynamic) {
+        const float inverse_mass_sum =
+            first_inverse_mass +
+            second_inverse_mass;
+
+        if (inverse_mass_sum <= 0.0f) {
             continue;
         }
 
@@ -3549,28 +4037,6 @@ CollisionResolutionStats resolve_box_contacts_3d(
 
         if (!first_transform ||
             !second_transform) {
-            continue;
-        }
-
-        const float first_inverse_mass =
-            first_dynamic &&
-            first_body->mass > 0.0f
-                ? 1.0f /
-                    first_body->mass
-                : 0.0f;
-
-        const float second_inverse_mass =
-            second_dynamic &&
-            second_body->mass > 0.0f
-                ? 1.0f /
-                    second_body->mass
-                : 0.0f;
-
-        const float inverse_mass_sum =
-            first_inverse_mass +
-            second_inverse_mass;
-
-        if (inverse_mass_sum <= 0.0f) {
             continue;
         }
 
@@ -3595,10 +4061,12 @@ CollisionResolutionStats resolve_box_contacts_3d(
             overlap.normal.x *
             correction *
             first_share;
+
         first_transform->local_position.y -=
             overlap.normal.y *
             correction *
             first_share;
+
         first_transform->local_position.z -=
             overlap.normal.z *
             correction *
@@ -3608,33 +4076,50 @@ CollisionResolutionStats resolve_box_contacts_3d(
             overlap.normal.x *
             correction *
             second_share;
+
         second_transform->local_position.y +=
             overlap.normal.y *
             correction *
             second_share;
+
         second_transform->local_position.z +=
             overlap.normal.z *
             correction *
             second_share;
 
-        const core::Vec3 first_velocity =
-            first_dynamic
-                ? first_body->linear_velocity
-                : core::Vec3{};
+        const auto first_material =
+            contact_material_3d(
+                world,
+                overlap.first);
 
-        const core::Vec3 second_velocity =
-            second_dynamic
-                ? second_body->linear_velocity
-                : core::Vec3{};
+        const auto second_material =
+            contact_material_3d(
+                world,
+                overlap.second);
 
-        core::Vec3 relative{
-            second_velocity.x -
-                first_velocity.x,
-            second_velocity.y -
-                first_velocity.y,
-            second_velocity.z -
-                first_velocity.z
-        };
+        VelocityConstraint3D constraint;
+        constraint.overlap =
+            &overlap;
+        constraint.first_body =
+            first_body;
+        constraint.second_body =
+            second_body;
+        constraint.first_inverse_mass =
+            first_inverse_mass;
+        constraint.second_inverse_mass =
+            second_inverse_mass;
+        constraint.inverse_mass_sum =
+            inverse_mass_sum;
+        constraint.friction =
+            std::sqrt(
+                std::max(
+                    0.0f,
+                    first_material.friction *
+                    second_material.friction));
+
+        const auto relative =
+            relative_velocity_3d(
+                constraint);
 
         const float normal_speed =
             dot3(
@@ -3642,168 +4127,38 @@ CollisionResolutionStats resolve_box_contacts_3d(
                 overlap.normal);
 
         if (normal_speed < 0.0f) {
-            const auto first_material =
-                contact_material_3d(
-                    world,
-                    overlap.first);
-
-            const auto second_material =
-                contact_material_3d(
-                    world,
-                    overlap.second);
-
-            const float restitution =
-                std::max(
+            constraint.restitution_target =
+                -std::max(
                     first_material.restitution,
-                    second_material.restitution);
-
-            const float normal_impulse =
-                -(1.0f + restitution) *
-                normal_speed /
-                inverse_mass_sum;
-
-            if (first_dynamic) {
-                first_body->linear_velocity.x -=
-                    overlap.normal.x *
-                    normal_impulse *
-                    first_inverse_mass;
-                first_body->linear_velocity.y -=
-                    overlap.normal.y *
-                    normal_impulse *
-                    first_inverse_mass;
-                first_body->linear_velocity.z -=
-                    overlap.normal.z *
-                    normal_impulse *
-                    first_inverse_mass;
-            }
-
-            if (second_dynamic) {
-                second_body->linear_velocity.x +=
-                    overlap.normal.x *
-                    normal_impulse *
-                    second_inverse_mass;
-                second_body->linear_velocity.y +=
-                    overlap.normal.y *
-                    normal_impulse *
-                    second_inverse_mass;
-                second_body->linear_velocity.z +=
-                    overlap.normal.z *
-                    normal_impulse *
-                    second_inverse_mass;
-            }
-
-            const core::Vec3 post_first =
-                first_dynamic
-                    ? first_body->linear_velocity
-                    : core::Vec3{};
-
-            const core::Vec3 post_second =
-                second_dynamic
-                    ? second_body->linear_velocity
-                    : core::Vec3{};
-
-            relative = {
-                post_second.x -
-                    post_first.x,
-                post_second.y -
-                    post_first.y,
-                post_second.z -
-                    post_first.z
-            };
-
-            const float post_normal_speed =
-                dot3(
-                    relative,
-                    overlap.normal);
-
-            core::Vec3 tangent{
-                relative.x -
-                    overlap.normal.x *
-                    post_normal_speed,
-                relative.y -
-                    overlap.normal.y *
-                    post_normal_speed,
-                relative.z -
-                    overlap.normal.z *
-                    post_normal_speed
-            };
-
-            const float tangent_squared =
-                dot3(
-                    tangent,
-                    tangent);
-
-            if (tangent_squared >
-                0.0000000001f) {
-
-                const float inverse_tangent =
-                    1.0f /
-                    std::sqrt(
-                        tangent_squared);
-
-                tangent.x *=
-                    inverse_tangent;
-                tangent.y *=
-                    inverse_tangent;
-                tangent.z *=
-                    inverse_tangent;
-
-                float tangent_impulse =
-                    -dot3(
-                        relative,
-                        tangent) /
-                    inverse_mass_sum;
-
-                const float friction =
-                    std::sqrt(
-                        std::max(
-                            0.0f,
-                            first_material.friction *
-                            second_material.friction));
-
-                const float limit =
-                    normal_impulse *
-                    friction;
-
-                tangent_impulse =
-                    std::clamp(
-                        tangent_impulse,
-                        -limit,
-                        limit);
-
-                if (first_dynamic) {
-                    first_body->linear_velocity.x -=
-                        tangent.x *
-                        tangent_impulse *
-                        first_inverse_mass;
-                    first_body->linear_velocity.y -=
-                        tangent.y *
-                        tangent_impulse *
-                        first_inverse_mass;
-                    first_body->linear_velocity.z -=
-                        tangent.z *
-                        tangent_impulse *
-                        first_inverse_mass;
-                }
-
-                if (second_dynamic) {
-                    second_body->linear_velocity.x +=
-                        tangent.x *
-                        tangent_impulse *
-                        second_inverse_mass;
-                    second_body->linear_velocity.y +=
-                        tangent.y *
-                        tangent_impulse *
-                        second_inverse_mass;
-                    second_body->linear_velocity.z +=
-                        tangent.z *
-                        tangent_impulse *
-                        second_inverse_mass;
-                }
-            }
+                    second_material.restitution) *
+                normal_speed;
         }
 
+        constraints.push_back(
+            constraint);
+
         ++stats.resolved_3d;
+    }
+
+    for (std::size_t iteration = 0u;
+         iteration <
+             velocity_solver_iterations;
+         ++iteration) {
+
+        bool changed = false;
+
+        for (auto& constraint :
+             constraints) {
+
+            changed =
+                solve_velocity_constraint_3d(
+                    constraint) ||
+                changed;
+        }
+
+        if (!changed) {
+            break;
+        }
     }
 
     return stats;
@@ -3815,12 +4170,11 @@ CollisionResolutionStats resolve_box_contacts_2d(
 
     CollisionResolutionStats stats;
 
-    const auto dot2 =
-        [](core::Vec3 a,
-           core::Vec3 b) noexcept {
-            return a.x * b.x +
-                a.y * b.y;
-        };
+    std::vector<VelocityConstraint2D>
+        constraints;
+
+    constraints.reserve(
+        overlaps.size());
 
     for (const auto& overlap :
          overlaps) {
@@ -3841,18 +4195,29 @@ CollisionResolutionStats resolve_box_contacts_2d(
                 overlap.second,
                 rigidbody2d_type());
 
-        const bool first_dynamic =
+        const float first_inverse_mass =
             first_body &&
-            first_body->enabled &&
-            !first_body->is_kinematic;
+                    first_body->enabled &&
+                    !first_body->is_kinematic &&
+                    first_body->mass > 0.0f
+                ? 1.0f /
+                    first_body->mass
+                : 0.0f;
 
-        const bool second_dynamic =
+        const float second_inverse_mass =
             second_body &&
-            second_body->enabled &&
-            !second_body->is_kinematic;
+                    second_body->enabled &&
+                    !second_body->is_kinematic &&
+                    second_body->mass > 0.0f
+                ? 1.0f /
+                    second_body->mass
+                : 0.0f;
 
-        if (!first_dynamic &&
-            !second_dynamic) {
+        const float inverse_mass_sum =
+            first_inverse_mass +
+            second_inverse_mass;
+
+        if (inverse_mass_sum <= 0.0f) {
             continue;
         }
 
@@ -3866,28 +4231,6 @@ CollisionResolutionStats resolve_box_contacts_2d(
 
         if (!first_transform ||
             !second_transform) {
-            continue;
-        }
-
-        const float first_inverse_mass =
-            first_dynamic &&
-            first_body->mass > 0.0f
-                ? 1.0f /
-                    first_body->mass
-                : 0.0f;
-
-        const float second_inverse_mass =
-            second_dynamic &&
-            second_body->mass > 0.0f
-                ? 1.0f /
-                    second_body->mass
-                : 0.0f;
-
-        const float inverse_mass_sum =
-            first_inverse_mass +
-            second_inverse_mass;
-
-        if (inverse_mass_sum <= 0.0f) {
             continue;
         }
 
@@ -3912,6 +4255,7 @@ CollisionResolutionStats resolve_box_contacts_2d(
             overlap.normal.x *
             correction *
             first_share;
+
         first_transform->local_position.y -=
             overlap.normal.y *
             correction *
@@ -3921,28 +4265,45 @@ CollisionResolutionStats resolve_box_contacts_2d(
             overlap.normal.x *
             correction *
             second_share;
+
         second_transform->local_position.y +=
             overlap.normal.y *
             correction *
             second_share;
 
-        const core::Vec3 first_velocity =
-            first_dynamic
-                ? first_body->linear_velocity
-                : core::Vec3{};
+        const auto first_material =
+            contact_material_2d(
+                world,
+                overlap.first);
 
-        const core::Vec3 second_velocity =
-            second_dynamic
-                ? second_body->linear_velocity
-                : core::Vec3{};
+        const auto second_material =
+            contact_material_2d(
+                world,
+                overlap.second);
 
-        core::Vec3 relative{
-            second_velocity.x -
-                first_velocity.x,
-            second_velocity.y -
-                first_velocity.y,
-            0.0f
-        };
+        VelocityConstraint2D constraint;
+        constraint.overlap =
+            &overlap;
+        constraint.first_body =
+            first_body;
+        constraint.second_body =
+            second_body;
+        constraint.first_inverse_mass =
+            first_inverse_mass;
+        constraint.second_inverse_mass =
+            second_inverse_mass;
+        constraint.inverse_mass_sum =
+            inverse_mass_sum;
+        constraint.friction =
+            std::sqrt(
+                std::max(
+                    0.0f,
+                    first_material.friction *
+                    second_material.friction));
+
+        const auto relative =
+            relative_velocity_2d(
+                constraint);
 
         const float normal_speed =
             dot2(
@@ -3950,157 +4311,56 @@ CollisionResolutionStats resolve_box_contacts_2d(
                 overlap.normal);
 
         if (normal_speed < 0.0f) {
-            const auto first_material =
-                contact_material_2d(
-                    world,
-                    overlap.first);
-
-            const auto second_material =
-                contact_material_2d(
-                    world,
-                    overlap.second);
-
-            const float restitution =
-                std::max(
+            constraint.restitution_target =
+                -std::max(
                     first_material.restitution,
-                    second_material.restitution);
-
-            const float normal_impulse =
-                -(1.0f + restitution) *
-                normal_speed /
-                inverse_mass_sum;
-
-            if (first_dynamic) {
-                first_body->linear_velocity.x -=
-                    overlap.normal.x *
-                    normal_impulse *
-                    first_inverse_mass;
-                first_body->linear_velocity.y -=
-                    overlap.normal.y *
-                    normal_impulse *
-                    first_inverse_mass;
-            }
-
-            if (second_dynamic) {
-                second_body->linear_velocity.x +=
-                    overlap.normal.x *
-                    normal_impulse *
-                    second_inverse_mass;
-                second_body->linear_velocity.y +=
-                    overlap.normal.y *
-                    normal_impulse *
-                    second_inverse_mass;
-            }
-
-            const core::Vec3 post_first =
-                first_dynamic
-                    ? first_body->linear_velocity
-                    : core::Vec3{};
-
-            const core::Vec3 post_second =
-                second_dynamic
-                    ? second_body->linear_velocity
-                    : core::Vec3{};
-
-            relative = {
-                post_second.x -
-                    post_first.x,
-                post_second.y -
-                    post_first.y,
-                0.0f
-            };
-
-            const float post_normal_speed =
-                dot2(
-                    relative,
-                    overlap.normal);
-
-            core::Vec3 tangent{
-                relative.x -
-                    overlap.normal.x *
-                    post_normal_speed,
-                relative.y -
-                    overlap.normal.y *
-                    post_normal_speed,
-                0.0f
-            };
-
-            const float tangent_squared =
-                dot2(
-                    tangent,
-                    tangent);
-
-            if (tangent_squared >
-                0.0000000001f) {
-
-                const float inverse_tangent =
-                    1.0f /
-                    std::sqrt(
-                        tangent_squared);
-
-                tangent.x *=
-                    inverse_tangent;
-                tangent.y *=
-                    inverse_tangent;
-
-                float tangent_impulse =
-                    -dot2(
-                        relative,
-                        tangent) /
-                    inverse_mass_sum;
-
-                const float friction =
-                    std::sqrt(
-                        std::max(
-                            0.0f,
-                            first_material.friction *
-                            second_material.friction));
-
-                const float limit =
-                    normal_impulse *
-                    friction;
-
-                tangent_impulse =
-                    std::clamp(
-                        tangent_impulse,
-                        -limit,
-                        limit);
-
-                if (first_dynamic) {
-                    first_body->linear_velocity.x -=
-                        tangent.x *
-                        tangent_impulse *
-                        first_inverse_mass;
-                    first_body->linear_velocity.y -=
-                        tangent.y *
-                        tangent_impulse *
-                        first_inverse_mass;
-                }
-
-                if (second_dynamic) {
-                    second_body->linear_velocity.x +=
-                        tangent.x *
-                        tangent_impulse *
-                        second_inverse_mass;
-                    second_body->linear_velocity.y +=
-                        tangent.y *
-                        tangent_impulse *
-                        second_inverse_mass;
-                }
-            }
+                    second_material.restitution) *
+                normal_speed;
         }
 
-        if (first_dynamic) {
-            first_body->linear_velocity.z =
-                0.0f;
-        }
-
-        if (second_dynamic) {
-            second_body->linear_velocity.z =
-                0.0f;
-        }
+        constraints.push_back(
+            constraint);
 
         ++stats.resolved_2d;
+    }
+
+    for (std::size_t iteration = 0u;
+         iteration <
+             velocity_solver_iterations;
+         ++iteration) {
+
+        bool changed = false;
+
+        for (auto& constraint :
+             constraints) {
+
+            changed =
+                solve_velocity_constraint_2d(
+                    constraint) ||
+                changed;
+        }
+
+        if (!changed) {
+            break;
+        }
+    }
+
+    for (auto& constraint :
+         constraints) {
+
+        if (constraint.first_body &&
+            constraint.first_inverse_mass >
+                0.0f) {
+            constraint.first_body
+                ->linear_velocity.z = 0.0f;
+        }
+
+        if (constraint.second_body &&
+            constraint.second_inverse_mass >
+                0.0f) {
+            constraint.second_body
+                ->linear_velocity.z = 0.0f;
+        }
     }
 
     return stats;

@@ -34,7 +34,7 @@ The repository currently includes:
 - managed GameObject name/active/Transform hierarchy access plus native create/find/deferred-destroy through ABI v15
 - managed Camera/Light, MeshRenderer/SpriteRenderer scalar+AssetGuid properties, and SpriteAnimator clip/playback/time controls through the generic PropertyAccessRegistry-backed native property bridge
 - managed keyboard/mouse Input, global Time frame clock, coroutines and WaitForSeconds
-- NEnginePhysics 3D/2D Rigidbody with contact-supported sleeping, rotated BoxCollider/SphereCollider/CapsuleCollider and BoxCollider2D/CircleCollider2D/CapsuleCollider2D, shared sweep-and-prune + OBB/radial/segment contacts, fixed-capacity reference/incident face-clipped box manifolds, collider friction/restitution impulse response, layer/mask filtering, managed collision/trigger callbacks, and rotation-aware raycast/overlap-box/BoxCast queries across box, radial and capsule targets
+- NEnginePhysics 3D/2D Rigidbody with contact-supported sleeping, rotated BoxCollider/SphereCollider/CapsuleCollider and BoxCollider2D/CircleCollider2D/CapsuleCollider2D, shared sweep-and-prune + OBB/radial/segment contacts, fixed-capacity reference/incident face-clipped box manifolds, accumulated multi-pass sequential friction/restitution impulses, layer/mask filtering, managed collision/trigger callbacks, and rotation-aware raycast/overlap-box/BoxCast queries across box, radial and capsule targets
 - NEngineAudio AudioSource/AudioListener data + Editor/C# bindings, deterministic playback clock, hierarchy/listener-oriented spatial stereo mixing, cached WAV PCM/float decode, software stereo rendering, and Windows WASAPI shared-mode output
 - Camera/Light/MeshRenderer components
 - RenderSnapshot with resolved world matrices

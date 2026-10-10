@@ -295,7 +295,7 @@ Implemented:
 - 3D gravity/linear-velocity Transform integration and 2D XY integration with kinematic/inactive bodies skipped.
 - BoxCollider/SphereCollider/CapsuleCollider and BoxCollider2D/CircleCollider2D/CapsuleCollider2D share the X-axis sweep-and-prune broad phase; rotated boxes and capsules contribute conservative world AABBs while narrow phase handles OBB-OBB, radial-radial, oriented box-radial, capsule-radial, capsule-capsule and oriented box-capsule pairs with layer/collision-mask filtering and trigger separation.
 - Collision detection records a fixed-capacity ContactManifold (up to four ContactPoints) on each solid overlap. Box/Box2D face contacts now choose a SAT-aligned reference face, construct the opposing incident face/edge, and Sutherland-Hodgman clip it against the reference side planes to retain up to four 3D or two 2D contacts even when neither original face contributes contained vertices. SAT edge-edge axes and non-box shape pairs fall back to a representative support-midpoint contact. Each point carries penetration.
-- 3D/2D contact resolution uses inverse-mass-weighted positional correction with a tiny persistent contact slop plus normal restitution impulses and Coulomb-limited tangential friction impulses; collider friction uses geometric-mean combination and restitution uses the larger value.
+- 3D/2D contact resolution performs inverse-mass-weighted positional correction once with a tiny persistent contact slop, then runs up to eight projected Gauss-Seidel-style sequential velocity passes. Each pair accumulates a non-negative normal impulse and a Coulomb-clamped tangent impulse vector for the current solve, preserving the larger restitution target and geometric-mean friction while allowing contact chains to converge within the frame.
 - Contact-supported Rigidbody/Rigidbody2D sleeping enters after 0.5 seconds at or below the configurable speed threshold, never sleeps unsupported bodies, wakes on externally assigned velocity/impact/support loss, and exposes managed allowSleep, sleepThreshold, Sleep(), WakeUp() and IsSleeping().
 - ContactTracker derives Enter/Stay/Exit phases for collision and trigger pairs; solid Enter/Stay events carry the active manifold count plus its centroid as the representative native point, trigger events keep zero contacts, and Exit retains the prior manifold centroid with zero active contacts.
 - Editor Play Mode dispatches tracked contact phases to both active managed Behaviours with side-correct contact normals.
@@ -308,7 +308,7 @@ Implemented:
 
 Not yet implemented:
 - Production broad-phase tuning and remaining polygon-style collider variants remain; additional cast shapes such as SphereCast/CapsuleCast are not yet exposed.
-- Production contact solving beyond the current reference/incident face-clipped manifold foundation: per-contact iterative constraint solving, warm starting and island-aware sleeping/wake propagation; SAT edge-edge contacts still use a single fallback point.
+- Production contact solving beyond the current accumulated per-pair iterative constraint foundation: angular velocity/inertia so manifold points become independent rotational constraints, cross-frame warm starting and island-aware sleeping/wake propagation; SAT edge-edge contacts still use a single fallback point.
 - Additional shape casts and richer hit semantics/query filtering policy.
 - Physics materials and joints.
 - Production 3D/2D backend selection/integration.
@@ -354,7 +354,7 @@ Not yet implemented:
 
 ## Immediate next work
 
-1. Add iterative sequential contact solving over the clipped manifolds, then warm-start accumulated impulses and island-aware sleep propagation before continuing polygon-style collider work.
+1. Add angular velocity/inertia and per-manifold-point rotational constraints, then persist impulses for cross-frame warm starting and island-aware sleep propagation before continuing polygon-style collider work.
 2. Extend audio with streaming + OGG/MP3/FLAC runtime decode and a callback-driven device path after real-Windows audible acceptance.
 3. Extend managed physics queries with additional shape casts and richer hit/filtering semantics.
 4. Package/version the managed NEngine API surface and add debugger attach/symbol workflow.

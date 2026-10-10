@@ -2313,6 +2313,212 @@ int main() {
 
 
 
+    core::World iterative_solver_world;
+
+    const auto iterative_a =
+        iterative_solver_world.create(
+            "Iterative A");
+
+    const auto iterative_b =
+        iterative_solver_world.create(
+            "Iterative B");
+
+    const auto iterative_wall =
+        iterative_solver_world.create(
+            "Iterative Wall");
+
+    iterative_solver_world.add_component<
+        physics::BoxCollider>(
+            iterative_a,
+            physics::box_collider_type());
+
+    iterative_solver_world.add_component<
+        physics::BoxCollider>(
+            iterative_b,
+            physics::box_collider_type());
+
+    iterative_solver_world.add_component<
+        physics::BoxCollider>(
+            iterative_wall,
+            physics::box_collider_type());
+
+    auto* iterative_body_a =
+        iterative_solver_world.add_component<
+            physics::Rigidbody>(
+                iterative_a,
+                physics::rigidbody_type());
+
+    auto* iterative_body_b =
+        iterative_solver_world.add_component<
+            physics::Rigidbody>(
+                iterative_b,
+                physics::rigidbody_type());
+
+    iterative_solver_world.transform(
+        iterative_b)->local_position =
+            {0.75f, 0.0f, 0.0f};
+
+    iterative_solver_world.transform(
+        iterative_wall)->local_position =
+            {1.5f, 0.0f, 0.0f};
+
+    if (iterative_body_a) {
+        iterative_body_a->use_gravity = false;
+        iterative_body_a->linear_velocity =
+            {1.0f, 0.0f, 0.0f};
+    }
+
+    if (iterative_body_b) {
+        iterative_body_b->use_gravity = false;
+    }
+
+    const auto iterative_detection =
+        physics::detect_box_overlaps(
+            iterative_solver_world);
+
+    const auto iterative_resolution =
+        physics::resolve_box_contacts_3d(
+            iterative_solver_world,
+            iterative_detection.overlaps);
+
+    iterative_body_a =
+        iterative_solver_world.get_component<
+            physics::Rigidbody>(
+                iterative_a,
+                physics::rigidbody_type());
+
+    iterative_body_b =
+        iterative_solver_world.get_component<
+            physics::Rigidbody>(
+                iterative_b,
+                physics::rigidbody_type());
+
+    check(
+        iterative_resolution.resolved_3d ==
+            2u &&
+        iterative_body_a &&
+        iterative_body_b &&
+        iterative_body_a
+            ->linear_velocity.x <
+            0.01f &&
+        std::abs(
+            iterative_body_b
+                ->linear_velocity.x) <
+            0.01f,
+        "3D sequential impulse iterations converge a two-contact dynamic chain against a static wall");
+
+    core::World iterative_solver_2d_world;
+
+    const auto iterative_2d_a =
+        iterative_solver_2d_world.create(
+            "Iterative 2D A");
+
+    const auto iterative_2d_b =
+        iterative_solver_2d_world.create(
+            "Iterative 2D B");
+
+    const auto iterative_2d_wall =
+        iterative_solver_2d_world.create(
+            "Iterative 2D Wall");
+
+    iterative_solver_2d_world
+        .add_component<
+            physics::BoxCollider2D>(
+                iterative_2d_a,
+                physics::box_collider2d_type());
+
+    iterative_solver_2d_world
+        .add_component<
+            physics::BoxCollider2D>(
+                iterative_2d_b,
+                physics::box_collider2d_type());
+
+    iterative_solver_2d_world
+        .add_component<
+            physics::BoxCollider2D>(
+                iterative_2d_wall,
+                physics::box_collider2d_type());
+
+    auto* iterative_body_2d_a =
+        iterative_solver_2d_world
+            .add_component<
+                physics::Rigidbody2D>(
+                    iterative_2d_a,
+                    physics::rigidbody2d_type());
+
+    auto* iterative_body_2d_b =
+        iterative_solver_2d_world
+            .add_component<
+                physics::Rigidbody2D>(
+                    iterative_2d_b,
+                    physics::rigidbody2d_type());
+
+    iterative_solver_2d_world.transform(
+        iterative_2d_b)->local_position =
+            {0.75f, 0.0f, 3.0f};
+
+    iterative_solver_2d_world.transform(
+        iterative_2d_wall)->local_position =
+            {1.5f, 0.0f, -6.0f};
+
+    if (iterative_body_2d_a) {
+        iterative_body_2d_a->use_gravity =
+            false;
+        iterative_body_2d_a
+            ->linear_velocity =
+            {1.0f, 0.0f, 7.0f};
+    }
+
+    if (iterative_body_2d_b) {
+        iterative_body_2d_b->use_gravity =
+            false;
+    }
+
+    const auto iterative_2d_detection =
+        physics::detect_box_overlaps(
+            iterative_solver_2d_world);
+
+    const auto iterative_2d_resolution =
+        physics::resolve_box_contacts_2d(
+            iterative_solver_2d_world,
+            iterative_2d_detection.overlaps);
+
+    iterative_body_2d_a =
+        iterative_solver_2d_world
+            .get_component<
+                physics::Rigidbody2D>(
+                    iterative_2d_a,
+                    physics::rigidbody2d_type());
+
+    iterative_body_2d_b =
+        iterative_solver_2d_world
+            .get_component<
+                physics::Rigidbody2D>(
+                    iterative_2d_b,
+                    physics::rigidbody2d_type());
+
+    check(
+        iterative_2d_resolution.resolved_2d ==
+            2u &&
+        iterative_body_2d_a &&
+        iterative_body_2d_b &&
+        iterative_body_2d_a
+            ->linear_velocity.x <
+            0.01f &&
+        std::abs(
+            iterative_body_2d_b
+                ->linear_velocity.x) <
+            0.01f &&
+        std::abs(
+            iterative_body_2d_a
+                ->linear_velocity.z) <
+            0.0001f &&
+        std::abs(
+            iterative_body_2d_b
+                ->linear_velocity.z) <
+            0.0001f,
+        "2D sequential impulse iterations converge contact chains while preserving XY-only velocity");
+
     core::World sleeping_world;
 
     const auto sleeping_floor =
