@@ -1035,4 +1035,181 @@ std::optional<RaycastHit> raycast_2d(
         true);
 }
 
+
+namespace {
+
+template <typename Collider>
+std::optional<RaycastHit> box_cast_bounds(
+    const core::World& world,
+    core::ComponentTypeId type,
+    core::Vec3 origin,
+    core::Vec3 size,
+    core::Vec3 direction,
+    float max_distance,
+    bool include_triggers,
+    std::uint32_t layer_mask,
+    bool is_2d) {
+
+    if (size.x <= 0.0f ||
+        size.y <= 0.0f ||
+        (!is_2d && size.z <= 0.0f) ||
+        !std::isfinite(max_distance) ||
+        max_distance < 0.0f) {
+        return std::nullopt;
+    }
+
+    const auto normalized =
+        normalized_direction(
+            direction,
+            is_2d);
+
+    if (normalized ==
+        core::Vec3{}) {
+        return std::nullopt;
+    }
+
+    const core::Vec3 cast_half{
+        size.x * 0.5f,
+        size.y * 0.5f,
+        is_2d
+            ? 0.0f
+            : size.z * 0.5f
+    };
+
+    const auto bounds =
+        collect_bounds<Collider>(
+            world,
+            type,
+            is_2d);
+
+    std::optional<RaycastHit>
+        closest;
+
+    for (const auto& candidate :
+         bounds) {
+
+        if ((!include_triggers &&
+             candidate.trigger) ||
+            !layer_enabled(
+                layer_mask,
+                candidate.layer)) {
+            continue;
+        }
+
+        auto expanded =
+            candidate;
+
+        expanded.half.x +=
+            cast_half.x;
+        expanded.half.y +=
+            cast_half.y;
+
+        if (!is_2d) {
+            expanded.half.z +=
+                cast_half.z;
+        }
+
+        float distance = 0.0f;
+        core::Vec3 normal{};
+
+        if (!ray_bounds(
+                origin,
+                normalized,
+                expanded,
+                max_distance,
+                is_2d,
+                distance,
+                normal)) {
+            continue;
+        }
+
+        if (closest &&
+            distance >=
+                closest->distance) {
+            continue;
+        }
+
+        // For this initial axis-aligned cast foundation, point is
+        // the cast box center at first time of impact.
+        closest =
+            RaycastHit{
+                candidate.entity,
+                {
+                    origin.x +
+                        normalized.x *
+                        distance,
+                    origin.y +
+                        normalized.y *
+                        distance,
+                    origin.z +
+                        normalized.z *
+                        distance
+                },
+                normal,
+                distance,
+                candidate.trigger,
+                is_2d,
+                candidate.layer
+            };
+    }
+
+    return closest;
+}
+
+} // namespace
+
+std::optional<RaycastHit> box_cast(
+    const core::World& world,
+    core::Vec3 origin,
+    core::Vec3 size,
+    core::Vec3 direction,
+    float max_distance,
+    bool include_triggers,
+    std::uint32_t layer_mask) {
+
+    return box_cast_bounds<BoxCollider>(
+        world,
+        box_collider_type(),
+        origin,
+        size,
+        direction,
+        max_distance,
+        include_triggers,
+        layer_mask,
+        false);
+}
+
+std::optional<RaycastHit> box_cast_2d(
+    const core::World& world,
+    core::Vec2 origin,
+    core::Vec2 size,
+    core::Vec2 direction,
+    float max_distance,
+    bool include_triggers,
+    std::uint32_t layer_mask) {
+
+    return box_cast_bounds<BoxCollider2D>(
+        world,
+        box_collider2d_type(),
+        {
+            origin.x,
+            origin.y,
+            0.0f
+        },
+        {
+            size.x,
+            size.y,
+            0.0f
+        },
+        {
+            direction.x,
+            direction.y,
+            0.0f
+        },
+        max_distance,
+        include_triggers,
+        layer_mask,
+        true);
+}
+
 } // namespace nengine::physics

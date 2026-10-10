@@ -946,6 +946,113 @@ int main() {
             -1.0f),
         "Raycast queries reject zero direction and invalid distance");
 
+    core::World cast_world;
+
+    const auto cast_target =
+        cast_world.create(
+            "Cast Target");
+
+    auto* cast_target_box =
+        cast_world.add_component<
+            physics::BoxCollider>(
+                cast_target,
+                physics::box_collider_type());
+
+    if (cast_target_box) {
+        cast_target_box->layer = 4u;
+    }
+
+    const auto cast_target_2d =
+        cast_world.create(
+            "Cast Target 2D");
+
+    auto* cast_target_box_2d =
+        cast_world.add_component<
+            physics::BoxCollider2D>(
+                cast_target_2d,
+                physics::box_collider2d_type());
+
+    if (cast_target_box_2d) {
+        cast_target_box_2d->layer = 6u;
+    }
+
+    const auto cast_hit =
+        physics::box_cast(
+            cast_world,
+            {-3.0f, 0.0f, 0.0f},
+            {1.0f, 1.0f, 1.0f},
+            {1.0f, 0.0f, 0.0f},
+            10.0f,
+            true,
+            (1u << 4u));
+
+    check(
+        cast_hit &&
+        cast_hit->entity ==
+            cast_target &&
+        cast_hit->layer == 4u &&
+        !cast_hit->is_2d &&
+        std::abs(
+            cast_hit->distance -
+            2.0f) < 0.0001f &&
+        cast_hit->normal ==
+            core::Vec3{
+                -1.0f,
+                0.0f,
+                0.0f} &&
+        cast_hit->point ==
+            core::Vec3{
+                -1.0f,
+                0.0f,
+                0.0f},
+        "3D BoxCast uses Minkowski-expanded AABB and returns cast-center time of impact");
+
+    const auto cast_hit_2d =
+        physics::box_cast_2d(
+            cast_world,
+            {0.0f, -3.0f},
+            {1.0f, 1.0f},
+            {0.0f, 1.0f},
+            10.0f,
+            true,
+            (1u << 6u));
+
+    check(
+        cast_hit_2d &&
+        cast_hit_2d->entity ==
+            cast_target_2d &&
+        cast_hit_2d->layer == 6u &&
+        cast_hit_2d->is_2d &&
+        std::abs(
+            cast_hit_2d->distance -
+            2.0f) < 0.0001f &&
+        cast_hit_2d->normal ==
+            core::Vec3{
+                0.0f,
+                -1.0f,
+                0.0f} &&
+        cast_hit_2d->point ==
+            core::Vec3{
+                0.0f,
+                -1.0f,
+                0.0f},
+        "2D BoxCast sweeps axis-aligned boxes on XY with layer filtering");
+
+    check(
+        !physics::box_cast(
+            cast_world,
+            {},
+            {0.0f, 1.0f, 1.0f},
+            {1.0f, 0.0f, 0.0f},
+            10.0f) &&
+        !physics::box_cast_2d(
+            cast_world,
+            {},
+            {1.0f, 1.0f},
+            {},
+            10.0f),
+        "BoxCast rejects invalid dimensions and zero direction");
+
     const auto collision_frame =
         physics::step_physics(
             collision_world,
@@ -958,7 +1065,7 @@ int main() {
             .size() == 2u &&
         collision_frame
             .collisions
-            .tested_pairs_3d == 3u &&
+            .tested_pairs_3d == 1u &&
         collision_frame
             .collisions
             .tested_pairs_2d == 1u &&

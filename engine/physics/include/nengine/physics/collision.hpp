@@ -83,4 +83,22 @@ std::optional<RaycastHit> raycast_2d(
     bool include_triggers = true,
     std::uint32_t layer_mask = 0xffffffffu);
 
+std::optional<RaycastHit> box_cast(
+    const core::World& world,
+    core::Vec3 origin,
+    core::Vec3 size,
+    core::Vec3 direction,
+    float max_distance,
+    bool include_triggers = true,
+    std::uint32_t layer_mask = 0xffffffffu);
+
+std::optional<RaycastHit> box_cast_2d(
+    const core::World& world,
+    core::Vec2 origin,
+    core::Vec2 size,
+    core::Vec2 direction,
+    float max_distance,
+    bool include_triggers = true,
+    std::uint32_t layer_mask = 0xffffffffu);
+
 } // namespace nengine::physics
