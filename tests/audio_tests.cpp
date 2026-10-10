@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "nengine/audio/audio_clip.hpp"
+#include "nengine/audio/audio_renderer.hpp"
 #include "nengine/audio/clip_cache.hpp"
 #include "nengine/audio/components.hpp"
 #include "nengine/audio/mix_snapshot.hpp"
@@ -612,6 +613,46 @@ int main() {
     std::filesystem::remove(
         cached_wav_path,
         remove_error);
+
+    audio::AudioClipData render_clip;
+    render_clip.sample_rate = 4u;
+    render_clip.channels = 1u;
+    render_clip.samples = {
+        0.0f, 1.0f, 0.0f, -1.0f
+    };
+
+    audio::AudioMixSnapshot render_snapshot;
+    audio::AudioSourceMixState render_source;
+    if (mix_clip) {
+        render_source.clip = *mix_clip;
+    }
+    render_source.playing = true;
+    render_source.loop = true;
+    render_source.pitch = 1.0f;
+    render_source.left_gain = 0.5f;
+    render_source.right_gain = 1.0f;
+    render_snapshot.sources.push_back(
+        render_source);
+
+    std::vector<float> rendered_audio;
+    const auto render_stats =
+        audio::render_stereo_mix(
+            render_snapshot,
+            [&render_clip](assets::AssetGuid) {
+                return &render_clip;
+            },
+            4u,
+            4u,
+            rendered_audio);
+
+    check(
+        render_stats.sources_mixed == 1u &&
+        rendered_audio.size() == 8u &&
+        std::abs(rendered_audio[2] - 0.5f) < 0.0001f &&
+        std::abs(rendered_audio[3] - 1.0f) < 0.0001f &&
+        std::abs(rendered_audio[6] + 0.5f) < 0.0001f &&
+        std::abs(rendered_audio[7] + 1.0f) < 0.0001f,
+        "software audio renderer mixes mono PCM into stereo gains");
 
     if (failures == 0) {
         std::cout
