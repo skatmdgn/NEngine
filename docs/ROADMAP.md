@@ -157,6 +157,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Native axis-aligned BoxCast/BoxCast2D foundation
 - [x] Managed Physics.BoxCast + Physics2D.BoxCast bindings over ABI v15
 - [x] SphereCollider + CircleCollider2D Scene/Editor/C# authoring foundation
+- [x] CapsuleCollider + CapsuleCollider2D Scene/Editor/C# authoring foundation
 - [x] Sphere/Circle + mixed Box-radial sweep-and-prune contacts and Raycast/OverlapBox participation
 - [x] Rotated BoxCollider/BoxCollider2D SAT contacts + rotation-aware Raycast/OverlapBox/BoxCast target queries
 - [ ] Additional shape casts + richer hit semantics/query filtering policy

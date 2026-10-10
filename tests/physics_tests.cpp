@@ -73,12 +73,16 @@ int main() {
         metadata.find(
             physics::sphere_collider_type()) != nullptr &&
         metadata.find(
+            physics::capsule_collider_type()) != nullptr &&
+        metadata.find(
             physics::rigidbody2d_type()) != nullptr &&
         metadata.find(
             physics::box_collider2d_type()) != nullptr &&
         metadata.find(
-            physics::circle_collider2d_type()) != nullptr,
-        "3D and 2D rigidbody box sphere and circle component descriptors are discoverable");
+            physics::circle_collider2d_type()) != nullptr &&
+        metadata.find(
+            physics::capsule_collider2d_type()) != nullptr,
+        "3D and 2D rigidbody box sphere circle and capsule component descriptors are discoverable");
 
     core::World world;
     const auto entity =
@@ -103,6 +107,12 @@ int main() {
                 entity,
                 physics::sphere_collider_type());
 
+    auto* capsule =
+        world.add_component<
+            physics::CapsuleCollider>(
+                entity,
+                physics::capsule_collider_type());
+
     auto* body2d =
         world.add_component<
             physics::Rigidbody2D>(
@@ -121,13 +131,21 @@ int main() {
                 entity,
                 physics::circle_collider2d_type());
 
+    auto* capsule2d =
+        world.add_component<
+            physics::CapsuleCollider2D>(
+                entity,
+                physics::capsule_collider2d_type());
+
     check(
         body &&
         collider &&
         sphere &&
+        capsule &&
         body2d &&
         collider2d &&
-        circle2d,
+        circle2d &&
+        capsule2d,
         "physics components attach to World entities");
 
     if (body) {
@@ -164,6 +182,19 @@ int main() {
         sphere->radius = 1.25f;
     }
 
+    if (capsule) {
+        capsule->layer = 11u;
+        capsule->collision_mask =
+            0x00ff00ffu;
+        capsule->friction = 0.7f;
+        capsule->restitution = 0.15f;
+        capsule->center =
+            {0.5f, 1.0f, 1.5f};
+        capsule->radius = 0.75f;
+        capsule->height = 3.0f;
+        capsule->direction = 2u;
+    }
+
     if (body2d) {
         body2d->use_gravity = false;
         body2d->mass = 3.0f;
@@ -187,6 +218,19 @@ int main() {
         circle2d->restitution = 0.9f;
     }
 
+    if (capsule2d) {
+        capsule2d->layer = 12u;
+        capsule2d->collision_mask =
+            0x0f0f0f0fu;
+        capsule2d->friction = 0.35f;
+        capsule2d->restitution = 0.45f;
+        capsule2d->center =
+            {0.25f, 0.5f, 0.0f};
+        capsule2d->size =
+            {2.0f, 5.0f, 0.0f};
+        capsule2d->direction = 1u;
+    }
+
     const auto captured_body =
         serialization.capture(
             world,
@@ -204,6 +248,12 @@ int main() {
             world,
             entity,
             physics::sphere_collider_type());
+
+    const auto captured_capsule =
+        serialization.capture(
+            world,
+            entity,
+            physics::capsule_collider_type());
 
     const auto captured_body2d =
         serialization.capture(
@@ -223,13 +273,21 @@ int main() {
             entity,
             physics::circle_collider2d_type());
 
+    const auto captured_capsule2d =
+        serialization.capture(
+            world,
+            entity,
+            physics::capsule_collider2d_type());
+
     check(
         captured_body &&
         captured_collider &&
         captured_sphere &&
+        captured_capsule &&
         captured_body2d &&
         captured_collider2d &&
-        captured_circle2d,
+        captured_circle2d &&
+        captured_capsule2d,
         "physics codecs capture all component data");
 
     core::World restored;
@@ -258,6 +316,12 @@ int main() {
             restored_entity,
             *captured_sphere,
             &error) &&
+        captured_capsule &&
+        serialization.restore(
+            restored,
+            restored_entity,
+            *captured_capsule,
+            &error) &&
         captured_body2d &&
         serialization.restore(
             restored,
@@ -275,6 +339,12 @@ int main() {
             restored,
             restored_entity,
             *captured_circle2d,
+            &error) &&
+        captured_capsule2d &&
+        serialization.restore(
+            restored,
+            restored_entity,
+            *captured_capsule2d,
             &error),
         "physics codecs restore 3D and 2D component data");
 
@@ -296,6 +366,12 @@ int main() {
                 restored_entity,
                 physics::sphere_collider_type());
 
+    const auto* restored_capsule =
+        restored.get_component<
+            physics::CapsuleCollider>(
+                restored_entity,
+                physics::capsule_collider_type());
+
     const auto* restored_body2d =
         restored.get_component<
             physics::Rigidbody2D>(
@@ -313,6 +389,12 @@ int main() {
             physics::CircleCollider2D>(
                 restored_entity,
                 physics::circle_collider2d_type());
+
+    const auto* restored_capsule2d =
+        restored.get_component<
+            physics::CapsuleCollider2D>(
+                restored_entity,
+                physics::capsule_collider2d_type());
 
     check(
         restored_body &&
@@ -355,6 +437,25 @@ int main() {
         std::abs(
             restored_sphere->radius -
             1.25f) < 0.0001f &&
+        restored_capsule &&
+        restored_capsule->layer == 11u &&
+        restored_capsule->collision_mask ==
+            0x00ff00ffu &&
+        std::abs(
+            restored_capsule->friction -
+            0.7f) < 0.0001f &&
+        std::abs(
+            restored_capsule->restitution -
+            0.15f) < 0.0001f &&
+        restored_capsule->center ==
+            core::Vec3{0.5f, 1.0f, 1.5f} &&
+        std::abs(
+            restored_capsule->radius -
+            0.75f) < 0.0001f &&
+        std::abs(
+            restored_capsule->height -
+            3.0f) < 0.0001f &&
+        restored_capsule->direction == 2u &&
         restored_body2d &&
         !restored_body2d->use_gravity &&
         restored_body2d->allow_sleep &&
@@ -384,7 +485,22 @@ int main() {
             0.4f) < 0.0001f &&
         std::abs(
             restored_circle2d->restitution -
-            0.9f) < 0.0001f,
+            0.9f) < 0.0001f &&
+        restored_capsule2d &&
+        restored_capsule2d->layer == 12u &&
+        restored_capsule2d->collision_mask ==
+            0x0f0f0f0fu &&
+        std::abs(
+            restored_capsule2d->friction -
+            0.35f) < 0.0001f &&
+        std::abs(
+            restored_capsule2d->restitution -
+            0.45f) < 0.0001f &&
+        restored_capsule2d->center ==
+            core::Vec3{0.25f, 0.5f, 0.0f} &&
+        restored_capsule2d->size ==
+            core::Vec3{2.0f, 5.0f, 0.0f} &&
+        restored_capsule2d->direction == 1u,
         "physics Scene roundtrip preserves configured values");
 
     if (captured_collider) {
@@ -593,6 +709,44 @@ int main() {
                 invalid,
                 &error),
             "CircleCollider2D codec rejects non-positive radius");
+    }
+
+
+    if (captured_capsule) {
+        auto invalid =
+            *captured_capsule;
+
+        set_property(
+            invalid,
+            "Height",
+            core::PropertyValue{1.0});
+
+        check(
+            !serialization.restore(
+                restored,
+                restored_entity,
+                invalid,
+                &error),
+            "CapsuleCollider codec rejects height below diameter");
+    }
+
+    if (captured_capsule2d) {
+        auto invalid =
+            *captured_capsule2d;
+
+        set_property(
+            invalid,
+            "Direction",
+            core::PropertyValue{
+                static_cast<std::int64_t>(2)});
+
+        check(
+            !serialization.restore(
+                restored,
+                restored_entity,
+                invalid,
+                &error),
+            "CapsuleCollider2D codec rejects invalid direction");
     }
 
     core::World simulation_world;

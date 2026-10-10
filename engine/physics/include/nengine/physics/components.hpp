@@ -42,6 +42,19 @@ struct SphereCollider {
     float radius{0.5f};
 };
 
+struct CapsuleCollider {
+    bool enabled{true};
+    bool is_trigger{false};
+    std::uint32_t layer{0};
+    std::uint32_t collision_mask{0xffffffffu};
+    float friction{0.5f};
+    float restitution{0.0f};
+    core::Vec3 center{};
+    float radius{0.5f};
+    float height{2.0f};
+    std::uint32_t direction{1};
+};
+
 struct Rigidbody2D {
     bool enabled{true};
     bool use_gravity{true};
@@ -81,6 +94,11 @@ inline core::ComponentTypeId sphere_collider_type() noexcept {
         "NEngine.SphereCollider");
 }
 
+inline core::ComponentTypeId capsule_collider_type() noexcept {
+    return core::ComponentRegistry::stable_id(
+        "NEngine.CapsuleCollider");
+}
+
 inline core::ComponentTypeId rigidbody2d_type() noexcept {
     return core::ComponentRegistry::stable_id(
         "NEngine.Rigidbody2D");
@@ -102,9 +120,26 @@ struct CircleCollider2D {
     float radius{0.5f};
 };
 
+struct CapsuleCollider2D {
+    bool enabled{true};
+    bool is_trigger{false};
+    std::uint32_t layer{0};
+    std::uint32_t collision_mask{0xffffffffu};
+    float friction{0.5f};
+    float restitution{0.0f};
+    core::Vec3 center{};
+    core::Vec3 size{1.0f, 2.0f, 0.0f};
+    std::uint32_t direction{0};
+};
+
 inline core::ComponentTypeId circle_collider2d_type() noexcept {
     return core::ComponentRegistry::stable_id(
         "NEngine.CircleCollider2D");
+}
+
+inline core::ComponentTypeId capsule_collider2d_type() noexcept {
+    return core::ComponentRegistry::stable_id(
+        "NEngine.CapsuleCollider2D");
 }
 
 } // namespace nengine::physics

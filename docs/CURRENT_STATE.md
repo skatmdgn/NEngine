@@ -287,10 +287,10 @@ The concrete Vulkan backend currently grows beneath this contract. The long-term
 
 Implemented:
 - Dedicated NEnginePhysics module.
-- Native Rigidbody / BoxCollider / SphereCollider and Rigidbody2D / BoxCollider2D / CircleCollider2D components.
+- Native Rigidbody / BoxCollider / SphereCollider / CapsuleCollider and Rigidbody2D / BoxCollider2D / CircleCollider2D / CapsuleCollider2D components.
 - Reflection metadata and Scene serialization for mass, gravity, velocity, Rigidbody sleep enable/threshold, trigger, collider layer/collision-mask, friction/restitution, center, box size and radial radius state, with legacy Scene defaults for sleep, filter and contact-material fields; runtime sleep state/timers are intentionally transient.
-- Editor Add Component, Inspector and generic PropertyAccess integration for all six physics components.
-- Managed Rigidbody / BoxCollider / SphereCollider / Rigidbody2D / BoxCollider2D / CircleCollider2D proxies over ABI v15, including Unity-familiar velocity/useGravity/isKinematic naming.
+- Editor Add Component, Inspector and generic PropertyAccess integration for all eight physics components.
+- Managed Rigidbody / BoxCollider / SphereCollider / CapsuleCollider / Rigidbody2D / BoxCollider2D / CircleCollider2D / CapsuleCollider2D proxies over ABI v15, including Unity-familiar velocity/useGravity/isKinematic naming and CapsuleDirection2D.
 - Fixed-step rigidbody foundation runs after managed FixedUpdate so script velocity changes affect the same simulation step; sleeping bodies skip gravity/integration until velocity, impact or support changes wake them.
 - 3D gravity/linear-velocity Transform integration and 2D XY integration with kinematic/inactive bodies skipped.
 - BoxCollider/SphereCollider and BoxCollider2D/CircleCollider2D share the X-axis sweep-and-prune broad phase; rotated boxes contribute conservative world AABBs while SAT narrow phase handles OBB-OBB, sphere-sphere/circle-circle and oriented box-radial pairs with layer/collision-mask filtering and trigger separation.
@@ -306,7 +306,7 @@ Implemented:
 - Native serialization/property tests and real managed C# property round-trip coverage.
 
 Not yet implemented:
-- Production broad-phase tuning beyond the initial sweep-and-prune plus remaining shapes such as capsule/polygon variants.
+- Capsule runtime collision/query participation is not yet wired; production broad-phase tuning and remaining polygon-style variants also remain.
 - Production contact solving beyond the current single-contact impulse foundation, including iterative manifolds, warm starting and island-aware sleeping/wake propagation.
 - Additional shape casts and richer hit semantics/query filtering policy.
 - Physics materials and joints.

@@ -752,6 +752,397 @@ bool register_radial_properties(
     return ok;
 }
 
+template <typename Component>
+bool register_capsule_common_properties(
+    PropertyAccessRegistry& properties,
+    core::ComponentTypeId type) {
+
+    bool ok = true;
+
+    const auto bool_property =
+        [&properties, type, &ok](
+            const char* name,
+            bool Component::* member) {
+
+            ok =
+                properties.register_property(
+                    type,
+                    name,
+                    core::PropertyKind::Boolean,
+                    [type, member](
+                        const core::World& world,
+                        core::Entity entity) {
+                        return read_component_property<Component>(
+                            world,
+                            entity,
+                            type,
+                            [member](const Component& value) {
+                                return core::PropertyValue{
+                                    value.*member};
+                            });
+                    },
+                    [type, member](
+                        core::World& world,
+                        core::Entity entity,
+                        const core::PropertyValue& value) {
+                        return write_component_property<Component>(
+                            world,
+                            entity,
+                            type,
+                            value,
+                            [member](
+                                Component& component,
+                                const core::PropertyValue& raw) {
+                                const auto* typed =
+                                    std::get_if<bool>(&raw);
+                                if (!typed) return false;
+                                component.*member = *typed;
+                                return true;
+                            });
+                    }) &&
+                ok;
+        };
+
+    bool_property("Enabled", &Component::enabled);
+    bool_property("Is Trigger", &Component::is_trigger);
+
+    const auto integer_property =
+        [&properties, type, &ok](
+            const char* name,
+            std::uint32_t Component::* member,
+            std::int64_t minimum,
+            std::int64_t maximum) {
+
+            ok =
+                properties.register_property(
+                    type,
+                    name,
+                    core::PropertyKind::Integer,
+                    [type, member](
+                        const core::World& world,
+                        core::Entity entity) {
+                        return read_component_property<Component>(
+                            world,
+                            entity,
+                            type,
+                            [member](const Component& value) {
+                                return core::PropertyValue{
+                                    static_cast<std::int64_t>(
+                                        value.*member)};
+                            });
+                    },
+                    [type, member, minimum, maximum](
+                        core::World& world,
+                        core::Entity entity,
+                        const core::PropertyValue& value) {
+                        return write_component_property<Component>(
+                            world,
+                            entity,
+                            type,
+                            value,
+                            [member, minimum, maximum](
+                                Component& component,
+                                const core::PropertyValue& raw) {
+                                const auto* typed =
+                                    std::get_if<std::int64_t>(&raw);
+
+                                if (!typed ||
+                                    *typed < minimum ||
+                                    *typed > maximum) {
+                                    return false;
+                                }
+
+                                component.*member =
+                                    static_cast<std::uint32_t>(
+                                        *typed);
+                                return true;
+                            });
+                    }) &&
+                ok;
+        };
+
+    integer_property(
+        "Layer",
+        &Component::layer,
+        0,
+        31);
+    integer_property(
+        "Collision Mask",
+        &Component::collision_mask,
+        0,
+        static_cast<std::int64_t>(
+            0xffffffffu));
+
+    ok =
+        register_contact_material_properties<Component>(
+            properties,
+            type) &&
+        ok;
+
+    ok =
+        properties.register_property(
+            type,
+            "Center",
+            core::PropertyKind::Vec3,
+            [type](
+                const core::World& world,
+                core::Entity entity) {
+                return read_component_property<Component>(
+                    world,
+                    entity,
+                    type,
+                    [](const Component& value) {
+                        return core::PropertyValue{
+                            value.center};
+                    });
+            },
+            [type](
+                core::World& world,
+                core::Entity entity,
+                const core::PropertyValue& value) {
+                return write_component_property<Component>(
+                    world,
+                    entity,
+                    type,
+                    value,
+                    [](Component& component,
+                       const core::PropertyValue& raw) {
+                        const auto* typed =
+                            std::get_if<core::Vec3>(&raw);
+                        if (!typed) return false;
+                        component.center = *typed;
+                        return true;
+                    });
+            }) &&
+        ok;
+
+    return ok;
+}
+
+bool register_capsule_properties(
+    PropertyAccessRegistry& properties) {
+
+    const auto type =
+        physics::capsule_collider_type();
+
+    bool ok =
+        register_capsule_common_properties<
+            physics::CapsuleCollider>(
+                properties,
+                type);
+
+    const auto float_property =
+        [&properties, type, &ok](
+            const char* name,
+            float physics::CapsuleCollider::* member) {
+
+            ok =
+                properties.register_property(
+                    type,
+                    name,
+                    core::PropertyKind::Float,
+                    [type, member](
+                        const core::World& world,
+                        core::Entity entity) {
+                        return read_component_property<
+                            physics::CapsuleCollider>(
+                                world,
+                                entity,
+                                type,
+                                [member](
+                                    const physics::CapsuleCollider& value) {
+                                    return core::PropertyValue{
+                                        static_cast<double>(
+                                            value.*member)};
+                                });
+                    },
+                    [type, member](
+                        core::World& world,
+                        core::Entity entity,
+                        const core::PropertyValue& value) {
+                        return write_component_property<
+                            physics::CapsuleCollider>(
+                                world,
+                                entity,
+                                type,
+                                value,
+                                [member](
+                                    physics::CapsuleCollider& component,
+                                    const core::PropertyValue& raw) {
+                                    const auto* typed =
+                                        std::get_if<double>(&raw);
+                                    if (!typed ||
+                                        *typed <= 0.0) {
+                                        return false;
+                                    }
+                                    component.*member =
+                                        static_cast<float>(*typed);
+                                    return component.height >=
+                                        component.radius * 2.0f;
+                                });
+                    }) &&
+                ok;
+        };
+
+    float_property(
+        "Radius",
+        &physics::CapsuleCollider::radius);
+    float_property(
+        "Height",
+        &physics::CapsuleCollider::height);
+
+    ok =
+        properties.register_property(
+            type,
+            "Direction",
+            core::PropertyKind::Integer,
+            [type](
+                const core::World& world,
+                core::Entity entity) {
+                return read_component_property<
+                    physics::CapsuleCollider>(
+                        world,
+                        entity,
+                        type,
+                        [](const physics::CapsuleCollider& value) {
+                            return core::PropertyValue{
+                                static_cast<std::int64_t>(
+                                    value.direction)};
+                        });
+            },
+            [type](
+                core::World& world,
+                core::Entity entity,
+                const core::PropertyValue& value) {
+                return write_component_property<
+                    physics::CapsuleCollider>(
+                        world,
+                        entity,
+                        type,
+                        value,
+                        [](physics::CapsuleCollider& component,
+                           const core::PropertyValue& raw) {
+                            const auto* typed =
+                                std::get_if<std::int64_t>(&raw);
+                            if (!typed ||
+                                *typed < 0 ||
+                                *typed > 2) {
+                                return false;
+                            }
+                            component.direction =
+                                static_cast<std::uint32_t>(*typed);
+                            return true;
+                        });
+            }) &&
+        ok;
+
+    return ok;
+}
+
+bool register_capsule2d_properties(
+    PropertyAccessRegistry& properties) {
+
+    const auto type =
+        physics::capsule_collider2d_type();
+
+    bool ok =
+        register_capsule_common_properties<
+            physics::CapsuleCollider2D>(
+                properties,
+                type);
+
+    ok =
+        properties.register_property(
+            type,
+            "Size",
+            core::PropertyKind::Vec3,
+            [type](
+                const core::World& world,
+                core::Entity entity) {
+                return read_component_property<
+                    physics::CapsuleCollider2D>(
+                        world,
+                        entity,
+                        type,
+                        [](const physics::CapsuleCollider2D& value) {
+                            return core::PropertyValue{
+                                value.size};
+                        });
+            },
+            [type](
+                core::World& world,
+                core::Entity entity,
+                const core::PropertyValue& value) {
+                return write_component_property<
+                    physics::CapsuleCollider2D>(
+                        world,
+                        entity,
+                        type,
+                        value,
+                        [](physics::CapsuleCollider2D& component,
+                           const core::PropertyValue& raw) {
+                            const auto* typed =
+                                std::get_if<core::Vec3>(&raw);
+                            if (!typed ||
+                                typed->x <= 0.0f ||
+                                typed->y <= 0.0f) {
+                                return false;
+                            }
+                            component.size = *typed;
+                            component.size.z = 0.0f;
+                            return true;
+                        });
+            }) &&
+        ok;
+
+    ok =
+        properties.register_property(
+            type,
+            "Direction",
+            core::PropertyKind::Integer,
+            [type](
+                const core::World& world,
+                core::Entity entity) {
+                return read_component_property<
+                    physics::CapsuleCollider2D>(
+                        world,
+                        entity,
+                        type,
+                        [](const physics::CapsuleCollider2D& value) {
+                            return core::PropertyValue{
+                                static_cast<std::int64_t>(
+                                    value.direction)};
+                        });
+            },
+            [type](
+                core::World& world,
+                core::Entity entity,
+                const core::PropertyValue& value) {
+                return write_component_property<
+                    physics::CapsuleCollider2D>(
+                        world,
+                        entity,
+                        type,
+                        value,
+                        [](physics::CapsuleCollider2D& component,
+                           const core::PropertyValue& raw) {
+                            const auto* typed =
+                                std::get_if<std::int64_t>(&raw);
+                            if (!typed ||
+                                *typed < 0 ||
+                                *typed > 1) {
+                                return false;
+                            }
+                            component.direction =
+                                static_cast<std::uint32_t>(*typed);
+                            return true;
+                        });
+            }) &&
+        ok;
+
+    return ok;
+}
+
 } // namespace
 
 bool register_physics_integration(
@@ -794,6 +1185,11 @@ bool register_physics_integration(
         ok;
 
     ok =
+        register_capsule_properties(
+            properties) &&
+        ok;
+
+    ok =
         register_rigidbody_properties<
             physics::Rigidbody2D>(
                 properties,
@@ -813,6 +1209,11 @@ bool register_physics_integration(
             physics::CircleCollider2D>(
                 properties,
                 physics::circle_collider2d_type()) &&
+        ok;
+
+    ok =
+        register_capsule2d_properties(
+            properties) &&
         ok;
 
     return ok;
@@ -861,6 +1262,18 @@ bool register_physics_component_factories(
 
     ok =
         factories.register_factory(
+            physics::capsule_collider_type(),
+            [](core::World& world,
+               core::Entity entity) {
+                return world.add_component<
+                    physics::CapsuleCollider>(
+                        entity,
+                        physics::capsule_collider_type()) != nullptr;
+            }) &&
+        ok;
+
+    ok =
+        factories.register_factory(
             physics::rigidbody2d_type(),
             [](core::World& world,
                core::Entity entity) {
@@ -892,6 +1305,18 @@ bool register_physics_component_factories(
                     physics::CircleCollider2D>(
                         entity,
                         physics::circle_collider2d_type()) != nullptr;
+            }) &&
+        ok;
+
+    ok =
+        factories.register_factory(
+            physics::capsule_collider2d_type(),
+            [](core::World& world,
+               core::Entity entity) {
+                return world.add_component<
+                    physics::CapsuleCollider2D>(
+                        entity,
+                        physics::capsule_collider2d_type()) != nullptr;
             }) &&
         ok;
 

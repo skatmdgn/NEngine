@@ -394,7 +394,7 @@ Implemented foundation:
 - FixedUpdate fixed-step scheduling separated from host-frame Update/LateUpdate.
 - managed Camera/Light plus MeshRenderer/SpriteRenderer scalar and AssetGuid properties over the generic native property bridge.
 - managed SpriteAnimator clip/playback/time properties plus Play/Pause/Stop/Restart controls.
-- NEnginePhysics 3D/2D Rigidbody with contact-supported sleeping plus rotated BoxCollider/SphereCollider and BoxCollider2D/CircleCollider2D data/Scene/Editor/C# bindings, shared sweep-and-prune broad phase with OBB/radial SAT contacts, collider friction/restitution impulse response, layer/mask filtering, managed collision/trigger callbacks, and rotation-aware raycast/overlap-box/BoxCast queries over the ABI v15 query bridge.
+- NEnginePhysics 3D/2D Rigidbody with contact-supported sleeping plus rotated BoxCollider/SphereCollider/CapsuleCollider and BoxCollider2D/CircleCollider2D/CapsuleCollider2D data/Scene/Editor/C# authoring bindings, shared sweep-and-prune broad phase with OBB/radial SAT contacts for the currently runtime-enabled box/sphere/circle shapes, collider friction/restitution impulse response, layer/mask filtering, managed collision/trigger callbacks, and rotation-aware raycast/overlap-box/BoxCast queries over the ABI v15 query bridge.
 - NEngineAudio AudioSource/AudioListener Scene/Editor/C# bindings, deterministic playback timing, hierarchy/listener-oriented spatial stereo mixing, WAV PCM/float runtime decode, software stereo rendering, AssetGuid/fingerprint clip caching and Windows WASAPI shared-mode output; compressed/streaming decode and production DSP remain.
 - coroutine scheduling including WaitForSeconds.
 

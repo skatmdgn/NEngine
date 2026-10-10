@@ -1667,7 +1667,13 @@ int main() {
             std::string::npos &&
         api.find("sealed class SphereCollider") !=
             std::string::npos &&
+        api.find("sealed class CapsuleCollider") !=
+            std::string::npos &&
         api.find("sealed class CircleCollider2D") !=
+            std::string::npos &&
+        api.find("sealed class CapsuleCollider2D") !=
+            std::string::npos &&
+        api.find("CapsuleDirection2D") !=
             std::string::npos &&
         api.find("static class Physics") !=
             std::string::npos &&

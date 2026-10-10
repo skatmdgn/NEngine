@@ -186,6 +186,25 @@ bool valid_contact_material(
         restitution <= 1.0f;
 }
 
+bool valid_capsule(
+    float radius,
+    float height,
+    std::uint32_t direction) noexcept {
+
+    return radius > 0.0f &&
+        height >= radius * 2.0f &&
+        direction <= 2u;
+}
+
+bool valid_capsule2d(
+    core::Vec3 size,
+    std::uint32_t direction) noexcept {
+
+    return size.x > 0.0f &&
+        size.y > 0.0f &&
+        direction <= 1u;
+}
+
 template <typename T>
 T* ensure_component(
     core::World& world,
@@ -338,6 +357,83 @@ bool register_radial_metadata(
                 }) &&
             ok;
     }
+
+    return ok;
+}
+
+bool register_capsule_metadata(
+    core::ComponentRegistry& registry,
+    std::string type_name,
+    core::ComponentTypeId type,
+    std::string category,
+    bool is_2d) {
+
+    bool ok =
+        registry.register_type(
+            std::move(type_name),
+            std::move(category),
+            true,
+            false);
+
+    const auto flags =
+        core::PropertyFlags::Serializable |
+        core::PropertyFlags::Editable;
+
+    const auto common =
+        std::initializer_list<
+            std::pair<
+                const char*,
+                core::PropertyKind>>{
+            {"Enabled", core::PropertyKind::Boolean},
+            {"Is Trigger", core::PropertyKind::Boolean},
+            {"Layer", core::PropertyKind::Integer},
+            {"Collision Mask", core::PropertyKind::Integer},
+            {"Friction", core::PropertyKind::Float},
+            {"Restitution", core::PropertyKind::Float},
+            {"Center", core::PropertyKind::Vec3}
+        };
+
+    for (const auto& [name, kind] : common) {
+        ok =
+            registry.register_property(
+                type,
+                {name, kind, flags}) &&
+            ok;
+    }
+
+    if (is_2d) {
+        ok =
+            registry.register_property(
+                type,
+                {"Size",
+                 core::PropertyKind::Vec3,
+                 flags}) &&
+            ok;
+    } else {
+        ok =
+            registry.register_property(
+                type,
+                {"Radius",
+                 core::PropertyKind::Float,
+                 flags}) &&
+            ok;
+
+        ok =
+            registry.register_property(
+                type,
+                {"Height",
+                 core::PropertyKind::Float,
+                 flags}) &&
+            ok;
+    }
+
+    ok =
+        registry.register_property(
+            type,
+            {"Direction",
+             core::PropertyKind::Integer,
+             flags}) &&
+        ok;
 
     return ok;
 }
@@ -752,6 +848,247 @@ bool restore_radial(
     return true;
 }
 
+std::optional<core::SerializedComponentData>
+capture_capsule(
+    const core::World& world,
+    core::Entity entity) {
+
+    const auto* value =
+        world.get_component<CapsuleCollider>(
+            entity,
+            capsule_collider_type());
+
+    if (!value) return std::nullopt;
+
+    core::SerializedComponentData data;
+    data.properties = {
+        bool_property("Enabled", value->enabled),
+        bool_property("Is Trigger", value->is_trigger),
+        integer_property(
+            "Layer",
+            static_cast<std::int64_t>(value->layer)),
+        integer_property(
+            "Collision Mask",
+            static_cast<std::int64_t>(
+                value->collision_mask)),
+        float_property("Friction", value->friction),
+        float_property("Restitution", value->restitution),
+        vec3_property("Center", value->center),
+        float_property("Radius", value->radius),
+        float_property("Height", value->height),
+        integer_property(
+            "Direction",
+            static_cast<std::int64_t>(
+                value->direction))
+    };
+
+    return data;
+}
+
+bool restore_capsule(
+    core::World& world,
+    core::Entity entity,
+    const core::SerializedComponentData& data,
+    std::string* error) {
+
+    CapsuleCollider value;
+    std::int64_t layer = value.layer;
+    std::int64_t collision_mask =
+        value.collision_mask;
+    std::int64_t direction =
+        value.direction;
+
+    if (!read_bool(data, "Enabled", value.enabled) ||
+        !read_bool(
+            data,
+            "Is Trigger",
+            value.is_trigger) ||
+        !read_integer(data, "Layer", layer, true) ||
+        !read_integer(
+            data,
+            "Collision Mask",
+            collision_mask,
+            true) ||
+        !read_float(
+            data,
+            "Friction",
+            value.friction,
+            true) ||
+        !read_float(
+            data,
+            "Restitution",
+            value.restitution,
+            true) ||
+        !read_vec3(data, "Center", value.center) ||
+        !read_float(data, "Radius", value.radius) ||
+        !read_float(data, "Height", value.height) ||
+        !read_integer(
+            data,
+            "Direction",
+            direction) ||
+        layer < 0 ||
+        layer > 31 ||
+        collision_mask < 0 ||
+        collision_mask >
+            static_cast<std::int64_t>(
+                0xffffffffu) ||
+        direction < 0 ||
+        direction > 2 ||
+        !valid_contact_material(
+            value.friction,
+            value.restitution) ||
+        !valid_capsule(
+            value.radius,
+            value.height,
+            static_cast<std::uint32_t>(
+                direction))) {
+
+        if (error) {
+            *error =
+                "malformed NEngine.CapsuleCollider data";
+        }
+        return false;
+    }
+
+    value.layer =
+        static_cast<std::uint32_t>(layer);
+    value.collision_mask =
+        static_cast<std::uint32_t>(
+            collision_mask);
+    value.direction =
+        static_cast<std::uint32_t>(
+            direction);
+
+    auto* component =
+        ensure_component<CapsuleCollider>(
+            world,
+            entity,
+            capsule_collider_type());
+
+    if (!component) return false;
+    *component = value;
+    return true;
+}
+
+std::optional<core::SerializedComponentData>
+capture_capsule2d(
+    const core::World& world,
+    core::Entity entity) {
+
+    const auto* value =
+        world.get_component<CapsuleCollider2D>(
+            entity,
+            capsule_collider2d_type());
+
+    if (!value) return std::nullopt;
+
+    core::SerializedComponentData data;
+    data.properties = {
+        bool_property("Enabled", value->enabled),
+        bool_property("Is Trigger", value->is_trigger),
+        integer_property(
+            "Layer",
+            static_cast<std::int64_t>(value->layer)),
+        integer_property(
+            "Collision Mask",
+            static_cast<std::int64_t>(
+                value->collision_mask)),
+        float_property("Friction", value->friction),
+        float_property("Restitution", value->restitution),
+        vec3_property("Center", value->center),
+        vec3_property("Size", value->size),
+        integer_property(
+            "Direction",
+            static_cast<std::int64_t>(
+                value->direction))
+    };
+
+    return data;
+}
+
+bool restore_capsule2d(
+    core::World& world,
+    core::Entity entity,
+    const core::SerializedComponentData& data,
+    std::string* error) {
+
+    CapsuleCollider2D value;
+    std::int64_t layer = value.layer;
+    std::int64_t collision_mask =
+        value.collision_mask;
+    std::int64_t direction =
+        value.direction;
+
+    if (!read_bool(data, "Enabled", value.enabled) ||
+        !read_bool(
+            data,
+            "Is Trigger",
+            value.is_trigger) ||
+        !read_integer(data, "Layer", layer, true) ||
+        !read_integer(
+            data,
+            "Collision Mask",
+            collision_mask,
+            true) ||
+        !read_float(
+            data,
+            "Friction",
+            value.friction,
+            true) ||
+        !read_float(
+            data,
+            "Restitution",
+            value.restitution,
+            true) ||
+        !read_vec3(data, "Center", value.center) ||
+        !read_vec3(data, "Size", value.size) ||
+        !read_integer(
+            data,
+            "Direction",
+            direction) ||
+        layer < 0 ||
+        layer > 31 ||
+        collision_mask < 0 ||
+        collision_mask >
+            static_cast<std::int64_t>(
+                0xffffffffu) ||
+        direction < 0 ||
+        direction > 1 ||
+        !valid_contact_material(
+            value.friction,
+            value.restitution) ||
+        !valid_capsule2d(
+            value.size,
+            static_cast<std::uint32_t>(
+                direction))) {
+
+        if (error) {
+            *error =
+                "malformed NEngine.CapsuleCollider2D data";
+        }
+        return false;
+    }
+
+    value.layer =
+        static_cast<std::uint32_t>(layer);
+    value.collision_mask =
+        static_cast<std::uint32_t>(
+            collision_mask);
+    value.direction =
+        static_cast<std::uint32_t>(
+            direction);
+
+    auto* component =
+        ensure_component<CapsuleCollider2D>(
+            world,
+            entity,
+            capsule_collider2d_type());
+
+    if (!component) return false;
+    *component = value;
+    return true;
+}
+
 } // namespace
 
 bool register_component_metadata(
@@ -784,6 +1121,15 @@ bool register_component_metadata(
         ok;
 
     ok =
+        register_capsule_metadata(
+            registry,
+            "NEngine.CapsuleCollider",
+            capsule_collider_type(),
+            "Physics",
+            false) &&
+        ok;
+
+    ok =
         register_rigidbody_metadata(
             registry,
             "NEngine.Rigidbody2D",
@@ -805,6 +1151,15 @@ bool register_component_metadata(
             "NEngine.CircleCollider2D",
             circle_collider2d_type(),
             "Physics 2D") &&
+        ok;
+
+    ok =
+        register_capsule_metadata(
+            registry,
+            "NEngine.CapsuleCollider2D",
+            capsule_collider2d_type(),
+            "Physics 2D",
+            true) &&
         ok;
 
     return ok;
@@ -899,6 +1254,30 @@ bool register_component_serializers(
 
     ok =
         registry.register_codec({
+            capsule_collider_type(),
+            1,
+            "NEngine.CapsuleCollider",
+            [](const core::World& world,
+               core::Entity entity) {
+                return capture_capsule(
+                    world,
+                    entity);
+            },
+            [](core::World& world,
+               core::Entity entity,
+               const core::SerializedComponentData& data,
+               std::string* error) {
+                return restore_capsule(
+                    world,
+                    entity,
+                    data,
+                    error);
+            }
+        }) &&
+        ok;
+
+    ok =
+        registry.register_codec({
             rigidbody2d_type(),
             2,
             "NEngine.Rigidbody2D",
@@ -974,6 +1353,30 @@ bool register_component_serializers(
                     circle_collider2d_type(),
                     data,
                     "NEngine.CircleCollider2D",
+                    error);
+            }
+        }) &&
+        ok;
+
+    ok =
+        registry.register_codec({
+            capsule_collider2d_type(),
+            1,
+            "NEngine.CapsuleCollider2D",
+            [](const core::World& world,
+               core::Entity entity) {
+                return capture_capsule2d(
+                    world,
+                    entity);
+            },
+            [](core::World& world,
+               core::Entity entity,
+               const core::SerializedComponentData& data,
+               std::string* error) {
+                return restore_capsule2d(
+                    world,
+                    entity,
+                    data,
                     error);
             }
         }) &&
