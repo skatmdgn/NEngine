@@ -1252,6 +1252,10 @@ std::string api_stub(
             if (type == typeof(MeshRenderer)) return "NEngine.MeshRenderer";
             if (type == typeof(SpriteRenderer)) return "NEngine.SpriteRenderer";
             if (type == typeof(SpriteAnimator)) return "NEngine.SpriteAnimator";
+            if (type == typeof(Rigidbody)) return "NEngine.Rigidbody";
+            if (type == typeof(BoxCollider)) return "NEngine.BoxCollider";
+            if (type == typeof(Rigidbody2D)) return "NEngine.Rigidbody2D";
+            if (type == typeof(BoxCollider2D)) return "NEngine.BoxCollider2D";
             return null;
         }
     }
@@ -1460,6 +1464,23 @@ std::string api_stub(
                     : fallback;
         }
 
+        private protected Vector2 NativeVector2(
+            string propertyName,
+            Vector2 fallback)
+        {
+            Vector3 value =
+                NativeVector3(
+                    propertyName,
+                    new Vector3(
+                        fallback.x,
+                        fallback.y,
+                        0));
+
+            return new Vector2(
+                value.x,
+                value.y);
+        }
+
         private protected void SetNativeBool(
             string propertyName,
             bool value)
@@ -1547,6 +1568,18 @@ std::string api_stub(
                     y = value.y,
                     z = value.z
                 });
+        }
+
+        private protected void SetNativeVector2(
+            string propertyName,
+            Vector2 value)
+        {
+            SetNativeVector3(
+                propertyName,
+                new Vector3(
+                    value.x,
+                    value.y,
+                    0));
         }
     }
 
@@ -1681,6 +1714,174 @@ std::string api_stub(
 
             _coroutines.RemoveAll(
                 coroutine => coroutine.stopped || coroutine.completed);
+        }
+    }
+
+    public sealed class Rigidbody : Component
+    {
+        public bool enabled
+        {
+            get => NativeBool("Enabled", true);
+            set => SetNativeBool("Enabled", value);
+        }
+
+        public bool useGravity
+        {
+            get => NativeBool("Use Gravity", true);
+            set => SetNativeBool("Use Gravity", value);
+        }
+
+        public bool isKinematic
+        {
+            get => NativeBool("Is Kinematic", false);
+            set => SetNativeBool("Is Kinematic", value);
+        }
+
+        public float mass
+        {
+            get => NativeFloat("Mass", 1);
+            set => SetNativeFloat("Mass", value);
+        }
+
+        public float gravityScale
+        {
+            get => NativeFloat("Gravity Scale", 1);
+            set => SetNativeFloat("Gravity Scale", value);
+        }
+
+        public Vector3 linearVelocity
+        {
+            get => NativeVector3(
+                "Linear Velocity",
+                Vector3.zero);
+            set => SetNativeVector3(
+                "Linear Velocity",
+                value);
+        }
+
+        public Vector3 velocity
+        {
+            get => linearVelocity;
+            set => linearVelocity = value;
+        }
+    }
+
+    public sealed class BoxCollider : Component
+    {
+        public bool enabled
+        {
+            get => NativeBool("Enabled", true);
+            set => SetNativeBool("Enabled", value);
+        }
+
+        public bool isTrigger
+        {
+            get => NativeBool("Is Trigger", false);
+            set => SetNativeBool("Is Trigger", value);
+        }
+
+        public Vector3 center
+        {
+            get => NativeVector3(
+                "Center",
+                Vector3.zero);
+            set => SetNativeVector3(
+                "Center",
+                value);
+        }
+
+        public Vector3 size
+        {
+            get => NativeVector3(
+                "Size",
+                Vector3.one);
+            set => SetNativeVector3(
+                "Size",
+                value);
+        }
+    }
+
+    public sealed class Rigidbody2D : Component
+    {
+        public bool enabled
+        {
+            get => NativeBool("Enabled", true);
+            set => SetNativeBool("Enabled", value);
+        }
+
+        public bool useGravity
+        {
+            get => NativeBool("Use Gravity", true);
+            set => SetNativeBool("Use Gravity", value);
+        }
+
+        public bool isKinematic
+        {
+            get => NativeBool("Is Kinematic", false);
+            set => SetNativeBool("Is Kinematic", value);
+        }
+
+        public float mass
+        {
+            get => NativeFloat("Mass", 1);
+            set => SetNativeFloat("Mass", value);
+        }
+
+        public float gravityScale
+        {
+            get => NativeFloat("Gravity Scale", 1);
+            set => SetNativeFloat("Gravity Scale", value);
+        }
+
+        public Vector2 linearVelocity
+        {
+            get => NativeVector2(
+                "Linear Velocity",
+                Vector2.zero);
+            set => SetNativeVector2(
+                "Linear Velocity",
+                value);
+        }
+
+        public Vector2 velocity
+        {
+            get => linearVelocity;
+            set => linearVelocity = value;
+        }
+    }
+
+    public sealed class BoxCollider2D : Component
+    {
+        public bool enabled
+        {
+            get => NativeBool("Enabled", true);
+            set => SetNativeBool("Enabled", value);
+        }
+
+        public bool isTrigger
+        {
+            get => NativeBool("Is Trigger", false);
+            set => SetNativeBool("Is Trigger", value);
+        }
+
+        public Vector2 center
+        {
+            get => NativeVector2(
+                "Center",
+                Vector2.zero);
+            set => SetNativeVector2(
+                "Center",
+                value);
+        }
+
+        public Vector2 size
+        {
+            get => NativeVector2(
+                "Size",
+                new Vector2(1, 1));
+            set => SetNativeVector2(
+                "Size",
+                value);
         }
     }
 
