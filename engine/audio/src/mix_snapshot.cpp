@@ -186,16 +186,30 @@ float distance_gain(
 
 float spatial_pan(
     core::Vec3 source,
-    core::Vec3 listener) noexcept {
+    core::Vec3 listener,
+    core::Quat listener_rotation) noexcept {
 
-    const float dx =
-        source.x - listener.x;
-    const float dz =
-        source.z - listener.z;
+    const core::Vec3 delta{
+        source.x - listener.x,
+        source.y - listener.y,
+        source.z - listener.z
+    };
+
+    const core::Quat inverse{
+        -listener_rotation.x,
+        -listener_rotation.y,
+        -listener_rotation.z,
+        listener_rotation.w
+    };
+
+    const auto local =
+        rotate(
+            inverse,
+            delta);
 
     const float denominator =
-        std::abs(dx) +
-        std::abs(dz);
+        std::abs(local.x) +
+        std::abs(local.z);
 
     if (denominator <=
         0.000001f) {
@@ -203,7 +217,7 @@ float spatial_pan(
     }
 
     return clamp_pan(
-        dx / denominator);
+        local.x / denominator);
 }
 
 void stereo_gains(
@@ -256,11 +270,15 @@ AudioMixSnapshot build_mix_snapshot(
         snapshot.has_listener = true;
         snapshot.listener.entity =
             entity;
-        snapshot.listener.position =
+        const auto listener_transform =
             resolve_world_transform(
                 world,
-                entity)
-                .position;
+                entity);
+
+        snapshot.listener.position =
+            listener_transform.position;
+        snapshot.listener.rotation =
+            listener_transform.rotation;
         snapshot.listener.volume =
             clamp_unit(
                 listener->volume);
@@ -321,7 +339,8 @@ AudioMixSnapshot build_mix_snapshot(
                     pan +
                     spatial_pan(
                         world_transform.position,
-                        listener_position));
+                        listener_position,
+                        snapshot.listener.rotation));
         }
 
         AudioSourceMixState state;

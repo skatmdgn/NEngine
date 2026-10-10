@@ -14,6 +14,7 @@ struct AudioListenerState {
     core::Entity entity{
         core::Entity::invalid()};
     core::Vec3 position{};
+    core::Quat rotation{};
     float volume{1.0f};
 };
 

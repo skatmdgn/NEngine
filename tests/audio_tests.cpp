@@ -403,6 +403,32 @@ int main() {
             1.25f) < 0.0001f,
         "audio mix snapshot resolves hierarchy world positions and computes spatial stereo attenuation");
 
+    if (auto* transform =
+            mix_world.transform(
+                listener_entity)) {
+        transform->local_rotation = {
+            0.0f,
+            0.70710678f,
+            0.0f,
+            0.70710678f
+        };
+    }
+
+    const auto rotated_listener_mix =
+        audio::build_mix_snapshot(
+            mix_world);
+
+    check(
+        rotated_listener_mix.sources.size() ==
+            1u &&
+        std::abs(
+            rotated_listener_mix.sources.front().left_gain -
+            0.25f) < 0.0002f &&
+        std::abs(
+            rotated_listener_mix.sources.front().right_gain -
+            0.25f) < 0.0002f,
+        "spatial stereo pan follows listener world rotation");
+
     const auto wav_bytes =
         make_pcm16_wav();
 
