@@ -590,7 +590,7 @@ int main() {
             "GetAbiVersion") !=
                 std::string::npos &&
         bridge.find(
-            "AbiVersion = 11") !=
+            "AbiVersion = 12") !=
                 std::string::npos &&
         bridge.find(
             "GameplayLoadContext") !=
@@ -615,6 +615,12 @@ int main() {
                 std::string::npos &&
         api.find(
             "TryGetProperty") !=
+                std::string::npos &&
+        api.find(
+            "TryGetTextProperty") !=
+                std::string::npos &&
+        api.find(
+            "SetTextProperty") !=
                 std::string::npos &&
         bridge.find(
             "ConfigureNativeWorldCallbacks") !=
@@ -649,7 +655,7 @@ int main() {
         bridge.find(
             "GetBehaviourEnabled") !=
                 std::string::npos,
-        "managed bridge exposes activation FixedUpdate LateUpdate native World property input and frame-clock ABI v11 entries");
+        "managed bridge exposes activation FixedUpdate LateUpdate native World property input and frame-clock ABI v12 entries");
 
     const auto runtime_config =
         read_all(

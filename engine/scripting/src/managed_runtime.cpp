@@ -542,7 +542,16 @@ int ManagedRuntime::callback_get_property(
         return -2;
     }
 
+    char* text_buffer =
+        output->text_buffer;
+    const auto text_capacity =
+        output->text_capacity;
+
     *output = {};
+    output->text_buffer =
+        text_buffer;
+    output->text_capacity =
+        text_capacity;
 
     if (const auto* typed =
             std::get_if<bool>(
@@ -598,6 +607,35 @@ int ManagedRuntime::callback_get_property(
         output->y = typed->y;
         output->z = typed->z;
         output->w = typed->w;
+        return 1;
+    }
+
+    if (const auto* typed =
+            std::get_if<std::string>(
+                &value)) {
+
+        if (typed->size() >=
+            static_cast<std::size_t>(
+                std::numeric_limits<
+                    std::int32_t>::max())) {
+            return -3;
+        }
+
+        output->kind = 7;
+        output->text_length =
+            static_cast<std::int32_t>(
+                typed->size() + 1u);
+
+        if (output->text_buffer &&
+            output->text_capacity >=
+                output->text_length) {
+
+            std::memcpy(
+                output->text_buffer,
+                typed->c_str(),
+                typed->size() + 1u);
+        }
+
         return 1;
     }
 
@@ -667,6 +705,21 @@ int ManagedRuntime::callback_set_property(
                 input->y,
                 input->z,
                 input->w};
+        break;
+    case 7:
+        if (!input->text_buffer ||
+            input->text_capacity <= 0 ||
+            input->text_length <= 0 ||
+            input->text_length >
+                input->text_capacity) {
+            return 0;
+        }
+
+        value =
+            std::string{
+                input->text_buffer,
+                static_cast<std::size_t>(
+                    input->text_length - 1)};
         break;
     default:
         return 0;
@@ -1240,9 +1293,9 @@ bool ManagedRuntime::initialize(
     const int abi_version =
         abi();
 
-    if (abi_version != 11) {
+    if (abi_version != 12) {
         diagnostic_ =
-            "managed bridge ABI mismatch: expected 11, got " +
+            "managed bridge ABI mismatch: expected 12, got " +
             std::to_string(
                 abi_version);
         shutdown();
@@ -1451,7 +1504,7 @@ bool ManagedRuntime::initialize(
         !count_) {
 
         diagnostic_ =
-            "managed bridge is missing one or more ABI v11 entry points";
+            "managed bridge is missing one or more ABI v12 entry points";
         shutdown();
         return false;
     }
@@ -1558,7 +1611,7 @@ bool ManagedRuntime::initialize(
     }
 
     diagnostic_ =
-        "managed gameplay runtime initialized; ABI v11 activation lifecycle native World lifetime input and coroutine callbacks ready";
+        "managed gameplay runtime initialized; ABI v12 activation lifecycle native World lifetime input and coroutine callbacks ready";
 
     return true;
 }

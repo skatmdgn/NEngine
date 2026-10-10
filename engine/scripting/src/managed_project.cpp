@@ -168,7 +168,7 @@ namespace NEngine.Internal
 
     public static class NativeBridge
     {
-        public const int AbiVersion = 11;
+        public const int AbiVersion = 12;
 
         private static readonly Dictionary<long, NEngine.Behaviour> Instances = new();
         private static long _nextHandle = 1;
@@ -773,6 +773,9 @@ std::string api_stub(
         public ulong unsignedValue;
         public double numberValue;
         public float x, y, z, w;
+        public nint textBuffer;
+        public int textCapacity;
+        public int textLength;
     }
 
     internal static class NativeWorld
@@ -1128,6 +1131,119 @@ std::string api_stub(
                 propertyName,
                 ref value) > 0;
 
+        internal static bool TryGetTextProperty(
+            ulong entityId,
+            string typeName,
+            string propertyName,
+            out string value)
+        {
+            value = string.Empty;
+
+            NativePropertyValue state =
+                new NativePropertyValue();
+
+            int first =
+                InvokeProperty(
+                    _getProperty,
+                    entityId,
+                    typeName,
+                    propertyName,
+                    ref state);
+
+            if (first <= 0 ||
+                state.kind != 7 ||
+                state.textLength <= 0 ||
+                state.textLength >
+                    1024 * 1024)
+            {
+                return false;
+            }
+
+            nint buffer =
+                Marshal.AllocHGlobal(
+                    state.textLength);
+
+            try
+            {
+                state.textBuffer =
+                    buffer;
+                state.textCapacity =
+                    state.textLength;
+
+                int second =
+                    InvokeProperty(
+                        _getProperty,
+                        entityId,
+                        typeName,
+                        propertyName,
+                        ref state);
+
+                if (second <= 0 ||
+                    state.kind != 7)
+                {
+                    return false;
+                }
+
+                value =
+                    Marshal.PtrToStringUTF8(
+                        buffer) ??
+                    string.Empty;
+
+                return true;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(
+                    buffer);
+            }
+        }
+
+        internal static bool SetTextProperty(
+            ulong entityId,
+            string typeName,
+            string propertyName,
+            string value)
+        {
+            byte[] bytes =
+                Encoding.UTF8.GetBytes(
+                    (value ?? string.Empty) +
+                    "\0");
+
+            nint buffer =
+                Marshal.AllocHGlobal(
+                    bytes.Length);
+
+            try
+            {
+                Marshal.Copy(
+                    bytes,
+                    0,
+                    buffer,
+                    bytes.Length);
+
+                NativePropertyValue state =
+                    new NativePropertyValue
+                    {
+                        kind = 7,
+                        textBuffer = buffer,
+                        textCapacity = bytes.Length,
+                        textLength = bytes.Length
+                    };
+
+                return InvokeProperty(
+                    _setProperty,
+                    entityId,
+                    typeName,
+                    propertyName,
+                    ref state) > 0;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(
+                    buffer);
+            }
+        }
+
         internal static string? NativeComponentName(Type type)
         {
             if (type == typeof(Transform)) return "NEngine.Transform";
@@ -1290,6 +1406,30 @@ std::string api_stub(
                     : fallback;
         }
 
+        private protected string NativeString(
+            string propertyName,
+            string fallback = "")
+        {
+            if (!gameObject.nativeBound ||
+                !NativeWorld.available)
+            {
+                return fallback;
+            }
+
+            string? typeName =
+                NativeWorld.NativeComponentName(
+                    GetType());
+
+            return typeName != null &&
+                NativeWorld.TryGetTextProperty(
+                    gameObject.instanceId,
+                    typeName,
+                    propertyName,
+                    out string value)
+                    ? value
+                    : fallback;
+        }
+
         private protected Vector3 NativeVector3(
             string propertyName,
             Vector3 fallback)
@@ -1342,6 +1482,30 @@ std::string api_stub(
                     kind = 2,
                     integerValue = value
                 });
+        }
+
+        private protected void SetNativeString(
+            string propertyName,
+            string value)
+        {
+            if (!gameObject.nativeBound ||
+                !NativeWorld.available)
+            {
+                return;
+            }
+
+            string? typeName =
+                NativeWorld.NativeComponentName(
+                    GetType());
+
+            if (typeName != null)
+            {
+                NativeWorld.SetTextProperty(
+                    gameObject.instanceId,
+                    typeName,
+                    propertyName,
+                    value);
+            }
         }
 
         private protected void SetNativeVector3(

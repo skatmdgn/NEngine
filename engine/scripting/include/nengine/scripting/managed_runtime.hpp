@@ -292,6 +292,9 @@ private:
         float y{0.0f};
         float z{0.0f};
         float w{0.0f};
+        char* text_buffer{nullptr};
+        std::int32_t text_capacity{0};
+        std::int32_t text_length{0};
     };
 
     using WorldCreateFn =
