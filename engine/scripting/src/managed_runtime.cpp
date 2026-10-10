@@ -496,6 +496,216 @@ int ManagedRuntime::callback_has_component(
         : 0;
 }
 
+int ManagedRuntime::callback_get_property(
+    void* context,
+    std::uint64_t entity_id,
+    const char* type_name,
+    const char* property_name,
+    NativePropertyValue* output) {
+
+    auto* state =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!state ||
+        !state->world ||
+        !state->property_read ||
+        !type_name ||
+        *type_name == '\0' ||
+        !property_name ||
+        *property_name == '\0' ||
+        !output) {
+        return -1;
+    }
+
+    const core::Entity entity{
+        entity_id};
+
+    if (!state->world->is_alive(
+            entity)) {
+        return -1;
+    }
+
+    core::PropertyValue value;
+
+    try {
+        if (!state->property_read(
+                state->property_context,
+                *state->world,
+                entity,
+                type_name,
+                property_name,
+                value)) {
+            return 0;
+        }
+    } catch (...) {
+        return -2;
+    }
+
+    *output = {};
+
+    if (const auto* typed =
+            std::get_if<bool>(
+                &value)) {
+        output->kind = 1;
+        output->boolean_value =
+            *typed ? 1 : 0;
+        return 1;
+    }
+
+    if (const auto* typed =
+            std::get_if<std::int64_t>(
+                &value)) {
+        output->kind = 2;
+        output->integer_value =
+            *typed;
+        return 1;
+    }
+
+    if (const auto* typed =
+            std::get_if<std::uint64_t>(
+                &value)) {
+        output->kind = 3;
+        output->unsigned_value =
+            *typed;
+        return 1;
+    }
+
+    if (const auto* typed =
+            std::get_if<double>(
+                &value)) {
+        output->kind = 4;
+        output->number_value =
+            *typed;
+        return 1;
+    }
+
+    if (const auto* typed =
+            std::get_if<core::Vec3>(
+                &value)) {
+        output->kind = 5;
+        output->x = typed->x;
+        output->y = typed->y;
+        output->z = typed->z;
+        return 1;
+    }
+
+    if (const auto* typed =
+            std::get_if<core::Quat>(
+                &value)) {
+        output->kind = 6;
+        output->x = typed->x;
+        output->y = typed->y;
+        output->z = typed->z;
+        output->w = typed->w;
+        return 1;
+    }
+
+    return 0;
+}
+
+int ManagedRuntime::callback_set_property(
+    void* context,
+    std::uint64_t entity_id,
+    const char* type_name,
+    const char* property_name,
+    NativePropertyValue* input) {
+
+    auto* state =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!state ||
+        !state->world ||
+        !state->property_write ||
+        !type_name ||
+        *type_name == '\0' ||
+        !property_name ||
+        *property_name == '\0' ||
+        !input) {
+        return -1;
+    }
+
+    const core::Entity entity{
+        entity_id};
+
+    if (!state->world->is_alive(
+            entity)) {
+        return -1;
+    }
+
+    core::PropertyValue value;
+
+    switch (input->kind) {
+    case 1:
+        value =
+            input->boolean_value != 0;
+        break;
+    case 2:
+        value =
+            input->integer_value;
+        break;
+    case 3:
+        value =
+            input->unsigned_value;
+        break;
+    case 4:
+        value =
+            input->number_value;
+        break;
+    case 5:
+        value =
+            core::Vec3{
+                input->x,
+                input->y,
+                input->z};
+        break;
+    case 6:
+        value =
+            core::Quat{
+                input->x,
+                input->y,
+                input->z,
+                input->w};
+        break;
+    default:
+        return 0;
+    }
+
+    try {
+        return state->property_write(
+            state->property_context,
+            *state->world,
+            entity,
+            type_name,
+            property_name,
+            value)
+            ? 1
+            : 0;
+    } catch (...) {
+        return -2;
+    }
+}
+
+void ManagedRuntime::bind_property_access(
+    void* context,
+    PropertyReadFn read,
+    PropertyWriteFn write) noexcept {
+
+    if (!world_context_) {
+        world_context_ =
+            std::make_unique<
+                NativeWorldContext>();
+    }
+
+    world_context_->property_context =
+        context;
+    world_context_->property_read =
+        read;
+    world_context_->property_write =
+        write;
+}
+
 void ManagedRuntime::bind_world(
     core::World* world) noexcept {
 
@@ -1030,9 +1240,9 @@ bool ManagedRuntime::initialize(
     const int abi_version =
         abi();
 
-    if (abi_version != 10) {
+    if (abi_version != 11) {
         diagnostic_ =
-            "managed bridge ABI mismatch: expected 10, got " +
+            "managed bridge ABI mismatch: expected 11, got " +
             std::to_string(
                 abi_version);
         shutdown();
@@ -1241,7 +1451,7 @@ bool ManagedRuntime::initialize(
         !count_) {
 
         diagnostic_ =
-            "managed bridge is missing one or more ABI v10 entry points";
+            "managed bridge is missing one or more ABI v11 entry points";
         shutdown();
         return false;
     }
@@ -1285,6 +1495,10 @@ bool ManagedRuntime::initialize(
         &ManagedRuntime::callback_get_child_at;
     callbacks.has_component =
         &ManagedRuntime::callback_has_component;
+    callbacks.get_property =
+        &ManagedRuntime::callback_get_property;
+    callbacks.set_property =
+        &ManagedRuntime::callback_set_property;
 
     if (configure_world_callbacks_(
             &callbacks) <= 0) {
@@ -1344,7 +1558,7 @@ bool ManagedRuntime::initialize(
     }
 
     diagnostic_ =
-        "managed gameplay runtime initialized; ABI v10 activation lifecycle native World lifetime input and coroutine callbacks ready";
+        "managed gameplay runtime initialized; ABI v11 activation lifecycle native World lifetime input and coroutine callbacks ready";
 
     return true;
 }

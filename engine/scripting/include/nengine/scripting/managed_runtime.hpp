@@ -3,11 +3,13 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "nengine/core/entity.hpp"
+#include "nengine/core/property_value.hpp"
 #include "nengine/core/transform.hpp"
 #include "nengine/scripting/dotnet_host.hpp"
 
@@ -119,6 +121,29 @@ public:
     bool reload_gameplay(
         const std::filesystem::path& assembly_path,
         std::string_view assembly_name);
+
+    using PropertyReadFn =
+        bool (*)(
+            void*,
+            const core::World&,
+            core::Entity,
+            std::string_view,
+            std::string_view,
+            core::PropertyValue&);
+
+    using PropertyWriteFn =
+        bool (*)(
+            void*,
+            core::World&,
+            core::Entity,
+            std::string_view,
+            std::string_view,
+            const core::PropertyValue&);
+
+    void bind_property_access(
+        void* context,
+        PropertyReadFn read,
+        PropertyWriteFn write) noexcept;
 
     void bind_world(
         core::World* world) noexcept;
@@ -251,7 +276,22 @@ private:
     struct NativeWorldContext {
         core::World* world{nullptr};
         const input::InputState* input{nullptr};
+        void* property_context{nullptr};
+        PropertyReadFn property_read{nullptr};
+        PropertyWriteFn property_write{nullptr};
         std::vector<core::Entity> pending_destroy{};
+    };
+
+    struct NativePropertyValue {
+        std::int32_t kind{0};
+        std::int32_t boolean_value{0};
+        std::int64_t integer_value{0};
+        std::uint64_t unsigned_value{0};
+        double number_value{0.0};
+        float x{0.0f};
+        float y{0.0f};
+        float z{0.0f};
+        float w{0.0f};
     };
 
     using WorldCreateFn =
@@ -332,6 +372,14 @@ private:
             std::uint64_t,
             const char*);
 
+    using WorldPropertyFn =
+        int (*)(
+            void*,
+            std::uint64_t,
+            const char*,
+            const char*,
+            NativePropertyValue*);
+
     struct NativeWorldCallbacks {
         void* context{nullptr};
         WorldCreateFn create{nullptr};
@@ -349,6 +397,8 @@ private:
         WorldChildCountFn get_child_count{nullptr};
         WorldChildAtFn get_child_at{nullptr};
         WorldHasComponentFn has_component{nullptr};
+        WorldPropertyFn get_property{nullptr};
+        WorldPropertyFn set_property{nullptr};
     };
 
     using ConfigureWorldCallbacksFn =
@@ -423,6 +473,20 @@ private:
         void* context,
         std::uint64_t entity_id,
         const char* type_name);
+
+    static int callback_get_property(
+        void* context,
+        std::uint64_t entity_id,
+        const char* type_name,
+        const char* property_name,
+        NativePropertyValue* value);
+
+    static int callback_set_property(
+        void* context,
+        std::uint64_t entity_id,
+        const char* type_name,
+        const char* property_name,
+        NativePropertyValue* value);
 
     using InputKeyFn =
         int (*)(

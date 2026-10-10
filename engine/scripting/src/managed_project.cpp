@@ -168,7 +168,7 @@ namespace NEngine.Internal
 
     public static class NativeBridge
     {
-        public const int AbiVersion = 10;
+        public const int AbiVersion = 11;
 
         private static readonly Dictionary<long, NEngine.Behaviour> Instances = new();
         private static long _nextHandle = 1;
@@ -198,6 +198,8 @@ namespace NEngine.Internal
             public nint getChildCount;
             public nint getChildAt;
             public nint hasComponent;
+            public nint getProperty;
+            public nint setProperty;
         }
 
         [UnmanagedCallersOnly]
@@ -230,7 +232,9 @@ namespace NEngine.Internal
                     callbacks.setParent,
                     callbacks.getChildCount,
                     callbacks.getChildAt,
-                    callbacks.hasComponent);
+                    callbacks.hasComponent,
+                    callbacks.getProperty,
+                    callbacks.setProperty);
 
                 return 1;
             }
@@ -760,6 +764,17 @@ std::string api_stub(
         public float sx, sy, sz;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativePropertyValue
+    {
+        public int kind;
+        public int booleanValue;
+        public long integerValue;
+        public ulong unsignedValue;
+        public double numberValue;
+        public float x, y, z, w;
+    }
+
     internal static class NativeWorld
     {
         internal const ulong InvalidEntity = ulong.MaxValue;
@@ -806,6 +821,14 @@ std::string api_stub(
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate int HasComponentFn(nint context, ulong entityId, nint typeNameUtf8);
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int PropertyFn(
+            nint context,
+            ulong entityId,
+            nint typeNameUtf8,
+            nint propertyNameUtf8,
+            ref NativePropertyValue value);
+
         private static nint _context;
         private static CreateFn? _create;
         private static DestroyFn? _destroy;
@@ -822,6 +845,8 @@ std::string api_stub(
         private static GetChildCountFn? _getChildCount;
         private static GetChildAtFn? _getChildAt;
         private static HasComponentFn? _hasComponent;
+        private static PropertyFn? _getProperty;
+        private static PropertyFn? _setProperty;
 
         internal static bool available =>
             _context != 0 &&
@@ -843,7 +868,9 @@ std::string api_stub(
             nint setParent,
             nint getChildCount,
             nint getChildAt,
-            nint hasComponent)
+            nint hasComponent,
+            nint getProperty,
+            nint setProperty)
         {
             _context = context;
             _create = Marshal.GetDelegateForFunctionPointer<CreateFn>(create);
@@ -861,6 +888,8 @@ std::string api_stub(
             _getChildCount = Marshal.GetDelegateForFunctionPointer<GetChildCountFn>(getChildCount);
             _getChildAt = Marshal.GetDelegateForFunctionPointer<GetChildAtFn>(getChildAt);
             _hasComponent = Marshal.GetDelegateForFunctionPointer<HasComponentFn>(hasComponent);
+            _getProperty = Marshal.GetDelegateForFunctionPointer<PropertyFn>(getProperty);
+            _setProperty = Marshal.GetDelegateForFunctionPointer<PropertyFn>(setProperty);
         }
 
         internal static void Clear()
@@ -881,6 +910,8 @@ std::string api_stub(
             _getChildCount = null;
             _getChildAt = null;
             _hasComponent = null;
+            _getProperty = null;
+            _setProperty = null;
         }
 
         private static ulong WithUtf8Entity(
@@ -1012,6 +1043,90 @@ std::string api_stub(
         internal static bool HasComponent(ulong entityId, string typeName) =>
             _hasComponent != null &&
             WithUtf8(typeName, ptr => _hasComponent(_context, entityId, ptr) > 0);
+
+        private static int InvokeProperty(
+            PropertyFn? callback,
+            ulong entityId,
+            string typeName,
+            string propertyName,
+            ref NativePropertyValue value)
+        {
+            if (callback == null)
+                return -1;
+
+            byte[] typeBytes =
+                Encoding.UTF8.GetBytes(
+                    (typeName ?? string.Empty) + "\0");
+
+            byte[] propertyBytes =
+                Encoding.UTF8.GetBytes(
+                    (propertyName ?? string.Empty) + "\0");
+
+            nint typeBuffer =
+                Marshal.AllocHGlobal(
+                    typeBytes.Length);
+
+            nint propertyBuffer =
+                Marshal.AllocHGlobal(
+                    propertyBytes.Length);
+
+            try
+            {
+                Marshal.Copy(
+                    typeBytes,
+                    0,
+                    typeBuffer,
+                    typeBytes.Length);
+
+                Marshal.Copy(
+                    propertyBytes,
+                    0,
+                    propertyBuffer,
+                    propertyBytes.Length);
+
+                return callback(
+                    _context,
+                    entityId,
+                    typeBuffer,
+                    propertyBuffer,
+                    ref value);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(
+                    typeBuffer);
+                Marshal.FreeHGlobal(
+                    propertyBuffer);
+            }
+        }
+
+        internal static bool TryGetProperty(
+            ulong entityId,
+            string typeName,
+            string propertyName,
+            out NativePropertyValue value)
+        {
+            value = new NativePropertyValue();
+
+            return InvokeProperty(
+                _getProperty,
+                entityId,
+                typeName,
+                propertyName,
+                ref value) > 0;
+        }
+
+        internal static bool SetProperty(
+            ulong entityId,
+            string typeName,
+            string propertyName,
+            NativePropertyValue value) =>
+            InvokeProperty(
+                _setProperty,
+                entityId,
+                typeName,
+                propertyName,
+                ref value) > 0;
 
         internal static string? NativeComponentName(Type type)
         {

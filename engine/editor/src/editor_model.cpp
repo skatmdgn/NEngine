@@ -3,6 +3,71 @@
 #include "nengine/editor/scripting_integration.hpp"
 
 namespace nengine::editor {
+namespace {
+
+void bind_managed_property_access(
+    scripting::ManagedRuntime& runtime,
+    PropertyAccessRegistry& properties) {
+
+    runtime.bind_property_access(
+        &properties,
+        [](
+            void* context,
+            const core::World& world,
+            core::Entity entity,
+            std::string_view component_name,
+            std::string_view property_name,
+            core::PropertyValue& output) {
+
+            auto* registry =
+                static_cast<
+                    PropertyAccessRegistry*>(
+                        context);
+
+            if (!registry) {
+                return false;
+            }
+
+            const auto value =
+                registry->read(
+                    world,
+                    entity,
+                    core::ComponentRegistry::stable_id(
+                        component_name),
+                    property_name);
+
+            if (!value) {
+                return false;
+            }
+
+            output = *value;
+            return true;
+        },
+        [](
+            void* context,
+            core::World& world,
+            core::Entity entity,
+            std::string_view component_name,
+            std::string_view property_name,
+            const core::PropertyValue& value) {
+
+            auto* registry =
+                static_cast<
+                    PropertyAccessRegistry*>(
+                        context);
+
+            return registry &&
+                registry->write(
+                    world,
+                    entity,
+                    core::ComponentRegistry::stable_id(
+                        component_name),
+                    property_name,
+                    value);
+        });
+}
+
+} // namespace
 
 EditorModel::EditorModel() {
     component_registry_.register_type(
@@ -195,6 +260,10 @@ bool EditorModel::initialize_managed_runtime(
     managed_runtime_.bind_input(
         &input_state_);
 
+    bind_managed_property_access(
+        managed_runtime_,
+        property_access_);
+
     managed_script_system_.bind(
         &managed_runtime_);
 
@@ -234,6 +303,10 @@ bool EditorModel::reload_managed_runtime(
 
     managed_runtime_.bind_input(
         &input_state_);
+
+    bind_managed_property_access(
+        managed_runtime_,
+        property_access_);
 
     managed_script_system_.bind(
         &managed_runtime_);
