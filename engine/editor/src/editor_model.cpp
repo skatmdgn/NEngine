@@ -312,6 +312,39 @@ bool EditorModel::begin_play_mode() {
     audio_playback_system_.reset();
     audio_mix_snapshot_ = {};
 
+    std::string audio_device_error;
+
+    if (!audio_output_device_.open(
+            &audio_device_error)) {
+
+        console_.warning(
+            "Audio",
+            audio_device_error.empty()
+                ? "Audio output device could not be opened."
+                : std::move(audio_device_error));
+    } else {
+        const auto info =
+            audio_output_device_.info();
+
+        if (!info.diagnostic.empty()) {
+            console_.warning(
+                "Audio",
+                info.diagnostic);
+        } else {
+            console_.info(
+                "Audio",
+                "Audio output: " +
+                    info.backend +
+                    " " +
+                    std::to_string(
+                        info.sample_rate) +
+                    " Hz, " +
+                    std::to_string(
+                        info.channels) +
+                    " channel(s).");
+        }
+    }
+
     if (managed_runtime_.valid() &&
         !managed_runtime_.reset_time()) {
 
@@ -327,6 +360,7 @@ bool EditorModel::stop_play_mode() {
     managed_script_system_.clear(play_session_.runtime_world());
     physics_contact_tracker_.clear();
     audio_playback_system_.reset();
+    audio_output_device_.close();
     audio_mix_snapshot_ = {};
     return play_session_.stop();
 }
@@ -341,6 +375,7 @@ bool EditorModel::initialize_managed_runtime(
     managed_script_system_.clear(play_session_.runtime_world());
     physics_contact_tracker_.clear();
     audio_playback_system_.reset();
+    audio_output_device_.close();
     audio_mix_snapshot_ = {};
     managed_runtime_.shutdown();
 
@@ -431,6 +466,7 @@ void EditorModel::shutdown_managed_runtime()
     managed_script_system_.clear(play_session_.runtime_world());
     physics_contact_tracker_.clear();
     audio_playback_system_.reset();
+    audio_output_device_.close();
     audio_mix_snapshot_ = {};
     managed_runtime_.shutdown();
 }
@@ -446,6 +482,7 @@ void EditorModel::tick_runtime(
             play_session_.runtime_world());
         physics_contact_tracker_.clear();
         audio_playback_system_.reset();
+        audio_output_device_.close();
         audio_mix_snapshot_ = {};
         return;
     }
@@ -475,6 +512,7 @@ void EditorModel::tick_runtime(
     std::string animation_error;
     std::string script_error;
     std::string audio_error;
+    std::string audio_device_error;
 
     const auto resolve_audio_duration =
         [this, &audio_error](
@@ -612,6 +650,16 @@ void EditorModel::tick_runtime(
             audio_mix_snapshot_ =
                 audio::build_mix_snapshot(
                     *runtime);
+
+            if (audio_output_device_.is_open()) {
+                audio_output_device_.pump(
+                    audio_mix_snapshot_,
+                    [this](assets::AssetGuid guid) {
+                        return audio_clip_cache_.find(
+                            guid);
+                    },
+                    &audio_device_error);
+            }
         }
     } else {
         // A host frame may contain zero or several fixed simulation steps.
@@ -648,6 +696,16 @@ void EditorModel::tick_runtime(
             audio_mix_snapshot_ =
                 audio::build_mix_snapshot(
                     *runtime);
+
+            if (audio_output_device_.is_open()) {
+                audio_output_device_.pump(
+                    audio_mix_snapshot_,
+                    [this](assets::AssetGuid guid) {
+                        return audio_clip_cache_.find(
+                            guid);
+                    },
+                    &audio_device_error);
+            }
         }
     }
 
@@ -670,6 +728,13 @@ void EditorModel::tick_runtime(
             "Audio",
             std::move(
                 audio_error));
+    }
+
+    if (!audio_device_error.empty()) {
+        console_.warning(
+            "Audio",
+            std::move(
+                audio_device_error));
     }
 }
 

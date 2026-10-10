@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "nengine/audio/audio_device.hpp"
 #include "nengine/audio/clip_cache.hpp"
 #include "nengine/audio/mix_snapshot.hpp"
 #include "nengine/audio/playback.hpp"
@@ -135,6 +136,11 @@ public:
         return audio_mix_snapshot_;
     }
 
+    audio::AudioDeviceInfo
+    audio_device_info() const {
+        return audio_output_device_.info();
+    }
+
     const audio::AudioClipCache&
     audio_clip_cache() const noexcept {
         return audio_clip_cache_;
@@ -191,6 +197,9 @@ private:
 
     audio::AudioPlaybackSystem
         audio_playback_system_{};
+
+    audio::AudioOutputDevice
+        audio_output_device_{};
 
     audio::AudioMixSnapshot
         audio_mix_snapshot_{};
