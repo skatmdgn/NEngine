@@ -46,6 +46,17 @@ public:
         float delta_seconds,
         std::string* error = nullptr);
 
+    bool dispatch_physics_event(
+        core::World& world,
+        core::Entity target,
+        core::Entity other,
+        int phase,
+        bool is_trigger,
+        bool is_2d,
+        core::Vec3 normal,
+        float penetration,
+        std::string* error = nullptr);
+
     void clear(
         core::World* world = nullptr) noexcept;
 

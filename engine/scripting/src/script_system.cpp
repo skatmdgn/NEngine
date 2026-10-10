@@ -1074,6 +1074,160 @@ ManagedScriptSystem::update(
     return stats;
 }
 
+bool ManagedScriptSystem::dispatch_physics_event(
+    core::World& world,
+    core::Entity target,
+    core::Entity other,
+    int phase,
+    bool is_trigger,
+    bool is_2d,
+    core::Vec3 normal,
+    float penetration,
+    std::string* error) {
+
+    if (!runtime_ ||
+        !runtime_->valid() ||
+        !world.is_alive(target) ||
+        !world.is_alive(other) ||
+        phase < 0 ||
+        phase > 2) {
+
+        if (error) {
+            *error =
+                "managed physics event dispatch received invalid runtime or entities";
+        }
+        return false;
+    }
+
+    auto existing =
+        instances_.find(
+            target.value);
+
+    if (existing == instances_.end() ||
+        !existing->second.active) {
+        return true;
+    }
+
+    RuntimeWorldBinding world_binding{
+        runtime_,
+        &world
+    };
+
+    auto* transform =
+        world.transform(target);
+
+    const auto* behaviour =
+        world.get_component<ScriptBehaviour>(
+            target,
+            script_behaviour_type());
+
+    if (!transform ||
+        !behaviour) {
+        if (error) {
+            *error =
+                "managed physics event target has no Transform or ScriptBehaviour";
+        }
+        return false;
+    }
+
+    auto& instance =
+        existing->second;
+
+    if (!runtime_->set_transform(
+            instance.handle,
+            *transform) ||
+        !runtime_->set_game_object(
+            instance.handle,
+            target,
+            world.name(target),
+            world.active(target)) ||
+        !runtime_->set_behaviour_enabled(
+            instance.handle,
+            behaviour->enabled) ||
+        !runtime_->physics_event(
+            instance.handle,
+            other,
+            phase,
+            is_trigger,
+            is_2d,
+            normal,
+            penetration)) {
+
+        if (error) {
+            *error =
+                runtime_->diagnostic();
+        }
+        return false;
+    }
+
+    transform =
+        world.transform(target);
+
+    if (!transform ||
+        !runtime_->get_transform(
+            instance.handle,
+            *transform)) {
+
+        if (error) {
+            *error =
+                runtime_->diagnostic();
+        }
+        return false;
+    }
+
+    core::Entity managed_entity =
+        core::Entity::invalid();
+
+    std::string managed_name;
+    bool managed_active = true;
+
+    if (!runtime_->get_game_object(
+            instance.handle,
+            managed_entity,
+            managed_name,
+            managed_active) ||
+        managed_entity != target ||
+        managed_name.empty() ||
+        !world.set_name(
+            target,
+            std::move(managed_name)) ||
+        !world.set_active(
+            target,
+            managed_active)) {
+
+        if (error) {
+            *error =
+                "managed physics callback returned invalid GameObject state";
+        }
+        return false;
+    }
+
+    bool managed_enabled = false;
+
+    if (!runtime_->get_behaviour_enabled(
+            instance.handle,
+            managed_enabled)) {
+
+        if (error) {
+            *error =
+                runtime_->diagnostic();
+        }
+        return false;
+    }
+
+    auto* mutable_behaviour =
+        world.get_component<ScriptBehaviour>(
+            target,
+            script_behaviour_type());
+
+    if (mutable_behaviour) {
+        mutable_behaviour->enabled =
+            managed_enabled;
+    }
+
+    return true;
+}
+
 void ManagedScriptSystem::clear(
     core::World* world) noexcept {
 
