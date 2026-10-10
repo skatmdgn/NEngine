@@ -583,8 +583,11 @@ int main() {
                 << "    private void Update() {\n"
                 << "        if (ran) return;\n"
                 << "        GameObject spawned = new GameObject(\"Managed Spawn\");\n"
+                << "        GameObject survivor = new GameObject(\"Managed Survivor\");\n"
                 << "        GameObject? found = GameObject.Find(\"Managed Spawn\");\n"
                 << "        if (found == null || found.GetInstanceID() != spawned.GetInstanceID()) throw new System.Exception(\"find mismatch\");\n"
+                << "        GameObject.Destroy(spawned);\n"
+                << "        GameObject.Destroy(spawned);\n"
                 << "        GameObject.Destroy(gameObject);\n"
                 << "        ran = true;\n"
                 << "    }\n"
@@ -926,12 +929,12 @@ int main() {
                             lifetime_tick.unresolved == 0u &&
                             !lifetime_world.is_alive(
                                 lifetime_entity) &&
-                            lifetime_world.is_alive(
+                            !lifetime_world.is_alive(
                                 spawned_entity) &&
                             lifetime_world.size() == 1u &&
                             lifetime_system.instance_count() == 0u &&
                             managed_runtime.instance_count() == 0,
-                            "managed GameObject create/find and deferred self-destroy round-trip through native World");
+                            "managed GameObject create/find deferred foreign destroy duplicate destroy and self-destroy round-trip through native World");
 
                         lifetime_system.clear();
 
