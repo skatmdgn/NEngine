@@ -1799,6 +1799,18 @@ std::string api_stub(
 
     public sealed class MeshRenderer : Component
     {
+        public AssetGuid mesh
+        {
+            get => NativeAssetGuid("Mesh");
+            set => SetNativeAssetGuid("Mesh", value);
+        }
+
+        public AssetGuid material
+        {
+            get => NativeAssetGuid("Material");
+            set => SetNativeAssetGuid("Material", value);
+        }
+
         public bool enabled
         {
             get => NativeBool("Enabled", true);
