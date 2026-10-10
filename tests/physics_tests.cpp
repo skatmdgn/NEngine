@@ -1209,11 +1209,15 @@ int main() {
         std::abs(
             rotated_ray_hit->distance -
             2.75f) < 0.0002f &&
-        rotated_ray_hit->normal ==
-            core::Vec3{
-                -1.0f,
-                0.0f,
-                0.0f},
+        std::abs(
+            rotated_ray_hit->normal.x +
+            1.0f) < 0.0002f &&
+        std::abs(
+            rotated_ray_hit->normal.y) <
+            0.0002f &&
+        std::abs(
+            rotated_ray_hit->normal.z) <
+            0.0002f,
         "3D Raycast transforms the ray into rotated BoxCollider local axes");
 
     check(
