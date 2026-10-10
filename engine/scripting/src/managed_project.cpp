@@ -1608,8 +1608,59 @@ std::string api_stub(
         }
     }
 
-    public sealed class MeshRenderer : Component { }
-    public sealed class SpriteRenderer : Component { }
+    public sealed class MeshRenderer : Component
+    {
+        public bool enabled
+        {
+            get => NativeBool("Enabled", true);
+            set => SetNativeBool("Enabled", value);
+        }
+
+        public bool castShadows
+        {
+            get => NativeBool("Cast Shadows", true);
+            set => SetNativeBool("Cast Shadows", value);
+        }
+
+        public bool receiveShadows
+        {
+            get => NativeBool("Receive Shadows", true);
+            set => SetNativeBool("Receive Shadows", value);
+        }
+    }
+
+    public sealed class SpriteRenderer : Component
+    {
+        public bool enabled
+        {
+            get => NativeBool("Enabled", true);
+            set => SetNativeBool("Enabled", value);
+        }
+
+        public float pixelsPerUnit
+        {
+            get => NativeFloat("Pixels Per Unit", 100);
+            set => SetNativeFloat("Pixels Per Unit", value);
+        }
+
+        public int sortingOrder
+        {
+            get => (int)NativeInteger("Sort Order", 0);
+            set => SetNativeInteger("Sort Order", value);
+        }
+
+        public bool flipX
+        {
+            get => NativeBool("Flip X", false);
+            set => SetNativeBool("Flip X", value);
+        }
+
+        public bool flipY
+        {
+            get => NativeBool("Flip Y", false);
+            set => SetNativeBool("Flip Y", value);
+        }
+    }
 
     public sealed class GameObject
     {
