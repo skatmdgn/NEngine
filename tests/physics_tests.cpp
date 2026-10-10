@@ -1138,12 +1138,12 @@ int main() {
 
     if (clipped_reference_box) {
         clipped_reference_box->size =
-            {4.0f, 1.0f, 1.0f};
+            {4.0f, 1.0f, 4.0f};
     }
 
     if (clipped_incident_box) {
         clipped_incident_box->size =
-            {1.0f, 4.0f, 1.0f};
+            {1.0f, 4.0f, 4.0f};
     }
 
     clipped_manifold_world.transform(
@@ -1194,7 +1194,7 @@ int main() {
                 std::abs(
                     std::abs(
                         point.point.z) -
-                    0.5f) <
+                    2.0f) <
                     0.0003f &&
                 std::abs(
                     point.penetration -

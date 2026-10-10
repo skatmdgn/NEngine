@@ -1378,29 +1378,170 @@ box_face_vertices(
             box,
             tangent_axes[1]);
 
-    const float signs[]{
+    const float first_signs[]{
         -1.0f,
+        1.0f,
+        1.0f,
+        -1.0f
+    };
+
+    const float second_signs[]{
+        -1.0f,
+        -1.0f,
+        1.0f,
         1.0f
     };
 
-    for (const float first_sign :
-         signs) {
-        for (const float second_sign :
-             signs) {
+    for (int index = 0;
+         index < 4;
+         ++index) {
 
-            result.push_back(
+        result.push_back(
+            added(
                 added(
-                    added(
-                        face_center,
-                        scaled(
-                            tangent_a,
-                            extent_a *
-                                first_sign)),
+                    face_center,
                     scaled(
-                        tangent_b,
-                        extent_b *
-                            second_sign)));
+                        tangent_a,
+                        extent_a *
+                            first_signs[index])),
+                scaled(
+                    tangent_b,
+                    extent_b *
+                        second_signs[index])));
+    }
+
+    return result;
+}
+
+std::vector<core::Vec3>
+clip_segment_to_reference_edge(
+    const std::vector<core::Vec3>& input,
+    core::Vec3 reference_face_center,
+    core::Vec3 tangent,
+    float extent) {
+
+    if (input.size() != 2u) {
+        return {};
+    }
+
+    const auto first =
+        input[0];
+
+    const auto second =
+        input[1];
+
+    const core::Vec3 delta{
+        second.x - first.x,
+        second.y - first.y,
+        second.z - first.z
+    };
+
+    const core::Vec3 relative{
+        first.x -
+            reference_face_center.x,
+        first.y -
+            reference_face_center.y,
+        first.z -
+            reference_face_center.z
+    };
+
+    const float origin =
+        dot(
+            relative,
+            tangent);
+
+    const float velocity =
+        dot(
+            delta,
+            tangent);
+
+    float minimum = 0.0f;
+    float maximum = 1.0f;
+
+    constexpr float epsilon =
+        0.0000001f;
+
+    if (std::abs(velocity) <=
+        epsilon) {
+
+        if (origin < -extent ||
+            origin > extent) {
+            return {};
         }
+    } else {
+        float first_t =
+            (-extent - origin) /
+            velocity;
+
+        float second_t =
+            (extent - origin) /
+            velocity;
+
+        if (first_t > second_t) {
+            std::swap(
+                first_t,
+                second_t);
+        }
+
+        minimum =
+            std::max(
+                minimum,
+                first_t);
+
+        maximum =
+            std::min(
+                maximum,
+                second_t);
+
+        if (minimum >
+            maximum) {
+            return {};
+        }
+    }
+
+    const auto point_at =
+        [&](float t) {
+            return core::Vec3{
+                first.x +
+                    delta.x * t,
+                first.y +
+                    delta.y * t,
+                first.z +
+                    delta.z * t
+            };
+        };
+
+    std::vector<core::Vec3> result;
+
+    result.push_back(
+        point_at(
+            std::clamp(
+                minimum,
+                0.0f,
+                1.0f)));
+
+    const auto last =
+        point_at(
+            std::clamp(
+                maximum,
+                0.0f,
+                1.0f));
+
+    const core::Vec3 separation{
+        last.x -
+            result.front().x,
+        last.y -
+            result.front().y,
+        last.z -
+            result.front().z
+    };
+
+    if (dot(
+            separation,
+            separation) >
+        0.0000000001f) {
+        result.push_back(
+            last);
     }
 
     return result;
@@ -1762,54 +1903,76 @@ bool populate_box_pair_manifold(
             incident_outward,
             is_2d);
 
-    for (int axis_index = 0;
-         axis_index <
-             box_axis_count(is_2d);
-         ++axis_index) {
-
-        if (axis_index ==
-            reference_axis) {
-            continue;
-        }
-
-        const auto tangent =
-            box_axis(
-                reference,
-                axis_index);
-
-        const float extent =
-            box_extent(
-                reference,
-                axis_index);
+    if (is_2d) {
+        const int tangent_axis =
+            reference_axis == 0
+                ? 1
+                : 0;
 
         polygon =
-            clip_polygon_against_plane(
+            clip_segment_to_reference_edge(
                 polygon,
-                added(
-                    reference_face_center,
-                    scaled(
-                        tangent,
-                        extent)),
-                tangent);
+                reference_face_center,
+                box_axis(
+                    reference,
+                    tangent_axis),
+                box_extent(
+                    reference,
+                    tangent_axis));
 
         if (polygon.empty()) {
             return false;
         }
+    } else {
+        for (int axis_index = 0;
+             axis_index <
+                 box_axis_count(false);
+             ++axis_index) {
 
-        polygon =
-            clip_polygon_against_plane(
-                polygon,
-                added(
-                    reference_face_center,
+            if (axis_index ==
+                reference_axis) {
+                continue;
+            }
+
+            const auto tangent =
+                box_axis(
+                    reference,
+                    axis_index);
+
+            const float extent =
+                box_extent(
+                    reference,
+                    axis_index);
+
+            polygon =
+                clip_polygon_against_plane(
+                    polygon,
+                    added(
+                        reference_face_center,
+                        scaled(
+                            tangent,
+                            extent)),
+                    tangent);
+
+            if (polygon.empty()) {
+                return false;
+            }
+
+            polygon =
+                clip_polygon_against_plane(
+                    polygon,
+                    added(
+                        reference_face_center,
+                        scaled(
+                            tangent,
+                            -extent)),
                     scaled(
                         tangent,
-                        -extent)),
-                scaled(
-                    tangent,
-                    -1.0f));
+                        -1.0f));
 
-        if (polygon.empty()) {
-            return false;
+            if (polygon.empty()) {
+                return false;
+            }
         }
     }
 
