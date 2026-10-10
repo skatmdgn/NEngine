@@ -636,6 +636,46 @@ int main() {
         box_b)->local_position =
             {0.75f, 0.0f, 0.0f};
 
+    const auto query_3d_all =
+        physics::overlap_box(
+            collision_world,
+            {0.0f, 0.0f, 0.0f},
+            {2.0f, 2.0f, 2.0f});
+
+    const auto query_3d_solid =
+        physics::overlap_box(
+            collision_world,
+            {0.0f, 0.0f, 0.0f},
+            {2.0f, 2.0f, 2.0f},
+            false);
+
+    const auto query_2d =
+        physics::overlap_box_2d(
+            collision_world,
+            {0.0f, 0.0f},
+            {2.0f, 2.0f});
+
+    check(
+        query_3d_all.size() == 2u &&
+        query_3d_solid.size() == 1u &&
+        query_3d_solid.front() ==
+            box_a &&
+        query_2d.size() == 2u,
+        "OverlapBox queries return active 3D/2D colliders and can exclude triggers");
+
+    check(
+        physics::overlap_box(
+            collision_world,
+            {},
+            {0.0f, 1.0f, 1.0f})
+            .empty() &&
+        physics::overlap_box_2d(
+            collision_world,
+            {},
+            {-1.0f, 1.0f})
+            .empty(),
+        "OverlapBox queries reject non-positive query dimensions");
+
     const auto collision_frame =
         physics::step_physics(
             collision_world,

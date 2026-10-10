@@ -577,4 +577,109 @@ CollisionResolutionStats resolve_box_contacts_2d(
     return stats;
 }
 
+std::vector<core::Entity> overlap_box(
+    const core::World& world,
+    core::Vec3 center,
+    core::Vec3 size,
+    bool include_triggers) {
+
+    std::vector<core::Entity> result;
+
+    if (size.x <= 0.0f ||
+        size.y <= 0.0f ||
+        size.z <= 0.0f) {
+        return result;
+    }
+
+    ColliderBounds query;
+    query.center = center;
+    query.half = {
+        size.x * 0.5f,
+        size.y * 0.5f,
+        size.z * 0.5f
+    };
+
+    const auto bounds =
+        collect_bounds<BoxCollider>(
+            world,
+            box_collider_type(),
+            false);
+
+    for (const auto& candidate :
+         bounds) {
+
+        if (!include_triggers &&
+            candidate.trigger) {
+            continue;
+        }
+
+        BoxOverlap overlap;
+
+        if (overlap_pair(
+                query,
+                candidate,
+                false,
+                overlap)) {
+            result.push_back(
+                candidate.entity);
+        }
+    }
+
+    return result;
+}
+
+std::vector<core::Entity> overlap_box_2d(
+    const core::World& world,
+    core::Vec2 center,
+    core::Vec2 size,
+    bool include_triggers) {
+
+    std::vector<core::Entity> result;
+
+    if (size.x <= 0.0f ||
+        size.y <= 0.0f) {
+        return result;
+    }
+
+    ColliderBounds query;
+    query.center = {
+        center.x,
+        center.y,
+        0.0f
+    };
+    query.half = {
+        size.x * 0.5f,
+        size.y * 0.5f,
+        0.0f
+    };
+
+    const auto bounds =
+        collect_bounds<BoxCollider2D>(
+            world,
+            box_collider2d_type(),
+            true);
+
+    for (const auto& candidate :
+         bounds) {
+
+        if (!include_triggers &&
+            candidate.trigger) {
+            continue;
+        }
+
+        BoxOverlap overlap;
+
+        if (overlap_pair(
+                query,
+                candidate,
+                true,
+                overlap)) {
+            result.push_back(
+                candidate.entity);
+        }
+    }
+
+    return result;
+}
+
 } // namespace nengine::physics

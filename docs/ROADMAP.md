@@ -145,9 +145,11 @@ Roadmap entries are implementation order, not promises tied to dates.
 ## 0.6 — Physics, input, audio
 - [x] NEnginePhysics module + 3D/2D Rigidbody and BoxCollider metadata/Scene/Editor foundations
 - [x] Fixed-step 3D/2D gravity + linear-velocity Transform integration foundation
-- [ ] 3D collision/contact backend integration
-- [ ] 2D collision/contact backend integration
-- [ ] collision/trigger callbacks + ray/overlap query APIs
+- [x] Initial 3D AABB BoxCollider overlap + position contact resolution foundation
+- [x] Initial 2D AABB BoxCollider2D overlap + XY contact resolution foundation
+- [x] Native collision/trigger Enter/Stay/Exit tracker + OverlapBox/OverlapBox2D query foundation
+- [ ] Managed collision/trigger callbacks + ray/cast query APIs
+- [ ] Scalable broad-phase, rotated shapes, friction/restitution and sleeping
 - [x] Keyboard/mouse InputState transitions + Win32 message capture
 - [x] Named action-map binding/query foundation
 - [x] Managed KeyCode/GetKey/GetKeyDown/GetKeyUp + mouse position/delta/wheel

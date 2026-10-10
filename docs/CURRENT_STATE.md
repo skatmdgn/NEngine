@@ -293,13 +293,17 @@ Implemented:
 - Managed Rigidbody / BoxCollider / Rigidbody2D / BoxCollider2D proxies over ABI v12, including Unity-familiar velocity/useGravity/isKinematic naming.
 - Fixed-step rigidbody foundation runs after managed FixedUpdate so script velocity changes affect the same simulation step.
 - 3D gravity/linear-velocity Transform integration and 2D XY integration with kinematic/inactive bodies skipped.
+- Axis-aligned BoxCollider/BoxCollider2D overlap detection reports minimum penetration normal and separates trigger from solid pairs.
+- Basic 3D/2D position contact resolution removes entering normal velocity; dynamic/dynamic correction is inverse-mass weighted.
+- ContactTracker derives Enter/Stay/Exit phases for collision and trigger pairs.
+- Native OverlapBox / OverlapBox2D queries support optional trigger exclusion.
 - Native serialization/property tests and real managed C# property round-trip coverage.
 
 Not yet implemented:
-- Broad-phase/narrow-phase collision detection.
-- Contact solving, friction, restitution and sleeping.
-- Collision/trigger callbacks.
-- Raycasts, overlap queries and casts.
+- Scalable broad-phase plus oriented/rotated narrow-phase collision detection.
+- Production contact solving, friction, restitution and sleeping.
+- Managed Collision/Trigger callbacks consuming the native Enter/Stay/Exit tracker.
+- Raycasts, casts and managed query bindings.
 - Physics materials and joints.
 - Production 3D/2D backend selection/integration.
 
@@ -319,8 +323,9 @@ Not yet implemented:
 
 ## Immediate next work
 
-1. Add the first collision backend layer on top of the new Rigidbody/Collider fixed-step foundation, starting with box broad-phase/contact semantics and trigger separation.
-2. Add AudioSource/AudioListener native components and ABI v12 managed property bindings.
+1. Consume ContactTracker events from ScriptSystem to add managed OnCollision/OnTrigger Enter/Stay/Exit callbacks.
+2. Replace the O(n²) AABB pair scan with a scalable broad-phase and add ray/cast query primitives.
+3. Add AudioSource/AudioListener native components and ABI v12 managed property bindings.
 3. Package/version the managed NEngine API surface and add debugger attach/symbol workflow.
 3. Finish production PBR validation: sampler state, lights/shadows and remaining material behavior.
 4. Decide and implement the explicit policy for remote/nonlocal or outside-directory glTF resources while preserving sandbox safety.

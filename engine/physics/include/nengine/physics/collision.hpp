@@ -40,4 +40,16 @@ CollisionResolutionStats resolve_box_contacts_2d(
     core::World& world,
     const std::vector<BoxOverlap>& overlaps);
 
+std::vector<core::Entity> overlap_box(
+    const core::World& world,
+    core::Vec3 center,
+    core::Vec3 size,
+    bool include_triggers = true);
+
+std::vector<core::Entity> overlap_box_2d(
+    const core::World& world,
+    core::Vec2 center,
+    core::Vec2 size,
+    bool include_triggers = true);
+
 } // namespace nengine::physics

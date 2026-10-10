@@ -394,7 +394,7 @@ Implemented foundation:
 - FixedUpdate fixed-step scheduling separated from host-frame Update/LateUpdate.
 - managed Camera/Light plus MeshRenderer/SpriteRenderer scalar and AssetGuid properties over the generic native property bridge.
 - managed SpriteAnimator clip/playback/time properties plus Play/Pause/Stop/Restart controls.
-- NEnginePhysics 3D/2D Rigidbody + BoxCollider data/Scene/Editor/C# bindings with deterministic fixed-step gravity/velocity integration as the pre-collision foundation.
+- NEnginePhysics 3D/2D Rigidbody + BoxCollider data/Scene/Editor/C# bindings with fixed-step integration, initial AABB solid contact resolution, trigger/contact Enter-Stay-Exit tracking and native overlap queries.
 - coroutine scheduling including WaitForSeconds.
 
 Remaining major work:
