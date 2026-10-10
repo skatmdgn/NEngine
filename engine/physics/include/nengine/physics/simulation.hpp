@@ -23,6 +23,7 @@ PhysicsStepStats step_rigidbodies(
 struct PhysicsFrameResult {
     PhysicsStepStats integration{};
     CollisionDetectionResult collisions{};
+    CollisionResolutionStats resolution{};
 };
 
 PhysicsFrameResult step_physics(

@@ -27,4 +27,13 @@ struct CollisionDetectionResult {
 CollisionDetectionResult detect_box_overlaps(
     const core::World& world);
 
+struct CollisionResolutionStats {
+    std::size_t resolved_3d{0};
+    std::size_t resolved_2d{0};
+};
+
+CollisionResolutionStats resolve_box_contacts_3d(
+    core::World& world,
+    const std::vector<BoxOverlap>& overlaps);
+
 } // namespace nengine::physics

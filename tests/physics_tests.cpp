@@ -558,8 +558,81 @@ int main() {
             .tested_pairs_3d == 3u &&
         collision_frame
             .collisions
-            .tested_pairs_2d == 1u,
-        "full physics frame performs integration before collision detection");
+            .tested_pairs_2d == 1u &&
+        collision_frame
+            .resolution
+            .resolved_3d == 0u,
+        "full physics frame performs integration before collision detection while leaving triggers unresolved");
+
+    core::World resolution_world;
+
+    const auto wall =
+        resolution_world.create(
+            "Wall");
+    const auto dynamic_box =
+        resolution_world.create(
+            "Dynamic Box");
+
+    resolution_world.add_component<
+        physics::BoxCollider>(
+            wall,
+            physics::box_collider_type());
+
+    resolution_world.add_component<
+        physics::BoxCollider>(
+            dynamic_box,
+            physics::box_collider_type());
+
+    auto* resolution_body =
+        resolution_world.add_component<
+            physics::Rigidbody>(
+                dynamic_box,
+                physics::rigidbody_type());
+
+    resolution_world.transform(
+        dynamic_box)->local_position =
+            {0.75f, 0.0f, 0.0f};
+
+    if (resolution_body) {
+        resolution_body->use_gravity =
+            false;
+        resolution_body->linear_velocity =
+            {-2.0f, 0.0f, 0.0f};
+    }
+
+    const auto resolution_detection =
+        physics::detect_box_overlaps(
+            resolution_world);
+
+    const auto resolution_stats =
+        physics::resolve_box_contacts_3d(
+            resolution_world,
+            resolution_detection.overlaps);
+
+    resolution_body =
+        resolution_world.get_component<
+            physics::Rigidbody>(
+                dynamic_box,
+                physics::rigidbody_type());
+
+    const auto* resolved_transform =
+        resolution_world.transform(
+            dynamic_box);
+
+    check(
+        resolution_stats.resolved_3d ==
+            1u &&
+        resolved_transform &&
+        std::abs(
+            resolved_transform
+                ->local_position.x -
+            1.0f) < 0.0001f &&
+        resolution_body &&
+        std::abs(
+            resolution_body
+                ->linear_velocity.x) <
+            0.0001f,
+        "3D box contact resolution separates a dynamic body from a static collider and removes entering normal velocity");
 
     if (failures != 0) {
         std::cerr

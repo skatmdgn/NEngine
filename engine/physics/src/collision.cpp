@@ -250,4 +250,173 @@ CollisionDetectionResult detect_box_overlaps(
     return result;
 }
 
+CollisionResolutionStats resolve_box_contacts_3d(
+    core::World& world,
+    const std::vector<BoxOverlap>& overlaps) {
+
+    CollisionResolutionStats stats;
+
+    const auto dot =
+        [](core::Vec3 a,
+           core::Vec3 b) noexcept {
+            return a.x * b.x +
+                a.y * b.y +
+                a.z * b.z;
+        };
+
+    const auto subtract_normal_velocity =
+        [&dot](
+            core::Vec3& velocity,
+            core::Vec3 normal,
+            bool first_body) {
+
+            const float along =
+                dot(
+                    velocity,
+                    normal);
+
+            const bool entering =
+                first_body
+                    ? along > 0.0f
+                    : along < 0.0f;
+
+            if (!entering) {
+                return;
+            }
+
+            velocity.x -=
+                normal.x * along;
+            velocity.y -=
+                normal.y * along;
+            velocity.z -=
+                normal.z * along;
+        };
+
+    for (const auto& overlap :
+         overlaps) {
+
+        if (overlap.is_2d ||
+            overlap.is_trigger ||
+            overlap.penetration <= 0.0f) {
+            continue;
+        }
+
+        auto* first_body =
+            world.get_component<Rigidbody>(
+                overlap.first,
+                rigidbody_type());
+
+        auto* second_body =
+            world.get_component<Rigidbody>(
+                overlap.second,
+                rigidbody_type());
+
+        const bool first_dynamic =
+            first_body &&
+            first_body->enabled &&
+            !first_body->is_kinematic;
+
+        const bool second_dynamic =
+            second_body &&
+            second_body->enabled &&
+            !second_body->is_kinematic;
+
+        if (!first_dynamic &&
+            !second_dynamic) {
+            continue;
+        }
+
+        auto* first_transform =
+            world.transform(
+                overlap.first);
+
+        auto* second_transform =
+            world.transform(
+                overlap.second);
+
+        if (!first_transform ||
+            !second_transform) {
+            continue;
+        }
+
+        float first_share = 0.0f;
+        float second_share = 0.0f;
+
+        if (first_dynamic &&
+            second_dynamic) {
+
+            const float first_inverse_mass =
+                first_body->mass > 0.0f
+                    ? 1.0f / first_body->mass
+                    : 0.0f;
+
+            const float second_inverse_mass =
+                second_body->mass > 0.0f
+                    ? 1.0f / second_body->mass
+                    : 0.0f;
+
+            const float total =
+                first_inverse_mass +
+                second_inverse_mass;
+
+            if (total > 0.0f) {
+                first_share =
+                    first_inverse_mass /
+                    total;
+                second_share =
+                    second_inverse_mass /
+                    total;
+            }
+        } else if (first_dynamic) {
+            first_share = 1.0f;
+        } else {
+            second_share = 1.0f;
+        }
+
+        first_transform->local_position.x -=
+            overlap.normal.x *
+            overlap.penetration *
+            first_share;
+        first_transform->local_position.y -=
+            overlap.normal.y *
+            overlap.penetration *
+            first_share;
+        first_transform->local_position.z -=
+            overlap.normal.z *
+            overlap.penetration *
+            first_share;
+
+        second_transform->local_position.x +=
+            overlap.normal.x *
+            overlap.penetration *
+            second_share;
+        second_transform->local_position.y +=
+            overlap.normal.y *
+            overlap.penetration *
+            second_share;
+        second_transform->local_position.z +=
+            overlap.normal.z *
+            overlap.penetration *
+            second_share;
+
+        if (first_dynamic) {
+            subtract_normal_velocity(
+                first_body->linear_velocity,
+                overlap.normal,
+                true);
+        }
+
+        if (second_dynamic) {
+            subtract_normal_velocity(
+                second_body->linear_velocity,
+                overlap.normal,
+                false);
+        }
+
+        ++stats.resolved_3d;
+    }
+
+    return stats;
+}
+
 } // namespace nengine::physics

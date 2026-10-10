@@ -135,6 +135,11 @@ PhysicsFrameResult step_physics(
         detect_box_overlaps(
             world);
 
+    result.resolution =
+        resolve_box_contacts_3d(
+            world,
+            result.collisions.overlaps);
+
     return result;
 }
 
