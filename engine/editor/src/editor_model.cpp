@@ -1,4 +1,5 @@
 #include "nengine/editor/editor_model.hpp"
+#include "nengine/editor/audio_integration.hpp"
 #include "nengine/editor/render_integration.hpp"
 #include "nengine/editor/physics_integration.hpp"
 #include "nengine/editor/scripting_integration.hpp"
@@ -253,6 +254,24 @@ EditorModel::EditorModel() {
         console_.warning(
             "Editor",
             "Physics component factories were only partially registered.");
+    }
+
+    if (!register_audio_integration(
+            component_registry_,
+            component_serialization_,
+            property_access_)) {
+
+        console_.warning(
+            "Editor",
+            "Audio component integration was only partially registered.");
+    }
+
+    if (!register_audio_component_factories(
+            component_factories_)) {
+
+        console_.warning(
+            "Editor",
+            "Audio component factories were only partially registered.");
     }
 
     if (!register_scripting_integration(

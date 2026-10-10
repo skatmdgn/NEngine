@@ -1,4 +1,5 @@
 add_library(NEngineEditorModel STATIC
+  src/audio_integration.cpp
   src/command.cpp
   src/component_factory.cpp
   src/console_model.cpp
@@ -22,7 +23,7 @@ target_include_directories(NEngineEditorModel
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(NEngineEditorModel PUBLIC NEngineCore NEngineAssets NEnginePhysics NEngineRender NEngineScripting NEngineInput)
+target_link_libraries(NEngineEditorModel PUBLIC NEngineCore NEngineAssets NEngineAudio NEnginePhysics NEngineRender NEngineScripting NEngineInput)
 target_compile_features(NEngineEditorModel PUBLIC cxx_std_20)
 
 if(MSVC)
