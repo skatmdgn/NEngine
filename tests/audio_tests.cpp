@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "nengine/audio/components.hpp"
+#include "nengine/audio/mix_snapshot.hpp"
 #include "nengine/audio/registration.hpp"
 #include "nengine/core/component_registry.hpp"
 #include "nengine/core/component_serialization.hpp"
@@ -220,6 +221,87 @@ int main() {
                 &error),
             "AudioListener codec rejects volume above 1");
     }
+
+    core::World mix_world;
+
+    const auto listener_entity =
+        mix_world.create(
+            "Listener");
+
+    const auto source_entity =
+        mix_world.create(
+            "Spatial Source");
+
+    auto* mix_listener =
+        mix_world.add_component<
+            audio::AudioListener>(
+                listener_entity,
+                audio::audio_listener_type());
+
+    auto* mix_source =
+        mix_world.add_component<
+            audio::AudioSource>(
+                source_entity,
+                audio::audio_source_type());
+
+    const auto mix_clip =
+        assets::AssetGuid::parse(
+            "aaaaaaaaaaaaaaaabbbbbbbbbbbbbbbb");
+
+    if (mix_listener) {
+        mix_listener->volume =
+            0.5f;
+    }
+
+    if (mix_source && mix_clip) {
+        mix_source->clip =
+            *mix_clip;
+        mix_source->spatialize =
+            true;
+        mix_source->volume =
+            1.0f;
+        mix_source->playing =
+            true;
+        mix_source->time_seconds =
+            2.0f;
+        mix_source->pitch =
+            1.25f;
+    }
+
+    if (auto* transform =
+            mix_world.transform(
+                source_entity)) {
+        transform->local_position =
+            {1.0f, 0.0f, 0.0f};
+    }
+
+    const auto mix_snapshot =
+        audio::build_mix_snapshot(
+            mix_world);
+
+    check(
+        mix_snapshot.has_listener &&
+        mix_snapshot.listener.entity ==
+            listener_entity &&
+        mix_snapshot.sources.size() ==
+            1u &&
+        mix_snapshot.sources.front().entity ==
+            source_entity &&
+        mix_snapshot.sources.front().playing &&
+        mix_snapshot.sources.front().spatialized &&
+        std::abs(
+            mix_snapshot.sources.front().left_gain) <
+            0.0001f &&
+        std::abs(
+            mix_snapshot.sources.front().right_gain -
+            0.25f) < 0.0001f &&
+        std::abs(
+            mix_snapshot.sources.front().time_seconds -
+            2.0f) < 0.0001f &&
+        std::abs(
+            mix_snapshot.sources.front().pitch -
+            1.25f) < 0.0001f,
+        "audio mix snapshot selects listener and computes spatial stereo attenuation");
 
     if (failures == 0) {
         std::cout

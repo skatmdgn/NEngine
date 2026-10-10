@@ -1,4 +1,5 @@
 add_library(NEngineAudio STATIC
+  src/mix_snapshot.cpp
   src/registration.cpp
 )
 
