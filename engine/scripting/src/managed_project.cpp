@@ -1251,6 +1251,7 @@ std::string api_stub(
             if (type == typeof(Light)) return "NEngine.Light";
             if (type == typeof(MeshRenderer)) return "NEngine.MeshRenderer";
             if (type == typeof(SpriteRenderer)) return "NEngine.SpriteRenderer";
+            if (type == typeof(SpriteAnimator)) return "NEngine.SpriteAnimator";
             return null;
         }
     }
@@ -1829,6 +1830,8 @@ std::string api_stub(
             set => SetNativeBool("Receive Shadows", value);
         }
     }
+
+    public sealed class SpriteAnimator : Component { }
 
     public sealed class SpriteRenderer : Component
     {
