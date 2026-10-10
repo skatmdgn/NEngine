@@ -1,7 +1,7 @@
 # Current state
 
-Version: 0.3.0-dev
-Milestone: Asset database is integrated with the first real Vulkan runtime/resource path.
+Version: 0.5.0-dev
+Milestone: C# gameplay scripting is active on top of the asset/Vulkan foundations.
 
 ## Verified baseline
 
@@ -14,7 +14,7 @@ The user previously verified the 0.2.6 Windows editor runtime:
 - Scene Save / Open round-trip works.
 - UTF-8 names including Korean display correctly.
 
-Newer 0.3/0.4 work is continuously built and tested on Windows + Ubuntu CI. A fresh user-side Windows acceptance pass is still required after the Vulkan/editor changes.
+Newer 0.3/0.4/0.5 work is continuously built and tested on Windows + Ubuntu CI. A fresh user-side Windows acceptance pass is still required after the Vulkan/editor and managed-runtime changes.
 
 ## Core / Scene / Prefab
 
@@ -130,18 +130,25 @@ Implemented:
 - Visual Studio/Rider/default .sln association open path.
 - hostfxr discovery/dynamic loading with generated runtimeconfig.
 - dotnet SDK discovery, deterministic gameplay DLL/PDB build output and Editor **Build C#** action.
-- Managed ABI v6 lifecycle bridge: Behaviour Create / Start / Update / OnDestroy plus a native World callback table shared through stable NEngine.API/NEngine.Bridge assemblies.
+- Managed ABI v7 shared through stable NEngine.API/NEngine.Bridge assemblies.
 - Native ScriptBehaviour component with Scene serialization, Add Component and generic Inspector editing.
 - Play Mode ScriptBehaviour instance management against the cloned runtime World.
-- Native <-> managed local Transform position/rotation/scale synchronization around Start/Update.
+- Managed Behaviour Create / Start / Update / OnDestroy execution.
+- Native <-> managed local Transform position/rotation/scale synchronization around lifecycle calls.
 - Generated NEngine.API, stable NEngine.Bridge and gameplay projects are separate assemblies; collectible gameplay AssemblyLoadContext reloads user code without restarting hostfxr.
-- Managed GameObject name/active state can mutate the native World immediately during lifecycle calls.
-- Managed Transform hierarchy uses native callbacks for parent, childCount, GetChild and reparent/unparent; proxy GameObjects can query native name/active/TRS and built-in component presence.
+- Managed GameObject name/active state, Transform parent/children/TRS and built-in component presence query native World state.
+- Managed GameObject construction and Find route through native World create/find callbacks.
+- GameObject.Destroy uses an end-of-simulation-tick native destroy queue so self-destroy and foreign/duplicate destroy requests do not invalidate ScriptSystem iteration.
+- Cross-platform keyboard/mouse Input callbacks expose KeyCode, GetKey/GetKeyDown/GetKeyUp, mouse position/delta and wheel.
+- Managed Time.deltaTime/time/frameCount advances once per simulation tick regardless of Behaviour count and resets when Play Mode begins.
+- Coroutine scheduling supports StartCoroutine, StopCoroutine, StopAllCoroutines, nested IEnumerator, yield return null and WaitForSeconds.
 
 Not yet implemented:
-- Distribution as a packaged/versioned NEngine managed API (the dedicated generated API/Bridge assemblies are implemented).
-- Broader render component property APIs plus input/physics/audio managed bindings.
-- debugger attach integration.
+- Packaged/versioned distribution of the NEngine managed API.
+- Awake/OnEnable/OnDisable/FixedUpdate/LateUpdate lifecycle coverage.
+- Broader native render/physics/audio component property APIs.
+- Visual Studio debugger attach integration.
+- NuGet runtime/package loading beyond generated project references.
 
 ## Renderer 0.4
 
@@ -281,7 +288,7 @@ The concrete Vulkan backend currently grows beneath this contract. The long-term
 - Win32 platform event polling feeds keyboard, mouse buttons, focus-loss releases and cursor position into InputState.
 - ActionMap can bind multiple keys/buttons to named actions and query held/pressed/released aggregation.
 - EditorModel receives the platform InputState every frame.
-- Managed ABI v6 has a separate native Input callback table; generated C# exposes Unity-familiar KeyCode, Input.GetKey/GetKeyDown/GetKeyUp, mousePosition, mouseDelta and mouseScrollDelta.
+- Managed ABI v7 has a separate native Input callback table; generated C# exposes Unity-familiar KeyCode, Input.GetKey/GetKeyDown/GetKeyUp, mousePosition, mouseDelta and mouseScrollDelta.
 - Cross-platform tests cover same-frame press/release, focus loss, pointer accumulation, action bindings and real managed C# Input callbacks.
 
 Not yet implemented:
@@ -291,10 +298,11 @@ Not yet implemented:
 
 ## Immediate next work
 
-1. Continue the now-stable ABI v6 boundary into richer render/physics/audio component APIs; keyboard/mouse managed Input and hierarchy/GameObject callbacks are implemented.
-2. Finish production PBR validation: sampler state, lights/shadows and remaining material behavior.
-3. Decide and implement the explicit policy for remote/nonlocal or outside-directory glTF resources while preserving sandbox safety.
-4. Add WebP decoding plus texture compression/transcoding policy; mipmap generation/upload is already implemented.
-5. Choose a vendored FBX decoder strategy and add FBX mesh/material cooking.
-6. Replace the GDI Scene View presentation only together with a Vulkan Editor Camera + matching picking/gizmo projection.
-7. Extend shader tooling with reflection and validated HLSL compiler parity.
+1. Expand the managed lifecycle beyond Start/Update/OnDestroy with Awake, OnEnable/OnDisable, FixedUpdate and LateUpdate semantics without recreating Behaviour instances merely because they are disabled.
+2. Continue ABI v7 into richer native component/property access, starting with mainstream render components while preserving subsystem dependency boundaries.
+3. Finish production PBR validation: sampler state, lights/shadows and remaining material behavior.
+4. Decide and implement the explicit policy for remote/nonlocal or outside-directory glTF resources while preserving sandbox safety.
+5. Add WebP decoding plus texture compression/transcoding policy; mipmap generation/upload is already implemented.
+6. Choose a vendored FBX decoder strategy and add FBX mesh/material cooking.
+7. Replace the GDI Scene View presentation only together with a Vulkan Editor Camera + matching picking/gizmo projection.
+8. Extend shader tooling with reflection and validated HLSL compiler parity.

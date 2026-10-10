@@ -13,7 +13,7 @@ Target scope:
 
 ## Current milestone
 
-`0.3.0-dev — Asset pipeline is integrated with the first concrete Vulkan runtime/GPU resource path`
+`0.5.0-dev — C# gameplay scripting is active on top of the asset and Vulkan runtime foundations`
 
 The repository currently includes:
 - generational Entity/World lifetime and Transform hierarchy
@@ -28,6 +28,11 @@ The repository currently includes:
 - GUID/.meta Asset Database, watcher, import cache and dependency graph
 - texture/audio/model descriptors and validated SPIR-V shader import
 - generated C# solution/project and NuGet manifest foundation
+- hostfxr-based .NET runtime loading plus deterministic gameplay DLL/PDB builds
+- ScriptBehaviour lifecycle execution in the cloned Play Mode World
+- dedicated NEngine.API and stable NEngine.Bridge assemblies with collectible gameplay hot reload
+- managed GameObject name/active/Transform hierarchy access plus native create/find/deferred-destroy through ABI v7
+- managed keyboard/mouse Input, global Time frame clock, coroutines and WaitForSeconds
 - Camera/Light/MeshRenderer components
 - RenderSnapshot with resolved world matrices
 - camera matrix math and stable built-in Cube/Quad mesh AssetGuids
@@ -45,11 +50,12 @@ The repository currently includes:
 - glTF/GLB geometry decode into MeshData with AssetGuid CPU/GPU mesh caches, including selected-scene node hierarchy TRS/matrix baking and mirrored winding correction
 - opt-in VK Preview that renders the actual presentation World Camera + built-in/imported glTF geometry, explicit .nmat textures, and auto-sampled glTF first-primitive PBR base-color PNG/JPEG or color-only baseColorFactor when MeshRenderer.material is unset
 - external multi-file .gltf BIN/PNG/JPEG sidecar staging, import-fingerprint invalidation and watcher-driven dependency reimport
+- OBJ/MTL import, SpriteRenderer/SpriteAnimation, multi-slot PBR material cooking and GLSL/SPIR-V fixture tooling
 - Windows + Ubuntu CI tests
 
 The Win32 Scene View still uses GDI by default for interactive object/gizmo editing. The opt-in VK Preview now uses the real Vulkan graphics path for depth-tested indexed World rendering, while the GDI view remains the safe editing fallback.
 
-C# project generation exists, but the embedded .NET runtime/compile/reload path is **not implemented yet**.
+The .NET gameplay path is now live: the editor can build C# gameplay assemblies, host them through hostfxr, run ScriptBehaviour instances in Play Mode, and reload collectible gameplay assemblies without restarting the host runtime. The managed API is still a development surface rather than a packaged/versioned SDK, and broader component/lifecycle/debugger coverage remains.
 
 This repository intentionally does not use Unity source code or Unity-source-derived implementation.
 

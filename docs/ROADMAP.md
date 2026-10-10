@@ -126,11 +126,14 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Native <-> managed Transform local position/rotation/scale synchronization
 - [x] Dedicated generated NEngine.API + stable NEngine.Bridge assemblies
 - [x] Safe collectible AssemblyLoadContext gameplay hot reload/unload
-- [x] Native World callback ABI v6 for GameObject name/active, Transform hierarchy/TRS and component presence
+- [x] Native World callback ABI v7 for GameObject lifetime/name/active, Transform hierarchy/TRS and component presence
+- [x] Managed GameObject create/find plus deferred self/foreign destroy
 - [x] Managed keyboard/mouse Input API over native callback table
+- [x] Managed Time.deltaTime/time/frameCount global simulation-tick clock
+- [x] Coroutine/WaitForSeconds scheduler with nested IEnumerator and stop APIs
+- [ ] Awake/OnEnable/OnDisable/FixedUpdate/LateUpdate lifecycle coverage
 - [ ] Wider render/physics/audio managed component/property bindings
 - [ ] Visual Studio attach/debug symbols
-- [ ] coroutine/timer scheduler
 
 ## 0.6 — Physics, input, audio
 - [ ] 3D physics backend integration

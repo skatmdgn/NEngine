@@ -326,9 +326,10 @@ Includes:
 - shader binary import.
 
 Remaining major work:
-- real texture decode/transcode.
-- glTF mesh/material cooking.
-- shader source compilation.
+- WebP decoding plus production texture compression/transcoding policy.
+- explicit safe policy/support for nonlocal or outside-model-directory glTF resources.
+- FBX mesh/material cooking.
+- validated HLSL compiler-path parity and shader reflection.
 
 ### 0.4 — Vulkan renderer
 Goal: move from renderer bootstrap to real asset-backed Scene/Game rendering.
@@ -368,30 +369,36 @@ Implemented foundation includes:
 - glTF linear baseColorFactor auto colors and texture tinting baked to the existing Vulkan SRGB material path.
 - External .gltf sidecar BIN/images staged and tracked through AssetGuid dependency invalidation and file-watcher reimports.
 
-Immediate implementation order:
-1. Expand initial glTF base-color preview to multi-material/image extraction and permanent NEngine material/texture asset cooking.
-2. Expand already implemented external .gltf sidecar staging with URI/path variants and missing-meta recovery.
-3. WebP decoding plus mipmap/compression/transcoding policy.
-4. Quantized/sparse glTF accessor cooking expansion (node hierarchy transforms are implemented).
-5. Shader compiler toolchain.
-5. Replace remaining GDI presentation where appropriate.
-6. Vulkan Game View.
-7. PBR/lights/shadows/sprites.
-8. Android Vulkan surface.
+Remaining implementation order:
+1. Finish production PBR behavior, lights/shadows and sampler-state validation.
+2. Add WebP plus texture compression/transcoding policy.
+3. Add shader reflection and validated HLSL compiler-path parity.
+4. Replace remaining GDI presentation only with matching Vulkan Editor Camera, picking and gizmo projection.
+5. Add Vulkan Game View and Android Vulkan surface.
+6. Add FBX cooking and finalize the safe nonlocal glTF resource policy.
 
 ### 0.5 — C# scripting + IDE
 Goal: real gameplay scripting.
 
-Includes:
-- .NET host.
-- NEngine managed API assemblies.
-- gameplay assembly build/load.
-- managed component discovery.
-- lifecycle execution.
-- compile/reload.
-- debugger symbols/attach.
-- coroutine/timer scheduler.
-- NuGet runtime integration.
+Implemented foundation:
+- hostfxr runtime discovery/loading and generated runtimeconfig.
+- generated NEngine.API / NEngine.Bridge / gameplay projects and solution.
+- deterministic dotnet gameplay DLL/PDB build.
+- ScriptBehaviour Scene/Inspector integration and Play Mode execution.
+- stable ABI v7 native World callback table.
+- GameObject name/active, Transform hierarchy/TRS and component presence.
+- native-backed GameObject create/find plus deferred destroy.
+- collectible gameplay AssemblyLoadContext reload without restarting hostfxr.
+- keyboard/mouse managed Input.
+- global managed Time frame clock.
+- coroutine scheduling including WaitForSeconds.
+
+Remaining major work:
+- Awake/OnEnable/OnDisable/FixedUpdate/LateUpdate lifecycle coverage.
+- broader render/physics/audio managed component APIs.
+- packaged/versioned managed API distribution.
+- debugger symbols/attach workflow.
+- NuGet runtime/package integration.
 
 ### 0.6 — Physics, input, audio
 Goal: ordinary playable gameplay foundation.
@@ -442,13 +449,13 @@ Completion means an experienced Unity developer can reasonably build and ship an
 
 ## 11. Current development focus
 
-The active development line is currently Renderer 0.4.
+The active development line is currently **0.5 — C# scripting + IDE**. The 0.3 asset and 0.4 Vulkan foundations are sufficiently proven to support real gameplay-runtime integration, although their production follow-up items remain on the roadmap.
 
 The immediate sequence is:
 
-`complete glTF multi-material/image cooking (first base-color preview/factor delivered) -> quantized/sparse geometry + sidecar robustness -> texture production pipeline -> shader toolchain`
+`lifecycle completeness -> richer native component/property API -> debugger/IDE polish -> physics/audio scripting boundary`
 
-After the renderer/resource boundary is proven with real assets, development returns to the .NET gameplay runtime.
+Renderer work continues as a secondary line around production PBR, Scene/Game Vulkan presentation, WebP/transcoding, HLSL/reflection and Android Vulkan support.
 
 ## 12. Definition of done for important features
 
