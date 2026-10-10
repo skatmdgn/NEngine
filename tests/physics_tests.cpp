@@ -1489,6 +1489,174 @@ int main() {
         "BoxCast rejects invalid dimensions and zero direction");
 
 
+
+    core::World shape_cast_world;
+
+    const auto sphere_cast_target =
+        shape_cast_world.create(
+            "Sphere Cast Target");
+
+    auto* sphere_cast_collider =
+        shape_cast_world.add_component<
+            physics::SphereCollider>(
+                sphere_cast_target,
+                physics::sphere_collider_type());
+
+    if (sphere_cast_collider) {
+        sphere_cast_collider->layer = 9u;
+    }
+
+    const auto capsule_cast_target =
+        shape_cast_world.create(
+            "Capsule Cast Target");
+
+    auto* capsule_cast_collider =
+        shape_cast_world.add_component<
+            physics::CapsuleCollider>(
+                capsule_cast_target,
+                physics::capsule_collider_type());
+
+    if (capsule_cast_collider) {
+        capsule_cast_collider->layer = 10u;
+    }
+
+    shape_cast_world.transform(
+        capsule_cast_target)->local_position =
+            {4.0f, 0.0f, 0.0f};
+
+    const auto sphere_cast_hit =
+        physics::box_cast(
+            shape_cast_world,
+            {-3.0f, 0.0f, 0.0f},
+            {1.0f, 1.0f, 1.0f},
+            {1.0f, 0.0f, 0.0f},
+            10.0f,
+            true,
+            (1u << 9u));
+
+    const auto capsule_cast_hit =
+        physics::box_cast(
+            shape_cast_world,
+            {1.0f, 0.0f, 0.0f},
+            {1.0f, 1.0f, 1.0f},
+            {1.0f, 0.0f, 0.0f},
+            10.0f,
+            true,
+            (1u << 10u));
+
+    check(
+        sphere_cast_hit &&
+        sphere_cast_hit->entity ==
+            sphere_cast_target &&
+        sphere_cast_hit->layer == 9u &&
+        std::abs(
+            sphere_cast_hit->distance -
+            2.0f) < 0.001f &&
+        std::abs(
+            sphere_cast_hit->point.x +
+            1.0f) < 0.001f &&
+        std::abs(
+            sphere_cast_hit->normal.x +
+            1.0f) < 0.001f &&
+        capsule_cast_hit &&
+        capsule_cast_hit->entity ==
+            capsule_cast_target &&
+        capsule_cast_hit->layer == 10u &&
+        std::abs(
+            capsule_cast_hit->distance -
+            2.0f) < 0.001f &&
+        std::abs(
+            capsule_cast_hit->point.x -
+            3.0f) < 0.001f &&
+        std::abs(
+            capsule_cast_hit->normal.x +
+            1.0f) < 0.001f,
+        "3D BoxCast reaches SphereCollider and CapsuleCollider targets with cast-center TOI semantics");
+
+    core::World shape_cast_2d_world;
+
+    const auto circle_cast_target =
+        shape_cast_2d_world.create(
+            "Circle Cast Target");
+
+    auto* circle_cast_collider =
+        shape_cast_2d_world.add_component<
+            physics::CircleCollider2D>(
+                circle_cast_target,
+                physics::circle_collider2d_type());
+
+    if (circle_cast_collider) {
+        circle_cast_collider->layer = 11u;
+    }
+
+    const auto capsule2d_cast_target =
+        shape_cast_2d_world.create(
+            "Capsule2D Cast Target");
+
+    auto* capsule2d_cast_collider =
+        shape_cast_2d_world.add_component<
+            physics::CapsuleCollider2D>(
+                capsule2d_cast_target,
+                physics::capsule_collider2d_type());
+
+    if (capsule2d_cast_collider) {
+        capsule2d_cast_collider->layer =
+            12u;
+    }
+
+    shape_cast_2d_world.transform(
+        capsule2d_cast_target)
+        ->local_position =
+            {4.0f, 0.0f, 8.0f};
+
+    const auto circle_cast_hit =
+        physics::box_cast_2d(
+            shape_cast_2d_world,
+            {-3.0f, 0.0f},
+            {1.0f, 1.0f},
+            {1.0f, 0.0f},
+            10.0f,
+            true,
+            (1u << 11u));
+
+    const auto capsule2d_cast_hit =
+        physics::box_cast_2d(
+            shape_cast_2d_world,
+            {1.0f, 0.0f},
+            {1.0f, 1.0f},
+            {1.0f, 0.0f},
+            10.0f,
+            true,
+            (1u << 12u));
+
+    check(
+        circle_cast_hit &&
+        circle_cast_hit->entity ==
+            circle_cast_target &&
+        circle_cast_hit->is_2d &&
+        circle_cast_hit->layer == 11u &&
+        std::abs(
+            circle_cast_hit->distance -
+            2.0f) < 0.001f &&
+        std::abs(
+            circle_cast_hit->normal.x +
+            1.0f) < 0.001f &&
+        capsule2d_cast_hit &&
+        capsule2d_cast_hit->entity ==
+            capsule2d_cast_target &&
+        capsule2d_cast_hit->is_2d &&
+        capsule2d_cast_hit->layer == 12u &&
+        std::abs(
+            capsule2d_cast_hit->distance -
+            2.0f) < 0.001f &&
+        std::abs(
+            capsule2d_cast_hit->normal.x +
+            1.0f) < 0.001f &&
+        std::abs(
+            capsule2d_cast_hit->point.z) <
+            0.0001f,
+        "2D BoxCast reaches CircleCollider2D and CapsuleCollider2D targets on XY");
+
     core::World rotated_query_world;
 
     const auto rotated_query_target =

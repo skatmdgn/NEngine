@@ -161,7 +161,8 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Capsule 3D/2D sweep-and-prune contacts + Raycast/OverlapBox participation
 - [x] Sphere/Circle + mixed Box-radial sweep-and-prune contacts and Raycast/OverlapBox participation
 - [x] Rotated BoxCollider/BoxCollider2D SAT contacts + rotation-aware Raycast/OverlapBox/BoxCast target queries
-- [ ] Additional shape casts + richer hit semantics/query filtering policy
+- [x] BoxCast/BoxCast2D target coverage for box + radial + capsule colliders
+- [ ] Additional cast shapes (SphereCast/CapsuleCast) + richer hit semantics/query filtering policy
 - [x] Collider friction/restitution authoring + 3D/2D impulse response foundation
 - [x] Contact-supported Rigidbody/Rigidbody2D sleeping + managed Sleep/WakeUp/IsSleeping foundation
 - [x] Fixed-capacity native ContactManifold + representative contact-point tracking foundation

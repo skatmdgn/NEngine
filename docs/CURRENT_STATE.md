@@ -302,12 +302,12 @@ Implemented:
 - Generated C# exposes Collision/Collision2D plus Collider/Collider2D callback payloads for OnCollisionEnter/Stay/Exit, OnTriggerEnter/Stay/Exit and their 2D variants.
 - Native Raycast/Raycast2D transform rays into BoxCollider/BoxCollider2D local axes for exact rotated-box hits and analytically intersect capsule segment+radii, selecting the nearest box/radial/capsule result; OverlapBox/OverlapBox2D use the same OBB/radial/capsule narrow phase.
 - ABI v15 carries raycast/box-cast layer masks plus multi-hit overlap query callbacks without introducing a Scripting -> Physics dependency.
-- Generated Physics.Raycast / Physics2D.Raycast and Physics.OverlapBox / Physics2D.OverlapBoxAll resolve Box/Sphere/Capsule and Box2D/Circle2D/Capsule2D collider proxies; Physics.BoxCast / Physics2D.BoxCast keep an axis-aligned moving cast box and currently target rotated box colliders only.
-- Native BoxCast / BoxCast2D use continuous SAT against fixed-orientation box targets to return nearest time-of-impact, oriented hit normal and cast-center position; managed casts preserve those semantics.
+- Generated Physics.Raycast / Physics2D.Raycast and Physics.OverlapBox / Physics2D.OverlapBoxAll resolve Box/Sphere/Capsule and Box2D/Circle2D/Capsule2D collider proxies; Physics.BoxCast / Physics2D.BoxCast keep an axis-aligned moving cast box and now consider box, radial and capsule targets.
+- Native BoxCast / BoxCast2D use continuous SAT against fixed-orientation box targets and convex distance/root solving against sphere/circle/capsule targets to return nearest time-of-impact, target-facing hit normal and cast-center position; managed casts preserve those semantics.
 - Native serialization/property tests and real managed C# property round-trip coverage.
 
 Not yet implemented:
-- Production broad-phase tuning and remaining polygon-style collider variants remain; BoxCast target coverage still excludes radial/capsule shapes.
+- Production broad-phase tuning and remaining polygon-style collider variants remain; additional cast shapes such as SphereCast/CapsuleCast are not yet exposed.
 - Production contact solving beyond the current representative single-point manifold seed: box/face clipping into 2-4 contacts, iterative constraint solving, warm starting and island-aware sleeping/wake propagation.
 - Additional shape casts and richer hit semantics/query filtering policy.
 - Physics materials and joints.

@@ -4383,6 +4383,605 @@ bool swept_box_hit(
     return true;
 }
 
+bool swept_aabb_interval(
+    core::Vec3 origin,
+    core::Vec3 cast_half,
+    core::Vec3 direction,
+    const ColliderBounds& target,
+    float max_distance,
+    bool is_2d,
+    float& enter,
+    float& exit) noexcept {
+
+    enter = 0.0f;
+    exit = max_distance;
+
+    const core::Vec3 separation{
+        target.center.x - origin.x,
+        target.center.y - origin.y,
+        is_2d
+            ? 0.0f
+            : target.center.z - origin.z
+    };
+
+    const auto test_axis =
+        [&](float center_distance,
+            float velocity,
+            float radius) {
+
+            constexpr float epsilon =
+                0.000001f;
+
+            if (std::abs(velocity) <=
+                epsilon) {
+                return std::abs(center_distance) <=
+                    radius;
+            }
+
+            float first =
+                (center_distance - radius) /
+                velocity;
+            float second =
+                (center_distance + radius) /
+                velocity;
+
+            if (first > second) {
+                std::swap(first, second);
+            }
+
+            enter =
+                std::max(
+                    enter,
+                    first);
+
+            exit =
+                std::min(
+                    exit,
+                    second);
+
+            return enter <= exit;
+        };
+
+    if (!test_axis(
+            separation.x,
+            direction.x,
+            cast_half.x +
+                target.broad_half.x) ||
+        !test_axis(
+            separation.y,
+            direction.y,
+            cast_half.y +
+                target.broad_half.y)) {
+        return false;
+    }
+
+    if (!is_2d &&
+        !test_axis(
+            separation.z,
+            direction.z,
+            cast_half.z +
+                target.broad_half.z)) {
+        return false;
+    }
+
+    return exit >= 0.0f &&
+        enter <= max_distance;
+}
+
+float point_aabb_distance_squared(
+    core::Vec3 point,
+    core::Vec3 center,
+    core::Vec3 half,
+    bool is_2d,
+    core::Vec3* closest = nullptr) noexcept {
+
+    core::Vec3 result{
+        std::clamp(
+            point.x,
+            center.x - half.x,
+            center.x + half.x),
+        std::clamp(
+            point.y,
+            center.y - half.y,
+            center.y + half.y),
+        is_2d
+            ? 0.0f
+            : std::clamp(
+                point.z,
+                center.z - half.z,
+                center.z + half.z)
+    };
+
+    if (closest) {
+        *closest = result;
+    }
+
+    const core::Vec3 delta{
+        point.x - result.x,
+        point.y - result.y,
+        is_2d
+            ? 0.0f
+            : point.z - result.z
+    };
+
+    return length_squared(
+        delta,
+        is_2d);
+}
+
+float segment_aabb_distance_squared(
+    core::Vec3 a,
+    core::Vec3 b,
+    core::Vec3 center,
+    core::Vec3 half,
+    bool is_2d,
+    core::Vec3* segment_point = nullptr,
+    core::Vec3* box_point = nullptr) noexcept {
+
+    if (is_2d) {
+        a.z = 0.0f;
+        b.z = 0.0f;
+        center.z = 0.0f;
+    }
+
+    const core::Vec3 delta{
+        b.x - a.x,
+        b.y - a.y,
+        is_2d
+            ? 0.0f
+            : b.z - a.z
+    };
+
+    const auto evaluate =
+        [&](float t,
+            core::Vec3* out_segment,
+            core::Vec3* out_box) {
+
+            const core::Vec3 point{
+                a.x + delta.x * t,
+                a.y + delta.y * t,
+                is_2d
+                    ? 0.0f
+                    : a.z + delta.z * t
+            };
+
+            core::Vec3 closest{};
+
+            const float squared =
+                point_aabb_distance_squared(
+                    point,
+                    center,
+                    half,
+                    is_2d,
+                    &closest);
+
+            if (out_segment) {
+                *out_segment = point;
+            }
+
+            if (out_box) {
+                *out_box = closest;
+            }
+
+            return squared;
+        };
+
+    float low = 0.0f;
+    float high = 1.0f;
+
+    for (int iteration = 0;
+         iteration < 40;
+         ++iteration) {
+
+        const float first =
+            (low * 2.0f + high) /
+            3.0f;
+
+        const float second =
+            (low + high * 2.0f) /
+            3.0f;
+
+        if (evaluate(
+                first,
+                nullptr,
+                nullptr) <
+            evaluate(
+                second,
+                nullptr,
+                nullptr)) {
+            high = second;
+        } else {
+            low = first;
+        }
+    }
+
+    return evaluate(
+        (low + high) * 0.5f,
+        segment_point,
+        box_point);
+}
+
+float cast_shape_gap(
+    core::Vec3 origin,
+    core::Vec3 cast_half,
+    core::Vec3 direction,
+    float time,
+    const ColliderBounds& target,
+    bool is_2d) noexcept {
+
+    const core::Vec3 center{
+        origin.x + direction.x * time,
+        origin.y + direction.y * time,
+        is_2d
+            ? 0.0f
+            : origin.z +
+                direction.z * time
+    };
+
+    float squared = 0.0f;
+
+    if (target.shape ==
+        ColliderShape::Radial) {
+
+        squared =
+            point_aabb_distance_squared(
+                target.center,
+                center,
+                cast_half,
+                is_2d);
+    } else {
+        squared =
+            segment_aabb_distance_squared(
+                target.segment_a,
+                target.segment_b,
+                center,
+                cast_half,
+                is_2d);
+    }
+
+    return squared -
+        target.radius *
+            target.radius;
+}
+
+core::Vec3 cast_shape_normal(
+    core::Vec3 origin,
+    core::Vec3 cast_half,
+    core::Vec3 direction,
+    float time,
+    const ColliderBounds& target,
+    bool is_2d) noexcept {
+
+    const core::Vec3 center{
+        origin.x + direction.x * time,
+        origin.y + direction.y * time,
+        is_2d
+            ? 0.0f
+            : origin.z +
+                direction.z * time
+    };
+
+    core::Vec3 target_point{};
+    core::Vec3 box_point{};
+
+    if (target.shape ==
+        ColliderShape::Radial) {
+
+        target_point =
+            target.center;
+
+        point_aabb_distance_squared(
+            target.center,
+            center,
+            cast_half,
+            is_2d,
+            &box_point);
+    } else {
+        segment_aabb_distance_squared(
+            target.segment_a,
+            target.segment_b,
+            center,
+            cast_half,
+            is_2d,
+            &target_point,
+            &box_point);
+    }
+
+    const core::Vec3 outward{
+        box_point.x -
+            target_point.x,
+        box_point.y -
+            target_point.y,
+        is_2d
+            ? 0.0f
+            : box_point.z -
+                target_point.z
+    };
+
+    if (length_squared(
+            outward,
+            is_2d) <=
+        0.0000000001f) {
+
+        return normalized_or_axis(
+            {
+                -direction.x,
+                -direction.y,
+                is_2d
+                    ? 0.0f
+                    : -direction.z
+            },
+            is_2d);
+    }
+
+    return normalized_or_axis(
+        outward,
+        is_2d);
+}
+
+bool swept_box_shape_hit(
+    core::Vec3 origin,
+    core::Vec3 cast_half,
+    core::Vec3 direction,
+    const ColliderBounds& target,
+    float max_distance,
+    bool is_2d,
+    float& distance,
+    core::Vec3& normal) noexcept {
+
+    float broad_enter = 0.0f;
+    float broad_exit =
+        max_distance;
+
+    if (!swept_aabb_interval(
+            origin,
+            cast_half,
+            direction,
+            target,
+            max_distance,
+            is_2d,
+            broad_enter,
+            broad_exit)) {
+        return false;
+    }
+
+    broad_enter =
+        std::clamp(
+            broad_enter,
+            0.0f,
+            max_distance);
+
+    broad_exit =
+        std::clamp(
+            broad_exit,
+            0.0f,
+            max_distance);
+
+    if (broad_enter >
+        broad_exit) {
+        return false;
+    }
+
+    const float start_gap =
+        cast_shape_gap(
+            origin,
+            cast_half,
+            direction,
+            broad_enter,
+            target,
+            is_2d);
+
+    if (start_gap <= 0.0f) {
+        distance =
+            broad_enter;
+        normal =
+            cast_shape_normal(
+                origin,
+                cast_half,
+                direction,
+                distance,
+                target,
+                is_2d);
+        return true;
+    }
+
+    float low =
+        broad_enter;
+    float high =
+        broad_exit;
+
+    for (int iteration = 0;
+         iteration < 48;
+         ++iteration) {
+
+        const float first =
+            (low * 2.0f + high) /
+            3.0f;
+
+        const float second =
+            (low + high * 2.0f) /
+            3.0f;
+
+        if (cast_shape_gap(
+                origin,
+                cast_half,
+                direction,
+                first,
+                target,
+                is_2d) <
+            cast_shape_gap(
+                origin,
+                cast_half,
+                direction,
+                second,
+                target,
+                is_2d)) {
+            high = second;
+        } else {
+            low = first;
+        }
+    }
+
+    const float minimum_time =
+        (low + high) *
+        0.5f;
+
+    if (cast_shape_gap(
+            origin,
+            cast_half,
+            direction,
+            minimum_time,
+            target,
+            is_2d) >
+        0.000001f) {
+        return false;
+    }
+
+    low =
+        broad_enter;
+    high =
+        minimum_time;
+
+    for (int iteration = 0;
+         iteration < 48;
+         ++iteration) {
+
+        const float middle =
+            (low + high) *
+            0.5f;
+
+        if (cast_shape_gap(
+                origin,
+                cast_half,
+                direction,
+                middle,
+                target,
+                is_2d) <=
+            0.0f) {
+            high = middle;
+        } else {
+            low = middle;
+        }
+    }
+
+    distance =
+        std::clamp(
+            high,
+            0.0f,
+            max_distance);
+
+    normal =
+        cast_shape_normal(
+            origin,
+            cast_half,
+            direction,
+            distance,
+            target,
+            is_2d);
+
+    return true;
+}
+
+std::optional<RaycastHit>
+box_cast_shape_collection(
+    const std::vector<ColliderBounds>& bounds,
+    core::Vec3 origin,
+    core::Vec3 size,
+    core::Vec3 direction,
+    float max_distance,
+    bool include_triggers,
+    std::uint32_t layer_mask,
+    bool is_2d) {
+
+    if (size.x <= 0.0f ||
+        size.y <= 0.0f ||
+        (!is_2d &&
+         size.z <= 0.0f) ||
+        !std::isfinite(max_distance) ||
+        max_distance < 0.0f) {
+        return std::nullopt;
+    }
+
+    const auto normalized =
+        normalized_direction(
+            direction,
+            is_2d);
+
+    if (normalized ==
+        core::Vec3{}) {
+        return std::nullopt;
+    }
+
+    const core::Vec3 cast_half{
+        size.x * 0.5f,
+        size.y * 0.5f,
+        is_2d
+            ? 0.0f
+            : size.z * 0.5f
+    };
+
+    std::optional<RaycastHit>
+        closest;
+
+    for (const auto& candidate :
+         bounds) {
+
+        if ((!include_triggers &&
+             candidate.trigger) ||
+            !layer_enabled(
+                layer_mask,
+                candidate.layer)) {
+            continue;
+        }
+
+        float distance = 0.0f;
+        core::Vec3 normal{};
+
+        if (!swept_box_shape_hit(
+                origin,
+                cast_half,
+                normalized,
+                candidate,
+                max_distance,
+                is_2d,
+                distance,
+                normal)) {
+            continue;
+        }
+
+        if (closest &&
+            distance >=
+                closest->distance) {
+            continue;
+        }
+
+        closest =
+            RaycastHit{
+                candidate.entity,
+                {
+                    origin.x +
+                        normalized.x *
+                        distance,
+                    origin.y +
+                        normalized.y *
+                        distance,
+                    is_2d
+                        ? 0.0f
+                        : origin.z +
+                            normalized.z *
+                                distance
+                },
+                normal,
+                distance,
+                candidate.trigger,
+                is_2d,
+                candidate.layer
+            };
+    }
+
+    return closest;
+}
+
 template <typename Collider>
 std::optional<RaycastHit> box_cast_bounds(
     const core::World& world,
@@ -4500,16 +5099,41 @@ std::optional<RaycastHit> box_cast(
     bool include_triggers,
     std::uint32_t layer_mask) {
 
-    return box_cast_bounds<BoxCollider>(
-        world,
-        box_collider_type(),
-        origin,
-        size,
-        direction,
-        max_distance,
-        include_triggers,
-        layer_mask,
-        false);
+    return nearest_hit(
+        nearest_hit(
+            box_cast_bounds<BoxCollider>(
+                world,
+                box_collider_type(),
+                origin,
+                size,
+                direction,
+                max_distance,
+                include_triggers,
+                layer_mask,
+                false),
+            box_cast_shape_collection(
+                collect_radial_bounds<
+                    SphereCollider>(
+                        world,
+                        sphere_collider_type(),
+                        false),
+                origin,
+                size,
+                direction,
+                max_distance,
+                include_triggers,
+                layer_mask,
+                false)),
+        box_cast_shape_collection(
+            collect_capsule_bounds(
+                world),
+            origin,
+            size,
+            direction,
+            max_distance,
+            include_triggers,
+            layer_mask,
+            false));
 }
 
 std::optional<RaycastHit> box_cast_2d(
@@ -4521,28 +5145,59 @@ std::optional<RaycastHit> box_cast_2d(
     bool include_triggers,
     std::uint32_t layer_mask) {
 
-    return box_cast_bounds<BoxCollider2D>(
-        world,
-        box_collider2d_type(),
-        {
-            origin.x,
-            origin.y,
-            0.0f
-        },
-        {
-            size.x,
-            size.y,
-            0.0f
-        },
-        {
-            direction.x,
-            direction.y,
-            0.0f
-        },
-        max_distance,
-        include_triggers,
-        layer_mask,
-        true);
+    const core::Vec3 origin_3d{
+        origin.x,
+        origin.y,
+        0.0f
+    };
+
+    const core::Vec3 size_3d{
+        size.x,
+        size.y,
+        0.0f
+    };
+
+    const core::Vec3 direction_3d{
+        direction.x,
+        direction.y,
+        0.0f
+    };
+
+    return nearest_hit(
+        nearest_hit(
+            box_cast_bounds<BoxCollider2D>(
+                world,
+                box_collider2d_type(),
+                origin_3d,
+                size_3d,
+                direction_3d,
+                max_distance,
+                include_triggers,
+                layer_mask,
+                true),
+            box_cast_shape_collection(
+                collect_radial_bounds<
+                    CircleCollider2D>(
+                        world,
+                        circle_collider2d_type(),
+                        true),
+                origin_3d,
+                size_3d,
+                direction_3d,
+                max_distance,
+                include_triggers,
+                layer_mask,
+                true)),
+        box_cast_shape_collection(
+            collect_capsule2d_bounds(
+                world),
+            origin_3d,
+            size_3d,
+            direction_3d,
+            max_distance,
+            include_triggers,
+            layer_mask,
+            true));
 }
 
 } // namespace nengine::physics
