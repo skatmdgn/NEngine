@@ -170,7 +170,8 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Reference/incident face polygon clipping for Box/Box2D manifolds
 - [x] Accumulated eight-pass sequential velocity solver foundation for 3D/2D contact chains
 - [x] Rigidbody/Rigidbody2D angular velocity Scene/Editor/C# + quaternion integration foundation
-- [ ] Inertia/per-contact rotational constraints, warm starting, remaining collider shapes and production broad-phase/solver tuning
+- [x] Collider-derived inertia + per-manifold-point rotational sequential constraints
+- [ ] Cross-frame warm starting, island-aware sleeping, remaining collider shapes and production broad-phase/solver tuning
 - [x] Keyboard/mouse InputState transitions + Win32 message capture
 - [x] Named action-map binding/query foundation
 - [x] Managed KeyCode/GetKey/GetKeyDown/GetKeyUp + mouse position/delta/wheel

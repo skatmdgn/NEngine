@@ -3496,6 +3496,13 @@ namespace {
 constexpr std::size_t
     velocity_solver_iterations = 8u;
 
+struct InverseInertia3D {
+    core::Vec3 axis_x{1.0f, 0.0f, 0.0f};
+    core::Vec3 axis_y{0.0f, 1.0f, 0.0f};
+    core::Vec3 axis_z{0.0f, 0.0f, 1.0f};
+    core::Vec3 diagonal{};
+};
+
 struct VelocityConstraint3D {
     const BoxOverlap* overlap{nullptr};
     Rigidbody* first_body{nullptr};
@@ -3503,6 +3510,10 @@ struct VelocityConstraint3D {
     float first_inverse_mass{0.0f};
     float second_inverse_mass{0.0f};
     float inverse_mass_sum{0.0f};
+    InverseInertia3D first_inverse_inertia{};
+    InverseInertia3D second_inverse_inertia{};
+    core::Vec3 first_offset{};
+    core::Vec3 second_offset{};
     float restitution_target{0.0f};
     float friction{0.0f};
     float accumulated_normal_impulse{0.0f};
@@ -3516,6 +3527,10 @@ struct VelocityConstraint2D {
     float first_inverse_mass{0.0f};
     float second_inverse_mass{0.0f};
     float inverse_mass_sum{0.0f};
+    float first_inverse_inertia{0.0f};
+    float second_inverse_inertia{0.0f};
+    core::Vec3 first_offset{};
+    core::Vec3 second_offset{};
     float restitution_target{0.0f};
     float friction{0.0f};
     float accumulated_normal_impulse{0.0f};
@@ -3537,6 +3552,466 @@ float dot2(
 
     return a.x * b.x +
         a.y * b.y;
+}
+
+float cross2(
+    core::Vec3 a,
+    core::Vec3 b) noexcept {
+
+    return a.x * b.y -
+        a.y * b.x;
+}
+
+float safe_inverse(
+    float value) noexcept {
+
+    return value >
+            0.0000001f
+        ? 1.0f / value
+        : 0.0f;
+}
+
+InverseInertia3D inverse_inertia_3d(
+    const core::World& world,
+    core::Entity entity,
+    const Rigidbody* body) noexcept {
+
+    InverseInertia3D result;
+
+    if (!body ||
+        !body->enabled ||
+        body->is_kinematic ||
+        body->mass <= 0.0f) {
+        result.diagonal = {};
+        return result;
+    }
+
+    const auto* transform =
+        world.transform(entity);
+
+    if (!transform) {
+        result.diagonal = {};
+        return result;
+    }
+
+    box_axes(
+        transform->local_rotation,
+        false,
+        result.axis_x,
+        result.axis_y,
+        result.axis_z);
+
+    const auto scale =
+        abs_scale(
+            transform->local_scale);
+
+    core::Vec3 size{
+        1.0f,
+        1.0f,
+        1.0f
+    };
+
+    core::Vec3 center{};
+    bool spherical = false;
+    float sphere_radius = 0.0f;
+
+    if (const auto* collider =
+            world.get_component<BoxCollider>(
+                entity,
+                box_collider_type());
+        collider &&
+        collider->enabled) {
+
+        size = {
+            std::abs(collider->size.x) *
+                scale.x,
+            std::abs(collider->size.y) *
+                scale.y,
+            std::abs(collider->size.z) *
+                scale.z
+        };
+
+        center = {
+            collider->center.x * scale.x,
+            collider->center.y * scale.y,
+            collider->center.z * scale.z
+        };
+    } else if (
+        const auto* collider =
+            world.get_component<SphereCollider>(
+                entity,
+                sphere_collider_type());
+        collider &&
+        collider->enabled) {
+
+        spherical = true;
+
+        sphere_radius =
+            std::abs(
+                collider->radius) *
+            std::max(
+                scale.x,
+                std::max(
+                    scale.y,
+                    scale.z));
+
+        center = {
+            collider->center.x * scale.x,
+            collider->center.y * scale.y,
+            collider->center.z * scale.z
+        };
+    } else if (
+        const auto* collider =
+            world.get_component<CapsuleCollider>(
+                entity,
+                capsule_collider_type());
+        collider &&
+        collider->enabled) {
+
+        float axial_scale =
+            scale.y;
+
+        float radial_scale =
+            std::max(
+                scale.x,
+                scale.z);
+
+        if (collider->direction == 0u) {
+            axial_scale =
+                scale.x;
+
+            radial_scale =
+                std::max(
+                    scale.y,
+                    scale.z);
+        } else if (
+            collider->direction == 2u) {
+
+            axial_scale =
+                scale.z;
+
+            radial_scale =
+                std::max(
+                    scale.x,
+                    scale.y);
+        }
+
+        const float radius =
+            std::abs(
+                collider->radius) *
+            radial_scale;
+
+        const float height =
+            std::max(
+                std::abs(
+                    collider->height) *
+                    axial_scale,
+                radius * 2.0f);
+
+        const float diameter =
+            radius * 2.0f;
+
+        size = {
+            diameter,
+            height,
+            diameter
+        };
+
+        if (collider->direction == 0u) {
+            size = {
+                height,
+                diameter,
+                diameter
+            };
+        } else if (
+            collider->direction == 2u) {
+
+            size = {
+                diameter,
+                diameter,
+                height
+            };
+        }
+
+        center = {
+            collider->center.x * scale.x,
+            collider->center.y * scale.y,
+            collider->center.z * scale.z
+        };
+    }
+
+    float inertia_x = 0.0f;
+    float inertia_y = 0.0f;
+    float inertia_z = 0.0f;
+
+    if (spherical) {
+        const float inertia =
+            0.4f *
+            body->mass *
+            sphere_radius *
+            sphere_radius;
+
+        inertia_x = inertia;
+        inertia_y = inertia;
+        inertia_z = inertia;
+    } else {
+        inertia_x =
+            body->mass *
+            (size.y * size.y +
+             size.z * size.z) /
+            12.0f;
+
+        inertia_y =
+            body->mass *
+            (size.x * size.x +
+             size.z * size.z) /
+            12.0f;
+
+        inertia_z =
+            body->mass *
+            (size.x * size.x +
+             size.y * size.y) /
+            12.0f;
+    }
+
+    inertia_x +=
+        body->mass *
+        (center.y * center.y +
+         center.z * center.z);
+
+    inertia_y +=
+        body->mass *
+        (center.x * center.x +
+         center.z * center.z);
+
+    inertia_z +=
+        body->mass *
+        (center.x * center.x +
+         center.y * center.y);
+
+    result.diagonal = {
+        safe_inverse(inertia_x),
+        safe_inverse(inertia_y),
+        safe_inverse(inertia_z)
+    };
+
+    return result;
+}
+
+float inverse_inertia_2d(
+    const core::World& world,
+    core::Entity entity,
+    const Rigidbody2D* body) noexcept {
+
+    if (!body ||
+        !body->enabled ||
+        body->is_kinematic ||
+        body->mass <= 0.0f) {
+        return 0.0f;
+    }
+
+    const auto* transform =
+        world.transform(entity);
+
+    if (!transform) {
+        return 0.0f;
+    }
+
+    const auto scale =
+        abs_scale(
+            transform->local_scale);
+
+    float inertia = 0.0f;
+    core::Vec3 center{};
+
+    if (const auto* collider =
+            world.get_component<BoxCollider2D>(
+                entity,
+                box_collider2d_type());
+        collider &&
+        collider->enabled) {
+
+        const float width =
+            std::abs(
+                collider->size.x) *
+            scale.x;
+
+        const float height =
+            std::abs(
+                collider->size.y) *
+            scale.y;
+
+        inertia =
+            body->mass *
+            (width * width +
+             height * height) /
+            12.0f;
+
+        center = {
+            collider->center.x * scale.x,
+            collider->center.y * scale.y,
+            0.0f
+        };
+    } else if (
+        const auto* collider =
+            world.get_component<CircleCollider2D>(
+                entity,
+                circle_collider2d_type());
+        collider &&
+        collider->enabled) {
+
+        const float radius =
+            std::abs(
+                collider->radius) *
+            std::max(
+                scale.x,
+                scale.y);
+
+        inertia =
+            0.5f *
+            body->mass *
+            radius *
+            radius;
+
+        center = {
+            collider->center.x * scale.x,
+            collider->center.y * scale.y,
+            0.0f
+        };
+    } else if (
+        const auto* collider =
+            world.get_component<CapsuleCollider2D>(
+                entity,
+                capsule_collider2d_type());
+        collider &&
+        collider->enabled) {
+
+        const float width =
+            std::abs(
+                collider->size.x) *
+            scale.x;
+
+        const float height =
+            std::abs(
+                collider->size.y) *
+            scale.y;
+
+        inertia =
+            body->mass *
+            (width * width +
+             height * height) /
+            12.0f;
+
+        center = {
+            collider->center.x * scale.x,
+            collider->center.y * scale.y,
+            0.0f
+        };
+    }
+
+    inertia +=
+        body->mass *
+        (center.x * center.x +
+         center.y * center.y);
+
+    return safe_inverse(
+        inertia);
+}
+
+core::Vec3 apply_inverse_inertia(
+    const InverseInertia3D& inertia,
+    core::Vec3 torque) noexcept {
+
+    return added(
+        added(
+            scaled(
+                inertia.axis_x,
+                dot3(
+                    torque,
+                    inertia.axis_x) *
+                    inertia.diagonal.x),
+            scaled(
+                inertia.axis_y,
+                dot3(
+                    torque,
+                    inertia.axis_y) *
+                    inertia.diagonal.y)),
+        scaled(
+            inertia.axis_z,
+            dot3(
+                torque,
+                inertia.axis_z) *
+                inertia.diagonal.z));
+}
+
+float effective_mass_3d(
+    const VelocityConstraint3D& constraint,
+    core::Vec3 axis) noexcept {
+
+    float denominator =
+        constraint.inverse_mass_sum;
+
+    if (constraint.first_inverse_mass >
+        0.0f) {
+
+        const auto angular =
+            cross(
+                constraint.first_offset,
+                axis);
+
+        denominator +=
+            dot3(
+                angular,
+                apply_inverse_inertia(
+                    constraint
+                        .first_inverse_inertia,
+                    angular));
+    }
+
+    if (constraint.second_inverse_mass >
+        0.0f) {
+
+        const auto angular =
+            cross(
+                constraint.second_offset,
+                axis);
+
+        denominator +=
+            dot3(
+                angular,
+                apply_inverse_inertia(
+                    constraint
+                        .second_inverse_inertia,
+                    angular));
+    }
+
+    return denominator;
+}
+
+float effective_mass_2d(
+    const VelocityConstraint2D& constraint,
+    core::Vec3 axis) noexcept {
+
+    const float first_arm =
+        cross2(
+            constraint.first_offset,
+            axis);
+
+    const float second_arm =
+        cross2(
+            constraint.second_offset,
+            axis);
+
+    return
+        constraint.inverse_mass_sum +
+        first_arm *
+            first_arm *
+            constraint
+                .first_inverse_inertia +
+        second_arm *
+            second_arm *
+            constraint
+                .second_inverse_inertia;
 }
 
 void apply_impulse_3d(
@@ -3561,6 +4036,25 @@ void apply_impulse_3d(
             ->linear_velocity.z -=
             impulse.z *
             constraint.first_inverse_mass;
+
+        const auto angular_delta =
+            apply_inverse_inertia(
+                constraint.first_inverse_inertia,
+                cross(
+                    constraint.first_offset,
+                    impulse));
+
+        constraint.first_body
+            ->angular_velocity.x -=
+            angular_delta.x;
+
+        constraint.first_body
+            ->angular_velocity.y -=
+            angular_delta.y;
+
+        constraint.first_body
+            ->angular_velocity.z -=
+            angular_delta.z;
     }
 
     if (constraint.second_body &&
@@ -3581,6 +4075,25 @@ void apply_impulse_3d(
             ->linear_velocity.z +=
             impulse.z *
             constraint.second_inverse_mass;
+
+        const auto angular_delta =
+            apply_inverse_inertia(
+                constraint.second_inverse_inertia,
+                cross(
+                    constraint.second_offset,
+                    impulse));
+
+        constraint.second_body
+            ->angular_velocity.x +=
+            angular_delta.x;
+
+        constraint.second_body
+            ->angular_velocity.y +=
+            angular_delta.y;
+
+        constraint.second_body
+            ->angular_velocity.z +=
+            angular_delta.z;
     }
 }
 
@@ -3607,6 +4120,14 @@ void apply_impulse_2d(
         constraint.first_body
             ->linear_velocity.z =
             0.0f;
+
+        constraint.first_body
+            ->angular_velocity.z -=
+            cross2(
+                constraint.first_offset,
+                impulse) *
+            constraint
+                .first_inverse_inertia;
     }
 
     if (constraint.second_body &&
@@ -3626,27 +4147,69 @@ void apply_impulse_2d(
         constraint.second_body
             ->linear_velocity.z =
             0.0f;
+
+        constraint.second_body
+            ->angular_velocity.z +=
+            cross2(
+                constraint.second_offset,
+                impulse) *
+            constraint
+                .second_inverse_inertia;
     }
+}
+
+core::Vec3 contact_velocity_3d(
+    const Rigidbody* body,
+    float inverse_mass,
+    core::Vec3 offset) noexcept {
+
+    if (!body ||
+        inverse_mass <= 0.0f) {
+        return {};
+    }
+
+    return added(
+        body->linear_velocity,
+        cross(
+            body->angular_velocity,
+            offset));
+}
+
+core::Vec3 contact_velocity_2d(
+    const Rigidbody2D* body,
+    float inverse_mass,
+    core::Vec3 offset) noexcept {
+
+    if (!body ||
+        inverse_mass <= 0.0f) {
+        return {};
+    }
+
+    return {
+        body->linear_velocity.x -
+            body->angular_velocity.z *
+                offset.y,
+        body->linear_velocity.y +
+            body->angular_velocity.z *
+                offset.x,
+        0.0f
+    };
 }
 
 core::Vec3 relative_velocity_3d(
     const VelocityConstraint3D& constraint) noexcept {
 
-    const core::Vec3 first =
-        constraint.first_body &&
-                constraint.first_inverse_mass >
-                    0.0f
-            ? constraint.first_body
-                  ->linear_velocity
-            : core::Vec3{};
+    const auto first =
+        contact_velocity_3d(
+            constraint.first_body,
+            constraint.first_inverse_mass,
+            constraint.first_offset);
 
-    const core::Vec3 second =
-        constraint.second_body &&
-                constraint.second_inverse_mass >
-                    0.0f
-            ? constraint.second_body
-                  ->linear_velocity
-            : core::Vec3{};
+    const auto second =
+        contact_velocity_3d(
+            constraint.second_body,
+            constraint.second_inverse_mass,
+            constraint.second_offset);
 
     return {
         second.x - first.x,
@@ -3658,21 +4221,17 @@ core::Vec3 relative_velocity_3d(
 core::Vec3 relative_velocity_2d(
     const VelocityConstraint2D& constraint) noexcept {
 
-    const core::Vec3 first =
-        constraint.first_body &&
-                constraint.first_inverse_mass >
-                    0.0f
-            ? constraint.first_body
-                  ->linear_velocity
-            : core::Vec3{};
+    const auto first =
+        contact_velocity_2d(
+            constraint.first_body,
+            constraint.first_inverse_mass,
+            constraint.first_offset);
 
-    const core::Vec3 second =
-        constraint.second_body &&
-                constraint.second_inverse_mass >
-                    0.0f
-            ? constraint.second_body
-                  ->linear_velocity
-            : core::Vec3{};
+    const auto second =
+        contact_velocity_2d(
+            constraint.second_body,
+            constraint.second_inverse_mass,
+            constraint.second_offset);
 
     return {
         second.x - first.x,
@@ -3684,14 +4243,22 @@ core::Vec3 relative_velocity_2d(
 bool solve_velocity_constraint_3d(
     VelocityConstraint3D& constraint) noexcept {
 
-    if (!constraint.overlap ||
-        constraint.inverse_mass_sum <=
-            0.0f) {
+    if (!constraint.overlap) {
         return false;
     }
 
     const auto normal =
         constraint.overlap->normal;
+
+    const float normal_denominator =
+        effective_mass_3d(
+            constraint,
+            normal);
+
+    if (normal_denominator <=
+        0.0000001f) {
+        return false;
+    }
 
     auto relative =
         relative_velocity_3d(
@@ -3705,7 +4272,7 @@ bool solve_velocity_constraint_3d(
     const float requested_normal =
         (constraint.restitution_target -
          normal_speed) /
-        constraint.inverse_mass_sum;
+        normal_denominator;
 
     const float next_normal =
         std::max(
@@ -3743,39 +4310,69 @@ bool solve_velocity_constraint_3d(
             relative,
             normal);
 
-    core::Vec3 tangent_velocity{
-        relative.x -
-            normal.x *
-                post_normal_speed,
-        relative.y -
-            normal.y *
-                post_normal_speed,
-        relative.z -
-            normal.z *
-                post_normal_speed
-    };
+    auto tangent_velocity =
+        core::Vec3{
+            relative.x -
+                normal.x *
+                    post_normal_speed,
+            relative.y -
+                normal.y *
+                    post_normal_speed,
+            relative.z -
+                normal.z *
+                    post_normal_speed
+        };
 
-    core::Vec3 candidate_tangent{
-        constraint
-                .accumulated_tangent_impulse.x -
-            tangent_velocity.x /
-                constraint.inverse_mass_sum,
-        constraint
-                .accumulated_tangent_impulse.y -
-            tangent_velocity.y /
-                constraint.inverse_mass_sum,
-        constraint
-                .accumulated_tangent_impulse.z -
-            tangent_velocity.z /
-                constraint.inverse_mass_sum
-    };
+    const float tangent_speed_squared =
+        dot3(
+            tangent_velocity,
+            tangent_velocity);
+
+    if (tangent_speed_squared <=
+        0.0000000001f) {
+        return changed;
+    }
+
+    const float inverse_tangent_speed =
+        1.0f /
+        std::sqrt(
+            tangent_speed_squared);
+
+    const auto tangent =
+        scaled(
+            tangent_velocity,
+            inverse_tangent_speed);
+
+    const float tangent_denominator =
+        effective_mass_3d(
+            constraint,
+            tangent);
+
+    if (tangent_denominator <=
+        0.0000001f) {
+        return changed;
+    }
+
+    const float tangent_delta =
+        -dot3(
+            relative,
+            tangent) /
+        tangent_denominator;
+
+    auto candidate_tangent =
+        added(
+            constraint
+                .accumulated_tangent_impulse,
+            scaled(
+                tangent,
+                tangent_delta));
 
     const float tangent_limit =
         constraint.friction *
         constraint
             .accumulated_normal_impulse;
 
-    const float tangent_squared =
+    const float candidate_squared =
         dot3(
             candidate_tangent,
             candidate_tangent);
@@ -3783,19 +4380,16 @@ bool solve_velocity_constraint_3d(
     if (tangent_limit <= 0.0f) {
         candidate_tangent = {};
     } else if (
-        tangent_squared >
+        candidate_squared >
         tangent_limit *
             tangent_limit) {
-
-        const float inverse =
-            tangent_limit /
-            std::sqrt(
-                tangent_squared);
 
         candidate_tangent =
             scaled(
                 candidate_tangent,
-                inverse);
+                tangent_limit /
+                    std::sqrt(
+                        candidate_squared));
     }
 
     const core::Vec3 applied_tangent{
@@ -3831,14 +4425,22 @@ bool solve_velocity_constraint_3d(
 bool solve_velocity_constraint_2d(
     VelocityConstraint2D& constraint) noexcept {
 
-    if (!constraint.overlap ||
-        constraint.inverse_mass_sum <=
-            0.0f) {
+    if (!constraint.overlap) {
         return false;
     }
 
     const auto normal =
         constraint.overlap->normal;
+
+    const float normal_denominator =
+        effective_mass_2d(
+            constraint,
+            normal);
+
+    if (normal_denominator <=
+        0.0000001f) {
+        return false;
+    }
 
     auto relative =
         relative_velocity_2d(
@@ -3852,7 +4454,7 @@ bool solve_velocity_constraint_2d(
     const float requested_normal =
         (constraint.restitution_target -
          normal_speed) /
-        constraint.inverse_mass_sum;
+        normal_denominator;
 
     const float next_normal =
         std::max(
@@ -3900,15 +4502,54 @@ bool solve_velocity_constraint_2d(
         0.0f
     };
 
+    const float tangent_speed_squared =
+        dot2(
+            tangent_velocity,
+            tangent_velocity);
+
+    if (tangent_speed_squared <=
+        0.0000000001f) {
+        return changed;
+    }
+
+    const float inverse_tangent_speed =
+        1.0f /
+        std::sqrt(
+            tangent_speed_squared);
+
+    const core::Vec3 tangent{
+        tangent_velocity.x *
+            inverse_tangent_speed,
+        tangent_velocity.y *
+            inverse_tangent_speed,
+        0.0f
+    };
+
+    const float tangent_denominator =
+        effective_mass_2d(
+            constraint,
+            tangent);
+
+    if (tangent_denominator <=
+        0.0000001f) {
+        return changed;
+    }
+
+    const float tangent_delta =
+        -dot2(
+            relative,
+            tangent) /
+        tangent_denominator;
+
     core::Vec3 candidate_tangent{
         constraint
-                .accumulated_tangent_impulse.x -
-            tangent_velocity.x /
-                constraint.inverse_mass_sum,
+                .accumulated_tangent_impulse.x +
+            tangent.x *
+                tangent_delta,
         constraint
-                .accumulated_tangent_impulse.y -
-            tangent_velocity.y /
-                constraint.inverse_mass_sum,
+                .accumulated_tangent_impulse.y +
+            tangent.y *
+                tangent_delta,
         0.0f
     };
 
@@ -3917,7 +4558,7 @@ bool solve_velocity_constraint_2d(
         constraint
             .accumulated_normal_impulse;
 
-    const float tangent_squared =
+    const float candidate_squared =
         dot2(
             candidate_tangent,
             candidate_tangent);
@@ -3925,17 +4566,18 @@ bool solve_velocity_constraint_2d(
     if (tangent_limit <= 0.0f) {
         candidate_tangent = {};
     } else if (
-        tangent_squared >
+        candidate_squared >
         tangent_limit *
             tangent_limit) {
 
         const float inverse =
             tangent_limit /
             std::sqrt(
-                tangent_squared);
+                candidate_squared);
 
         candidate_tangent.x *=
             inverse;
+
         candidate_tangent.y *=
             inverse;
     }
@@ -3980,7 +4622,8 @@ CollisionResolutionStats resolve_box_contacts_3d(
         constraints;
 
     constraints.reserve(
-        overlaps.size());
+        overlaps.size() *
+        ContactManifold::max_points);
 
     for (const auto& overlap :
          overlaps) {
@@ -4097,45 +4740,120 @@ CollisionResolutionStats resolve_box_contacts_3d(
                 world,
                 overlap.second);
 
-        VelocityConstraint3D constraint;
-        constraint.overlap =
-            &overlap;
-        constraint.first_body =
-            first_body;
-        constraint.second_body =
-            second_body;
-        constraint.first_inverse_mass =
-            first_inverse_mass;
-        constraint.second_inverse_mass =
-            second_inverse_mass;
-        constraint.inverse_mass_sum =
-            inverse_mass_sum;
-        constraint.friction =
-            std::sqrt(
-                std::max(
-                    0.0f,
-                    first_material.friction *
-                    second_material.friction));
+        const auto first_inertia =
+            inverse_inertia_3d(
+                world,
+                overlap.first,
+                first_body);
 
-        const auto relative =
-            relative_velocity_3d(
+        const auto second_inertia =
+            inverse_inertia_3d(
+                world,
+                overlap.second,
+                second_body);
+
+        const std::size_t contact_count =
+            std::max<std::size_t>(
+                1u,
+                overlap.manifold.count);
+
+        for (std::size_t index = 0u;
+             index < contact_count;
+             ++index) {
+
+            core::Vec3 contact_point{
+                (first_transform
+                         ->local_position.x +
+                 second_transform
+                         ->local_position.x) *
+                    0.5f,
+                (first_transform
+                         ->local_position.y +
+                 second_transform
+                         ->local_position.y) *
+                    0.5f,
+                (first_transform
+                         ->local_position.z +
+                 second_transform
+                         ->local_position.z) *
+                    0.5f
+            };
+
+            if (index <
+                overlap.manifold.count) {
+
+                contact_point =
+                    overlap.manifold
+                        .points[index]
+                        .point;
+            }
+
+            VelocityConstraint3D constraint;
+            constraint.overlap =
+                &overlap;
+            constraint.first_body =
+                first_body;
+            constraint.second_body =
+                second_body;
+            constraint.first_inverse_mass =
+                first_inverse_mass;
+            constraint.second_inverse_mass =
+                second_inverse_mass;
+            constraint.inverse_mass_sum =
+                inverse_mass_sum;
+            constraint.first_inverse_inertia =
+                first_inertia;
+            constraint.second_inverse_inertia =
+                second_inertia;
+            constraint.first_offset = {
+                contact_point.x -
+                    first_transform
+                        ->local_position.x,
+                contact_point.y -
+                    first_transform
+                        ->local_position.y,
+                contact_point.z -
+                    first_transform
+                        ->local_position.z
+            };
+            constraint.second_offset = {
+                contact_point.x -
+                    second_transform
+                        ->local_position.x,
+                contact_point.y -
+                    second_transform
+                        ->local_position.y,
+                contact_point.z -
+                    second_transform
+                        ->local_position.z
+            };
+            constraint.friction =
+                std::sqrt(
+                    std::max(
+                        0.0f,
+                        first_material.friction *
+                        second_material.friction));
+
+            const auto relative =
+                relative_velocity_3d(
+                    constraint);
+
+            const float normal_speed =
+                dot3(
+                    relative,
+                    overlap.normal);
+
+            if (normal_speed < 0.0f) {
+                constraint.restitution_target =
+                    -std::max(
+                        first_material.restitution,
+                        second_material.restitution) *
+                    normal_speed;
+            }
+
+            constraints.push_back(
                 constraint);
-
-        const float normal_speed =
-            dot3(
-                relative,
-                overlap.normal);
-
-        if (normal_speed < 0.0f) {
-            constraint.restitution_target =
-                -std::max(
-                    first_material.restitution,
-                    second_material.restitution) *
-                normal_speed;
         }
-
-        constraints.push_back(
-            constraint);
 
         ++stats.resolved_3d;
     }
@@ -4174,7 +4892,8 @@ CollisionResolutionStats resolve_box_contacts_2d(
         constraints;
 
     constraints.reserve(
-        overlaps.size());
+        overlaps.size() *
+        ContactManifold::max_points);
 
     for (const auto& overlap :
          overlaps) {
@@ -4281,45 +5000,112 @@ CollisionResolutionStats resolve_box_contacts_2d(
                 world,
                 overlap.second);
 
-        VelocityConstraint2D constraint;
-        constraint.overlap =
-            &overlap;
-        constraint.first_body =
-            first_body;
-        constraint.second_body =
-            second_body;
-        constraint.first_inverse_mass =
-            first_inverse_mass;
-        constraint.second_inverse_mass =
-            second_inverse_mass;
-        constraint.inverse_mass_sum =
-            inverse_mass_sum;
-        constraint.friction =
-            std::sqrt(
-                std::max(
-                    0.0f,
-                    first_material.friction *
-                    second_material.friction));
+        const float first_inertia =
+            inverse_inertia_2d(
+                world,
+                overlap.first,
+                first_body);
 
-        const auto relative =
-            relative_velocity_2d(
+        const float second_inertia =
+            inverse_inertia_2d(
+                world,
+                overlap.second,
+                second_body);
+
+        const std::size_t contact_count =
+            std::max<std::size_t>(
+                1u,
+                overlap.manifold.count);
+
+        for (std::size_t index = 0u;
+             index < contact_count;
+             ++index) {
+
+            core::Vec3 contact_point{
+                (first_transform
+                         ->local_position.x +
+                 second_transform
+                         ->local_position.x) *
+                    0.5f,
+                (first_transform
+                         ->local_position.y +
+                 second_transform
+                         ->local_position.y) *
+                    0.5f,
+                0.0f
+            };
+
+            if (index <
+                overlap.manifold.count) {
+
+                contact_point =
+                    overlap.manifold
+                        .points[index]
+                        .point;
+            }
+
+            VelocityConstraint2D constraint;
+            constraint.overlap =
+                &overlap;
+            constraint.first_body =
+                first_body;
+            constraint.second_body =
+                second_body;
+            constraint.first_inverse_mass =
+                first_inverse_mass;
+            constraint.second_inverse_mass =
+                second_inverse_mass;
+            constraint.inverse_mass_sum =
+                inverse_mass_sum;
+            constraint.first_inverse_inertia =
+                first_inertia;
+            constraint.second_inverse_inertia =
+                second_inertia;
+            constraint.first_offset = {
+                contact_point.x -
+                    first_transform
+                        ->local_position.x,
+                contact_point.y -
+                    first_transform
+                        ->local_position.y,
+                0.0f
+            };
+            constraint.second_offset = {
+                contact_point.x -
+                    second_transform
+                        ->local_position.x,
+                contact_point.y -
+                    second_transform
+                        ->local_position.y,
+                0.0f
+            };
+            constraint.friction =
+                std::sqrt(
+                    std::max(
+                        0.0f,
+                        first_material.friction *
+                        second_material.friction));
+
+            const auto relative =
+                relative_velocity_2d(
+                    constraint);
+
+            const float normal_speed =
+                dot2(
+                    relative,
+                    overlap.normal);
+
+            if (normal_speed < 0.0f) {
+                constraint.restitution_target =
+                    -std::max(
+                        first_material.restitution,
+                        second_material.restitution) *
+                    normal_speed;
+            }
+
+            constraints.push_back(
                 constraint);
-
-        const float normal_speed =
-            dot2(
-                relative,
-                overlap.normal);
-
-        if (normal_speed < 0.0f) {
-            constraint.restitution_target =
-                -std::max(
-                    first_material.restitution,
-                    second_material.restitution) *
-                normal_speed;
         }
-
-        constraints.push_back(
-            constraint);
 
         ++stats.resolved_2d;
     }
@@ -4351,15 +5137,29 @@ CollisionResolutionStats resolve_box_contacts_2d(
         if (constraint.first_body &&
             constraint.first_inverse_mass >
                 0.0f) {
+
             constraint.first_body
                 ->linear_velocity.z = 0.0f;
+
+            constraint.first_body
+                ->angular_velocity.x = 0.0f;
+
+            constraint.first_body
+                ->angular_velocity.y = 0.0f;
         }
 
         if (constraint.second_body &&
             constraint.second_inverse_mass >
                 0.0f) {
+
             constraint.second_body
                 ->linear_velocity.z = 0.0f;
+
+            constraint.second_body
+                ->angular_velocity.x = 0.0f;
+
+            constraint.second_body
+                ->angular_velocity.y = 0.0f;
         }
     }
 

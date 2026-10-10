@@ -2586,6 +2586,159 @@ int main() {
             0.0001f,
         "2D sequential impulse iterations converge contact chains while preserving XY-only velocity");
 
+
+    core::World rotational_contact_world;
+
+    const auto rotational_box =
+        rotational_contact_world.create(
+            "Rotational Box");
+
+    const auto rotational_sphere =
+        rotational_contact_world.create(
+            "Rotational Sphere");
+
+    rotational_contact_world.add_component<
+        physics::BoxCollider>(
+            rotational_box,
+            physics::box_collider_type());
+
+    rotational_contact_world.add_component<
+        physics::SphereCollider>(
+            rotational_sphere,
+            physics::sphere_collider_type());
+
+    auto* rotational_body =
+        rotational_contact_world.add_component<
+            physics::Rigidbody>(
+                rotational_box,
+                physics::rigidbody_type());
+
+    rotational_contact_world.transform(
+        rotational_sphere)->local_position =
+            {0.75f, 0.35f, 0.0f};
+
+    if (rotational_body) {
+        rotational_body->use_gravity =
+            false;
+        rotational_body->linear_velocity =
+            {2.0f, 0.0f, 0.0f};
+    }
+
+    const auto rotational_detection =
+        physics::detect_box_overlaps(
+            rotational_contact_world);
+
+    const auto rotational_resolution =
+        physics::resolve_box_contacts_3d(
+            rotational_contact_world,
+            rotational_detection.overlaps);
+
+    rotational_body =
+        rotational_contact_world
+            .get_component<
+                physics::Rigidbody>(
+                    rotational_box,
+                    physics::rigidbody_type());
+
+    check(
+        rotational_resolution.resolved_3d ==
+            1u &&
+        rotational_body &&
+        rotational_body
+            ->linear_velocity.x <
+            2.0f &&
+        (std::abs(
+             rotational_body
+                 ->angular_velocity.y) +
+         std::abs(
+             rotational_body
+                 ->angular_velocity.z)) >
+            0.05f,
+        "off-center 3D contact impulse changes angular velocity through collider-derived inertia");
+
+    core::World rotational_contact_2d_world;
+
+    const auto rotational_box_2d =
+        rotational_contact_2d_world.create(
+            "Rotational Box2D");
+
+    const auto rotational_circle_2d =
+        rotational_contact_2d_world.create(
+            "Rotational Circle2D");
+
+    rotational_contact_2d_world
+        .add_component<
+            physics::BoxCollider2D>(
+                rotational_box_2d,
+                physics::box_collider2d_type());
+
+    rotational_contact_2d_world
+        .add_component<
+            physics::CircleCollider2D>(
+                rotational_circle_2d,
+                physics::circle_collider2d_type());
+
+    auto* rotational_body_2d =
+        rotational_contact_2d_world
+            .add_component<
+                physics::Rigidbody2D>(
+                    rotational_box_2d,
+                    physics::rigidbody2d_type());
+
+    rotational_contact_2d_world.transform(
+        rotational_circle_2d)
+        ->local_position =
+            {0.75f, 0.35f, 7.0f};
+
+    if (rotational_body_2d) {
+        rotational_body_2d->use_gravity =
+            false;
+        rotational_body_2d
+            ->linear_velocity =
+            {2.0f, 0.0f, 9.0f};
+    }
+
+    const auto rotational_detection_2d =
+        physics::detect_box_overlaps(
+            rotational_contact_2d_world);
+
+    const auto rotational_resolution_2d =
+        physics::resolve_box_contacts_2d(
+            rotational_contact_2d_world,
+            rotational_detection_2d.overlaps);
+
+    rotational_body_2d =
+        rotational_contact_2d_world
+            .get_component<
+                physics::Rigidbody2D>(
+                    rotational_box_2d,
+                    physics::rigidbody2d_type());
+
+    check(
+        rotational_resolution_2d.resolved_2d ==
+            1u &&
+        rotational_body_2d &&
+        rotational_body_2d
+            ->linear_velocity.x <
+            2.0f &&
+        std::abs(
+            rotational_body_2d
+                ->angular_velocity.z) >
+            0.05f &&
+        std::abs(
+            rotational_body_2d
+                ->angular_velocity.x) <
+            0.0001f &&
+        std::abs(
+            rotational_body_2d
+                ->angular_velocity.y) <
+            0.0001f &&
+        std::abs(
+            rotational_body_2d
+                ->linear_velocity.z) <
+            0.0001f,
+        "off-center 2D contact impulse changes only Z angular velocity through planar inertia");
+
     core::World sleeping_world;
 
     const auto sleeping_floor =

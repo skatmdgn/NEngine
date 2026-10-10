@@ -292,10 +292,10 @@ Implemented:
 - Editor Add Component, Inspector and generic PropertyAccess integration for all eight physics components.
 - Managed Rigidbody / BoxCollider / SphereCollider / CapsuleCollider / Rigidbody2D / BoxCollider2D / CircleCollider2D / CapsuleCollider2D proxies over ABI v15, including Unity-familiar velocity/angularVelocity/useGravity/isKinematic naming and CapsuleDirection2D; Rigidbody2D.angularVelocity uses degrees/sec while native planar angular velocity is stored in Z radians/sec.
 - Fixed-step rigidbody foundation runs after managed FixedUpdate so script velocity changes affect the same simulation step; sleeping bodies skip gravity/integration until velocity, impact or support changes wake them.
-- 3D gravity + linear/angular velocity Transform integration and 2D XY + Z-axis angular integration with normalized quaternion updates; kinematic/inactive bodies are skipped and 2D X/Y angular components are discarded.
+- 3D gravity + linear/angular velocity Transform integration and 2D XY + Z-axis angular integration with normalized quaternion updates; kinematic/inactive bodies are skipped and 2D X/Y angular components are discarded. Solver inertia uses Box and Sphere analytic mass properties, Box2D/Circle2D planar formulas, and box-equivalent Capsule/Capsule2D approximations with collider-center parallel-axis diagonal terms.
 - BoxCollider/SphereCollider/CapsuleCollider and BoxCollider2D/CircleCollider2D/CapsuleCollider2D share the X-axis sweep-and-prune broad phase; rotated boxes and capsules contribute conservative world AABBs while narrow phase handles OBB-OBB, radial-radial, oriented box-radial, capsule-radial, capsule-capsule and oriented box-capsule pairs with layer/collision-mask filtering and trigger separation.
 - Collision detection records a fixed-capacity ContactManifold (up to four ContactPoints) on each solid overlap. Box/Box2D face contacts now choose a SAT-aligned reference face, construct the opposing incident face/edge, and Sutherland-Hodgman clip it against the reference side planes to retain up to four 3D or two 2D contacts even when neither original face contributes contained vertices. SAT edge-edge axes and non-box shape pairs fall back to a representative support-midpoint contact. Each point carries penetration.
-- 3D/2D contact resolution performs inverse-mass-weighted positional correction once with a tiny persistent contact slop, then runs up to eight projected Gauss-Seidel-style sequential velocity passes. Each pair accumulates a non-negative normal impulse and a Coulomb-clamped tangent impulse vector for the current solve, preserving the larger restitution target and geometric-mean friction while allowing contact chains to converge within the frame.
+- 3D/2D contact resolution performs inverse-mass-weighted positional correction once with a tiny persistent contact slop, then runs up to eight projected Gauss-Seidel-style sequential velocity passes over individual manifold points. Contact-point velocity includes omega x r, normal/tangent effective mass includes rotational inertia, impulses update both linear and angular velocity, and each point accumulates a non-negative normal impulse plus Coulomb-clamped tangent impulse for the current solve.
 - Contact-supported Rigidbody/Rigidbody2D sleeping enters after 0.5 seconds when combined linear/angular motion remains at or below the configurable threshold, never sleeps unsupported bodies, wakes on externally assigned linear/angular velocity, impact or support loss, and exposes managed allowSleep, sleepThreshold, Sleep(), WakeUp() and IsSleeping().
 - ContactTracker derives Enter/Stay/Exit phases for collision and trigger pairs; solid Enter/Stay events carry the active manifold count plus its centroid as the representative native point, trigger events keep zero contacts, and Exit retains the prior manifold centroid with zero active contacts.
 - Editor Play Mode dispatches tracked contact phases to both active managed Behaviours with side-correct contact normals.
@@ -308,7 +308,7 @@ Implemented:
 
 Not yet implemented:
 - Production broad-phase tuning and remaining polygon-style collider variants remain; additional cast shapes such as SphereCast/CapsuleCast are not yet exposed.
-- Production contact solving beyond the current angular-velocity integration + accumulated per-pair iterative constraint foundation: collider-derived inertia and per-manifold-point rotational constraints, cross-frame warm starting and island-aware sleeping/wake propagation; SAT edge-edge contacts still use a single fallback point.
+- Production contact solving beyond the current collider-derived inertia + per-manifold-point rotational constraint foundation: cross-frame warm starting, fuller capsule inertia tensors/compound-collider mass properties and island-aware sleeping/wake propagation; SAT edge-edge contacts still use a single fallback point.
 - Additional shape casts and richer hit semantics/query filtering policy.
 - Physics materials and joints.
 - Production 3D/2D backend selection/integration.
@@ -354,7 +354,7 @@ Not yet implemented:
 
 ## Immediate next work
 
-1. Derive collider inertia and solve each manifold point with rotational effective mass, then persist impulses for cross-frame warm starting and island-aware sleep propagation before continuing polygon-style collider work.
+1. Persist per-contact impulses for cross-frame warm starting, then add island-aware sleep/wake propagation and refine capsule/compound-collider mass properties before continuing polygon-style collider work.
 2. Extend audio with streaming + OGG/MP3/FLAC runtime decode and a callback-driven device path after real-Windows audible acceptance.
 3. Extend managed physics queries with additional shape casts and richer hit/filtering semantics.
 4. Package/version the managed NEngine API surface and add debugger attach/symbol workflow.
