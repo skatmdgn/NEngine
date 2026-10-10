@@ -80,6 +80,8 @@ struct ManagedRigidbodyFixture {
 struct ManagedBoxColliderFixture {
     bool enabled{true};
     bool is_trigger{false};
+    std::int64_t layer{0};
+    std::int64_t collision_mask{0xffffffffLL};
     nengine::core::Vec3 center{};
     nengine::core::Vec3 size{1.0f, 1.0f, 1.0f};
 };
@@ -96,6 +98,8 @@ struct ManagedRigidbody2DFixture {
 struct ManagedBoxCollider2DFixture {
     bool enabled{true};
     bool is_trigger{false};
+    std::int64_t layer{0};
+    std::int64_t collision_mask{0xffffffffLL};
     nengine::core::Vec3 center{};
     nengine::core::Vec3 size{1.0f, 1.0f, 0.0f};
 };
@@ -420,6 +424,10 @@ bool read_managed_render_property(
             output = value->enabled;
         else if (property == "Is Trigger")
             output = value->is_trigger;
+        else if (property == "Layer")
+            output = value->layer;
+        else if (property == "Collision Mask")
+            output = value->collision_mask;
         else if (property == "Center")
             output = value->center;
         else if (property == "Size")
@@ -470,6 +478,10 @@ bool read_managed_render_property(
             output = value->enabled;
         else if (property == "Is Trigger")
             output = value->is_trigger;
+        else if (property == "Layer")
+            output = value->layer;
+        else if (property == "Collision Mask")
+            output = value->collision_mask;
         else if (property == "Center")
             output = value->center;
         else if (property == "Size")
@@ -878,6 +890,22 @@ bool write_managed_render_property(
                 value->enabled = *typed;
             else
                 value->is_trigger = *typed;
+        } else if (property == "Layer" ||
+                   property == "Collision Mask") {
+            const auto* typed =
+                std::get_if<std::int64_t>(&input);
+            if (!typed) return false;
+
+            if (property == "Layer") {
+                if (*typed < 0 || *typed > 31)
+                    return false;
+                value->layer = *typed;
+            } else {
+                if (*typed < 0 ||
+                    *typed > 0xffffffffLL)
+                    return false;
+                value->collision_mask = *typed;
+            }
         } else if (property == "Center" ||
                    property == "Size") {
             const auto* typed =
@@ -958,6 +986,22 @@ bool write_managed_render_property(
                 value->enabled = *typed;
             else
                 value->is_trigger = *typed;
+        } else if (property == "Layer" ||
+                   property == "Collision Mask") {
+            const auto* typed =
+                std::get_if<std::int64_t>(&input);
+            if (!typed) return false;
+
+            if (property == "Layer") {
+                if (*typed < 0 || *typed > 31)
+                    return false;
+                value->layer = *typed;
+            } else {
+                if (*typed < 0 ||
+                    *typed > 0xffffffffLL)
+                    return false;
+                value->collision_mask = *typed;
+            }
         } else if (property == "Center" ||
                    property == "Size") {
             const auto* typed =
@@ -1664,9 +1708,9 @@ int main() {
                 << "        mesh.mesh = nextMesh; mesh.material = nextMaterial; mesh.enabled = false; mesh.castShadows = false; mesh.receiveShadows = false;\n"
                 << "        sprite.texture = nextTexture; sprite.enabled = false; sprite.pixelsPerUnit = 64f; sprite.sortingOrder = 7; sprite.flipX = true; sprite.flipY = true;\n"
                 << "        if (System.MathF.Abs(body.mass - 1f) > 0.001f || !body.useGravity || body.isKinematic) throw new System.Exception(\"rigidbody read mismatch\"); body.useGravity = false; body.mass = 2.5f; body.gravityScale = 0.5f; body.velocity = new Vector3(1, 2, 3); body.AddForce(new Vector3(2.5f, 0, 0)); body.isKinematic = true; body.enabled = false;\n"
-                << "        box.isTrigger = true; box.center = new Vector3(0.1f, 0.2f, 0.3f); box.size = new Vector3(2, 3, 4);\n"
+                << "        box.isTrigger = true; box.layer = 3; box.collisionMask = 0x000000a5u; box.center = new Vector3(0.1f, 0.2f, 0.3f); box.size = new Vector3(2, 3, 4);\n"
                 << "        body2d.useGravity = false; body2d.mass = 3f; body2d.gravityScale = 0.25f; body2d.velocity = new Vector2(4, 5); body2d.AddForce(new Vector2(3, 0)); body2d.isKinematic = true;\n"
-                << "        box2d.isTrigger = true; box2d.center = new Vector2(0.5f, 0.75f); box2d.size = new Vector2(6, 7);\n"
+                << "        box2d.isTrigger = true; box2d.layer = 7; box2d.collisionMask = 0x0000ff00u; box2d.center = new Vector2(0.5f, 0.75f); box2d.size = new Vector2(6, 7);\n"
                 << "        if (audio.clip.ToString() != \"10101010101010102020202020202020\" || audio.isPlaying || System.MathF.Abs(audio.time - 0.25f) > 0.001f) throw new System.Exception(\"audio initial state mismatch\");\n"
                 << "        audio.Play(); if (!audio.isPlaying || System.MathF.Abs(audio.time) > 0.001f) throw new System.Exception(\"audio play mismatch\"); audio.time = 0.5f; audio.Pause(); if (audio.isPlaying) throw new System.Exception(\"audio pause mismatch\"); audio.UnPause(); if (!audio.isPlaying) throw new System.Exception(\"audio unpause mismatch\"); audio.Stop(); if (audio.isPlaying || System.MathF.Abs(audio.time) > 0.001f) throw new System.Exception(\"audio stop mismatch\");\n"
                 << "        audio.playOnAwake = false; audio.loop = true; audio.spatialize = true; audio.volume = 0.4f; audio.pitch = 1.2f; audio.panStereo = 0.25f; listener.enabled = false; listener.volume = 0.7f;\n"
@@ -2189,6 +2233,9 @@ int main() {
                                 nengine::core::Vec3{2.0f, 2.0f, 3.0f} &&
                             box_fixture &&
                             box_fixture->is_trigger &&
+                            box_fixture->layer == 3 &&
+                            box_fixture->collision_mask ==
+                                0x000000a5LL &&
                             box_fixture->center ==
                                 nengine::core::Vec3{0.1f, 0.2f, 0.3f} &&
                             box_fixture->size ==
@@ -2202,6 +2249,9 @@ int main() {
                                 nengine::core::Vec3{5.0f, 5.0f, 0.0f} &&
                             box2d_fixture &&
                             box2d_fixture->is_trigger &&
+                            box2d_fixture->layer == 7 &&
+                            box2d_fixture->collision_mask ==
+                                0x0000ff00LL &&
                             box2d_fixture->center ==
                                 nengine::core::Vec3{0.5f, 0.75f, 0.0f} &&
                             box2d_fixture->size ==

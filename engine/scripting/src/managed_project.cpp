@@ -2173,6 +2173,8 @@ std::string api_stub(
     {
         public abstract bool enabled { get; set; }
         public abstract bool isTrigger { get; set; }
+        public abstract int layer { get; set; }
+        public abstract uint collisionMask { get; set; }
     }
 
     public sealed class BoxCollider : Collider
@@ -2187,6 +2189,18 @@ std::string api_stub(
         {
             get => NativeBool("Is Trigger", false);
             set => SetNativeBool("Is Trigger", value);
+        }
+
+        public override int layer
+        {
+            get => (int)NativeInteger("Layer", 0);
+            set => SetNativeInteger("Layer", value);
+        }
+
+        public override uint collisionMask
+        {
+            get => (uint)NativeInteger("Collision Mask", 0xffffffffL);
+            set => SetNativeInteger("Collision Mask", value);
         }
 
         public Vector3 center
@@ -2278,6 +2292,8 @@ std::string api_stub(
     {
         public abstract bool enabled { get; set; }
         public abstract bool isTrigger { get; set; }
+        public abstract int layer { get; set; }
+        public abstract uint collisionMask { get; set; }
     }
 
     public sealed class BoxCollider2D : Collider2D
@@ -2292,6 +2308,18 @@ std::string api_stub(
         {
             get => NativeBool("Is Trigger", false);
             set => SetNativeBool("Is Trigger", value);
+        }
+
+        public override int layer
+        {
+            get => (int)NativeInteger("Layer", 0);
+            set => SetNativeInteger("Layer", value);
+        }
+
+        public override uint collisionMask
+        {
+            get => (uint)NativeInteger("Collision Mask", 0xffffffffL);
+            set => SetNativeInteger("Collision Mask", value);
         }
 
         public Vector2 center

@@ -264,6 +264,74 @@ bool register_box_properties(
         "Is Trigger",
         &Component::is_trigger);
 
+    const auto integer_property =
+        [&properties, type, &ok](
+            const char* name,
+            std::uint32_t Component::* member,
+            std::int64_t minimum,
+            std::int64_t maximum) {
+
+            ok =
+                properties.register_property(
+                    type,
+                    name,
+                    core::PropertyKind::Integer,
+                    [type, member](
+                        const core::World& world,
+                        core::Entity entity) {
+                        return read_component_property<Component>(
+                            world,
+                            entity,
+                            type,
+                            [member](const Component& value) {
+                                return core::PropertyValue{
+                                    static_cast<std::int64_t>(
+                                        value.*member)};
+                            });
+                    },
+                    [type, member, minimum, maximum](
+                        core::World& world,
+                        core::Entity entity,
+                        const core::PropertyValue& value) {
+                        return write_component_property<Component>(
+                            world,
+                            entity,
+                            type,
+                            value,
+                            [member, minimum, maximum](
+                                Component& component,
+                                const core::PropertyValue& raw) {
+                                const auto* typed =
+                                    std::get_if<std::int64_t>(&raw);
+
+                                if (!typed ||
+                                    *typed < minimum ||
+                                    *typed > maximum) {
+                                    return false;
+                                }
+
+                                component.*member =
+                                    static_cast<std::uint32_t>(
+                                        *typed);
+                                return true;
+                            });
+                    }) &&
+                ok;
+        };
+
+    integer_property(
+        "Layer",
+        &Component::layer,
+        0,
+        31);
+
+    integer_property(
+        "Collision Mask",
+        &Component::collision_mask,
+        0,
+        static_cast<std::int64_t>(
+            0xffffffffu));
+
     const auto vec_property =
         [&properties, type, is_2d, &ok](
             const char* name,
