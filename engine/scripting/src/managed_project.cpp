@@ -1616,8 +1616,10 @@ std::string api_stub(
             if (type == typeof(SpriteAnimator)) return "NEngine.SpriteAnimator";
             if (type == typeof(Rigidbody)) return "NEngine.Rigidbody";
             if (type == typeof(BoxCollider)) return "NEngine.BoxCollider";
+            if (type == typeof(SphereCollider)) return "NEngine.SphereCollider";
             if (type == typeof(Rigidbody2D)) return "NEngine.Rigidbody2D";
             if (type == typeof(BoxCollider2D)) return "NEngine.BoxCollider2D";
+            if (type == typeof(CircleCollider2D)) return "NEngine.CircleCollider2D";
             if (type == typeof(AudioSource)) return "NEngine.AudioSource";
             if (type == typeof(AudioListener)) return "NEngine.AudioListener";
             return null;
@@ -2603,6 +2605,49 @@ std::string api_stub(
         }
     }
 
+    public sealed class SphereCollider : Collider
+    {
+        public override bool enabled
+        {
+            get => NativeBool("Enabled", true);
+            set => SetNativeBool("Enabled", value);
+        }
+
+        public override bool isTrigger
+        {
+            get => NativeBool("Is Trigger", false);
+            set => SetNativeBool("Is Trigger", value);
+        }
+
+        public override int layer
+        {
+            get => (int)NativeInteger("Layer", 0);
+            set => SetNativeInteger("Layer", value);
+        }
+
+        public override uint collisionMask
+        {
+            get => (uint)NativeInteger("Collision Mask", 0xffffffffL);
+            set => SetNativeInteger("Collision Mask", value);
+        }
+
+        public Vector3 center
+        {
+            get => NativeVector3(
+                "Center",
+                Vector3.zero);
+            set => SetNativeVector3(
+                "Center",
+                value);
+        }
+
+        public float radius
+        {
+            get => NativeFloat("Radius", 0.5f);
+            set => SetNativeFloat("Radius", value);
+        }
+    }
+
     public sealed class Rigidbody2D : Component
     {
         public bool enabled
@@ -2719,6 +2764,49 @@ std::string api_stub(
             set => SetNativeVector2(
                 "Size",
                 value);
+        }
+    }
+
+    public sealed class CircleCollider2D : Collider2D
+    {
+        public override bool enabled
+        {
+            get => NativeBool("Enabled", true);
+            set => SetNativeBool("Enabled", value);
+        }
+
+        public override bool isTrigger
+        {
+            get => NativeBool("Is Trigger", false);
+            set => SetNativeBool("Is Trigger", value);
+        }
+
+        public override int layer
+        {
+            get => (int)NativeInteger("Layer", 0);
+            set => SetNativeInteger("Layer", value);
+        }
+
+        public override uint collisionMask
+        {
+            get => (uint)NativeInteger("Collision Mask", 0xffffffffL);
+            set => SetNativeInteger("Collision Mask", value);
+        }
+
+        public Vector2 center
+        {
+            get => NativeVector2(
+                "Center",
+                Vector2.zero);
+            set => SetNativeVector2(
+                "Center",
+                value);
+        }
+
+        public float radius
+        {
+            get => NativeFloat("Radius", 0.5f);
+            set => SetNativeFloat("Radius", value);
         }
     }
 

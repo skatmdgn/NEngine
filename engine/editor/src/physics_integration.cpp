@@ -399,6 +399,216 @@ bool register_box_properties(
     return ok;
 }
 
+template <typename Component>
+bool register_radial_properties(
+    PropertyAccessRegistry& properties,
+    core::ComponentTypeId type) {
+
+    bool ok = true;
+
+    const auto bool_property =
+        [&properties, type, &ok](
+            const char* name,
+            bool Component::* member) {
+
+            ok =
+                properties.register_property(
+                    type,
+                    name,
+                    core::PropertyKind::Boolean,
+                    [type, member](
+                        const core::World& world,
+                        core::Entity entity) {
+                        return read_component_property<Component>(
+                            world,
+                            entity,
+                            type,
+                            [member](const Component& value) {
+                                return core::PropertyValue{
+                                    value.*member};
+                            });
+                    },
+                    [type, member](
+                        core::World& world,
+                        core::Entity entity,
+                        const core::PropertyValue& value) {
+                        return write_component_property<Component>(
+                            world,
+                            entity,
+                            type,
+                            value,
+                            [member](
+                                Component& component,
+                                const core::PropertyValue& raw) {
+                                const auto* typed =
+                                    std::get_if<bool>(&raw);
+                                if (!typed) return false;
+                                component.*member = *typed;
+                                return true;
+                            });
+                    }) &&
+                ok;
+        };
+
+    bool_property(
+        "Enabled",
+        &Component::enabled);
+    bool_property(
+        "Is Trigger",
+        &Component::is_trigger);
+
+    const auto integer_property =
+        [&properties, type, &ok](
+            const char* name,
+            std::uint32_t Component::* member,
+            std::int64_t minimum,
+            std::int64_t maximum) {
+
+            ok =
+                properties.register_property(
+                    type,
+                    name,
+                    core::PropertyKind::Integer,
+                    [type, member](
+                        const core::World& world,
+                        core::Entity entity) {
+                        return read_component_property<Component>(
+                            world,
+                            entity,
+                            type,
+                            [member](const Component& value) {
+                                return core::PropertyValue{
+                                    static_cast<std::int64_t>(
+                                        value.*member)};
+                            });
+                    },
+                    [type, member, minimum, maximum](
+                        core::World& world,
+                        core::Entity entity,
+                        const core::PropertyValue& value) {
+                        return write_component_property<Component>(
+                            world,
+                            entity,
+                            type,
+                            value,
+                            [member, minimum, maximum](
+                                Component& component,
+                                const core::PropertyValue& raw) {
+                                const auto* typed =
+                                    std::get_if<std::int64_t>(&raw);
+
+                                if (!typed ||
+                                    *typed < minimum ||
+                                    *typed > maximum) {
+                                    return false;
+                                }
+
+                                component.*member =
+                                    static_cast<std::uint32_t>(
+                                        *typed);
+                                return true;
+                            });
+                    }) &&
+                ok;
+        };
+
+    integer_property(
+        "Layer",
+        &Component::layer,
+        0,
+        31);
+
+    integer_property(
+        "Collision Mask",
+        &Component::collision_mask,
+        0,
+        static_cast<std::int64_t>(
+            0xffffffffu));
+
+    ok =
+        properties.register_property(
+            type,
+            "Center",
+            core::PropertyKind::Vec3,
+            [type](
+                const core::World& world,
+                core::Entity entity) {
+                return read_component_property<Component>(
+                    world,
+                    entity,
+                    type,
+                    [](const Component& value) {
+                        return core::PropertyValue{
+                            value.center};
+                    });
+            },
+            [type](
+                core::World& world,
+                core::Entity entity,
+                const core::PropertyValue& value) {
+                return write_component_property<Component>(
+                    world,
+                    entity,
+                    type,
+                    value,
+                    [](Component& component,
+                       const core::PropertyValue& raw) {
+                        const auto* typed =
+                            std::get_if<core::Vec3>(&raw);
+                        if (!typed) return false;
+                        component.center = *typed;
+                        return true;
+                    });
+            }) &&
+        ok;
+
+    ok =
+        properties.register_property(
+            type,
+            "Radius",
+            core::PropertyKind::Float,
+            [type](
+                const core::World& world,
+                core::Entity entity) {
+                return read_component_property<Component>(
+                    world,
+                    entity,
+                    type,
+                    [](const Component& value) {
+                        return core::PropertyValue{
+                            static_cast<double>(
+                                value.radius)};
+                    });
+            },
+            [type](
+                core::World& world,
+                core::Entity entity,
+                const core::PropertyValue& value) {
+                return write_component_property<Component>(
+                    world,
+                    entity,
+                    type,
+                    value,
+                    [](Component& component,
+                       const core::PropertyValue& raw) {
+                        const auto* typed =
+                            std::get_if<double>(&raw);
+                        if (!typed ||
+                            *typed <= 0.0) {
+                            return false;
+                        }
+
+                        component.radius =
+                            static_cast<float>(
+                                *typed);
+                        return true;
+                    });
+            }) &&
+        ok;
+
+    return ok;
+}
+
 } // namespace
 
 bool register_physics_integration(
@@ -434,6 +644,13 @@ bool register_physics_integration(
         ok;
 
     ok =
+        register_radial_properties<
+            physics::SphereCollider>(
+                properties,
+                physics::sphere_collider_type()) &&
+        ok;
+
+    ok =
         register_rigidbody_properties<
             physics::Rigidbody2D>(
                 properties,
@@ -446,6 +663,13 @@ bool register_physics_integration(
                 properties,
                 physics::box_collider2d_type(),
                 true) &&
+        ok;
+
+    ok =
+        register_radial_properties<
+            physics::CircleCollider2D>(
+                properties,
+                physics::circle_collider2d_type()) &&
         ok;
 
     return ok;
@@ -482,6 +706,18 @@ bool register_physics_component_factories(
 
     ok =
         factories.register_factory(
+            physics::sphere_collider_type(),
+            [](core::World& world,
+               core::Entity entity) {
+                return world.add_component<
+                    physics::SphereCollider>(
+                        entity,
+                        physics::sphere_collider_type()) != nullptr;
+            }) &&
+        ok;
+
+    ok =
+        factories.register_factory(
             physics::rigidbody2d_type(),
             [](core::World& world,
                core::Entity entity) {
@@ -501,6 +737,18 @@ bool register_physics_component_factories(
                     physics::BoxCollider2D>(
                         entity,
                         physics::box_collider2d_type()) != nullptr;
+            }) &&
+        ok;
+
+    ok =
+        factories.register_factory(
+            physics::circle_collider2d_type(),
+            [](core::World& world,
+               core::Entity entity) {
+                return world.add_component<
+                    physics::CircleCollider2D>(
+                        entity,
+                        physics::circle_collider2d_type()) != nullptr;
             }) &&
         ok;
 

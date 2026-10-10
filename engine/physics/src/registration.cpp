@@ -166,6 +166,12 @@ bool valid_box_size(
            (is_2d || size.z > 0.0f);
 }
 
+bool valid_radius(
+    float radius) noexcept {
+
+    return radius > 0.0f;
+}
+
 template <typename T>
 T* ensure_component(
     core::World& world,
@@ -258,6 +264,49 @@ bool register_box_metadata(
             {"Collision Mask", core::PropertyKind::Integer},
             {"Center", core::PropertyKind::Vec3},
             {"Size", core::PropertyKind::Vec3}}) {
+
+        ok =
+            registry.register_property(
+                type,
+                {
+                    name,
+                    kind,
+                    flags
+                }) &&
+            ok;
+    }
+
+    return ok;
+}
+
+bool register_radial_metadata(
+    core::ComponentRegistry& registry,
+    std::string type_name,
+    core::ComponentTypeId type,
+    std::string category) {
+
+    bool ok =
+        registry.register_type(
+            std::move(type_name),
+            std::move(category),
+            true,
+            false);
+
+    const auto flags =
+        core::PropertyFlags::Serializable |
+        core::PropertyFlags::Editable;
+
+    for (const auto& [name, kind] :
+         std::initializer_list<
+             std::pair<
+                 const char*,
+                 core::PropertyKind>>{
+            {"Enabled", core::PropertyKind::Boolean},
+            {"Is Trigger", core::PropertyKind::Boolean},
+            {"Layer", core::PropertyKind::Integer},
+            {"Collision Mask", core::PropertyKind::Integer},
+            {"Center", core::PropertyKind::Vec3},
+            {"Radius", core::PropertyKind::Float}}) {
 
         ok =
             registry.register_property(
@@ -502,6 +551,132 @@ bool restore_box(
     return true;
 }
 
+template <typename T>
+std::optional<core::SerializedComponentData>
+capture_radial(
+    const core::World& world,
+    core::Entity entity,
+    core::ComponentTypeId type) {
+
+    const auto* value =
+        world.get_component<T>(
+            entity,
+            type);
+
+    if (!value) {
+        return std::nullopt;
+    }
+
+    core::SerializedComponentData data;
+    data.properties = {
+        bool_property(
+            "Enabled",
+            value->enabled),
+        bool_property(
+            "Is Trigger",
+            value->is_trigger),
+        integer_property(
+            "Layer",
+            static_cast<std::int64_t>(
+                value->layer)),
+        integer_property(
+            "Collision Mask",
+            static_cast<std::int64_t>(
+                value->collision_mask)),
+        vec3_property(
+            "Center",
+            value->center),
+        float_property(
+            "Radius",
+            value->radius)
+    };
+
+    return data;
+}
+
+template <typename T>
+bool restore_radial(
+    core::World& world,
+    core::Entity entity,
+    core::ComponentTypeId type,
+    const core::SerializedComponentData& data,
+    std::string_view type_name,
+    std::string* error) {
+
+    T value;
+
+    std::int64_t layer =
+        static_cast<std::int64_t>(
+            value.layer);
+
+    std::int64_t collision_mask =
+        static_cast<std::int64_t>(
+            value.collision_mask);
+
+    if (!read_bool(
+            data,
+            "Enabled",
+            value.enabled) ||
+        !read_bool(
+            data,
+            "Is Trigger",
+            value.is_trigger) ||
+        !read_integer(
+            data,
+            "Layer",
+            layer,
+            true) ||
+        !read_integer(
+            data,
+            "Collision Mask",
+            collision_mask,
+            true) ||
+        layer < 0 ||
+        layer > 31 ||
+        collision_mask < 0 ||
+        collision_mask >
+            static_cast<std::int64_t>(
+                0xffffffffu) ||
+        !read_vec3(
+            data,
+            "Center",
+            value.center) ||
+        !read_float(
+            data,
+            "Radius",
+            value.radius) ||
+        !valid_radius(
+            value.radius)) {
+
+        if (error) {
+            *error =
+                "malformed " +
+                std::string(type_name) +
+                " data";
+        }
+        return false;
+    }
+
+    value.layer =
+        static_cast<std::uint32_t>(
+            layer);
+
+    value.collision_mask =
+        static_cast<std::uint32_t>(
+            collision_mask);
+
+    auto* component =
+        ensure_component<T>(
+            world,
+            entity,
+            type);
+
+    if (!component) return false;
+
+    *component = value;
+    return true;
+}
+
 } // namespace
 
 bool register_component_metadata(
@@ -526,6 +701,14 @@ bool register_component_metadata(
         ok;
 
     ok =
+        register_radial_metadata(
+            registry,
+            "NEngine.SphereCollider",
+            sphere_collider_type(),
+            "Physics") &&
+        ok;
+
+    ok =
         register_rigidbody_metadata(
             registry,
             "NEngine.Rigidbody2D",
@@ -538,6 +721,14 @@ bool register_component_metadata(
             registry,
             "NEngine.BoxCollider2D",
             box_collider2d_type(),
+            "Physics 2D") &&
+        ok;
+
+    ok =
+        register_radial_metadata(
+            registry,
+            "NEngine.CircleCollider2D",
+            circle_collider2d_type(),
             "Physics 2D") &&
         ok;
 
@@ -606,6 +797,33 @@ bool register_component_serializers(
 
     ok =
         registry.register_codec({
+            sphere_collider_type(),
+            1,
+            "NEngine.SphereCollider",
+            [](const core::World& world,
+               core::Entity entity) {
+                return capture_radial<SphereCollider>(
+                    world,
+                    entity,
+                    sphere_collider_type());
+            },
+            [](core::World& world,
+               core::Entity entity,
+               const core::SerializedComponentData& data,
+               std::string* error) {
+                return restore_radial<SphereCollider>(
+                    world,
+                    entity,
+                    sphere_collider_type(),
+                    data,
+                    "NEngine.SphereCollider",
+                    error);
+            }
+        }) &&
+        ok;
+
+    ok =
+        registry.register_codec({
             rigidbody2d_type(),
             1,
             "NEngine.Rigidbody2D",
@@ -654,6 +872,33 @@ bool register_component_serializers(
                     data,
                     true,
                     "NEngine.BoxCollider2D",
+                    error);
+            }
+        }) &&
+        ok;
+
+    ok =
+        registry.register_codec({
+            circle_collider2d_type(),
+            1,
+            "NEngine.CircleCollider2D",
+            [](const core::World& world,
+               core::Entity entity) {
+                return capture_radial<CircleCollider2D>(
+                    world,
+                    entity,
+                    circle_collider2d_type());
+            },
+            [](core::World& world,
+               core::Entity entity,
+               const core::SerializedComponentData& data,
+               std::string* error) {
+                return restore_radial<CircleCollider2D>(
+                    world,
+                    entity,
+                    circle_collider2d_type(),
+                    data,
+                    "NEngine.CircleCollider2D",
                     error);
             }
         }) &&

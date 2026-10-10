@@ -71,10 +71,14 @@ int main() {
         metadata.find(
             physics::box_collider_type()) != nullptr &&
         metadata.find(
+            physics::sphere_collider_type()) != nullptr &&
+        metadata.find(
             physics::rigidbody2d_type()) != nullptr &&
         metadata.find(
-            physics::box_collider2d_type()) != nullptr,
-        "3D and 2D physics component descriptors are discoverable");
+            physics::box_collider2d_type()) != nullptr &&
+        metadata.find(
+            physics::circle_collider2d_type()) != nullptr,
+        "3D and 2D rigidbody box sphere and circle component descriptors are discoverable");
 
     core::World world;
     const auto entity =
@@ -93,6 +97,12 @@ int main() {
                 entity,
                 physics::box_collider_type());
 
+    auto* sphere =
+        world.add_component<
+            physics::SphereCollider>(
+                entity,
+                physics::sphere_collider_type());
+
     auto* body2d =
         world.add_component<
             physics::Rigidbody2D>(
@@ -105,11 +115,19 @@ int main() {
                 entity,
                 physics::box_collider2d_type());
 
+    auto* circle2d =
+        world.add_component<
+            physics::CircleCollider2D>(
+                entity,
+                physics::circle_collider2d_type());
+
     check(
         body &&
         collider &&
+        sphere &&
         body2d &&
-        collider2d,
+        collider2d &&
+        circle2d,
         "physics components attach to World entities");
 
     if (body) {
@@ -128,6 +146,16 @@ int main() {
             {0.25f, 0.5f, 0.75f};
         collider->size =
             {2.0f, 3.0f, 4.0f};
+    }
+
+    if (sphere) {
+        sphere->is_trigger = true;
+        sphere->layer = 9u;
+        sphere->collision_mask =
+            0x00000f0fu;
+        sphere->center =
+            {1.0f, 2.0f, 3.0f};
+        sphere->radius = 1.25f;
     }
 
     if (body2d) {
@@ -157,6 +185,12 @@ int main() {
             entity,
             physics::box_collider_type());
 
+    const auto captured_sphere =
+        serialization.capture(
+            world,
+            entity,
+            physics::sphere_collider_type());
+
     const auto captured_body2d =
         serialization.capture(
             world,
@@ -169,11 +203,19 @@ int main() {
             entity,
             physics::box_collider2d_type());
 
+    const auto captured_circle2d =
+        serialization.capture(
+            world,
+            entity,
+            physics::circle_collider2d_type());
+
     check(
         captured_body &&
         captured_collider &&
+        captured_sphere &&
         captured_body2d &&
-        captured_collider2d,
+        captured_collider2d &&
+        captured_circle2d,
         "physics codecs capture all component data");
 
     core::World restored;
@@ -196,6 +238,12 @@ int main() {
             restored_entity,
             *captured_collider,
             &error) &&
+        captured_sphere &&
+        serialization.restore(
+            restored,
+            restored_entity,
+            *captured_sphere,
+            &error) &&
         captured_body2d &&
         serialization.restore(
             restored,
@@ -207,6 +255,12 @@ int main() {
             restored,
             restored_entity,
             *captured_collider2d,
+            &error) &&
+        captured_circle2d &&
+        serialization.restore(
+            restored,
+            restored_entity,
+            *captured_circle2d,
             &error),
         "physics codecs restore 3D and 2D component data");
 
@@ -222,6 +276,12 @@ int main() {
                 restored_entity,
                 physics::box_collider_type());
 
+    const auto* restored_sphere =
+        restored.get_component<
+            physics::SphereCollider>(
+                restored_entity,
+                physics::sphere_collider_type());
+
     const auto* restored_body2d =
         restored.get_component<
             physics::Rigidbody2D>(
@@ -233,6 +293,12 @@ int main() {
             physics::BoxCollider2D>(
                 restored_entity,
                 physics::box_collider2d_type());
+
+    const auto* restored_circle2d =
+        restored.get_component<
+            physics::CircleCollider2D>(
+                restored_entity,
+                physics::circle_collider2d_type());
 
     check(
         restored_body &&
@@ -248,6 +314,16 @@ int main() {
             0x000000a5u &&
         restored_collider->size ==
             core::Vec3{2.0f, 3.0f, 4.0f} &&
+        restored_sphere &&
+        restored_sphere->is_trigger &&
+        restored_sphere->layer == 9u &&
+        restored_sphere->collision_mask ==
+            0x00000f0fu &&
+        restored_sphere->center ==
+            core::Vec3{1.0f, 2.0f, 3.0f} &&
+        std::abs(
+            restored_sphere->radius -
+            1.25f) < 0.0001f &&
         restored_body2d &&
         !restored_body2d->use_gravity &&
         restored_body2d->linear_velocity ==
@@ -257,7 +333,10 @@ int main() {
         restored_collider2d->collision_mask ==
             0x0000ff00u &&
         restored_collider2d->size ==
-            core::Vec3{6.0f, 7.0f, 0.0f},
+            core::Vec3{6.0f, 7.0f, 0.0f} &&
+        restored_circle2d &&
+        restored_circle2d->radius ==
+            0.5f,
         "physics Scene roundtrip preserves configured values");
 
     if (captured_collider) {
@@ -339,6 +418,42 @@ int main() {
                 invalid,
                 &error),
             "BoxCollider codec rejects non-positive dimensions");
+    }
+
+    if (captured_sphere) {
+        auto invalid =
+            *captured_sphere;
+
+        set_property(
+            invalid,
+            "Radius",
+            core::PropertyValue{0.0});
+
+        check(
+            !serialization.restore(
+                restored,
+                restored_entity,
+                invalid,
+                &error),
+            "SphereCollider codec rejects non-positive radius");
+    }
+
+    if (captured_circle2d) {
+        auto invalid =
+            *captured_circle2d;
+
+        set_property(
+            invalid,
+            "Radius",
+            core::PropertyValue{-1.0});
+
+        check(
+            !serialization.restore(
+                restored,
+                restored_entity,
+                invalid,
+                &error),
+            "CircleCollider2D codec rejects non-positive radius");
     }
 
     core::World simulation_world;

@@ -25,6 +25,15 @@ struct BoxCollider {
     core::Vec3 size{1.0f, 1.0f, 1.0f};
 };
 
+struct SphereCollider {
+    bool enabled{true};
+    bool is_trigger{false};
+    std::uint32_t layer{0};
+    std::uint32_t collision_mask{0xffffffffu};
+    core::Vec3 center{};
+    float radius{0.5f};
+};
+
 struct Rigidbody2D {
     bool enabled{true};
     bool use_gravity{true};
@@ -53,6 +62,11 @@ inline core::ComponentTypeId box_collider_type() noexcept {
         "NEngine.BoxCollider");
 }
 
+inline core::ComponentTypeId sphere_collider_type() noexcept {
+    return core::ComponentRegistry::stable_id(
+        "NEngine.SphereCollider");
+}
+
 inline core::ComponentTypeId rigidbody2d_type() noexcept {
     return core::ComponentRegistry::stable_id(
         "NEngine.Rigidbody2D");
@@ -61,6 +75,20 @@ inline core::ComponentTypeId rigidbody2d_type() noexcept {
 inline core::ComponentTypeId box_collider2d_type() noexcept {
     return core::ComponentRegistry::stable_id(
         "NEngine.BoxCollider2D");
+}
+
+struct CircleCollider2D {
+    bool enabled{true};
+    bool is_trigger{false};
+    std::uint32_t layer{0};
+    std::uint32_t collision_mask{0xffffffffu};
+    core::Vec3 center{};
+    float radius{0.5f};
+};
+
+inline core::ComponentTypeId circle_collider2d_type() noexcept {
+    return core::ComponentRegistry::stable_id(
+        "NEngine.CircleCollider2D");
 }
 
 } // namespace nengine::physics
