@@ -3494,7 +3494,7 @@ ContactMaterial contact_material_2d(
 namespace {
 
 constexpr std::size_t
-    velocity_solver_iterations = 16u;
+    velocity_solver_iterations = 24u;
 
 struct InverseInertia3D {
     core::Vec3 axis_x{1.0f, 0.0f, 0.0f};

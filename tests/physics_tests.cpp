@@ -2371,10 +2371,23 @@ int main() {
                 ->local_position.z -
             5.0f) < 0.0001f &&
         resolution_body_2d &&
-        resolution_body_2d
-            ->linear_velocity ==
-            core::Vec3{},
-        "2D box contact resolution separates only on XY and clears entering normal velocity without moving Z");
+        std::abs(
+            resolution_body_2d
+                ->linear_velocity.x) <
+            0.0001f &&
+        std::abs(
+            resolution_body_2d
+                ->linear_velocity.y) <
+            0.0001f &&
+        std::abs(
+            resolution_body_2d
+                ->linear_velocity.z) <
+            0.0001f &&
+        std::abs(
+            resolution_body_2d
+                ->angular_velocity.z) <
+            0.0001f,
+        "2D box contact resolution separates only on XY and converges centered linear/angular contact velocity without moving Z");
 
 
 
