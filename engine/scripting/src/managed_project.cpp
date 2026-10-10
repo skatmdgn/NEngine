@@ -168,7 +168,7 @@ namespace NEngine.Internal
 
     public static class NativeBridge
     {
-        public const int AbiVersion = 9;
+        public const int AbiVersion = 10;
 
         private static readonly Dictionary<long, NEngine.Behaviour> Instances = new();
         private static long _nextHandle = 1;
@@ -484,6 +484,25 @@ namespace NEngine.Internal
                 instance.AdvanceCoroutines(deltaTime);
 
             return invoked;
+        }
+
+        [UnmanagedCallersOnly]
+        public static int InvokeFixedUpdate(
+            long handle,
+            float fixedDeltaTime)
+        {
+            if (!float.IsFinite(fixedDeltaTime) ||
+                fixedDeltaTime < 0)
+            {
+                return -1;
+            }
+
+            NEngine.Time.SetFixedDeltaTime(
+                fixedDeltaTime);
+
+            return Invoke(
+                handle,
+                "FixedUpdate");
         }
 
         [UnmanagedCallersOnly]
@@ -1793,9 +1812,20 @@ std::string api_stub(
             frameCount++;
         }
 
+        internal static void SetFixedDeltaTime(float value)
+        {
+            fixedDeltaTime =
+                value >= 0 && float.IsFinite(value)
+                    ? value
+                    : 0;
+
+            deltaTime = fixedDeltaTime;
+        }
+
         internal static void Reset()
         {
             deltaTime = 0.0166667f;
+            fixedDeltaTime = 0.02f;
             time = 0;
             frameCount = 0;
         }

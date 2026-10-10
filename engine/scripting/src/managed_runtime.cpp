@@ -725,6 +725,10 @@ ManagedRuntime::ManagedRuntime(
           std::exchange(
               other.update_,
               nullptr)),
+      fixed_update_(
+          std::exchange(
+              other.fixed_update_,
+              nullptr)),
       late_update_(
           std::exchange(
               other.late_update_,
@@ -846,6 +850,11 @@ ManagedRuntime::operator=(
     update_ =
         std::exchange(
             other.update_,
+            nullptr);
+
+    fixed_update_ =
+        std::exchange(
+            other.fixed_update_,
             nullptr);
 
     late_update_ =
@@ -1021,9 +1030,9 @@ bool ManagedRuntime::initialize(
     const int abi_version =
         abi();
 
-    if (abi_version != 9) {
+    if (abi_version != 10) {
         diagnostic_ =
-            "managed bridge ABI mismatch: expected 9, got " +
+            "managed bridge ABI mismatch: expected 10, got " +
             std::to_string(
                 abi_version);
         shutdown();
@@ -1071,6 +1080,13 @@ bool ManagedRuntime::initialize(
             bridge_assembly_path,
             bridge_type,
             "InvokeUpdate");
+
+    fixed_update_ =
+        load_entry<UpdateFn>(
+            host_,
+            bridge_assembly_path,
+            bridge_type,
+            "InvokeFixedUpdate");
 
     late_update_ =
         load_entry<InvokeFn>(
@@ -1204,6 +1220,7 @@ bool ManagedRuntime::initialize(
         !on_disable_ ||
         !start_ ||
         !update_ ||
+        !fixed_update_ ||
         !late_update_ ||
         !advance_frame_ ||
         !reset_time_ ||
@@ -1224,7 +1241,7 @@ bool ManagedRuntime::initialize(
         !count_) {
 
         diagnostic_ =
-            "managed bridge is missing one or more ABI v9 entry points";
+            "managed bridge is missing one or more ABI v10 entry points";
         shutdown();
         return false;
     }
@@ -1327,7 +1344,7 @@ bool ManagedRuntime::initialize(
     }
 
     diagnostic_ =
-        "managed gameplay runtime initialized; ABI v9 activation lifecycle native World lifetime input and coroutine callbacks ready";
+        "managed gameplay runtime initialized; ABI v10 activation lifecycle native World lifetime input and coroutine callbacks ready";
 
     return true;
 }
@@ -1560,6 +1577,33 @@ bool ManagedRuntime::get_behaviour_enabled(
 
     enabled =
         result != 0;
+
+    return true;
+}
+
+bool ManagedRuntime::fixed_update(
+    ManagedBehaviourHandle handle,
+    float fixed_delta_seconds) {
+
+    if (!valid() ||
+        !handle.valid() ||
+        !std::isfinite(
+            fixed_delta_seconds) ||
+        fixed_delta_seconds < 0.0f) {
+
+        return false;
+    }
+
+    const int result =
+        fixed_update_(
+            handle.value,
+            fixed_delta_seconds);
+
+    if (result < 0) {
+        diagnostic_ =
+            "managed Behaviour FixedUpdate invocation failed";
+        return false;
+    }
 
     return true;
 }
@@ -1895,6 +1939,7 @@ void ManagedRuntime::shutdown() noexcept {
     on_disable_ = nullptr;
     start_ = nullptr;
     update_ = nullptr;
+    fixed_update_ = nullptr;
     late_update_ = nullptr;
     advance_frame_ = nullptr;
     reset_time_ = nullptr;

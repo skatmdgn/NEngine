@@ -260,7 +260,7 @@ int main() {
             "GetAbiVersion") !=
                 std::string::npos &&
         bridge.find(
-            "AbiVersion = 9") !=
+            "AbiVersion = 10") !=
                 std::string::npos &&
         bridge.find(
             "GameplayLoadContext") !=
@@ -302,6 +302,9 @@ int main() {
             "InvokeDisable") !=
                 std::string::npos &&
         bridge.find(
+            "InvokeFixedUpdate") !=
+                std::string::npos &&
+        bridge.find(
             "InvokeLateUpdate") !=
                 std::string::npos &&
         bridge.find(
@@ -310,7 +313,7 @@ int main() {
         bridge.find(
             "GetBehaviourEnabled") !=
                 std::string::npos,
-        "managed bridge exposes activation and LateUpdate lifecycle native World input and frame-clock ABI v9 entries");
+        "managed bridge exposes activation FixedUpdate and LateUpdate lifecycle native World input and frame-clock ABI v10 entries");
 
     const auto runtime_config =
         read_all(
@@ -562,6 +565,7 @@ int main() {
                 << "    public int updates;\n"
                 << "    private void Awake() { awakes++; if (gameObject.name != \"Runtime Object\" && gameObject.name != \"Managed Example\") throw new System.Exception(\"Awake native state mismatch\"); gameObject.name = \"Managed Awakened\"; }\n"
                 << "    private void Start() { if (awakes != 1 || gameObject.name != \"Managed Awakened\") throw new System.Exception(\"Awake/Start order mismatch\"); starts++; gameObject.name = \"Managed Renamed\"; }\n"
+                << "    private void FixedUpdate() { if (System.MathF.Abs(Time.fixedDeltaTime - 0.02f) > 0.0001f || System.MathF.Abs(Time.deltaTime - 0.02f) > 0.0001f) throw new System.Exception(\"fixed delta mismatch\"); }\n"
                 << "    private void Update() { updates++; var t = GetComponent<Transform>(); if (t == null) throw new System.Exception(\"Transform missing\"); t.localPosition = t.localPosition + new Vector3(1, 2, 3); }\n"
                 << "}\n"
                 << "public class DeactivateOnce : Behaviour {\n"
@@ -797,6 +801,12 @@ int main() {
                                 managed_runtime.start(
                                     behaviour),
                                 "managed lifecycle invokes explicit Awake before Start");
+
+                            check(
+                                managed_runtime.fixed_update(
+                                    behaviour,
+                                    0.02f),
+                                "managed lifecycle invokes FixedUpdate with fixed delta");
 
                             check(
                                 managed_runtime.update(
