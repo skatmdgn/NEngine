@@ -987,6 +987,10 @@ int main() {
                         late_system.clear(
                             &late_world);
 
+                        check(
+                            managed_runtime.reset_time(),
+                            "managed Time clock resets before multi-Behaviour host-frame probe");
+
                         ManagedScriptSystem
                             time_system;
 
@@ -1061,7 +1065,7 @@ int main() {
                             time_transform_b->local_position.y == 0.25f &&
                             time_transform_a->local_position.z == 0.25f &&
                             time_transform_b->local_position.z == 0.25f,
-                            "managed Time advances once per simulation tick regardless of Behaviour count");
+                            "managed Time advances once per host Update frame regardless of Behaviour count");
 
                         const auto time_tick_2 =
                             time_system.update(
