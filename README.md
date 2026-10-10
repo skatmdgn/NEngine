@@ -34,6 +34,7 @@ The repository currently includes:
 - managed GameObject name/active/Transform hierarchy access plus native create/find/deferred-destroy through ABI v12
 - managed Camera/Light, MeshRenderer/SpriteRenderer scalar+AssetGuid properties, and SpriteAnimator clip/playback/time controls through the generic PropertyAccessRegistry-backed native property bridge
 - managed keyboard/mouse Input, global Time frame clock, coroutines and WaitForSeconds
+- NEnginePhysics foundation with 3D/2D Rigidbody + BoxCollider components, Scene/Inspector/C# property bindings, and fixed-step gravity/velocity Transform integration
 - Camera/Light/MeshRenderer components
 - RenderSnapshot with resolved world matrices
 - camera matrix math and stable built-in Cube/Quad mesh AssetGuids

@@ -138,12 +138,16 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Generic native property ABI + managed Camera/Light and non-asset MeshRenderer/SpriteRenderer property bindings
 - [x] ABI v12 UTF-8/AssetGuid transport + SpriteRenderer.texture + MeshRenderer.mesh/material bindings
 - [x] Managed SpriteAnimator clip/enabled/playing/loop/speed/time bindings + Play/Pause/Stop/Restart helpers
-- [ ] Wider physics/audio managed component/property bindings
+- [x] Managed Rigidbody/BoxCollider + Rigidbody2D/BoxCollider2D component/property bindings
+- [ ] Audio managed component/property bindings
 - [ ] Visual Studio attach/debug symbols
 
 ## 0.6 — Physics, input, audio
-- [ ] 3D physics backend integration
-- [ ] 2D physics backend integration
+- [x] NEnginePhysics module + 3D/2D Rigidbody and BoxCollider metadata/Scene/Editor foundations
+- [x] Fixed-step 3D/2D gravity + linear-velocity Transform integration foundation
+- [ ] 3D collision/contact backend integration
+- [ ] 2D collision/contact backend integration
+- [ ] collision/trigger callbacks + ray/overlap query APIs
 - [x] Keyboard/mouse InputState transitions + Win32 message capture
 - [x] Named action-map binding/query foundation
 - [x] Managed KeyCode/GetKey/GetKeyDown/GetKeyUp + mouse position/delta/wheel

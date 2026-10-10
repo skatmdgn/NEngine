@@ -147,7 +147,7 @@ Implemented:
 
 Not yet implemented:
 - Packaged/versioned distribution of the NEngine managed API.
-- Broader physics/audio component property APIs.
+- Collision/query physics backend plus audio component/property APIs.
 - Visual Studio debugger attach integration.
 - NuGet runtime/package loading beyond generated project references.
 
@@ -283,6 +283,26 @@ Implemented vocabulary/contracts:
 
 The concrete Vulkan backend currently grows beneath this contract. The long-term public renderer should not expose raw Vulkan objects to gameplay/editor systems.
 
+## Physics foundation
+
+Implemented:
+- Dedicated NEnginePhysics module.
+- Native Rigidbody / BoxCollider and Rigidbody2D / BoxCollider2D components.
+- Reflection metadata and Scene serialization for mass, gravity, velocity, trigger, center and size state.
+- Editor Add Component, Inspector and generic PropertyAccess integration for all four physics components.
+- Managed Rigidbody / BoxCollider / Rigidbody2D / BoxCollider2D proxies over ABI v12, including Unity-familiar velocity/useGravity/isKinematic naming.
+- Fixed-step rigidbody foundation runs after managed FixedUpdate so script velocity changes affect the same simulation step.
+- 3D gravity/linear-velocity Transform integration and 2D XY integration with kinematic/inactive bodies skipped.
+- Native serialization/property tests and real managed C# property round-trip coverage.
+
+Not yet implemented:
+- Broad-phase/narrow-phase collision detection.
+- Contact solving, friction, restitution and sleeping.
+- Collision/trigger callbacks.
+- Raycasts, overlap queries and casts.
+- Physics materials and joints.
+- Production 3D/2D backend selection/integration.
+
 ## Input foundation
 - Cross-platform InputState tracks held/pressed/released key and mouse-button transitions per frame.
 - Pointer state tracks position, delta and vertical wheel accumulation.
@@ -299,8 +319,9 @@ Not yet implemented:
 
 ## Immediate next work
 
-1. Continue the ABI v12 generic property bridge into physics/audio components as those runtime systems land.
-2. Package/version the managed NEngine API surface and add debugger attach/symbol workflow.
+1. Add the first collision backend layer on top of the new Rigidbody/Collider fixed-step foundation, starting with box broad-phase/contact semantics and trigger separation.
+2. Add AudioSource/AudioListener native components and ABI v12 managed property bindings.
+3. Package/version the managed NEngine API surface and add debugger attach/symbol workflow.
 3. Finish production PBR validation: sampler state, lights/shadows and remaining material behavior.
 4. Decide and implement the explicit policy for remote/nonlocal or outside-directory glTF resources while preserving sandbox safety.
 5. Add WebP decoding plus texture compression/transcoding policy; mipmap generation/upload is already implemented.

@@ -394,10 +394,11 @@ Implemented foundation:
 - FixedUpdate fixed-step scheduling separated from host-frame Update/LateUpdate.
 - managed Camera/Light plus MeshRenderer/SpriteRenderer scalar and AssetGuid properties over the generic native property bridge.
 - managed SpriteAnimator clip/playback/time properties plus Play/Pause/Stop/Restart controls.
+- NEnginePhysics 3D/2D Rigidbody + BoxCollider data/Scene/Editor/C# bindings with deterministic fixed-step gravity/velocity integration as the pre-collision foundation.
 - coroutine scheduling including WaitForSeconds.
 
 Remaining major work:
-- broader physics/audio managed component APIs.
+- collision/query physics backend and audio managed component APIs.
 - packaged/versioned managed API distribution.
 - debugger symbols/attach workflow.
 - NuGet runtime/package integration.
@@ -451,11 +452,11 @@ Completion means an experienced Unity developer can reasonably build and ship an
 
 ## 11. Current development focus
 
-The active development line is currently **0.5 — C# scripting + IDE**. The 0.3 asset and 0.4 Vulkan foundations are sufficiently proven to support real gameplay-runtime integration, although their production follow-up items remain on the roadmap.
+The active development line is now crossing from **0.5 — C# scripting + IDE** into **0.6 — Physics, input, audio**. The 0.3 asset and 0.4 Vulkan foundations are sufficiently proven to support real gameplay-runtime integration, although their production follow-up items remain on the roadmap.
 
 The immediate sequence is:
 
-`FixedUpdate/Update/LateUpdate scheduling -> richer native component/property API -> debugger/IDE polish -> physics/audio scripting boundary`
+`Rigidbody/Collider fixed-step foundation -> collision/contact backend -> audio runtime boundary -> debugger/IDE polish`
 
 Renderer work continues as a secondary line around production PBR, Scene/Game Vulkan presentation, WebP/transcoding, HLSL/reflection and Android Vulkan support.
 
