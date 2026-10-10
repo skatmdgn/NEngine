@@ -385,7 +385,7 @@ Implemented foundation:
 - generated NEngine.API / NEngine.Bridge / gameplay projects and solution.
 - deterministic dotnet gameplay DLL/PDB build.
 - ScriptBehaviour Scene/Inspector integration and Play Mode execution.
-- stable ABI v13 native World callback table.
+- stable ABI v14 native World callback table.
 - GameObject name/active, Transform hierarchy/TRS and component presence.
 - native-backed GameObject create/find plus deferred destroy.
 - collectible gameplay AssemblyLoadContext reload without restarting hostfxr.
@@ -394,12 +394,12 @@ Implemented foundation:
 - FixedUpdate fixed-step scheduling separated from host-frame Update/LateUpdate.
 - managed Camera/Light plus MeshRenderer/SpriteRenderer scalar and AssetGuid properties over the generic native property bridge.
 - managed SpriteAnimator clip/playback/time properties plus Play/Pause/Stop/Restart controls.
-- NEnginePhysics 3D/2D Rigidbody + BoxCollider data/Scene/Editor/C# bindings with fixed-step AABB contact resolution, managed collision/trigger Enter-Stay-Exit callbacks, native overlap queries, and managed 3D/2D raycasts over the injected ABI v13 query bridge.
+- NEnginePhysics 3D/2D Rigidbody + BoxCollider data/Scene/Editor/C# bindings with sweep-and-prune AABB contact resolution, collider layer/mask filtering, managed collision/trigger callbacks, managed raycast/overlap-box queries and native BoxCast/BoxCast2D over the ABI v14 query bridge.
 - NEngineAudio AudioSource/AudioListener Scene/Editor/C# bindings, deterministic playback timing, hierarchy/listener-oriented spatial stereo mixing, WAV PCM/float runtime decode, software stereo rendering, AssetGuid/fingerprint clip caching and Windows WASAPI shared-mode output; compressed/streaming decode and production DSP remain.
 - coroutine scheduling including WaitForSeconds.
 
 Remaining major work:
-- scalable/rotated physics backend, richer query APIs, streaming/compressed audio decode and production DSP/device scheduling.
+- rotated/extra physics shapes, production contact solving and managed cast/richer query APIs, plus streaming/compressed audio decode and production DSP/device scheduling.
 - packaged/versioned managed API distribution.
 - debugger symbols/attach workflow.
 - NuGet runtime/package integration.
