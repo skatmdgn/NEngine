@@ -1208,7 +1208,7 @@ std::string api_stub(
         public Transform transform => gameObject.transform;
         public T? GetComponent<T>() where T : Component => gameObject.GetComponent<T>();
 
-        protected bool TryGetNativeProperty(
+        private protected bool TryGetNativeProperty(
             string propertyName,
             out NativePropertyValue value)
         {
@@ -1232,7 +1232,7 @@ std::string api_stub(
                     out value);
         }
 
-        protected bool SetNativeProperty(
+        private protected bool SetNativeProperty(
             string propertyName,
             NativePropertyValue value)
         {
@@ -1254,7 +1254,7 @@ std::string api_stub(
                     value);
         }
 
-        protected bool NativeBool(
+        private protected bool NativeBool(
             string propertyName,
             bool fallback = false)
         {
@@ -1266,7 +1266,7 @@ std::string api_stub(
                     : fallback;
         }
 
-        protected float NativeFloat(
+        private protected float NativeFloat(
             string propertyName,
             float fallback = 0)
         {
@@ -1278,7 +1278,7 @@ std::string api_stub(
                     : fallback;
         }
 
-        protected long NativeInteger(
+        private protected long NativeInteger(
             string propertyName,
             long fallback = 0)
         {
@@ -1290,7 +1290,7 @@ std::string api_stub(
                     : fallback;
         }
 
-        protected Vector3 NativeVector3(
+        private protected Vector3 NativeVector3(
             string propertyName,
             Vector3 fallback)
         {
@@ -1305,7 +1305,7 @@ std::string api_stub(
                     : fallback;
         }
 
-        protected void SetNativeBool(
+        private protected void SetNativeBool(
             string propertyName,
             bool value)
         {
@@ -1318,7 +1318,7 @@ std::string api_stub(
                 });
         }
 
-        protected void SetNativeFloat(
+        private protected void SetNativeFloat(
             string propertyName,
             float value)
         {
@@ -1331,7 +1331,7 @@ std::string api_stub(
                 });
         }
 
-        protected void SetNativeInteger(
+        private protected void SetNativeInteger(
             string propertyName,
             long value)
         {
@@ -1344,7 +1344,7 @@ std::string api_stub(
                 });
         }
 
-        protected void SetNativeVector3(
+        private protected void SetNativeVector3(
             string propertyName,
             Vector3 value)
         {
