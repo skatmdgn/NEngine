@@ -399,7 +399,7 @@ Implemented foundation:
 - coroutine scheduling including WaitForSeconds.
 
 Remaining major work:
-- remaining physics shapes, production contact manifolds/iterative solving with island-aware sleep propagation, and managed cast/richer query APIs, plus streaming/compressed audio decode and production DSP/device scheduling.
+- clipped multi-point contact manifolds, remaining physics shapes, production iterative solving/warm-starting with island-aware sleep propagation, and managed cast/richer query APIs, plus streaming/compressed audio decode and production DSP/device scheduling.
 - packaged/versioned managed API distribution.
 - debugger symbols/attach workflow.
 - NuGet runtime/package integration.

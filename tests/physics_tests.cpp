@@ -66,6 +66,11 @@ int main() {
         "physics component serializers register");
 
     check(
+        physics::ContactManifold::max_points ==
+            4u,
+        "contact manifold reserves four points for future clipped contact sets");
+
+    check(
         metadata.find(
             physics::rigidbody_type()) != nullptr &&
         metadata.find(
@@ -1167,6 +1172,8 @@ int main() {
             detection.overlaps);
 
     std::size_t enter_count = 0u;
+    bool saw_contact_point_event =
+        false;
 
     for (const auto& event :
          enter_events) {
@@ -1174,13 +1181,33 @@ int main() {
             physics::ContactPhase::Enter) {
             ++enter_count;
         }
+
+        if (event.phase ==
+                physics::ContactPhase::Enter &&
+            event.is_2d &&
+            !event.is_trigger) {
+
+            saw_contact_point_event =
+                event.contact_count == 1u &&
+                std::abs(
+                    event.point.x) <
+                    0.0001f &&
+                std::abs(
+                    event.point.y -
+                    0.3f) <
+                    0.0001f &&
+                std::abs(
+                    event.point.z) <
+                    0.0001f;
+        }
     }
 
     check(
         enter_count == 2u &&
+        saw_contact_point_event &&
         contact_tracker.active_pair_count() ==
             2u,
-        "contact tracker emits Enter for newly overlapping 3D/2D pairs");
+        "contact tracker emits Enter with representative manifold point for solid contacts");
 
     const auto stay_events =
         contact_tracker.update(
@@ -2541,8 +2568,20 @@ int main() {
             core::Vec3{
                 1.0f,
                 0.0f,
-                0.0f},
-        "SphereCollider pairs participate in the shared sweep-and-prune narrow phase");
+                0.0f} &&
+        sphere_detection.overlaps.front()
+            .manifold.count == 1u &&
+        std::abs(
+            sphere_detection.overlaps.front()
+                .manifold.points[0]
+                .point.x -
+            0.375f) < 0.0001f &&
+        std::abs(
+            sphere_detection.overlaps.front()
+                .manifold.points[0]
+                .penetration -
+            0.25f) < 0.0001f,
+        "SphereCollider pairs produce a representative contact manifold point");
 
     const auto sphere_resolution =
         physics::resolve_box_contacts_3d(
@@ -2707,6 +2746,17 @@ int main() {
                 0.0f,
                 1.0f,
                 0.0f} &&
+        circle_detection.overlaps.front()
+            .manifold.count == 1u &&
+        std::abs(
+            circle_detection.overlaps.front()
+                .manifold.points[0]
+                .point.y -
+            0.375f) < 0.0001f &&
+        std::abs(
+            circle_detection.overlaps.front()
+                .manifold.points[0]
+                .point.z) < 0.0001f &&
         circle_query.size() == 1u &&
         circle_query.front() ==
             circle_static &&
@@ -2780,6 +2830,15 @@ int main() {
                 .overlaps.front()
                 .normal.x -
             1.0f) < 0.0002f &&
+        capsule_sphere_detection
+            .overlaps.front()
+            .manifold.count == 1u &&
+        std::abs(
+            capsule_sphere_detection
+                .overlaps.front()
+                .manifold.points[0]
+                .point.x -
+            0.375f) < 0.0002f &&
         capsule_overlap_query.size() ==
             1u &&
         capsule_overlap_query.front() ==

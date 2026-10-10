@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -11,6 +12,23 @@
 
 namespace nengine::physics {
 
+struct ContactPoint {
+    core::Vec3 point{};
+    float penetration{0.0f};
+};
+
+struct ContactManifold {
+    static constexpr std::size_t
+        max_points = 4u;
+
+    std::array<
+        ContactPoint,
+        max_points>
+        points{};
+
+    std::size_t count{0};
+};
+
 struct BoxOverlap {
     core::Entity first{core::Entity::invalid()};
     core::Entity second{core::Entity::invalid()};
@@ -18,6 +36,7 @@ struct BoxOverlap {
     float penetration{0.0f};
     bool is_trigger{false};
     bool is_2d{false};
+    ContactManifold manifold{};
 };
 
 struct CollisionDetectionResult {

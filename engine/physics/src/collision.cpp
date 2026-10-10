@@ -989,6 +989,176 @@ core::Vec3 normalized_or_axis(
     };
 }
 
+core::Vec3 support_point(
+    const ColliderBounds& bounds,
+    core::Vec3 direction,
+    bool is_2d) noexcept {
+
+    direction =
+        normalized_or_axis(
+            direction,
+            is_2d);
+
+    if (bounds.shape ==
+        ColliderShape::Radial) {
+
+        return {
+            bounds.center.x +
+                direction.x *
+                    bounds.radius,
+            bounds.center.y +
+                direction.y *
+                    bounds.radius,
+            is_2d
+                ? 0.0f
+                : bounds.center.z +
+                    direction.z *
+                        bounds.radius
+        };
+    }
+
+    if (bounds.shape ==
+        ColliderShape::Capsule) {
+
+        const float first_projection =
+            dot(
+                bounds.segment_a,
+                direction);
+
+        const float second_projection =
+            dot(
+                bounds.segment_b,
+                direction);
+
+        const auto endpoint =
+            second_projection >
+                    first_projection
+                ? bounds.segment_b
+                : bounds.segment_a;
+
+        return {
+            endpoint.x +
+                direction.x *
+                    bounds.radius,
+            endpoint.y +
+                direction.y *
+                    bounds.radius,
+            is_2d
+                ? 0.0f
+                : endpoint.z +
+                    direction.z *
+                        bounds.radius
+        };
+    }
+
+    const auto support_extent =
+        [](float projection,
+           float half_extent) noexcept {
+
+            constexpr float epsilon =
+                0.000001f;
+
+            if (projection > epsilon)
+                return half_extent;
+
+            if (projection < -epsilon)
+                return -half_extent;
+
+            return 0.0f;
+        };
+
+    auto result =
+        bounds.center;
+
+    result =
+        added(
+            result,
+            scaled(
+                bounds.axis_x,
+                support_extent(
+                    dot(
+                        direction,
+                        bounds.axis_x),
+                    bounds.half.x)));
+
+    result =
+        added(
+            result,
+            scaled(
+                bounds.axis_y,
+                support_extent(
+                    dot(
+                        direction,
+                        bounds.axis_y),
+                    bounds.half.y)));
+
+    if (!is_2d) {
+        result =
+            added(
+                result,
+                scaled(
+                    bounds.axis_z,
+                    support_extent(
+                        dot(
+                            direction,
+                            bounds.axis_z),
+                        bounds.half.z)));
+    } else {
+        result.z = 0.0f;
+    }
+
+    return result;
+}
+
+void populate_contact_manifold(
+    const ColliderBounds& first,
+    const ColliderBounds& second,
+    bool is_2d,
+    BoxOverlap& overlap) noexcept {
+
+    if (overlap.penetration <=
+            0.0f ||
+        overlap.is_trigger) {
+        return;
+    }
+
+    const auto first_support =
+        support_point(
+            first,
+            overlap.normal,
+            is_2d);
+
+    const auto second_support =
+        support_point(
+            second,
+            scaled(
+                overlap.normal,
+                -1.0f),
+            is_2d);
+
+    auto& contact =
+        overlap.manifold.points[0];
+
+    contact.point = {
+        (first_support.x +
+         second_support.x) *
+            0.5f,
+        (first_support.y +
+         second_support.y) *
+            0.5f,
+        is_2d
+            ? 0.0f
+            : (first_support.z +
+               second_support.z) *
+                  0.5f
+    };
+
+    contact.penetration =
+        overlap.penetration;
+
+    overlap.manifold.count = 1u;
+}
+
 core::Vec3 closest_point_on_segment(
     core::Vec3 a,
     core::Vec3 b,
@@ -1890,7 +2060,7 @@ bool overlap_box_capsule(
     return penetration > 0.0f;
 }
 
-bool overlap_pair(
+bool overlap_pair_raw(
     const ColliderBounds& a,
     const ColliderBounds& b,
     bool is_2d,
@@ -1978,6 +2148,34 @@ bool overlap_pair(
         is_2d,
         false,
         overlap);
+}
+
+bool overlap_pair(
+    const ColliderBounds& a,
+    const ColliderBounds& b,
+    bool is_2d,
+    BoxOverlap& overlap) noexcept {
+
+    BoxOverlap candidate;
+
+    if (!overlap_pair_raw(
+            a,
+            b,
+            is_2d,
+            candidate)) {
+        return false;
+    }
+
+    populate_contact_manifold(
+        a,
+        b,
+        is_2d,
+        candidate);
+
+    overlap =
+        candidate;
+
+    return true;
 }
 
 template <typename Collider>

@@ -90,6 +90,13 @@ std::vector<ContactEvent> ContactTracker::update(
             previous_.find(key) !=
             previous_.end();
 
+        const core::Vec3 point =
+            overlap.manifold.count > 0u
+                ? overlap.manifold
+                    .points[0]
+                    .point
+                : core::Vec3{};
+
         events.push_back({
             overlap.first,
             overlap.second,
@@ -99,7 +106,9 @@ std::vector<ContactEvent> ContactTracker::update(
             overlap.is_trigger,
             overlap.is_2d,
             overlap.normal,
-            overlap.penetration
+            overlap.penetration,
+            point,
+            overlap.manifold.count
         });
     }
 
@@ -111,6 +120,13 @@ std::vector<ContactEvent> ContactTracker::update(
             continue;
         }
 
+        const core::Vec3 point =
+            overlap.manifold.count > 0u
+                ? overlap.manifold
+                    .points[0]
+                    .point
+                : core::Vec3{};
+
         events.push_back({
             overlap.first,
             overlap.second,
@@ -118,7 +134,9 @@ std::vector<ContactEvent> ContactTracker::update(
             overlap.is_trigger,
             overlap.is_2d,
             overlap.normal,
-            0.0f
+            0.0f,
+            point,
+            0u
         });
     }
 

@@ -26,6 +26,8 @@ struct ContactEvent {
     bool is_2d{false};
     core::Vec3 normal{};
     float penetration{0.0f};
+    core::Vec3 point{};
+    std::size_t contact_count{0};
 };
 
 class ContactTracker {
