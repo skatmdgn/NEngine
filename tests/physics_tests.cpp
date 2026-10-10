@@ -1350,16 +1350,16 @@ int main() {
                 rotated_box_a,
                 physics::box_collider_type());
 
+    if (rotated_collider_a) {
+        rotated_collider_a->size =
+            {2.0f, 0.2f, 0.2f};
+    }
+
     auto* rotated_collider_b =
         rotated_box_world.add_component<
             physics::BoxCollider>(
                 rotated_box_b,
                 physics::box_collider_type());
-
-    if (rotated_collider_a) {
-        rotated_collider_a->size =
-            {2.0f, 0.2f, 0.2f};
-    }
 
     if (rotated_collider_b) {
         rotated_collider_b->size =
@@ -1438,16 +1438,16 @@ int main() {
                 rotated_box_2d_a,
                 physics::box_collider2d_type());
 
+    if (rotated_collider_2d_a) {
+        rotated_collider_2d_a->size =
+            {2.0f, 0.2f, 0.0f};
+    }
+
     auto* rotated_collider_2d_b =
         rotated_box_2d_world.add_component<
             physics::BoxCollider2D>(
                 rotated_box_2d_b,
                 physics::box_collider2d_type());
-
-    if (rotated_collider_2d_a) {
-        rotated_collider_2d_a->size =
-            {2.0f, 0.2f, 0.0f};
-    }
 
     if (rotated_collider_2d_b) {
         rotated_collider_2d_b->size =
