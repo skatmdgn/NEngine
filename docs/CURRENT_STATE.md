@@ -130,7 +130,7 @@ Implemented:
 - Visual Studio/Rider/default .sln association open path.
 - hostfxr discovery/dynamic loading with generated runtimeconfig.
 - dotnet SDK discovery, deterministic gameplay DLL/PDB build output and Editor **Build C#** action.
-- Managed ABI v12 shared through stable NEngine.API/NEngine.Bridge assemblies.
+- Managed ABI v13 shared through stable NEngine.API/NEngine.Bridge assemblies.
 - Native ScriptBehaviour component with Scene serialization, Add Component and generic Inspector editing.
 - Play Mode ScriptBehaviour instance management against the cloned runtime World.
 - Managed Behaviour Awake / OnEnable / Start / FixedUpdate / Update / LateUpdate / OnDisable / OnDestroy execution with managed instances preserved while disabled or inactive.
@@ -142,7 +142,7 @@ Implemented:
 - Cross-platform keyboard/mouse Input callbacks expose KeyCode, GetKey/GetKeyDown/GetKeyUp, mouse position/delta and wheel.
 - Managed Time.deltaTime/time/frameCount advances once per host Update frame regardless of Behaviour count; Time.fixedDeltaTime is supplied on each fixed simulation step without advancing the host frame clock.
 - Coroutine scheduling supports StartCoroutine, StopCoroutine, StopAllCoroutines, nested IEnumerator, yield return null and WaitForSeconds.
-- Generic ABI v12 native component property transport is backed by the Editor PropertyAccessRegistry; bool/integer/float/vector/quaternion/UTF-8 string values round-trip, with public managed AssetGuid support for SpriteRenderer.texture and MeshRenderer.mesh/material.
+- Generic ABI v13 native component property transport is backed by the Editor PropertyAccessRegistry; bool/integer/float/vector/quaternion/UTF-8 string values round-trip, with public managed AssetGuid support for SpriteRenderer.texture and MeshRenderer.mesh/material.
 - Managed SpriteAnimator exposes enabled/clip/playing/loop/speed/runtime time plus Play/Pause/Stop/Restart helpers; Clip changes reset playback time and negative Time writes are rejected.
 
 Not yet implemented:
@@ -290,20 +290,23 @@ Implemented:
 - Native Rigidbody / BoxCollider and Rigidbody2D / BoxCollider2D components.
 - Reflection metadata and Scene serialization for mass, gravity, velocity, trigger, center and size state.
 - Editor Add Component, Inspector and generic PropertyAccess integration for all four physics components.
-- Managed Rigidbody / BoxCollider / Rigidbody2D / BoxCollider2D proxies over ABI v12, including Unity-familiar velocity/useGravity/isKinematic naming.
+- Managed Rigidbody / BoxCollider / Rigidbody2D / BoxCollider2D proxies over ABI v13, including Unity-familiar velocity/useGravity/isKinematic naming.
 - Fixed-step rigidbody foundation runs after managed FixedUpdate so script velocity changes affect the same simulation step.
 - 3D gravity/linear-velocity Transform integration and 2D XY integration with kinematic/inactive bodies skipped.
 - Axis-aligned BoxCollider/BoxCollider2D overlap detection reports minimum penetration normal and separates trigger from solid pairs.
 - Basic 3D/2D position contact resolution removes entering normal velocity; dynamic/dynamic correction is inverse-mass weighted.
 - ContactTracker derives Enter/Stay/Exit phases for collision and trigger pairs.
+- Editor Play Mode dispatches tracked contact phases to both active managed Behaviours with side-correct contact normals.
+- Generated C# exposes Collision/Collision2D plus Collider/Collider2D callback payloads for OnCollisionEnter/Stay/Exit, OnTriggerEnter/Stay/Exit and their 2D variants.
+- Native Raycast/Raycast2D queries return nearest BoxCollider hit entity, point, normal, distance and trigger state.
+- ABI v13 adds an injected physics-query callback; generated Physics.Raycast and Physics2D.Raycast consume the native NEnginePhysics query without introducing a Scripting -> Physics dependency.
 - Native OverlapBox / OverlapBox2D queries support optional trigger exclusion.
 - Native serialization/property tests and real managed C# property round-trip coverage.
 
 Not yet implemented:
 - Scalable broad-phase plus oriented/rotated narrow-phase collision detection.
 - Production contact solving, friction, restitution and sleeping.
-- Managed Collision/Trigger callbacks consuming the native Enter/Stay/Exit tracker.
-- Raycasts, casts and managed query bindings.
+- Shape casts beyond raycasts, managed overlap-query bindings and richer hit filtering/layers.
 - Physics materials and joints.
 - Production 3D/2D backend selection/integration.
 
@@ -313,7 +316,7 @@ Not yet implemented:
 - Win32 platform event polling feeds keyboard, mouse buttons, focus-loss releases and cursor position into InputState.
 - ActionMap can bind multiple keys/buttons to named actions and query held/pressed/released aggregation.
 - EditorModel receives the platform InputState every frame.
-- Managed ABI v12 has a separate native Input callback table; generated C# exposes Unity-familiar KeyCode, Input.GetKey/GetKeyDown/GetKeyUp, mousePosition, mouseDelta and mouseScrollDelta.
+- Managed ABI v13 has a separate native Input callback table; generated C# exposes Unity-familiar KeyCode, Input.GetKey/GetKeyDown/GetKeyUp, mousePosition, mouseDelta and mouseScrollDelta.
 - Cross-platform tests cover same-frame press/release, focus loss, pointer accumulation, action bindings and real managed C# Input callbacks.
 
 Not yet implemented:
@@ -323,11 +326,11 @@ Not yet implemented:
 
 ## Immediate next work
 
-1. Consume ContactTracker events from ScriptSystem to add managed OnCollision/OnTrigger Enter/Stay/Exit callbacks.
-2. Replace the O(n²) AABB pair scan with a scalable broad-phase and add ray/cast query primitives.
-3. Add AudioSource/AudioListener native components and ABI v12 managed property bindings.
-3. Package/version the managed NEngine API surface and add debugger attach/symbol workflow.
-3. Finish production PBR validation: sampler state, lights/shadows and remaining material behavior.
+1. Replace the O(n²) AABB pair scan with a scalable broad-phase and add rotated/extra collider shapes plus friction/restitution/sleeping.
+2. Extend managed physics queries with overlap/cast APIs, filtering/layers and richer hit data.
+3. Add AudioSource/AudioListener native components and ABI v13 managed property bindings.
+4. Package/version the managed NEngine API surface and add debugger attach/symbol workflow.
+5. Finish production PBR validation: sampler state, lights/shadows and remaining material behavior.
 4. Decide and implement the explicit policy for remote/nonlocal or outside-directory glTF resources while preserving sandbox safety.
 5. Add WebP decoding plus texture compression/transcoding policy; mipmap generation/upload is already implemented.
 6. Choose a vendored FBX decoder strategy and add FBX mesh/material cooking.

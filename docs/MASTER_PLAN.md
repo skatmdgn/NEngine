@@ -385,7 +385,7 @@ Implemented foundation:
 - generated NEngine.API / NEngine.Bridge / gameplay projects and solution.
 - deterministic dotnet gameplay DLL/PDB build.
 - ScriptBehaviour Scene/Inspector integration and Play Mode execution.
-- stable ABI v12 native World callback table.
+- stable ABI v13 native World callback table.
 - GameObject name/active, Transform hierarchy/TRS and component presence.
 - native-backed GameObject create/find plus deferred destroy.
 - collectible gameplay AssemblyLoadContext reload without restarting hostfxr.
@@ -394,11 +394,11 @@ Implemented foundation:
 - FixedUpdate fixed-step scheduling separated from host-frame Update/LateUpdate.
 - managed Camera/Light plus MeshRenderer/SpriteRenderer scalar and AssetGuid properties over the generic native property bridge.
 - managed SpriteAnimator clip/playback/time properties plus Play/Pause/Stop/Restart controls.
-- NEnginePhysics 3D/2D Rigidbody + BoxCollider data/Scene/Editor/C# bindings with fixed-step integration, initial AABB solid contact resolution, trigger/contact Enter-Stay-Exit tracking and native overlap queries.
+- NEnginePhysics 3D/2D Rigidbody + BoxCollider data/Scene/Editor/C# bindings with fixed-step AABB contact resolution, managed collision/trigger Enter-Stay-Exit callbacks, native overlap queries, and managed 3D/2D raycasts over the injected ABI v13 query bridge.
 - coroutine scheduling including WaitForSeconds.
 
 Remaining major work:
-- collision/query physics backend and audio managed component APIs.
+- scalable/rotated physics backend, richer query APIs and audio managed component APIs.
 - packaged/versioned managed API distribution.
 - debugger symbols/attach workflow.
 - NuGet runtime/package integration.
@@ -456,7 +456,7 @@ The active development line is now crossing from **0.5 — C# scripting + IDE** 
 
 The immediate sequence is:
 
-`Rigidbody/Collider fixed-step foundation -> collision/contact backend -> audio runtime boundary -> debugger/IDE polish`
+`managed collision/raycast foundation -> scalable collision solver/query expansion -> audio runtime boundary -> debugger/IDE polish`
 
 Renderer work continues as a secondary line around production PBR, Scene/Game Vulkan presentation, WebP/transcoding, HLSL/reflection and Android Vulkan support.
 

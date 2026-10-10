@@ -31,10 +31,10 @@ The repository currently includes:
 - hostfxr-based .NET runtime loading plus deterministic gameplay DLL/PDB builds
 - ScriptBehaviour Awake/OnEnable/Start/FixedUpdate/Update/LateUpdate/OnDisable/OnDestroy execution in the cloned Play Mode World with fixed-step and host-frame scheduling split
 - dedicated NEngine.API and stable NEngine.Bridge assemblies with collectible gameplay hot reload
-- managed GameObject name/active/Transform hierarchy access plus native create/find/deferred-destroy through ABI v12
+- managed GameObject name/active/Transform hierarchy access plus native create/find/deferred-destroy through ABI v13
 - managed Camera/Light, MeshRenderer/SpriteRenderer scalar+AssetGuid properties, and SpriteAnimator clip/playback/time controls through the generic PropertyAccessRegistry-backed native property bridge
 - managed keyboard/mouse Input, global Time frame clock, coroutines and WaitForSeconds
-- NEnginePhysics foundation with 3D/2D Rigidbody + BoxCollider components, fixed-step gravity/velocity integration, AABB contact resolution, trigger/contact phase tracking, and native OverlapBox queries
+- NEnginePhysics foundation with 3D/2D Rigidbody + BoxCollider components, fixed-step AABB contact resolution, managed collision/trigger Enter-Stay-Exit callbacks, native overlap queries, and managed Physics/Physics2D raycasts
 - Camera/Light/MeshRenderer components
 - RenderSnapshot with resolved world matrices
 - camera matrix math and stable built-in Cube/Quad mesh AssetGuids
