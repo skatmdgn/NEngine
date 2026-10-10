@@ -739,7 +739,8 @@ int main() {
         output_info.open &&
         output_info.sample_rate > 0u &&
         output_info.channels == 2u &&
-        output_info.buffer_frames > 0u,
+        output_info.buffer_frames > 0u &&
+        output_info.buffer_duration_ms > 0.0,
         "audio output device reports usable stereo format");
 
     const auto device_stats =

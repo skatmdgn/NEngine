@@ -16,6 +16,7 @@ struct AudioDeviceInfo {
     std::uint32_t sample_rate{0};
     std::uint16_t channels{0};
     std::size_t buffer_frames{0};
+    double buffer_duration_ms{0.0};
     std::uint64_t submitted_frames{0};
 };
 

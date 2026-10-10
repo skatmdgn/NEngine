@@ -150,7 +150,7 @@ struct AudioOutputDevice::Impl {
 
     std::uint32_t sample_rate{48000};
     std::uint16_t channels{2};
-    std::size_t buffer_frames{512};
+    std::size_t buffer_frames{1440};
     std::uint64_t submitted_frames{0};
     std::vector<float> scratch{};
 
@@ -199,7 +199,7 @@ struct AudioOutputDevice::Impl {
         diagnostic = std::move(reason);
         sample_rate = 48000;
         channels = 2;
-        buffer_frames = 512;
+        buffer_frames = 1440;
         submitted_frames = 0;
     }
 };
@@ -330,7 +330,7 @@ bool AudioOutputDevice::open(
         impl_->client->Initialize(
             AUDCLNT_SHAREMODE_SHARED,
             0,
-            0,
+            300000,
             0,
             impl_->format,
             nullptr);
@@ -448,6 +448,14 @@ AudioDeviceInfo AudioOutputDevice::info()
         impl_->channels;
     result.buffer_frames =
         impl_->buffer_frames;
+    result.buffer_duration_ms =
+        impl_->sample_rate == 0u
+            ? 0.0
+            : static_cast<double>(
+                  impl_->buffer_frames) *
+                1000.0 /
+                static_cast<double>(
+                    impl_->sample_rate);
     result.submitted_frames =
         impl_->submitted_frames;
     result.diagnostic =
