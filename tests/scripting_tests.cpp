@@ -999,6 +999,12 @@ int main() {
             std::string::npos &&
         api.find("BoxCollider2D") !=
             std::string::npos &&
+        api.find("sealed class Collision") !=
+            std::string::npos &&
+        api.find("sealed class Collision2D") !=
+            std::string::npos &&
+        api.find("abstract class Collider") !=
+            std::string::npos &&
         api.find("readonly struct AssetGuid") !=
             std::string::npos &&
         api.find("TryParse") !=
@@ -1416,6 +1422,22 @@ int main() {
                 << "        box2d.isTrigger = true; box2d.center = new Vector2(0.5f, 0.75f); box2d.size = new Vector2(6, 7);\n"
                 << "        gameObject.name = \"Render Physics Properties Passed\";\n"
                 << "    }\n"
+                << "}\n"
+                << "public class PhysicsEventProbe : Behaviour {\n"
+                << "    private int mask;\n"
+                << "    private void Mark(int bit, string otherName) { if (otherName != \"Physics Other\") throw new System.Exception(\"physics other mismatch\"); mask |= bit; if (mask == 4095) gameObject.name = \"Physics Events Passed\"; }\n"
+                << "    private void OnCollisionEnter(Collision c) { if (System.MathF.Abs(c.normal.x - 1f) > 0.001f || System.MathF.Abs(c.penetration - 0.25f) > 0.001f) throw new System.Exception(\"collision payload mismatch\"); Mark(1, c.gameObject.name); }\n"
+                << "    private void OnCollisionStay(Collision c) { Mark(2, c.gameObject.name); }\n"
+                << "    private void OnCollisionExit(Collision c) { Mark(4, c.gameObject.name); }\n"
+                << "    private void OnTriggerEnter(Collider c) { if (!c.isTrigger) throw new System.Exception(\"trigger collider mismatch\"); Mark(8, c.gameObject.name); }\n"
+                << "    private void OnTriggerStay(Collider c) { Mark(16, c.gameObject.name); }\n"
+                << "    private void OnTriggerExit(Collider c) { Mark(32, c.gameObject.name); }\n"
+                << "    private void OnCollisionEnter2D(Collision2D c) { if (System.MathF.Abs(c.normal.y - 1f) > 0.001f) throw new System.Exception(\"collision2d payload mismatch\"); Mark(64, c.gameObject.name); }\n"
+                << "    private void OnCollisionStay2D(Collision2D c) { Mark(128, c.gameObject.name); }\n"
+                << "    private void OnCollisionExit2D(Collision2D c) { Mark(256, c.gameObject.name); }\n"
+                << "    private void OnTriggerEnter2D(Collider2D c) { if (!c.isTrigger) throw new System.Exception(\"trigger2d collider mismatch\"); Mark(512, c.gameObject.name); }\n"
+                << "    private void OnTriggerStay2D(Collider2D c) { Mark(1024, c.gameObject.name); }\n"
+                << "    private void OnTriggerExit2D(Collider2D c) { Mark(2048, c.gameObject.name); }\n"
                 << "}\n"
                 << "public class FixedSystemProbe : Behaviour {\n"
                 << "    private void FixedUpdate() {\n"
@@ -1892,6 +1914,129 @@ int main() {
 
                         property_system.clear(
                             &property_world);
+
+                        ManagedScriptSystem
+                            physics_event_system;
+
+                        physics_event_system.bind(
+                            &managed_runtime);
+
+                        nengine::core::World
+                            physics_event_world;
+
+                        const auto physics_event_target =
+                            physics_event_world.create(
+                                "Physics Event Target");
+
+                        const auto physics_event_other =
+                            physics_event_world.create(
+                                "Physics Other");
+
+                        const auto event_box_type =
+                            nengine::core::ComponentRegistry::stable_id(
+                                "NEngine.BoxCollider");
+
+                        const auto event_box2d_type =
+                            nengine::core::ComponentRegistry::stable_id(
+                                "NEngine.BoxCollider2D");
+
+                        auto* event_script =
+                            physics_event_world.add_component<
+                                ScriptBehaviour>(
+                                    physics_event_target,
+                                    script_behaviour_type());
+
+                        if (event_script) {
+                            event_script->type_name =
+                                "PhysicsEventProbe";
+                        }
+
+                        auto* event_box =
+                            physics_event_world.add_component<
+                                ManagedBoxColliderFixture>(
+                                    physics_event_other,
+                                    event_box_type);
+
+                        auto* event_box2d =
+                            physics_event_world.add_component<
+                                ManagedBoxCollider2DFixture>(
+                                    physics_event_other,
+                                    event_box2d_type);
+
+                        if (event_box) {
+                            event_box->is_trigger =
+                                true;
+                        }
+
+                        if (event_box2d) {
+                            event_box2d->is_trigger =
+                                true;
+                        }
+
+                        std::string physics_event_error;
+
+                        const auto event_start =
+                            physics_event_system.fixed_update(
+                                physics_event_world,
+                                0.02f,
+                                &physics_event_error);
+
+                        bool all_physics_events = true;
+
+                        for (int is2d = 0;
+                             is2d <= 1;
+                             ++is2d) {
+                            for (int trigger = 0;
+                                 trigger <= 1;
+                                 ++trigger) {
+                                for (int phase = 0;
+                                     phase <= 2;
+                                     ++phase) {
+
+                                    const auto normal =
+                                        is2d != 0
+                                            ? nengine::core::Vec3{
+                                                0.0f,
+                                                1.0f,
+                                                0.0f}
+                                            : nengine::core::Vec3{
+                                                1.0f,
+                                                0.0f,
+                                                0.0f};
+
+                                    all_physics_events =
+                                        physics_event_system
+                                            .dispatch_physics_event(
+                                                physics_event_world,
+                                                physics_event_target,
+                                                physics_event_other,
+                                                phase,
+                                                trigger != 0,
+                                                is2d != 0,
+                                                normal,
+                                                phase == 2
+                                                    ? 0.0f
+                                                    : 0.25f,
+                                                &physics_event_error) &&
+                                        all_physics_events;
+                                }
+                            }
+                        }
+
+                        check(
+                            event_script &&
+                            event_start.created == 1u &&
+                            event_start.started == 1u &&
+                            event_start.unresolved == 0u &&
+                            all_physics_events &&
+                            physics_event_error.empty() &&
+                            physics_event_world.name(
+                                physics_event_target) ==
+                                "Physics Events Passed",
+                            "managed Collision Trigger 3D and 2D Enter Stay Exit callbacks receive native event payloads");
+
+                        physics_event_system.clear(
+                            &physics_event_world);
 
                         ManagedScriptSystem
                             fixed_system;
