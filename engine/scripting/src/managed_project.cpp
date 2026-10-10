@@ -1820,6 +1820,12 @@ std::string api_stub(
 
     public sealed class SpriteRenderer : Component
     {
+        public AssetGuid texture
+        {
+            get => NativeAssetGuid("Texture");
+            set => SetNativeAssetGuid("Texture", value);
+        }
+
         public bool enabled
         {
             get => NativeBool("Enabled", true);
