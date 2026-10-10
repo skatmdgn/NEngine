@@ -9,6 +9,7 @@
 #include "nengine/core/world.hpp"
 #include "nengine/physics/components.hpp"
 #include "nengine/physics/collision.hpp"
+#include "nengine/physics/contact_events.hpp"
 #include "nengine/physics/registration.hpp"
 #include "nengine/physics/simulation.hpp"
 
@@ -542,6 +543,98 @@ int main() {
         saw_3d_trigger &&
         saw_2d_contact,
         "AABB overlap records minimum penetration axis and trigger semantics");
+
+    physics::ContactTracker
+        contact_tracker;
+
+    const auto enter_events =
+        contact_tracker.update(
+            detection.overlaps);
+
+    std::size_t enter_count = 0u;
+
+    for (const auto& event :
+         enter_events) {
+        if (event.phase ==
+            physics::ContactPhase::Enter) {
+            ++enter_count;
+        }
+    }
+
+    check(
+        enter_count == 2u &&
+        contact_tracker.active_pair_count() ==
+            2u,
+        "contact tracker emits Enter for newly overlapping 3D/2D pairs");
+
+    const auto stay_events =
+        contact_tracker.update(
+            detection.overlaps);
+
+    std::size_t stay_count = 0u;
+
+    for (const auto& event :
+         stay_events) {
+        if (event.phase ==
+            physics::ContactPhase::Stay) {
+            ++stay_count;
+        }
+    }
+
+    check(
+        stay_count == 2u,
+        "contact tracker emits Stay for persistent overlap pairs");
+
+    collision_world.transform(
+        box_b)->local_position =
+            {5.0f, 0.0f, 0.0f};
+
+    const auto reduced_detection =
+        physics::detect_box_overlaps(
+            collision_world);
+
+    const auto exit_events =
+        contact_tracker.update(
+            reduced_detection.overlaps);
+
+    bool saw_trigger_exit = false;
+    bool saw_2d_stay = false;
+
+    for (const auto& event :
+         exit_events) {
+
+        if (event.phase ==
+                physics::ContactPhase::Exit &&
+            event.is_trigger &&
+            !event.is_2d) {
+            saw_trigger_exit = true;
+        }
+
+        if (event.phase ==
+                physics::ContactPhase::Stay &&
+            !event.is_trigger &&
+            event.is_2d) {
+            saw_2d_stay = true;
+        }
+    }
+
+    check(
+        saw_trigger_exit &&
+        saw_2d_stay &&
+        contact_tracker.active_pair_count() ==
+            1u,
+        "contact tracker separates trigger Exit from persistent 2D collision Stay");
+
+    contact_tracker.clear();
+
+    check(
+        contact_tracker.active_pair_count() ==
+            0u,
+        "contact tracker clear resets active overlap state");
+
+    collision_world.transform(
+        box_b)->local_position =
+            {0.75f, 0.0f, 0.0f};
 
     const auto collision_frame =
         physics::step_physics(

@@ -1,6 +1,7 @@
 add_library(NEnginePhysics STATIC
   src/components.cpp
   src/collision.cpp
+  src/contact_events.cpp
   src/registration.cpp
   src/simulation.cpp
 )
