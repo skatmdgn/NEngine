@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -120,6 +121,9 @@ int main() {
 
     if (collider) {
         collider->is_trigger = true;
+        collider->layer = 3u;
+        collider->collision_mask =
+            0x000000a5u;
         collider->center =
             {0.25f, 0.5f, 0.75f};
         collider->size =
@@ -134,6 +138,9 @@ int main() {
     }
 
     if (collider2d) {
+        collider2d->layer = 7u;
+        collider2d->collision_mask =
+            0x0000ff00u;
         collider2d->size =
             {6.0f, 7.0f, 0.0f};
     }
@@ -236,6 +243,9 @@ int main() {
             core::Vec3{1.0f, 2.0f, 3.0f} &&
         restored_collider &&
         restored_collider->is_trigger &&
+        restored_collider->layer == 3u &&
+        restored_collider->collision_mask ==
+            0x000000a5u &&
         restored_collider->size ==
             core::Vec3{2.0f, 3.0f, 4.0f} &&
         restored_body2d &&
@@ -243,9 +253,53 @@ int main() {
         restored_body2d->linear_velocity ==
             core::Vec3{4.0f, 5.0f, 0.0f} &&
         restored_collider2d &&
+        restored_collider2d->layer == 7u &&
+        restored_collider2d->collision_mask ==
+            0x0000ff00u &&
         restored_collider2d->size ==
             core::Vec3{6.0f, 7.0f, 0.0f},
         "physics Scene roundtrip preserves configured values");
+
+    if (captured_collider) {
+        auto legacy =
+            *captured_collider;
+
+        legacy.properties.erase(
+            std::remove_if(
+                legacy.properties.begin(),
+                legacy.properties.end(),
+                [](const auto& property) {
+                    return property.name == "Layer" ||
+                           property.name == "Collision Mask";
+                }),
+            legacy.properties.end());
+
+        core::World legacy_world;
+        const auto legacy_entity =
+            legacy_world.create(
+                "Legacy Collider");
+
+        check(
+            serialization.restore(
+                legacy_world,
+                legacy_entity,
+                legacy,
+                &error),
+            "BoxCollider restore remains compatible with pre-layer Scene data");
+
+        const auto* legacy_collider =
+            legacy_world.get_component<
+                physics::BoxCollider>(
+                    legacy_entity,
+                    physics::box_collider_type());
+
+        check(
+            legacy_collider &&
+            legacy_collider->layer == 0u &&
+            legacy_collider->collision_mask ==
+                0xffffffffu,
+            "legacy BoxCollider data defaults to layer zero and all collision layers");
+    }
 
     if (captured_body) {
         auto invalid =

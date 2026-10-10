@@ -63,6 +63,27 @@ bool read_float(
     return true;
 }
 
+bool read_integer(
+    const core::SerializedComponentData& data,
+    std::string_view name,
+    std::int64_t& value,
+    bool optional = false) {
+
+    const auto* property =
+        find_property(data, name);
+
+    if (!property) return optional;
+
+    const auto* typed =
+        std::get_if<std::int64_t>(
+            &property->value);
+
+    if (!typed) return false;
+
+    value = *typed;
+    return true;
+}
+
 bool read_vec3(
     const core::SerializedComponentData& data,
     std::string_view name,
@@ -103,6 +124,17 @@ core::SerializedPropertyData float_property(
         core::PropertyKind::Float,
         core::PropertyValue{
             static_cast<double>(value)}
+    };
+}
+
+core::SerializedPropertyData integer_property(
+    std::string name,
+    std::int64_t value) {
+
+    return {
+        std::move(name),
+        core::PropertyKind::Integer,
+        core::PropertyValue{value}
     };
 }
 
@@ -222,6 +254,8 @@ bool register_box_metadata(
                  core::PropertyKind>>{
             {"Enabled", core::PropertyKind::Boolean},
             {"Is Trigger", core::PropertyKind::Boolean},
+            {"Layer", core::PropertyKind::Integer},
+            {"Collision Mask", core::PropertyKind::Integer},
             {"Center", core::PropertyKind::Vec3},
             {"Size", core::PropertyKind::Vec3}}) {
 
@@ -364,6 +398,14 @@ capture_box(
         bool_property(
             "Is Trigger",
             value->is_trigger),
+        integer_property(
+            "Layer",
+            static_cast<std::int64_t>(
+                value->layer)),
+        integer_property(
+            "Collision Mask",
+            static_cast<std::int64_t>(
+                value->collision_mask)),
         vec3_property(
             "Center",
             value->center),
@@ -387,6 +429,14 @@ bool restore_box(
 
     T value;
 
+    std::int64_t layer =
+        static_cast<std::int64_t>(
+            value.layer);
+
+    std::int64_t collision_mask =
+        static_cast<std::int64_t>(
+            value.collision_mask);
+
     if (!read_bool(
             data,
             "Enabled",
@@ -395,6 +445,22 @@ bool restore_box(
             data,
             "Is Trigger",
             value.is_trigger) ||
+        !read_integer(
+            data,
+            "Layer",
+            layer,
+            true) ||
+        !read_integer(
+            data,
+            "Collision Mask",
+            collision_mask,
+            true) ||
+        layer < 0 ||
+        layer > 31 ||
+        collision_mask < 0 ||
+        collision_mask >
+            static_cast<std::int64_t>(
+                0xffffffffu) ||
         !read_vec3(
             data,
             "Center",
@@ -415,6 +481,14 @@ bool restore_box(
         }
         return false;
     }
+
+    value.layer =
+        static_cast<std::uint32_t>(
+            layer);
+
+    value.collision_mask =
+        static_cast<std::uint32_t>(
+            collision_mask);
 
     auto* component =
         ensure_component<T>(

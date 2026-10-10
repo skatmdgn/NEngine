@@ -19,6 +19,8 @@ struct Rigidbody {
 struct BoxCollider {
     bool enabled{true};
     bool is_trigger{false};
+    std::uint32_t layer{0};
+    std::uint32_t collision_mask{0xffffffffu};
     core::Vec3 center{};
     core::Vec3 size{1.0f, 1.0f, 1.0f};
 };
@@ -35,6 +37,8 @@ struct Rigidbody2D {
 struct BoxCollider2D {
     bool enabled{true};
     bool is_trigger{false};
+    std::uint32_t layer{0};
+    std::uint32_t collision_mask{0xffffffffu};
     core::Vec3 center{};
     core::Vec3 size{1.0f, 1.0f, 0.0f};
 };
