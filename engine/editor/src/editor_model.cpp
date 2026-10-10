@@ -235,6 +235,7 @@ bool EditorModel::begin_play_mode() {
     }
 
     managed_script_system_.clear(play_session_.runtime_world());
+    physics_contact_tracker_.clear();
 
     if (managed_runtime_.valid() &&
         !managed_runtime_.reset_time()) {
@@ -249,6 +250,7 @@ bool EditorModel::begin_play_mode() {
 
 bool EditorModel::stop_play_mode() {
     managed_script_system_.clear(play_session_.runtime_world());
+    physics_contact_tracker_.clear();
     return play_session_.stop();
 }
 
@@ -260,6 +262,7 @@ bool EditorModel::initialize_managed_runtime(
     std::string* error) {
 
     managed_script_system_.clear(play_session_.runtime_world());
+    physics_contact_tracker_.clear();
     managed_runtime_.shutdown();
 
     if (!managed_runtime_.initialize(
@@ -307,6 +310,7 @@ bool EditorModel::reload_managed_runtime(
     // Managed instances hold types from the collectible gameplay context.
     // Destroy them before requesting unload; Play Mode World state remains.
     managed_script_system_.clear(play_session_.runtime_world());
+    physics_contact_tracker_.clear();
 
     if (!managed_runtime_.reload_gameplay(
             assembly_path,
@@ -338,6 +342,7 @@ void EditorModel::shutdown_managed_runtime()
     noexcept {
 
     managed_script_system_.clear(play_session_.runtime_world());
+    physics_contact_tracker_.clear();
     managed_runtime_.shutdown();
 }
 
@@ -350,6 +355,7 @@ void EditorModel::tick_runtime(
     if (!runtime) {
         managed_script_system_.clear(
             play_session_.runtime_world());
+        physics_contact_tracker_.clear();
         return;
     }
 
@@ -405,9 +411,56 @@ void EditorModel::tick_runtime(
                         &script_error);
             }
 
-            physics::step_physics(
-                *runtime,
-                fixed_delta);
+            const auto physics_frame =
+                physics::step_physics(
+                    *runtime,
+                    fixed_delta);
+
+            const auto contact_events =
+                physics_contact_tracker_.update(
+                    physics_frame
+                        .collisions
+                        .overlaps);
+
+            if (managed_runtime_.valid()) {
+                for (const auto& event :
+                     contact_events) {
+
+                    const int phase =
+                        static_cast<int>(
+                            event.phase);
+
+                    if (!managed_script_system_
+                            .dispatch_physics_event(
+                                *runtime,
+                                event.first,
+                                event.second,
+                                phase,
+                                event.is_trigger,
+                                event.is_2d,
+                                event.normal,
+                                event.penetration,
+                                &script_error)) {
+                        continue;
+                    }
+
+                    managed_script_system_
+                        .dispatch_physics_event(
+                            *runtime,
+                            event.second,
+                            event.first,
+                            phase,
+                            event.is_trigger,
+                            event.is_2d,
+                            {
+                                -event.normal.x,
+                                -event.normal.y,
+                                -event.normal.z
+                            },
+                            event.penetration,
+                            &script_error);
+                }
+            }
         };
 
     if (play_state ==

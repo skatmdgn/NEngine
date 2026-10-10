@@ -16,6 +16,7 @@
 #include "nengine/editor/property_access.hpp"
 #include "nengine/editor/selection.hpp"
 #include "nengine/input/input_state.hpp"
+#include "nengine/physics/contact_events.hpp"
 #include "nengine/render/sprite_animation.hpp"
 #include "nengine/scripting/managed_runtime.hpp"
 #include "nengine/scripting/script_system.hpp"
@@ -167,6 +168,9 @@ private:
 
     scripting::ManagedScriptSystem
         managed_script_system_{};
+
+    physics::ContactTracker
+        physics_contact_tracker_{};
 
     std::uint64_t saved_scene_state_id_{0};
 };
