@@ -140,6 +140,14 @@ PhysicsFrameResult step_physics(
             world,
             result.collisions.overlaps);
 
+    const auto resolution_2d =
+        resolve_box_contacts_2d(
+            world,
+            result.collisions.overlaps);
+
+    result.resolution.resolved_2d +=
+        resolution_2d.resolved_2d;
+
     return result;
 }
 

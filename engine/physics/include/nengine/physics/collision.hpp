@@ -36,4 +36,8 @@ CollisionResolutionStats resolve_box_contacts_3d(
     core::World& world,
     const std::vector<BoxOverlap>& overlaps);
 
+CollisionResolutionStats resolve_box_contacts_2d(
+    core::World& world,
+    const std::vector<BoxOverlap>& overlaps);
+
 } // namespace nengine::physics

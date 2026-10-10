@@ -634,6 +634,79 @@ int main() {
             0.0001f,
         "3D box contact resolution separates a dynamic body from a static collider and removes entering normal velocity");
 
+    core::World resolution_2d_world;
+
+    const auto floor_2d =
+        resolution_2d_world.create(
+            "Floor2D");
+    const auto dynamic_2d =
+        resolution_2d_world.create(
+            "Dynamic2D");
+
+    resolution_2d_world.add_component<
+        physics::BoxCollider2D>(
+            floor_2d,
+            physics::box_collider2d_type());
+
+    resolution_2d_world.add_component<
+        physics::BoxCollider2D>(
+            dynamic_2d,
+            physics::box_collider2d_type());
+
+    auto* resolution_body_2d =
+        resolution_2d_world.add_component<
+            physics::Rigidbody2D>(
+                dynamic_2d,
+                physics::rigidbody2d_type());
+
+    resolution_2d_world.transform(
+        dynamic_2d)->local_position =
+            {0.0f, 0.6f, 5.0f};
+
+    if (resolution_body_2d) {
+        resolution_body_2d->use_gravity =
+            false;
+        resolution_body_2d->linear_velocity =
+            {0.0f, -3.0f, 7.0f};
+    }
+
+    const auto detection_2d =
+        physics::detect_box_overlaps(
+            resolution_2d_world);
+
+    const auto resolution_stats_2d =
+        physics::resolve_box_contacts_2d(
+            resolution_2d_world,
+            detection_2d.overlaps);
+
+    resolution_body_2d =
+        resolution_2d_world.get_component<
+            physics::Rigidbody2D>(
+                dynamic_2d,
+                physics::rigidbody2d_type());
+
+    const auto* resolved_transform_2d =
+        resolution_2d_world.transform(
+            dynamic_2d);
+
+    check(
+        resolution_stats_2d.resolved_2d ==
+            1u &&
+        resolved_transform_2d &&
+        std::abs(
+            resolved_transform_2d
+                ->local_position.y -
+            1.0f) < 0.0001f &&
+        std::abs(
+            resolved_transform_2d
+                ->local_position.z -
+            5.0f) < 0.0001f &&
+        resolution_body_2d &&
+        resolution_body_2d
+            ->linear_velocity ==
+            core::Vec3{},
+        "2D box contact resolution separates only on XY and clears entering normal velocity without moving Z");
+
     if (failures != 0) {
         std::cerr
             << failures
