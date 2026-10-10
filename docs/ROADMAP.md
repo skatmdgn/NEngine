@@ -141,7 +141,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Managed Rigidbody/BoxCollider + Rigidbody2D/BoxCollider2D component/property bindings
 - [x] Managed Collision/Trigger Enter/Stay/Exit callbacks + Collision/Collision2D payloads
 - [x] Managed Physics.Raycast + Physics2D.Raycast over ABI v13 injected native queries
-- [ ] Audio managed component/property bindings
+- [x] Managed AudioSource/AudioListener properties + AudioSource Play/Pause/UnPause/Stop/isPlaying/runtime time
 - [ ] Visual Studio attach/debug symbols
 
 ## 0.6 — Physics, input, audio
@@ -157,7 +157,9 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Named action-map binding/query foundation
 - [x] Managed KeyCode/GetKey/GetKeyDown/GetKeyUp + mouse position/delta/wheel
 - [ ] Gamepad/touch input backends and production action-map persistence
-- [ ] audio source/listener/mixer basics
+- [x] NEngineAudio AudioSource/AudioListener + deterministic playback clock + spatial stereo mix snapshot
+- [x] Cached WAV PCM/float runtime decode + AssetGuid AudioClipCache
+- [ ] OS audio output backend, streaming decode and OGG/MP3/FLAC runtime decode
 
 ## 0.7 — Animation/UI/navigation
 - [ ] animation clips/state machine/blend tree subset

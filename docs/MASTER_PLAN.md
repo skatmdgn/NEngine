@@ -395,10 +395,11 @@ Implemented foundation:
 - managed Camera/Light plus MeshRenderer/SpriteRenderer scalar and AssetGuid properties over the generic native property bridge.
 - managed SpriteAnimator clip/playback/time properties plus Play/Pause/Stop/Restart controls.
 - NEnginePhysics 3D/2D Rigidbody + BoxCollider data/Scene/Editor/C# bindings with fixed-step AABB contact resolution, managed collision/trigger Enter-Stay-Exit callbacks, native overlap queries, and managed 3D/2D raycasts over the injected ABI v13 query bridge.
+- NEngineAudio AudioSource/AudioListener Scene/Editor/C# bindings, deterministic playback timing, spatial stereo mix snapshots, WAV PCM/float runtime decode and AssetGuid/fingerprint clip caching; OS device output and compressed/streaming decode remain.
 - coroutine scheduling including WaitForSeconds.
 
 Remaining major work:
-- scalable/rotated physics backend, richer query APIs and audio managed component APIs.
+- scalable/rotated physics backend, richer query APIs and a production audio device/streaming backend.
 - packaged/versioned managed API distribution.
 - debugger symbols/attach workflow.
 - NuGet runtime/package integration.
@@ -456,7 +457,7 @@ The active development line is now crossing from **0.5 — C# scripting + IDE** 
 
 The immediate sequence is:
 
-`managed collision/raycast foundation -> scalable collision solver/query expansion -> audio runtime boundary -> debugger/IDE polish`
+`audio playback/mix boundary -> audio device backend + scalable physics/query expansion -> debugger/IDE polish`
 
 Renderer work continues as a secondary line around production PBR, Scene/Game Vulkan presentation, WebP/transcoding, HLSL/reflection and Android Vulkan support.
 

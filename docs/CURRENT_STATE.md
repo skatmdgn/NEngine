@@ -117,7 +117,7 @@ Not yet implemented:
 - Remote/nonlocal or outside-model-directory glTF resource policy/support; local percent-encoded sidecars are implemented.
 - FBX decoding/cooking.
 - HLSL compiler-path parity/validation; GLSL -> SPIR-V compile/embed tooling is implemented and exercised in CI.
-- Audio decode/stream runtime.
+- OS/device audio output backend and streaming decode; WAV PCM/float runtime decode is implemented, while OGG/MP3/FLAC runtime decode remains.
 - Dependency extraction from asset contents.
 
 ## C# / IDE foundation
@@ -147,7 +147,7 @@ Implemented:
 
 Not yet implemented:
 - Packaged/versioned distribution of the NEngine managed API.
-- Collision/query physics backend plus audio component/property APIs.
+- Native AddComponent/remove-component parity for managed scripts.
 - Visual Studio debugger attach integration.
 - NuGet runtime/package loading beyond generated project references.
 
@@ -310,6 +310,27 @@ Not yet implemented:
 - Physics materials and joints.
 - Production 3D/2D backend selection/integration.
 
+## Audio foundation
+
+Implemented:
+- Dedicated NEngineAudio module.
+- Native AudioSource / AudioListener components with reflection metadata, Scene serialization, Editor Add Component factories and generic PropertyAccess bindings.
+- AudioSource clip AssetGuid, playOnAwake, loop, spatialize, volume, pitch and panStereo authoring properties.
+- Managed AudioSource / AudioListener proxies over the ABI v13 generic native property bridge.
+- Managed AudioSource Play / Pause / UnPause / Stop, isPlaying and runtime time controls.
+- Deterministic AudioPlaybackSystem with play-on-awake, pitch-scaled time, loop wrapping and non-loop end-of-clip stopping.
+- AudioMixSnapshot extracts the active listener plus source state and computes listener volume, stereo pan and initial distance attenuation for spatialized sources.
+- RIFF/WAVE runtime decode supports PCM 8/16/24/32-bit and IEEE float32 into normalized interleaved float samples.
+- AudioClipCache resolves ProjectSession cached NEngine.Audio source artifacts by AssetGuid + import fingerprint and supplies real WAV duration to Play Mode playback.
+- Existing NEngine.Audio import pipeline stages WAV/OGG/MP3/FLAC sources and records WAV metadata.
+- Cross-platform NEngineAudioTests cover serialization, validation, mix extraction, playback timing, WAV decode and clip-cache reuse.
+
+Not yet implemented:
+- OS/device audio output backend, realtime callback/mixer thread and hardware buffer queue.
+- Streaming audio decode.
+- OGG/MP3/FLAC runtime decoders.
+- Production 3D audio using hierarchy-resolved world transforms, orientation/HRTF, Doppler, reverb and mixer buses/effects.
+
 ## Input foundation
 - Cross-platform InputState tracks held/pressed/released key and mouse-button transitions per frame.
 - Pointer state tracks position, delta and vertical wheel accumulation.
@@ -326,13 +347,13 @@ Not yet implemented:
 
 ## Immediate next work
 
-1. Replace the O(n²) AABB pair scan with a scalable broad-phase and add rotated/extra collider shapes plus friction/restitution/sleeping.
-2. Extend managed physics queries with overlap/cast APIs, filtering/layers and richer hit data.
-3. Add AudioSource/AudioListener native components and ABI v13 managed property bindings.
+1. Add a real OS audio device/output backend consuming AudioMixSnapshot + AudioClipCache PCM, then add streaming and OGG/MP3/FLAC runtime decode.
+2. Replace the O(n²) AABB pair scan with a scalable broad-phase and add rotated/extra collider shapes plus friction/restitution/sleeping.
+3. Extend managed physics queries with overlap/cast APIs, filtering/layers and richer hit data.
 4. Package/version the managed NEngine API surface and add debugger attach/symbol workflow.
 5. Finish production PBR validation: sampler state, lights/shadows and remaining material behavior.
-4. Decide and implement the explicit policy for remote/nonlocal or outside-directory glTF resources while preserving sandbox safety.
-5. Add WebP decoding plus texture compression/transcoding policy; mipmap generation/upload is already implemented.
-6. Choose a vendored FBX decoder strategy and add FBX mesh/material cooking.
-7. Replace the GDI Scene View presentation only together with a Vulkan Editor Camera + matching picking/gizmo projection.
-8. Extend shader tooling with reflection and validated HLSL compiler parity.
+6. Decide and implement the explicit policy for remote/nonlocal or outside-directory glTF resources while preserving sandbox safety.
+7. Add WebP decoding plus texture compression/transcoding policy; mipmap generation/upload is already implemented.
+8. Choose a vendored FBX decoder strategy and add FBX mesh/material cooking.
+9. Replace the GDI Scene View presentation only together with a Vulkan Editor Camera + matching picking/gizmo projection.
+10. Extend shader tooling with reflection and validated HLSL compiler parity.
