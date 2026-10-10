@@ -8,6 +8,7 @@
 #include "nengine/core/world.hpp"
 #include "nengine/physics/components.hpp"
 #include "nengine/physics/registration.hpp"
+#include "nengine/physics/simulation.hpp"
 
 namespace {
 
@@ -282,6 +283,122 @@ int main() {
                 &error),
             "BoxCollider codec rejects non-positive dimensions");
     }
+
+    core::World simulation_world;
+
+    const auto body_entity =
+        simulation_world.create(
+            "Dynamic 3D");
+
+    auto* simulated_body =
+        simulation_world.add_component<
+            physics::Rigidbody>(
+                body_entity,
+                physics::rigidbody_type());
+
+    if (simulated_body) {
+        simulated_body->linear_velocity =
+            {2.0f, 0.0f, 0.0f};
+    }
+
+    const auto body2d_entity =
+        simulation_world.create(
+            "Dynamic 2D");
+
+    auto* simulated_body2d =
+        simulation_world.add_component<
+            physics::Rigidbody2D>(
+                body2d_entity,
+                physics::rigidbody2d_type());
+
+    if (simulated_body2d) {
+        simulated_body2d->use_gravity =
+            false;
+        simulated_body2d->linear_velocity =
+            {3.0f, 4.0f, 0.0f};
+    }
+
+    const auto kinematic_entity =
+        simulation_world.create(
+            "Kinematic");
+
+    auto* kinematic_body =
+        simulation_world.add_component<
+            physics::Rigidbody>(
+                kinematic_entity,
+                physics::rigidbody_type());
+
+    if (kinematic_body) {
+        kinematic_body->is_kinematic =
+            true;
+        kinematic_body->linear_velocity =
+            {100.0f, 100.0f, 100.0f};
+    }
+
+    const auto step =
+        physics::step_rigidbodies(
+            simulation_world,
+            0.5f);
+
+    const auto* body_transform =
+        simulation_world.transform(
+            body_entity);
+
+    const auto* body2d_transform =
+        simulation_world.transform(
+            body2d_entity);
+
+    const auto* kinematic_transform =
+        simulation_world.transform(
+            kinematic_entity);
+
+    check(
+        step.integrated_3d == 1u &&
+        step.integrated_2d == 1u &&
+        step.gravity_applied == 1u &&
+        simulated_body &&
+        std::abs(
+            simulated_body
+                ->linear_velocity.y +
+            4.905f) < 0.0001f &&
+        body_transform &&
+        std::abs(
+            body_transform
+                ->local_position.x -
+            1.0f) < 0.0001f &&
+        std::abs(
+            body_transform
+                ->local_position.y +
+            2.4525f) < 0.0001f &&
+        simulated_body2d &&
+        simulated_body2d
+            ->linear_velocity ==
+            core::Vec3{
+                3.0f,
+                4.0f,
+                0.0f} &&
+        body2d_transform &&
+        body2d_transform
+            ->local_position ==
+            core::Vec3{
+                1.5f,
+                2.0f,
+                0.0f} &&
+        kinematic_transform &&
+        kinematic_transform
+            ->local_position ==
+            core::Vec3{},
+        "fixed-step rigidbody foundation integrates gravity velocity and Transform while skipping kinematic bodies");
+
+    const auto invalid_step =
+        physics::step_rigidbodies(
+            simulation_world,
+            -1.0f);
+
+    check(
+        invalid_step.integrated_3d == 0u &&
+        invalid_step.integrated_2d == 0u,
+        "physics fixed-step foundation ignores invalid negative delta");
 
     if (failures != 0) {
         std::cerr

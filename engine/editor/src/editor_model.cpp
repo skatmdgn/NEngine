@@ -2,6 +2,7 @@
 #include "nengine/editor/render_integration.hpp"
 #include "nengine/editor/physics_integration.hpp"
 #include "nengine/editor/scripting_integration.hpp"
+#include "nengine/physics/simulation.hpp"
 
 namespace nengine::editor {
 namespace {
@@ -403,6 +404,10 @@ void EditorModel::tick_runtime(
                         fixed_delta,
                         &script_error);
             }
+
+            physics::step_rigidbodies(
+                *runtime,
+                fixed_delta);
         };
 
     if (play_state ==
