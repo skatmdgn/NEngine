@@ -2887,7 +2887,7 @@ int main() {
 
     core::World capsule2d_world;
 
-    const auto capsule2d =
+    const auto capsule2d_entity =
         capsule2d_world.create(
             "Capsule2D");
 
@@ -2897,7 +2897,7 @@ int main() {
 
     capsule2d_world.add_component<
         physics::CapsuleCollider2D>(
-            capsule2d,
+            capsule2d_entity,
             physics::capsule_collider2d_type());
 
     capsule2d_world.add_component<
@@ -2941,10 +2941,10 @@ int main() {
             0.25f) < 0.0002f &&
         capsule2d_query.size() == 1u &&
         capsule2d_query.front() ==
-            capsule2d &&
+            capsule2d_entity &&
         capsule2d_ray &&
         capsule2d_ray->entity ==
-            capsule2d &&
+            capsule2d_entity &&
         std::abs(
             capsule2d_ray->distance -
             1.5f) < 0.0002f &&
