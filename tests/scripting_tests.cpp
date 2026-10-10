@@ -126,6 +126,8 @@ struct ManagedAudioListenerFixture {
 struct ManagedPhysicsQueryFixture {
     nengine::core::Entity hit_3d{
         nengine::core::Entity::invalid()};
+    nengine::core::Entity hit_3d_extra{
+        nengine::core::Entity::invalid()};
     nengine::core::Entity hit_2d{
         nengine::core::Entity::invalid()};
 };
@@ -138,7 +140,7 @@ bool read_managed_physics_query(
     nengine::core::Vec3,
     float,
     bool,
-    std::uint32_t,
+    std::uint32_t layer_mask,
     nengine::core::Entity& hit_entity,
     nengine::core::Vec3& point,
     nengine::core::Vec3& normal,
@@ -151,6 +153,14 @@ bool read_managed_physics_query(
                 context);
 
     if (!fixture) {
+        return false;
+    }
+
+    const std::uint32_t expected_layer =
+        is_2d ? 7u : 3u;
+
+    if ((layer_mask &
+         (1u << expected_layer)) == 0u) {
         return false;
     }
 
@@ -184,17 +194,72 @@ bool read_managed_physics_query(
 }
 
 std::size_t read_managed_overlap_query(
-    void*,
-    const nengine::core::World&,
-    bool,
+    void* context,
+    const nengine::core::World& world,
+    bool is_2d,
     nengine::core::Vec3,
     nengine::core::Vec3,
     bool,
-    std::uint32_t,
-    std::uint64_t*,
-    std::size_t) {
+    std::uint32_t layer_mask,
+    std::uint64_t* output,
+    std::size_t capacity) {
 
-    return 0u;
+    auto* fixture =
+        static_cast<
+            ManagedPhysicsQueryFixture*>(
+                context);
+
+    if (!fixture) {
+        return 0u;
+    }
+
+    nengine::core::Entity
+        hits[2]{
+            nengine::core::Entity::invalid(),
+            nengine::core::Entity::invalid()
+        };
+
+    std::size_t count = 0u;
+
+    if (is_2d) {
+        if ((layer_mask &
+             (1u << 7u)) != 0u &&
+            world.is_alive(
+                fixture->hit_2d)) {
+            hits[count++] =
+                fixture->hit_2d;
+        }
+    } else {
+        if ((layer_mask &
+             (1u << 3u)) != 0u &&
+            world.is_alive(
+                fixture->hit_3d)) {
+            hits[count++] =
+                fixture->hit_3d;
+        }
+
+        if ((layer_mask &
+             (1u << 5u)) != 0u &&
+            world.is_alive(
+                fixture->hit_3d_extra)) {
+            hits[count++] =
+                fixture->hit_3d_extra;
+        }
+    }
+
+    const auto written =
+        std::min(
+            count,
+            capacity);
+
+    for (std::size_t index = 0;
+         index < written;
+         ++index) {
+        output[index] =
+            hits[index].value;
+    }
+
+    return count;
 }
 
 bool read_managed_render_property(
@@ -1309,6 +1374,10 @@ int main() {
             std::string::npos &&
         api.find("static class Physics2D") !=
             std::string::npos &&
+        api.find("OverlapBoxAll") !=
+            std::string::npos &&
+        api.find("OverlapBox(") !=
+            std::string::npos &&
         api.find("RaycastHit2D") !=
             std::string::npos &&
         api.find("readonly struct AssetGuid") !=
@@ -1750,10 +1819,14 @@ int main() {
                 << "}\n"
                 << "public class PhysicsQueryProbe : Behaviour {\n"
                 << "    private void Update() {\n"
-                << "        if (!Physics.Raycast(new Vector3(0,0,0), new Vector3(1,0,0), out RaycastHit hit, 100f, false)) throw new System.Exception(\"3d raycast missing\");\n"
+                << "        if (!Physics.Raycast(new Vector3(0,0,0), new Vector3(1,0,0), out RaycastHit hit, 100f, false, 1u << 3)) throw new System.Exception(\"3d raycast missing\");\n"
                 << "        if (hit.gameObject.name != \"Physics Query 3D\" || hit.collider == null || hit.isTrigger || System.MathF.Abs(hit.distance - 4f) > 0.001f || System.MathF.Abs(hit.point.x - 1f) > 0.001f || System.MathF.Abs(hit.point.y - 2f) > 0.001f || System.MathF.Abs(hit.point.z - 3f) > 0.001f || System.MathF.Abs(hit.normal.x + 1f) > 0.001f || System.MathF.Abs(hit.normal.y) > 0.001f || System.MathF.Abs(hit.normal.z) > 0.001f) throw new System.Exception(\"3d raycast mismatch\");\n"
-                << "        if (!Physics2D.Raycast(new Vector2(0,0), new Vector2(0,1), out RaycastHit2D hit2d, 100f, true)) throw new System.Exception(\"2d raycast missing\");\n"
+                << "        if (!Physics2D.Raycast(new Vector2(0,0), new Vector2(0,1), out RaycastHit2D hit2d, 100f, true, 1u << 7)) throw new System.Exception(\"2d raycast missing\");\n"
                 << "        if (hit2d.gameObject.name != \"Physics Query 2D\" || hit2d.collider == null || !hit2d.isTrigger || System.MathF.Abs(hit2d.distance - 7f) > 0.001f || System.MathF.Abs(hit2d.point.x - 5f) > 0.001f || System.MathF.Abs(hit2d.point.y - 6f) > 0.001f || System.MathF.Abs(hit2d.normal.x) > 0.001f || System.MathF.Abs(hit2d.normal.y + 1f) > 0.001f) throw new System.Exception(\"2d raycast mismatch\");\n"
+                << "        Collider[] overlaps = Physics.OverlapBox(new Vector3(0,0,0), new Vector3(1,1,1), true, (1u << 3) | (1u << 5));\n"
+                << "        if (overlaps.Length != 2 || overlaps[0].gameObject.name != \"Physics Query 3D\" || overlaps[0].layer != 3 || overlaps[1].gameObject.name != \"Physics Query 3D Extra\" || overlaps[1].layer != 5) throw new System.Exception(\"3d overlap mismatch\");\n"
+                << "        Collider2D[] overlaps2d = Physics2D.OverlapBoxAll(new Vector2(0,0), new Vector2(2,2), true, 1u << 7);\n"
+                << "        if (overlaps2d.Length != 1 || overlaps2d[0].gameObject.name != \"Physics Query 2D\" || overlaps2d[0].layer != 7 || !overlaps2d[0].isTrigger) throw new System.Exception(\"2d overlap mismatch\");\n"
                 << "        gameObject.name = \"Physics Query Passed\";\n"
                 << "    }\n"
                 << "}\n"
@@ -2429,15 +2502,47 @@ int main() {
                             physics_query_world.create(
                                 "Physics Query 3D");
 
+                        physics_query_fixture.hit_3d_extra =
+                            physics_query_world.create(
+                                "Physics Query 3D Extra");
+
                         physics_query_fixture.hit_2d =
                             physics_query_world.create(
                                 "Physics Query 2D");
 
+                        const auto query_box_type =
+                            nengine::core::ComponentRegistry::stable_id(
+                                "NEngine.BoxCollider");
+
                         physics_query_world.add_component<
                             ManagedBoxColliderFixture>(
                                 physics_query_fixture.hit_3d,
-                                nengine::core::ComponentRegistry::stable_id(
-                                    "NEngine.BoxCollider"));
+                                query_box_type);
+
+                        physics_query_world.add_component<
+                            ManagedBoxColliderFixture>(
+                                physics_query_fixture.hit_3d_extra,
+                                query_box_type);
+
+                        auto* query_box_3d =
+                            physics_query_world.get_component<
+                                ManagedBoxColliderFixture>(
+                                    physics_query_fixture.hit_3d,
+                                    query_box_type);
+
+                        auto* query_box_3d_extra =
+                            physics_query_world.get_component<
+                                ManagedBoxColliderFixture>(
+                                    physics_query_fixture.hit_3d_extra,
+                                    query_box_type);
+
+                        if (query_box_3d) {
+                            query_box_3d->layer = 3;
+                        }
+
+                        if (query_box_3d_extra) {
+                            query_box_3d_extra->layer = 5;
+                        }
 
                         auto* query_box_2d =
                             physics_query_world.add_component<
@@ -2449,6 +2554,7 @@ int main() {
                         if (query_box_2d) {
                             query_box_2d->is_trigger =
                                 true;
+                            query_box_2d->layer = 7;
                         }
 
                         auto* query_script =
@@ -2480,7 +2586,7 @@ int main() {
                             physics_query_world.name(
                                 query_script_entity) ==
                                 "Physics Query Passed",
-                            "managed Physics.Raycast and Physics2D.Raycast consume injected native query callbacks");
+                            "managed raycast layer masks and 3D/2D overlap arrays consume ABI v14 native query callbacks");
 
                         physics_query_system.clear(
                             &physics_query_world);

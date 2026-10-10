@@ -1464,6 +1464,86 @@ std::string api_stub(
                 state.hitEntity != InvalidEntity;
         }
 
+        internal static ulong[] OverlapBoxEntities(
+            bool is2D,
+            Vector3 center,
+            Vector3 size,
+            bool includeTriggers,
+            uint layerMask)
+        {
+            if (_physicsOverlap == null)
+                return Array.Empty<ulong>();
+
+            int count = _physicsOverlap(
+                _context,
+                is2D ? 1 : 0,
+                center.x,
+                center.y,
+                center.z,
+                size.x,
+                size.y,
+                size.z,
+                includeTriggers ? 1 : 0,
+                layerMask,
+                0,
+                0);
+
+            if (count <= 0 ||
+                count > 1024 * 1024)
+            {
+                return Array.Empty<ulong>();
+            }
+
+            nint buffer =
+                Marshal.AllocHGlobal(
+                    checked(count * sizeof(long)));
+
+            try
+            {
+                int actual = _physicsOverlap(
+                    _context,
+                    is2D ? 1 : 0,
+                    center.x,
+                    center.y,
+                    center.z,
+                    size.x,
+                    size.y,
+                    size.z,
+                    includeTriggers ? 1 : 0,
+                    layerMask,
+                    buffer,
+                    count);
+
+                if (actual <= 0)
+                    return Array.Empty<ulong>();
+
+                actual = Math.Min(
+                    actual,
+                    count);
+
+                ulong[] result =
+                    new ulong[actual];
+
+                for (int index = 0;
+                     index < actual;
+                     ++index)
+                {
+                    result[index] =
+                        unchecked(
+                            (ulong)Marshal.ReadInt64(
+                                buffer,
+                                index * sizeof(long)));
+                }
+
+                return result;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(
+                    buffer);
+            }
+        }
+
         internal static string? NativeComponentName(Type type)
         {
             if (type == typeof(Transform)) return "NEngine.Transform";
@@ -2104,7 +2184,8 @@ std::string api_stub(
             Vector3 direction,
             out RaycastHit hit,
             float maxDistance = float.MaxValue,
-            bool includeTriggers = true)
+            bool includeTriggers = true,
+            uint layerMask = 0xffffffffu)
         {
             hit = default;
 
@@ -2114,7 +2195,8 @@ std::string api_stub(
                     direction,
                     maxDistance,
                     includeTriggers,
-                    out NativeRaycastState state))
+                    out NativeRaycastState state,
+                    layerMask))
             {
                 return false;
             }
@@ -2141,6 +2223,51 @@ std::string api_stub(
 
             return true;
         }
+
+        public static Collider[] OverlapBox(
+            Vector3 center,
+            Vector3 halfExtents,
+            bool includeTriggers = true,
+            uint layerMask = 0xffffffffu)
+        {
+            if (halfExtents.x <= 0 ||
+                halfExtents.y <= 0 ||
+                halfExtents.z <= 0)
+            {
+                return Array.Empty<Collider>();
+            }
+
+            ulong[] entities =
+                NativeWorld.OverlapBoxEntities(
+                    false,
+                    center,
+                    new Vector3(
+                        halfExtents.x * 2,
+                        halfExtents.y * 2,
+                        halfExtents.z * 2),
+                    includeTriggers,
+                    layerMask);
+
+            var colliders =
+                new List<Collider>(
+                    entities.Length);
+
+            foreach (ulong entity in entities)
+            {
+                GameObject? gameObject =
+                    GameObject.FromNative(
+                        entity);
+
+                BoxCollider? collider =
+                    gameObject?.GetComponent<
+                        BoxCollider>();
+
+                if (collider != null)
+                    colliders.Add(collider);
+            }
+
+            return colliders.ToArray();
+        }
     }
 
     public static class Physics2D
@@ -2150,7 +2277,8 @@ std::string api_stub(
             Vector2 direction,
             out RaycastHit2D hit,
             float maxDistance = float.MaxValue,
-            bool includeTriggers = true)
+            bool includeTriggers = true,
+            uint layerMask = 0xffffffffu)
         {
             hit = default;
 
@@ -2166,7 +2294,8 @@ std::string api_stub(
                         0),
                     maxDistance,
                     includeTriggers,
-                    out NativeRaycastState state))
+                    out NativeRaycastState state,
+                    layerMask))
             {
                 return false;
             }
@@ -2190,6 +2319,53 @@ std::string api_stub(
                 state.isTrigger != 0);
 
             return true;
+        }
+
+        public static Collider2D[] OverlapBoxAll(
+            Vector2 center,
+            Vector2 size,
+            bool includeTriggers = true,
+            uint layerMask = 0xffffffffu)
+        {
+            if (size.x <= 0 ||
+                size.y <= 0)
+            {
+                return Array.Empty<Collider2D>();
+            }
+
+            ulong[] entities =
+                NativeWorld.OverlapBoxEntities(
+                    true,
+                    new Vector3(
+                        center.x,
+                        center.y,
+                        0),
+                    new Vector3(
+                        size.x,
+                        size.y,
+                        0),
+                    includeTriggers,
+                    layerMask);
+
+            var colliders =
+                new List<Collider2D>(
+                    entities.Length);
+
+            foreach (ulong entity in entities)
+            {
+                GameObject? gameObject =
+                    GameObject.FromNative(
+                        entity);
+
+                BoxCollider2D? collider =
+                    gameObject?.GetComponent<
+                        BoxCollider2D>();
+
+                if (collider != null)
+                    colliders.Add(collider);
+            }
+
+            return colliders.ToArray();
         }
     }
 
