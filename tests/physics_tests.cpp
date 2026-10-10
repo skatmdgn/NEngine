@@ -1333,6 +1333,222 @@ int main() {
         "2D box contact resolution separates only on XY and clears entering normal velocity without moving Z");
 
 
+
+    core::World rotated_box_world;
+
+    const auto rotated_box_a =
+        rotated_box_world.create(
+            "Rotated Box A");
+
+    const auto rotated_box_b =
+        rotated_box_world.create(
+            "Rotated Box B");
+
+    auto* rotated_collider_a =
+        rotated_box_world.add_component<
+            physics::BoxCollider>(
+                rotated_box_a,
+                physics::box_collider_type());
+
+    auto* rotated_collider_b =
+        rotated_box_world.add_component<
+            physics::BoxCollider>(
+                rotated_box_b,
+                physics::box_collider_type());
+
+    if (rotated_collider_a) {
+        rotated_collider_a->size =
+            {2.0f, 0.2f, 0.2f};
+    }
+
+    if (rotated_collider_b) {
+        rotated_collider_b->size =
+            {2.0f, 0.2f, 0.2f};
+    }
+
+    const core::Quat rotation_45{
+        0.0f,
+        0.0f,
+        0.38268343f,
+        0.92387953f
+    };
+
+    rotated_box_world.transform(
+        rotated_box_a)->local_rotation =
+            rotation_45;
+
+    rotated_box_world.transform(
+        rotated_box_b)->local_rotation =
+            rotation_45;
+
+    rotated_box_world.transform(
+        rotated_box_b)->local_position =
+            {-0.35355339f, 0.35355339f, 0.0f};
+
+    const auto rotated_separated =
+        physics::detect_box_overlaps(
+            rotated_box_world);
+
+    check(
+        rotated_separated.tested_pairs_3d ==
+            1u &&
+        rotated_separated.overlaps.empty(),
+        "3D rotated BoxCollider SAT rejects broad-phase AABB false positives");
+
+    rotated_box_world.transform(
+        rotated_box_b)->local_position =
+            {-0.10606602f, 0.10606602f, 0.0f};
+
+    const auto rotated_overlap =
+        physics::detect_box_overlaps(
+            rotated_box_world);
+
+    check(
+        rotated_overlap.overlaps.size() ==
+            1u &&
+        std::abs(
+            rotated_overlap.overlaps.front()
+                .penetration -
+            0.05f) < 0.0002f &&
+        std::abs(
+            std::abs(
+                rotated_overlap.overlaps.front()
+                    .normal.x) -
+            0.70710678f) < 0.0002f &&
+        std::abs(
+            std::abs(
+                rotated_overlap.overlaps.front()
+                    .normal.y) -
+            0.70710678f) < 0.0002f,
+        "3D rotated BoxCollider SAT returns oriented minimum penetration axis");
+
+    core::World rotated_box_2d_world;
+
+    const auto rotated_box_2d_a =
+        rotated_box_2d_world.create(
+            "Rotated Box2D A");
+
+    const auto rotated_box_2d_b =
+        rotated_box_2d_world.create(
+            "Rotated Box2D B");
+
+    auto* rotated_collider_2d_a =
+        rotated_box_2d_world.add_component<
+            physics::BoxCollider2D>(
+                rotated_box_2d_a,
+                physics::box_collider2d_type());
+
+    auto* rotated_collider_2d_b =
+        rotated_box_2d_world.add_component<
+            physics::BoxCollider2D>(
+                rotated_box_2d_b,
+                physics::box_collider2d_type());
+
+    if (rotated_collider_2d_a) {
+        rotated_collider_2d_a->size =
+            {2.0f, 0.2f, 0.0f};
+    }
+
+    if (rotated_collider_2d_b) {
+        rotated_collider_2d_b->size =
+            {2.0f, 0.2f, 0.0f};
+    }
+
+    rotated_box_2d_world.transform(
+        rotated_box_2d_a)->local_rotation =
+            rotation_45;
+
+    rotated_box_2d_world.transform(
+        rotated_box_2d_b)->local_rotation =
+            rotation_45;
+
+    rotated_box_2d_world.transform(
+        rotated_box_2d_b)->local_position =
+            {-0.35355339f, 0.35355339f, 8.0f};
+
+    const auto rotated_2d_separated =
+        physics::detect_box_overlaps(
+            rotated_box_2d_world);
+
+    check(
+        rotated_2d_separated.tested_pairs_2d ==
+            1u &&
+        rotated_2d_separated.overlaps.empty(),
+        "2D rotated BoxCollider2D SAT rejects XY broad-phase false positives");
+
+    rotated_box_2d_world.transform(
+        rotated_box_2d_b)->local_position =
+            {-0.10606602f, 0.10606602f, 8.0f};
+
+    const auto rotated_2d_overlap =
+        physics::detect_box_overlaps(
+            rotated_box_2d_world);
+
+    check(
+        rotated_2d_overlap.overlaps.size() ==
+            1u &&
+        rotated_2d_overlap.overlaps.front()
+            .is_2d &&
+        std::abs(
+            rotated_2d_overlap.overlaps.front()
+                .penetration -
+            0.05f) < 0.0002f,
+        "2D rotated BoxCollider2D SAT resolves overlap only on XY");
+
+    core::World rotated_center_world;
+
+    const auto centered_box =
+        rotated_center_world.create(
+            "Offset Rotated Box");
+
+    const auto centered_sphere =
+        rotated_center_world.create(
+            "Offset Sphere");
+
+    auto* centered_box_collider =
+        rotated_center_world.add_component<
+            physics::BoxCollider>(
+                centered_box,
+                physics::box_collider_type());
+
+    rotated_center_world.add_component<
+        physics::SphereCollider>(
+            centered_sphere,
+            physics::sphere_collider_type());
+
+    if (centered_box_collider) {
+        centered_box_collider->center =
+            {1.0f, 0.0f, 0.0f};
+    }
+
+    rotated_center_world.transform(
+        centered_box)->local_rotation =
+            core::Quat{
+                0.0f,
+                0.0f,
+                0.70710678f,
+                0.70710678f
+            };
+
+    rotated_center_world.transform(
+        centered_sphere)->local_position =
+            {0.0f, 1.6f, 0.0f};
+
+    const auto centered_detection =
+        physics::detect_box_overlaps(
+            rotated_center_world);
+
+    check(
+        centered_detection.overlaps.size() ==
+            1u &&
+        std::abs(
+            centered_detection.overlaps.front()
+                .penetration -
+            0.4f) < 0.0002f &&
+        centered_detection.overlaps.front()
+            .normal.y > 0.99f,
+        "rotated BoxCollider center offsets rotate with Transform before mixed sphere narrow phase");
+
     core::World sphere_world;
 
     const auto sphere_static =

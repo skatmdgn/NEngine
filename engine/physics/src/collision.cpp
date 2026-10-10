@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -20,6 +21,10 @@ struct ColliderBounds {
         core::Entity::invalid()};
     core::Vec3 center{};
     core::Vec3 half{};
+    core::Vec3 broad_half{};
+    core::Vec3 axis_x{1.0f, 0.0f, 0.0f};
+    core::Vec3 axis_y{0.0f, 1.0f, 0.0f};
+    core::Vec3 axis_z{0.0f, 0.0f, 1.0f};
     float radius{0.0f};
     ColliderShape shape{ColliderShape::Box};
     bool trigger{false};
@@ -42,6 +47,282 @@ core::Vec3 abs_scale(
         std::abs(value.x),
         std::abs(value.y),
         std::abs(value.z)
+    };
+}
+
+float dot(
+    core::Vec3 a,
+    core::Vec3 b) noexcept {
+
+    return a.x * b.x +
+        a.y * b.y +
+        a.z * b.z;
+}
+
+core::Vec3 cross(
+    core::Vec3 a,
+    core::Vec3 b) noexcept {
+
+    return {
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x
+    };
+}
+
+core::Vec3 scaled(
+    core::Vec3 value,
+    float scalar) noexcept {
+
+    return {
+        value.x * scalar,
+        value.y * scalar,
+        value.z * scalar
+    };
+}
+
+core::Vec3 added(
+    core::Vec3 a,
+    core::Vec3 b) noexcept {
+
+    return {
+        a.x + b.x,
+        a.y + b.y,
+        a.z + b.z
+    };
+}
+
+core::Vec3 normalized_axis(
+    core::Vec3 value) noexcept {
+
+    const float squared =
+        dot(value, value);
+
+    if (squared <=
+        0.0000000001f) {
+        return {};
+    }
+
+    return scaled(
+        value,
+        1.0f / std::sqrt(squared));
+}
+
+core::Quat normalized_quaternion(
+    core::Quat value) noexcept {
+
+    const float squared =
+        value.x * value.x +
+        value.y * value.y +
+        value.z * value.z +
+        value.w * value.w;
+
+    if (squared <=
+        0.0000000001f) {
+        return {};
+    }
+
+    const float inverse =
+        1.0f / std::sqrt(squared);
+
+    return {
+        value.x * inverse,
+        value.y * inverse,
+        value.z * inverse,
+        value.w * inverse
+    };
+}
+
+core::Vec3 rotate_vector(
+    core::Quat rotation,
+    core::Vec3 value) noexcept {
+
+    rotation =
+        normalized_quaternion(
+            rotation);
+
+    const core::Vec3 q{
+        rotation.x,
+        rotation.y,
+        rotation.z
+    };
+
+    const auto first =
+        cross(q, value);
+
+    const auto second =
+        cross(
+            q,
+            added(
+                first,
+                scaled(
+                    value,
+                    rotation.w)));
+
+    return added(
+        value,
+        scaled(
+            second,
+            2.0f));
+}
+
+void box_axes(
+    core::Quat rotation,
+    bool is_2d,
+    core::Vec3& axis_x,
+    core::Vec3& axis_y,
+    core::Vec3& axis_z) noexcept {
+
+    if (is_2d) {
+        rotation =
+            normalized_quaternion(
+                rotation);
+
+        const float sine =
+            2.0f *
+            (rotation.w *
+                 rotation.z +
+             rotation.x *
+                 rotation.y);
+
+        const float cosine =
+            1.0f -
+            2.0f *
+            (rotation.y *
+                 rotation.y +
+             rotation.z *
+                 rotation.z);
+
+        const float angle =
+            std::atan2(
+                sine,
+                cosine);
+
+        const float c =
+            std::cos(angle);
+        const float s =
+            std::sin(angle);
+
+        axis_x = {
+            c,
+            s,
+            0.0f
+        };
+
+        axis_y = {
+            -s,
+            c,
+            0.0f
+        };
+
+        axis_z = {
+            0.0f,
+            0.0f,
+            1.0f
+        };
+
+        return;
+    }
+
+    axis_x =
+        normalized_axis(
+            rotate_vector(
+                rotation,
+                {1.0f, 0.0f, 0.0f}));
+
+    axis_y =
+        normalized_axis(
+            rotate_vector(
+                rotation,
+                {0.0f, 1.0f, 0.0f}));
+
+    axis_z =
+        normalized_axis(
+            rotate_vector(
+                rotation,
+                {0.0f, 0.0f, 1.0f}));
+
+    if (axis_x == core::Vec3{} ||
+        axis_y == core::Vec3{} ||
+        axis_z == core::Vec3{}) {
+        axis_x = {
+            1.0f, 0.0f, 0.0f};
+        axis_y = {
+            0.0f, 1.0f, 0.0f};
+        axis_z = {
+            0.0f, 0.0f, 1.0f};
+    }
+}
+
+core::Vec3 oriented_offset(
+    core::Vec3 local,
+    const ColliderBounds& bounds,
+    bool is_2d) noexcept {
+
+    auto result =
+        added(
+            scaled(
+                bounds.axis_x,
+                local.x),
+            scaled(
+                bounds.axis_y,
+                local.y));
+
+    if (!is_2d) {
+        result =
+            added(
+                result,
+                scaled(
+                    bounds.axis_z,
+                    local.z));
+    } else {
+        result.z = local.z;
+    }
+
+    return result;
+}
+
+void update_broad_half(
+    ColliderBounds& bounds,
+    bool is_2d) noexcept {
+
+    if (bounds.shape ==
+        ColliderShape::Radial) {
+        bounds.broad_half = {
+            bounds.radius,
+            bounds.radius,
+            is_2d
+                ? 0.0f
+                : bounds.radius
+        };
+        return;
+    }
+
+    bounds.broad_half = {
+        std::abs(bounds.axis_x.x) *
+                bounds.half.x +
+            std::abs(bounds.axis_y.x) *
+                bounds.half.y +
+            (is_2d
+                ? 0.0f
+                : std::abs(bounds.axis_z.x) *
+                    bounds.half.z),
+        std::abs(bounds.axis_x.y) *
+                bounds.half.x +
+            std::abs(bounds.axis_y.y) *
+                bounds.half.y +
+            (is_2d
+                ? 0.0f
+                : std::abs(bounds.axis_z.y) *
+                    bounds.half.z),
+        is_2d
+            ? 0.0f
+            : std::abs(bounds.axis_x.z) *
+                    bounds.half.x +
+                std::abs(bounds.axis_y.z) *
+                    bounds.half.y +
+                std::abs(bounds.axis_z.z) *
+                    bounds.half.z
     };
 }
 
@@ -74,13 +355,32 @@ ColliderBounds make_bounds(
         abs_scale(
             transform->local_scale);
 
+    box_axes(
+        transform->local_rotation,
+        is_2d,
+        result.axis_x,
+        result.axis_y,
+        result.axis_z);
+
+    const core::Vec3 scaled_center{
+        collider.center.x * scale.x,
+        collider.center.y * scale.y,
+        collider.center.z * scale.z
+    };
+
+    const auto offset =
+        oriented_offset(
+            scaled_center,
+            result,
+            is_2d);
+
     result.center = {
         transform->local_position.x +
-            collider.center.x * scale.x,
+            offset.x,
         transform->local_position.y +
-            collider.center.y * scale.y,
+            offset.y,
         transform->local_position.z +
-            collider.center.z * scale.z
+            offset.z
     };
 
     result.half = {
@@ -94,9 +394,14 @@ ColliderBounds make_bounds(
                 scale.z * 0.5f
     };
 
+    update_broad_half(
+        result,
+        is_2d);
+
     return result;
 }
 
+bool layer_enabled(
 bool layer_enabled(
     std::uint32_t mask,
     std::uint32_t layer) noexcept {
@@ -118,71 +423,150 @@ bool collision_layers_allow(
                a.layer);
 }
 
+float projected_box_radius(
+    const ColliderBounds& box,
+    core::Vec3 axis,
+    bool is_2d) noexcept {
+
+    return
+        std::abs(
+            dot(
+                axis,
+                box.axis_x)) *
+            box.half.x +
+        std::abs(
+            dot(
+                axis,
+                box.axis_y)) *
+            box.half.y +
+        (is_2d
+            ? 0.0f
+            : std::abs(
+                  dot(
+                      axis,
+                      box.axis_z)) *
+                  box.half.z);
+}
+
 bool overlap_box_pair(
     const ColliderBounds& a,
     const ColliderBounds& b,
     bool is_2d,
     BoxOverlap& overlap) noexcept {
 
-    const auto delta = core::Vec3{
+    const core::Vec3 delta{
         b.center.x - a.center.x,
         b.center.y - a.center.y,
-        b.center.z - a.center.z
+        is_2d
+            ? 0.0f
+            : b.center.z - a.center.z
     };
 
-    const float px =
-        a.half.x +
-        b.half.x -
-        std::abs(delta.x);
+    float minimum_penetration =
+        std::numeric_limits<float>::max();
 
-    const float py =
-        a.half.y +
-        b.half.y -
-        std::abs(delta.y);
+    core::Vec3 minimum_axis{
+        1.0f,
+        0.0f,
+        0.0f
+    };
 
-    if (px <= 0.0f ||
-        py <= 0.0f) {
+    const auto test_axis =
+        [&](core::Vec3 raw_axis) {
+
+            const auto axis =
+                normalized_axis(
+                    raw_axis);
+
+            if (axis ==
+                core::Vec3{}) {
+                return true;
+            }
+
+            const float distance =
+                std::abs(
+                    dot(
+                        delta,
+                        axis));
+
+            const float penetration =
+                projected_box_radius(
+                    a,
+                    axis,
+                    is_2d) +
+                projected_box_radius(
+                    b,
+                    axis,
+                    is_2d) -
+                distance;
+
+            if (penetration <=
+                0.0f) {
+                return false;
+            }
+
+            if (penetration <
+                minimum_penetration) {
+                minimum_penetration =
+                    penetration;
+
+                minimum_axis =
+                    dot(
+                        delta,
+                        axis) >= 0.0f
+                        ? axis
+                        : scaled(
+                            axis,
+                            -1.0f);
+            }
+
+            return true;
+        };
+
+    if (!test_axis(a.axis_x) ||
+        !test_axis(a.axis_y) ||
+        !test_axis(b.axis_x) ||
+        !test_axis(b.axis_y)) {
         return false;
     }
 
-    float penetration = px;
-    core::Vec3 normal{
-        axis_sign(delta.x),
-        0.0f,
-        0.0f};
-
-    if (py < penetration) {
-        penetration = py;
-        normal = {
-            0.0f,
-            axis_sign(delta.y),
-            0.0f};
-    }
-
     if (!is_2d) {
-        const float pz =
-            a.half.z +
-            b.half.z -
-            std::abs(delta.z);
-
-        if (pz <= 0.0f) {
+        if (!test_axis(a.axis_z) ||
+            !test_axis(b.axis_z)) {
             return false;
         }
 
-        if (pz < penetration) {
-            penetration = pz;
-            normal = {
-                0.0f,
-                0.0f,
-                axis_sign(delta.z)};
+        const core::Vec3 a_axes[]{
+            a.axis_x,
+            a.axis_y,
+            a.axis_z
+        };
+
+        const core::Vec3 b_axes[]{
+            b.axis_x,
+            b.axis_y,
+            b.axis_z
+        };
+
+        for (const auto a_axis :
+             a_axes) {
+            for (const auto b_axis :
+                 b_axes) {
+                if (!test_axis(
+                        cross(
+                            a_axis,
+                            b_axis))) {
+                    return false;
+                }
+            }
         }
     }
 
     overlap = {
         a.entity,
         b.entity,
-        normal,
-        penetration,
+        minimum_axis,
+        minimum_penetration,
         a.trigger || b.trigger,
         is_2d
     };
@@ -230,13 +614,32 @@ ColliderBounds make_radial_bounds(
                     scale.y,
                     scale.z));
 
+    box_axes(
+        transform->local_rotation,
+        is_2d,
+        result.axis_x,
+        result.axis_y,
+        result.axis_z);
+
+    const core::Vec3 scaled_center{
+        collider.center.x * scale.x,
+        collider.center.y * scale.y,
+        collider.center.z * scale.z
+    };
+
+    const auto offset =
+        oriented_offset(
+            scaled_center,
+            result,
+            is_2d);
+
     result.center = {
         transform->local_position.x +
-            collider.center.x * scale.x,
+            offset.x,
         transform->local_position.y +
-            collider.center.y * scale.y,
+            offset.y,
         transform->local_position.z +
-            collider.center.z * scale.z
+            offset.z
     };
 
     result.radius =
@@ -250,6 +653,10 @@ ColliderBounds make_radial_bounds(
             ? 0.0f
             : result.radius
     };
+
+    update_broad_half(
+        result,
+        is_2d);
 
     return result;
 }
@@ -366,29 +773,72 @@ bool overlap_box_radial(
                 box.center.z
     };
 
-    const core::Vec3 closest{
+    const float local_x =
+        dot(
+            delta,
+            box.axis_x);
+
+    const float local_y =
+        dot(
+            delta,
+            box.axis_y);
+
+    const float local_z =
+        is_2d
+            ? 0.0f
+            : dot(
+                delta,
+                box.axis_z);
+
+    const core::Vec3 closest_local{
         std::clamp(
-            delta.x,
+            local_x,
             -box.half.x,
             box.half.x),
         std::clamp(
-            delta.y,
+            local_y,
             -box.half.y,
             box.half.y),
         is_2d
             ? 0.0f
             : std::clamp(
-                delta.z,
+                local_z,
                 -box.half.z,
                 box.half.z)
     };
 
-    core::Vec3 separation{
-        delta.x - closest.x,
-        delta.y - closest.y,
+    auto closest_world =
+        added(
+            box.center,
+            scaled(
+                box.axis_x,
+                closest_local.x));
+
+    closest_world =
+        added(
+            closest_world,
+            scaled(
+                box.axis_y,
+                closest_local.y));
+
+    if (!is_2d) {
+        closest_world =
+            added(
+                closest_world,
+                scaled(
+                    box.axis_z,
+                    closest_local.z));
+    }
+
+    const core::Vec3 separation{
+        radial.center.x -
+            closest_world.x,
+        radial.center.y -
+            closest_world.y,
         is_2d
             ? 0.0f
-            : delta.z - closest.z
+            : radial.center.z -
+                closest_world.z
     };
 
     const float squared =
@@ -424,43 +874,43 @@ bool overlap_box_radial(
     } else {
         float face_distance =
             box.half.x -
-            std::abs(delta.x);
+            std::abs(local_x);
 
-        normal = {
-            axis_sign(delta.x),
-            0.0f,
-            0.0f
-        };
+        normal =
+            scaled(
+                box.axis_x,
+                axis_sign(
+                    local_x));
 
         const float y_distance =
             box.half.y -
-            std::abs(delta.y);
+            std::abs(local_y);
 
         if (y_distance <
             face_distance) {
             face_distance =
                 y_distance;
-            normal = {
-                0.0f,
-                axis_sign(delta.y),
-                0.0f
-            };
+            normal =
+                scaled(
+                    box.axis_y,
+                    axis_sign(
+                        local_y));
         }
 
         if (!is_2d) {
             const float z_distance =
                 box.half.z -
-                std::abs(delta.z);
+                std::abs(local_z);
 
             if (z_distance <
                 face_distance) {
                 face_distance =
                     z_distance;
-                normal = {
-                    0.0f,
-                    0.0f,
-                    axis_sign(delta.z)
-                };
+                normal =
+                    scaled(
+                        box.axis_z,
+                        axis_sign(
+                            local_z));
             }
         }
 
@@ -472,9 +922,10 @@ bool overlap_box_radial(
     }
 
     if (!box_is_first) {
-        normal.x = -normal.x;
-        normal.y = -normal.y;
-        normal.z = -normal.z;
+        normal =
+            scaled(
+                normal,
+                -1.0f);
     }
 
     overlap = {
@@ -494,6 +945,7 @@ bool overlap_box_radial(
     return penetration > 0.0f;
 }
 
+bool overlap_pair(
 bool overlap_pair(
     const ColliderBounds& a,
     const ColliderBounds& b,
@@ -627,10 +1079,10 @@ void append_overlaps(
            const ColliderBounds& b) {
 
             const float a_min =
-                a.center.x - a.half.x;
+                a.center.x - a.broad_half.x;
 
             const float b_min =
-                b.center.x - b.half.x;
+                b.center.x - b.broad_half.x;
 
             if (a_min != b_min) {
                 return a_min < b_min;
@@ -646,7 +1098,7 @@ void append_overlaps(
 
         const float maximum_x =
             bounds[i].center.x +
-            bounds[i].half.x;
+            bounds[i].broad_half.x;
 
         for (std::size_t j = i + 1;
              j < bounds.size();
@@ -654,7 +1106,7 @@ void append_overlaps(
 
             const float minimum_x =
                 bounds[j].center.x -
-                bounds[j].half.x;
+                bounds[j].broad_half.x;
 
             if (minimum_x >= maximum_x) {
                 break;
