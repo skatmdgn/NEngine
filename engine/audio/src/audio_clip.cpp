@@ -137,6 +137,14 @@ bool decode_wav(
         return false;
     }
 
+    std::uint32_t riff_size = 0;
+    if (!read_u32(bytes, 4u, riff_size) ||
+        riff_size < 4u ||
+        static_cast<std::size_t>(riff_size) > bytes.size() - 8u) {
+        set_error(error, "WAV RIFF size is invalid");
+        return false;
+    }
+    const std::size_t riff_end = 8u + static_cast<std::size_t>(riff_size);
     std::uint16_t format = 0;
     std::uint16_t channels = 0;
     std::uint32_t sample_rate = 0;
@@ -152,7 +160,7 @@ bool decode_wav(
     std::size_t offset = 12u;
 
     while (offset + 8u <=
-           bytes.size()) {
+           riff_end) {
 
         std::uint32_t chunk_size = 0;
 
@@ -174,7 +182,7 @@ bool decode_wav(
         if (data_end <
                 data_offset ||
             data_end >
-                bytes.size()) {
+                riff_end) {
 
             set_error(
                 error,
@@ -215,6 +223,38 @@ bool decode_wav(
                 return false;
             }
 
+            if (format == 0xfffeu) {
+                std::uint16_t cb_size = 0;
+                std::uint16_t valid_bits = 0;
+                std::uint32_t subtype = 0;
+                if (chunk_size < 40u ||
+                    !read_u16(bytes, data_offset + 16u, cb_size) ||
+                    !read_u16(bytes, data_offset + 18u, valid_bits) ||
+                    !read_u32(bytes, data_offset + 24u, subtype) ||
+                    cb_size < 22u) {
+                    set_error(error, "WAV extensible fmt is malformed");
+                    return false;
+                }
+                const std::uint8_t guid_tail[12] = {
+                    0x00u, 0x00u, 0x10u, 0x00u,
+                    0x80u, 0x00u, 0x00u, 0xaau,
+                    0x00u, 0x38u, 0x9bu, 0x71u
+                };
+                bool canonical = true;
+                for (std::size_t i = 0; i < 12u; ++i) {
+                    if (bytes[data_offset + 28u + i] != guid_tail[i])
+                        canonical = false;
+                }
+                if (!canonical || (subtype != 1u && subtype != 3u)) {
+                    set_error(error, "unsupported WAV extensible subtype");
+                    return false;
+                }
+                if (valid_bits != 0u && valid_bits != bits_per_sample) {
+                    set_error(error, "packed WAV extensible valid bits are unsupported");
+                    return false;
+                }
+                format = static_cast<std::uint16_t>(subtype);
+            }
             saw_fmt = true;
         } else if (tag_equals(
                        bytes,
@@ -245,6 +285,10 @@ bool decode_wav(
             return false;
         }
 
+        if (padded > riff_end - data_offset) {
+            set_error(error, "WAV chunk padding exceeds RIFF size");
+            return false;
+        }
         offset =
             data_offset +
             padded;

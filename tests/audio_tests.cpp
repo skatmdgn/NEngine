@@ -486,6 +486,37 @@ int main() {
             0.5f) < 0.0001f,
         "WAV decoder normalizes interleaved PCM16 samples and exposes clip metadata");
 
+    // WAVEFORMATEXTENSIBLE is emitted by many Windows DAWs.
+    auto extensible_wav = wav_bytes;
+    extensible_wav[4] = 68u; // RIFF size = 68
+    extensible_wav[16] = 40u; // fmt size = 40
+    extensible_wav[20] = 0xfeu;
+    extensible_wav[21] = 0xffu;
+    const std::vector<std::uint8_t> extension{
+        22u, 0u, 16u, 0u,
+        3u, 0u, 0u, 0u, // stereo speaker mask
+        1u, 0u, 0u, 0u, // PCM subtype
+        0u, 0u, 16u, 0u,
+        128u, 0u, 0u, 170u,
+        0u, 56u, 155u, 113u
+    };
+    extensible_wav.insert(
+        extensible_wav.begin() + 36,
+        extension.begin(),
+        extension.end());
+
+    check(
+        audio::decode_wav(extensible_wav, decoded_clip, &wav_error) &&
+        decoded_clip.frame_count() == 2u &&
+        std::abs(decoded_clip.samples[0] + 1.0f) < 0.0001f,
+        "WAVEFORMATEXTENSIBLE PCM subtype decodes");
+
+    auto malformed_riff = wav_bytes;
+    malformed_riff[4] = 12u; // fmt/data fall outside RIFF envelope
+    check(
+        !audio::decode_wav(malformed_riff, decoded_clip, &wav_error),
+        "WAV decoder rejects chunks beyond declared RIFF envelope");
+
     const std::vector<std::uint8_t>
         malformed_wav{
             'R', 'I', 'F', 'F',
