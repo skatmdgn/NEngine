@@ -58,6 +58,16 @@ struct ManagedSpriteFixture {
     bool flip_y{false};
 };
 
+struct ManagedSpriteAnimatorFixture {
+    std::string clip{
+        "77777777777777778888888888888888"};
+    bool enabled{true};
+    bool playing{true};
+    bool loop{true};
+    float speed{1.0f};
+    float time_seconds{0.5f};
+};
+
 bool read_managed_render_property(
     void*,
     const nengine::core::World& world,
@@ -172,6 +182,33 @@ bool read_managed_render_property(
             output = value->flip_x;
         else if (property == "Flip Y")
             output = value->flip_y;
+        else
+            return false;
+
+        return true;
+    }
+
+    if (component == "NEngine.SpriteAnimator") {
+        const auto* value =
+            world.get_component<
+                ManagedSpriteAnimatorFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Clip")
+            output = value->clip;
+        else if (property == "Enabled")
+            output = value->enabled;
+        else if (property == "Playing")
+            output = value->playing;
+        else if (property == "Loop")
+            output = value->loop;
+        else if (property == "Speed")
+            output = static_cast<double>(value->speed);
+        else if (property == "Time")
+            output = static_cast<double>(value->time_seconds);
         else
             return false;
 
@@ -357,6 +394,57 @@ bool write_managed_render_property(
                 std::get_if<std::int64_t>(&input);
             if (!typed) return false;
             value->sort_order = *typed;
+        } else {
+            return false;
+        }
+
+        return true;
+    }
+
+    if (component == "NEngine.SpriteAnimator") {
+        auto* value =
+            world.get_component<
+                ManagedSpriteAnimatorFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Clip") {
+            const auto* typed =
+                std::get_if<std::string>(
+                    &input);
+            if (!typed) return false;
+            value->clip = *typed;
+            value->time_seconds = 0.0f;
+        } else if (property == "Enabled" ||
+                   property == "Playing" ||
+                   property == "Loop") {
+            const auto* typed =
+                std::get_if<bool>(
+                    &input);
+            if (!typed) return false;
+
+            if (property == "Enabled")
+                value->enabled = *typed;
+            else if (property == "Playing")
+                value->playing = *typed;
+            else
+                value->loop = *typed;
+        } else if (property == "Speed" ||
+                   property == "Time") {
+            const auto* typed =
+                std::get_if<double>(
+                    &input);
+            if (!typed || *typed < 0.0)
+                return false;
+
+            if (property == "Speed")
+                value->speed =
+                    static_cast<float>(*typed);
+            else
+                value->time_seconds =
+                    static_cast<float>(*typed);
         } else {
             return false;
         }
@@ -606,6 +694,10 @@ int main() {
         api.find("pixelsPerUnit") !=
             std::string::npos &&
         api.find("receiveShadows") !=
+            std::string::npos &&
+        api.find("SpriteAnimator") !=
+            std::string::npos &&
+        api.find("Restart") !=
             std::string::npos &&
         api.find("readonly struct AssetGuid") !=
             std::string::npos &&
@@ -1004,13 +1096,17 @@ int main() {
                 << "        Light? light = GetComponent<Light>();\n"
                 << "        MeshRenderer? mesh = GetComponent<MeshRenderer>();\n"
                 << "        SpriteRenderer? sprite = GetComponent<SpriteRenderer>();\n"
-                << "        if (camera == null || light == null || mesh == null || sprite == null) throw new System.Exception(\"render component proxy missing\");\n"
+                << "        SpriteAnimator? animator = GetComponent<SpriteAnimator>();\n"
+                << "        if (camera == null || light == null || mesh == null || sprite == null || animator == null) throw new System.Exception(\"render component proxy missing\");\n"
                 << "        if (!camera.enabled || camera.orthographic || System.MathF.Abs(camera.fieldOfView - 60f) > 0.001f) throw new System.Exception(\"camera read mismatch\");\n"
                 << "        camera.enabled = false; camera.orthographic = true; camera.fieldOfView = 72f; camera.nearClipPlane = 0.25f; camera.farClipPlane = 750f; camera.orthographicSize = 8f;\n"
                 << "        if (light.type != LightType.Directional || System.MathF.Abs(light.intensity - 1f) > 0.001f) throw new System.Exception(\"light read mismatch\");\n"
                 << "        light.enabled = false; light.type = LightType.Point; light.color = new Color(0.2f, 0.3f, 0.4f); light.intensity = 2.5f; light.range = 20f; light.spotAngle = 45f; light.shadows = false;\n"
-                << "        if (mesh.mesh.ToString() != \"11111111111111112222222222222222\" || mesh.material.ToString() != \"33333333333333334444444444444444\" || sprite.texture.ToString() != \"55555555555555556666666666666666\") throw new System.Exception(\"asset guid read mismatch\");\n"
-                << "        if (!AssetGuid.TryParse(\"aaaaaaaaaaaaaaaabbbbbbbbbbbbbbbb\", out AssetGuid nextMesh) || !AssetGuid.TryParse(\"ccccccccccccccccdddddddddddddddd\", out AssetGuid nextMaterial) || !AssetGuid.TryParse(\"eeeeeeeeeeeeeeeeffffffffffffffff\", out AssetGuid nextTexture)) throw new System.Exception(\"asset guid parse mismatch\");\n"
+                << "        if (mesh.mesh.ToString() != \"11111111111111112222222222222222\" || mesh.material.ToString() != \"33333333333333334444444444444444\" || sprite.texture.ToString() != \"55555555555555556666666666666666\" || animator.clip.ToString() != \"77777777777777778888888888888888\") throw new System.Exception(\"asset guid read mismatch\");\n"
+                << "        if (!animator.enabled || !animator.playing || !animator.loop || System.MathF.Abs(animator.speed - 1f) > 0.001f || System.MathF.Abs(animator.time - 0.5f) > 0.001f) throw new System.Exception(\"animator initial state mismatch\");\n"
+                << "        animator.Pause(); if (animator.playing) throw new System.Exception(\"animator pause mismatch\"); animator.time = 0.75f; animator.Restart(); if (!animator.playing || System.MathF.Abs(animator.time) > 0.001f) throw new System.Exception(\"animator restart mismatch\");\n"
+                << "        if (!AssetGuid.TryParse(\"aaaaaaaaaaaaaaaabbbbbbbbbbbbbbbb\", out AssetGuid nextMesh) || !AssetGuid.TryParse(\"ccccccccccccccccdddddddddddddddd\", out AssetGuid nextMaterial) || !AssetGuid.TryParse(\"eeeeeeeeeeeeeeeeffffffffffffffff\", out AssetGuid nextTexture) || !AssetGuid.TryParse(\"9999999999999999aaaaaaaaaaaaaaaa\", out AssetGuid nextClip)) throw new System.Exception(\"asset guid parse mismatch\");\n"
+                << "        animator.Play(nextClip); if (!animator.playing || animator.clip != nextClip || System.MathF.Abs(animator.time) > 0.001f) throw new System.Exception(\"animator Play clip mismatch\"); animator.speed = 1.5f; animator.loop = false; animator.enabled = false; animator.Stop();\n"
                 << "        mesh.mesh = nextMesh; mesh.material = nextMaterial; mesh.enabled = false; mesh.castShadows = false; mesh.receiveShadows = false;\n"
                 << "        sprite.texture = nextTexture; sprite.enabled = false; sprite.pixelsPerUnit = 64f; sprite.sortingOrder = 7; sprite.flipX = true; sprite.flipY = true;\n"
                 << "        gameObject.name = \"Render Properties Passed\";\n"
@@ -1272,6 +1368,10 @@ int main() {
                             nengine::core::ComponentRegistry::stable_id(
                                 "NEngine.SpriteRenderer");
 
+                        const auto animator_type =
+                            nengine::core::ComponentRegistry::stable_id(
+                                "NEngine.SpriteAnimator");
+
                         property_world.add_component<
                             ManagedCameraFixture>(
                                 property_entity,
@@ -1291,6 +1391,11 @@ int main() {
                             ManagedSpriteFixture>(
                                 property_entity,
                                 sprite_type);
+
+                        property_world.add_component<
+                            ManagedSpriteAnimatorFixture>(
+                                property_entity,
+                                animator_type);
 
                         auto* property_script =
                             property_world.add_component<
@@ -1335,6 +1440,12 @@ int main() {
                                     property_entity,
                                     sprite_type);
 
+                        const auto* animator_fixture =
+                            property_world.get_component<
+                                ManagedSpriteAnimatorFixture>(
+                                    property_entity,
+                                    animator_type);
+
                         check(
                             property_script &&
                             property_tick.created == 1u &&
@@ -1376,8 +1487,16 @@ int main() {
                             std::abs(sprite_fixture->pixels_per_unit - 64.0f) < 0.001f &&
                             sprite_fixture->sort_order == 7 &&
                             sprite_fixture->flip_x &&
-                            sprite_fixture->flip_y,
-                            "managed render component property proxies round-trip through generic native property ABI");
+                            sprite_fixture->flip_y &&
+                            animator_fixture &&
+                            animator_fixture->clip ==
+                                "9999999999999999aaaaaaaaaaaaaaaa" &&
+                            !animator_fixture->enabled &&
+                            !animator_fixture->playing &&
+                            !animator_fixture->loop &&
+                            std::abs(animator_fixture->speed - 1.5f) < 0.001f &&
+                            std::abs(animator_fixture->time_seconds) < 0.001f,
+                            "managed render and SpriteAnimator property proxies round-trip through generic native property ABI");
 
                         property_system.clear(
                             &property_world);
