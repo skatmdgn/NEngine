@@ -440,10 +440,25 @@ namespace NEngine.Internal
             Invoke(handle, "Start");
 
         [UnmanagedCallersOnly]
+        public static int AdvanceFrameClock(float deltaTime)
+        {
+            if (!float.IsFinite(deltaTime) || deltaTime < 0)
+                return -1;
+
+            NEngine.Time.SetDeltaTime(deltaTime);
+            return 1;
+        }
+
+        [UnmanagedCallersOnly]
+        public static int ResetFrameClock()
+        {
+            NEngine.Time.Reset();
+            return 1;
+        }
+
+        [UnmanagedCallersOnly]
         public static int InvokeUpdate(long handle, float deltaTime)
         {
-            NEngine.Time.SetDeltaTime(deltaTime);
-
             int invoked = Invoke(handle, "Update");
             if (invoked < 0) return invoked;
 

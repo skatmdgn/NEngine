@@ -143,6 +143,30 @@ EditorModel::EditorModel() {
 }
 
 
+bool EditorModel::begin_play_mode() {
+    if (!play_session_.play(
+            world_)) {
+        return false;
+    }
+
+    managed_script_system_.clear();
+
+    if (managed_runtime_.valid() &&
+        !managed_runtime_.reset_time()) {
+
+        console_.warning(
+            "Scripting",
+            managed_runtime_.diagnostic());
+    }
+
+    return true;
+}
+
+bool EditorModel::stop_play_mode() {
+    managed_script_system_.clear();
+    return play_session_.stop();
+}
+
 bool EditorModel::initialize_managed_runtime(
     const std::filesystem::path& hostfxr_path,
     const std::filesystem::path& runtime_config_path,

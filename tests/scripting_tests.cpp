@@ -281,8 +281,14 @@ int main() {
                 std::string::npos &&
         bridge.find(
             "ConfigureNativeInputCallbacks") !=
+                std::string::npos &&
+        bridge.find(
+            "AdvanceFrameClock") !=
+                std::string::npos &&
+        bridge.find(
+            "ResetFrameClock") !=
                 std::string::npos,
-        "managed bridge exposes collectible gameplay lifecycle and native World callback ABI v6 entries");
+        "managed bridge exposes collectible gameplay lifecycle native World input and frame-clock ABI v7 entries");
 
     const auto runtime_config =
         read_all(
@@ -565,6 +571,9 @@ int main() {
                 << "        frame++;\n"
                 << "    }\n"
                 << "}\n"
+                << "public class TimeProbe : Behaviour {\n"
+                << "    private void Update() { transform.localPosition = new Vector3((float)Time.frameCount, Time.time, Time.deltaTime); }\n"
+                << "}\n"
                 << "public class CoroutineProbe : Behaviour {\n"
                 << "    private System.Collections.IEnumerator Routine() {\n"
                 << "        gameObject.name = \"Coroutine Started\";\n"
@@ -736,6 +745,109 @@ int main() {
                                 managed_runtime.instance_count() == 0,
                                 "managed lifecycle invokes OnDestroy path and releases instance handle");
                         }
+
+                        check(
+                            managed_runtime.reset_time(),
+                            "managed Time clock resets explicitly before simulation");
+
+                        ManagedScriptSystem
+                            time_system;
+
+                        time_system.bind(
+                            &managed_runtime);
+
+                        nengine::core::World
+                            time_world;
+
+                        const auto time_entity_a =
+                            time_world.create(
+                                "Time A");
+
+                        const auto time_entity_b =
+                            time_world.create(
+                                "Time B");
+
+                        auto* time_script_a =
+                            time_world.add_component<
+                                ScriptBehaviour>(
+                                    time_entity_a,
+                                    script_behaviour_type());
+
+                        auto* time_script_b =
+                            time_world.add_component<
+                                ScriptBehaviour>(
+                                    time_entity_b,
+                                    script_behaviour_type());
+
+                        if (time_script_a) {
+                            time_script_a->type_name =
+                                "TimeProbe";
+                        }
+
+                        if (time_script_b) {
+                            time_script_b->type_name =
+                                "TimeProbe";
+                        }
+
+                        std::string
+                            time_error;
+
+                        const auto time_tick_1 =
+                            time_system.update(
+                                time_world,
+                                0.25f,
+                                &time_error);
+
+                        const auto* time_transform_a =
+                            time_world.transform(
+                                time_entity_a);
+
+                        const auto* time_transform_b =
+                            time_world.transform(
+                                time_entity_b);
+
+                        check(
+                            time_script_a &&
+                            time_script_b &&
+                            time_tick_1.created == 2u &&
+                            time_tick_1.started == 2u &&
+                            time_tick_1.updated == 2u &&
+                            time_tick_1.unresolved == 0u &&
+                            time_transform_a &&
+                            time_transform_b &&
+                            time_transform_a->local_position.x == 1.0f &&
+                            time_transform_b->local_position.x == 1.0f &&
+                            time_transform_a->local_position.y == 0.25f &&
+                            time_transform_b->local_position.y == 0.25f &&
+                            time_transform_a->local_position.z == 0.25f &&
+                            time_transform_b->local_position.z == 0.25f,
+                            "managed Time advances once per simulation tick regardless of Behaviour count");
+
+                        const auto time_tick_2 =
+                            time_system.update(
+                                time_world,
+                                0.5f,
+                                &time_error);
+
+                        check(
+                            time_tick_2.created == 0u &&
+                            time_tick_2.updated == 2u &&
+                            time_tick_2.unresolved == 0u &&
+                            time_transform_a &&
+                            time_transform_b &&
+                            time_transform_a->local_position.x == 2.0f &&
+                            time_transform_b->local_position.x == 2.0f &&
+                            time_transform_a->local_position.y == 0.75f &&
+                            time_transform_b->local_position.y == 0.75f &&
+                            time_transform_a->local_position.z == 0.5f &&
+                            time_transform_b->local_position.z == 0.5f,
+                            "managed Time frame count and accumulated time stay global across multiple Behaviours");
+
+                        time_system.clear();
+
+                        check(
+                            managed_runtime.reset_time(),
+                            "managed Time clock resets after multi-Behaviour regression probe");
 
                         ManagedScriptSystem
                             script_system;

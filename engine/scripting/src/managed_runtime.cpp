@@ -626,6 +626,14 @@ ManagedRuntime::ManagedRuntime(
           std::exchange(
               other.update_,
               nullptr)),
+      advance_frame_(
+          std::exchange(
+              other.advance_frame_,
+              nullptr)),
+      reset_time_(
+          std::exchange(
+              other.reset_time_,
+              nullptr)),
       destroy_(
           std::exchange(
               other.destroy_,
@@ -712,6 +720,16 @@ ManagedRuntime::operator=(
     update_ =
         std::exchange(
             other.update_,
+            nullptr);
+
+    advance_frame_ =
+        std::exchange(
+            other.advance_frame_,
+            nullptr);
+
+    reset_time_ =
+        std::exchange(
+            other.reset_time_,
             nullptr);
 
     destroy_ =
@@ -892,6 +910,20 @@ bool ManagedRuntime::initialize(
             bridge_type,
             "InvokeUpdate");
 
+    advance_frame_ =
+        load_entry<FrameFn>(
+            host_,
+            bridge_assembly_path,
+            bridge_type,
+            "AdvanceFrameClock");
+
+    reset_time_ =
+        load_entry<SimpleFn>(
+            host_,
+            bridge_assembly_path,
+            bridge_type,
+            "ResetFrameClock");
+
     destroy_ =
         load_entry<InvokeFn>(
             host_,
@@ -986,6 +1018,8 @@ bool ManagedRuntime::initialize(
     if (!create_ ||
         !start_ ||
         !update_ ||
+        !advance_frame_ ||
+        !reset_time_ ||
         !destroy_ ||
         !set_transform_ ||
         !get_transform_ ||
@@ -1155,6 +1189,48 @@ bool ManagedRuntime::start(
     if (result < 0) {
         diagnostic_ =
             "managed Behaviour Start invocation failed";
+        return false;
+    }
+
+    return true;
+}
+
+bool ManagedRuntime::advance_frame(
+    float delta_seconds) {
+
+    if (!valid() ||
+        !std::isfinite(
+            delta_seconds) ||
+        delta_seconds < 0.0f) {
+
+        return false;
+    }
+
+    const int result =
+        advance_frame_(
+            delta_seconds);
+
+    if (result < 0) {
+        diagnostic_ =
+            "managed Time frame advance failed";
+        return false;
+    }
+
+    return true;
+}
+
+bool ManagedRuntime::reset_time() {
+
+    if (!valid()) {
+        return false;
+    }
+
+    const int result =
+        reset_time_();
+
+    if (result < 0) {
+        diagnostic_ =
+            "managed Time reset failed";
         return false;
     }
 
@@ -1495,6 +1571,8 @@ void ManagedRuntime::shutdown() noexcept {
     create_ = nullptr;
     start_ = nullptr;
     update_ = nullptr;
+    advance_frame_ = nullptr;
+    reset_time_ = nullptr;
     destroy_ = nullptr;
     set_transform_ = nullptr;
     get_transform_ = nullptr;

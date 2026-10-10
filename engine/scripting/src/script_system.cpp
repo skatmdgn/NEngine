@@ -92,6 +92,19 @@ ManagedScriptSystem::update(
         &world
     };
 
+    if (!runtime_->advance_frame(
+            delta_seconds)) {
+
+        ++stats.unresolved;
+
+        if (error) {
+            *error =
+                runtime_->diagnostic();
+        }
+
+        return stats;
+    }
+
     const auto push_native_state =
         [&](core::Entity entity,
             ManagedBehaviourHandle handle) {

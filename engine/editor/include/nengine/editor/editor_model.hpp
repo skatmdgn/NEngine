@@ -95,6 +95,9 @@ public:
 
     bool can_edit() const noexcept { return !play_session_.is_playing(); }
 
+    bool begin_play_mode();
+    bool stop_play_mode();
+
     bool initialize_managed_runtime(
         const std::filesystem::path& hostfxr_path,
         const std::filesystem::path& runtime_config_path,

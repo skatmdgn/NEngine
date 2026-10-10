@@ -63,6 +63,11 @@ public:
         ManagedBehaviourHandle handle,
         float delta_seconds);
 
+    bool advance_frame(
+        float delta_seconds);
+
+    bool reset_time();
+
     bool destroy(
         ManagedBehaviourHandle handle);
 
@@ -115,6 +120,8 @@ public:
             create_ != nullptr &&
             start_ != nullptr &&
             update_ != nullptr &&
+            advance_frame_ != nullptr &&
+            reset_time_ != nullptr &&
             destroy_ != nullptr &&
             set_transform_ != nullptr &&
             get_transform_ != nullptr &&
@@ -151,6 +158,10 @@ private:
     using UpdateFn =
         int (*)(
             std::int64_t,
+            float);
+
+    using FrameFn =
+        int (*)(
             float);
 
     struct NativeTransformState {
@@ -431,6 +442,8 @@ private:
     CreateFn create_{nullptr};
     InvokeFn start_{nullptr};
     UpdateFn update_{nullptr};
+    FrameFn advance_frame_{nullptr};
+    SimpleFn reset_time_{nullptr};
     InvokeFn destroy_{nullptr};
     TransformFn set_transform_{nullptr};
     TransformFn get_transform_{nullptr};

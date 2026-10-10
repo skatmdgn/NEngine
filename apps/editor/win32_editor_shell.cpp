@@ -3466,13 +3466,13 @@ struct Win32EditorShell::Impl {
 
         case IdPlay:
             if (notification != BN_CLICKED) return false;
-            editor.play_session().play(editor.world());
+            editor.begin_play_mode();
             handled = true;
             break;
 
         case IdStop:
             if (notification != BN_CLICKED) return false;
-            editor.play_session().stop();
+            editor.stop_play_mode();
             handled = true;
             break;
 
