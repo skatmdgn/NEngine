@@ -27,3 +27,8 @@ add_executable(NEngineInputTests input_tests.cpp)
 target_link_libraries(NEngineInputTests PRIVATE NEngineInput)
 target_compile_features(NEngineInputTests PRIVATE cxx_std_20)
 add_test(NAME NEngineInputTests COMMAND NEngineInputTests)
+
+add_executable(NEnginePhysicsTests physics_tests.cpp)
+target_link_libraries(NEnginePhysicsTests PRIVATE NEnginePhysics)
+target_compile_features(NEnginePhysicsTests PRIVATE cxx_std_20)
+add_test(NAME NEnginePhysicsTests COMMAND NEnginePhysicsTests)
