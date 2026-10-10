@@ -1246,6 +1246,76 @@ int main() {
 
     model.commands().clear();
 
+    auto* sprite_animator =
+        world.add_component<
+            render::SpriteAnimator>(
+                sprite_entity,
+                render::sprite_animator_type());
+
+    const auto animator_clip_a =
+        assets::AssetGuid::generate();
+
+    const auto animator_clip_b =
+        assets::AssetGuid::generate();
+
+    check(
+        sprite_animator != nullptr,
+        "EditorModel accepts registered SpriteAnimator component");
+
+    if (sprite_animator) {
+        sprite_animator->clip =
+            animator_clip_a;
+        sprite_animator->time_seconds =
+            2.0f;
+    }
+
+    check(
+        model.property_access().write(
+            world,
+            sprite_entity,
+            render::sprite_animator_type(),
+            "Time",
+            core::PropertyValue{
+                1.25
+            }) &&
+        sprite_animator &&
+        std::abs(
+            sprite_animator->time_seconds -
+            1.25f) < 0.0001f,
+        "SpriteAnimator runtime Time property writes through generic property access");
+
+    check(
+        !model.property_access().write(
+            world,
+            sprite_entity,
+            render::sprite_animator_type(),
+            "Time",
+            core::PropertyValue{
+                -0.5
+            }) &&
+        sprite_animator &&
+        std::abs(
+            sprite_animator->time_seconds -
+            1.25f) < 0.0001f,
+        "SpriteAnimator runtime Time property rejects negative values");
+
+    check(
+        model.property_access().write(
+            world,
+            sprite_entity,
+            render::sprite_animator_type(),
+            "Clip",
+            core::PropertyValue{
+                animator_clip_b.to_string()
+            }) &&
+        sprite_animator &&
+        sprite_animator->clip ==
+            animator_clip_b &&
+        std::abs(
+            sprite_animator->time_seconds) <
+            0.0001f,
+        "SpriteAnimator Clip property resets runtime playback time");
+
     check(
         world.destroy(sprite_entity),
         "sprite render integration test entity cleanup succeeds");
