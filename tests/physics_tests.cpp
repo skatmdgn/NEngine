@@ -642,6 +642,115 @@ int main() {
             .empty(),
         "sweep-and-prune broad phase avoids quadratic narrow-phase tests for sparse colliders");
 
+    core::World layer_world;
+
+    const auto layer_a =
+        layer_world.create("Layer A");
+    const auto layer_b =
+        layer_world.create("Layer B");
+    const auto layer_c =
+        layer_world.create("Layer C");
+
+    auto* layer_a_box =
+        layer_world.add_component<
+            physics::BoxCollider>(
+                layer_a,
+                physics::box_collider_type());
+
+    auto* layer_b_box =
+        layer_world.add_component<
+            physics::BoxCollider>(
+                layer_b,
+                physics::box_collider_type());
+
+    layer_world.add_component<
+        physics::BoxCollider>(
+            layer_c,
+            physics::box_collider_type());
+
+    layer_a_box =
+        layer_world.get_component<
+            physics::BoxCollider>(
+                layer_a,
+                physics::box_collider_type());
+
+    layer_b_box =
+        layer_world.get_component<
+            physics::BoxCollider>(
+                layer_b,
+                physics::box_collider_type());
+
+    auto* layer_c_box =
+        layer_world.get_component<
+            physics::BoxCollider>(
+                layer_c,
+                physics::box_collider_type());
+
+    if (layer_a_box) {
+        layer_a_box->layer = 0u;
+        layer_a_box->collision_mask =
+            (1u << 1u);
+    }
+
+    if (layer_b_box) {
+        layer_b_box->layer = 1u;
+        layer_b_box->collision_mask =
+            (1u << 0u);
+    }
+
+    if (layer_c_box) {
+        layer_c_box->layer = 2u;
+        layer_c_box->collision_mask =
+            0xffffffffu;
+    }
+
+    const auto layer_detection =
+        physics::detect_box_overlaps(
+            layer_world);
+
+    check(
+        layer_detection
+            .tested_pairs_3d == 1u &&
+        layer_detection
+            .overlaps.size() == 1u &&
+        layer_detection
+            .overlaps.front().first ==
+            layer_a &&
+        layer_detection
+            .overlaps.front().second ==
+            layer_b,
+        "collider collision masks require mutual layer permission before narrow phase");
+
+    const auto layer_query =
+        physics::overlap_box(
+            layer_world,
+            {},
+            {2.0f, 2.0f, 2.0f},
+            true,
+            (1u << 1u));
+
+    check(
+        layer_query.size() == 1u &&
+        layer_query.front() ==
+            layer_b,
+        "OverlapBox layer mask filters candidate collider layers");
+
+    const auto layer_ray =
+        physics::raycast(
+            layer_world,
+            {-2.0f, 0.0f, 0.0f},
+            {1.0f, 0.0f, 0.0f},
+            10.0f,
+            true,
+            (1u << 1u));
+
+    check(
+        layer_ray &&
+        layer_ray->entity ==
+            layer_b &&
+        layer_ray->layer == 1u,
+        "Raycast layer mask filters hits and returns the hit layer");
+
     physics::ContactTracker
         contact_tracker;
 

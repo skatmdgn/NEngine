@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <vector>
 
@@ -45,13 +46,15 @@ std::vector<core::Entity> overlap_box(
     const core::World& world,
     core::Vec3 center,
     core::Vec3 size,
-    bool include_triggers = true);
+    bool include_triggers = true,
+    std::uint32_t layer_mask = 0xffffffffu);
 
 std::vector<core::Entity> overlap_box_2d(
     const core::World& world,
     core::Vec2 center,
     core::Vec2 size,
-    bool include_triggers = true);
+    bool include_triggers = true,
+    std::uint32_t layer_mask = 0xffffffffu);
 
 struct RaycastHit {
     core::Entity entity{
@@ -61,6 +64,7 @@ struct RaycastHit {
     float distance{0.0f};
     bool is_trigger{false};
     bool is_2d{false};
+    std::uint32_t layer{0};
 };
 
 std::optional<RaycastHit> raycast(
@@ -68,13 +72,15 @@ std::optional<RaycastHit> raycast(
     core::Vec3 origin,
     core::Vec3 direction,
     float max_distance,
-    bool include_triggers = true);
+    bool include_triggers = true,
+    std::uint32_t layer_mask = 0xffffffffu);
 
 std::optional<RaycastHit> raycast_2d(
     const core::World& world,
     core::Vec2 origin,
     core::Vec2 direction,
     float max_distance,
-    bool include_triggers = true);
+    bool include_triggers = true,
+    std::uint32_t layer_mask = 0xffffffffu);
 
 } // namespace nengine::physics

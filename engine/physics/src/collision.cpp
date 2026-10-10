@@ -15,6 +15,8 @@ struct ColliderBounds {
     core::Vec3 center{};
     core::Vec3 half{};
     bool trigger{false};
+    std::uint32_t layer{0};
+    std::uint32_t collision_mask{0xffffffffu};
 };
 
 float axis_sign(
@@ -46,6 +48,10 @@ ColliderBounds make_bounds(
     result.entity = entity;
     result.trigger =
         collider.is_trigger;
+    result.layer =
+        collider.layer;
+    result.collision_mask =
+        collider.collision_mask;
 
     const auto* transform =
         world.transform(entity);
@@ -79,6 +85,27 @@ ColliderBounds make_bounds(
     };
 
     return result;
+}
+
+bool layer_enabled(
+    std::uint32_t mask,
+    std::uint32_t layer) noexcept {
+
+    return layer < 32u &&
+        (mask &
+         (std::uint32_t{1u} << layer)) != 0u;
+}
+
+bool collision_layers_allow(
+    const ColliderBounds& a,
+    const ColliderBounds& b) noexcept {
+
+    return layer_enabled(
+               a.collision_mask,
+               b.layer) &&
+           layer_enabled(
+               b.collision_mask,
+               a.layer);
 }
 
 bool overlap_pair(
@@ -241,6 +268,12 @@ void append_overlaps(
 
             if (minimum_x >= maximum_x) {
                 break;
+            }
+
+            if (!collision_layers_allow(
+                    bounds[i],
+                    bounds[j])) {
+                continue;
             }
 
             ++tested_pairs;
@@ -614,7 +647,8 @@ std::vector<core::Entity> overlap_box(
     const core::World& world,
     core::Vec3 center,
     core::Vec3 size,
-    bool include_triggers) {
+    bool include_triggers,
+    std::uint32_t layer_mask) {
 
     std::vector<core::Entity> result;
 
@@ -641,8 +675,11 @@ std::vector<core::Entity> overlap_box(
     for (const auto& candidate :
          bounds) {
 
-        if (!include_triggers &&
-            candidate.trigger) {
+        if ((!include_triggers &&
+             candidate.trigger) ||
+            !layer_enabled(
+                layer_mask,
+                candidate.layer)) {
             continue;
         }
 
@@ -665,7 +702,8 @@ std::vector<core::Entity> overlap_box_2d(
     const core::World& world,
     core::Vec2 center,
     core::Vec2 size,
-    bool include_triggers) {
+    bool include_triggers,
+    std::uint32_t layer_mask) {
 
     std::vector<core::Entity> result;
 
@@ -695,8 +733,11 @@ std::vector<core::Entity> overlap_box_2d(
     for (const auto& candidate :
          bounds) {
 
-        if (!include_triggers &&
-            candidate.trigger) {
+        if ((!include_triggers &&
+             candidate.trigger) ||
+            !layer_enabled(
+                layer_mask,
+                candidate.layer)) {
             continue;
         }
 
@@ -871,6 +912,7 @@ std::optional<RaycastHit> raycast_bounds(
     core::Vec3 direction,
     float max_distance,
     bool include_triggers,
+    std::uint32_t layer_mask,
     bool is_2d) {
 
     if (!std::isfinite(max_distance) ||
@@ -900,8 +942,11 @@ std::optional<RaycastHit> raycast_bounds(
     for (const auto& candidate :
          bounds) {
 
-        if (!include_triggers &&
-            candidate.trigger) {
+        if ((!include_triggers &&
+             candidate.trigger) ||
+            !layer_enabled(
+                layer_mask,
+                candidate.layer)) {
             continue;
         }
 
@@ -942,7 +987,8 @@ std::optional<RaycastHit> raycast_bounds(
                 normal,
                 distance,
                 candidate.trigger,
-                is_2d
+                is_2d,
+                candidate.layer
             };
     }
 
@@ -956,7 +1002,8 @@ std::optional<RaycastHit> raycast(
     core::Vec3 origin,
     core::Vec3 direction,
     float max_distance,
-    bool include_triggers) {
+    bool include_triggers,
+    std::uint32_t layer_mask) {
 
     return raycast_bounds<BoxCollider>(
         world,
@@ -965,6 +1012,7 @@ std::optional<RaycastHit> raycast(
         direction,
         max_distance,
         include_triggers,
+        layer_mask,
         false);
 }
 
@@ -973,7 +1021,8 @@ std::optional<RaycastHit> raycast_2d(
     core::Vec2 origin,
     core::Vec2 direction,
     float max_distance,
-    bool include_triggers) {
+    bool include_triggers,
+    std::uint32_t layer_mask) {
 
     return raycast_bounds<BoxCollider2D>(
         world,
@@ -982,6 +1031,7 @@ std::optional<RaycastHit> raycast_2d(
         {direction.x, direction.y, 0.0f},
         max_distance,
         include_triggers,
+        layer_mask,
         true);
 }
 
