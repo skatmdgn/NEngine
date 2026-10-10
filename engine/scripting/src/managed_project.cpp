@@ -1717,6 +1717,62 @@ std::string api_stub(
                 throw new ArgumentOutOfRangeException(nameof(index));
         }
 
+        public Transform? Find(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return null;
+
+            Transform current = this;
+            string[] segments =
+                path.Split(
+                    '/',
+                    StringSplitOptions.RemoveEmptyEntries);
+
+            if (segments.Length == 0)
+                return null;
+
+            foreach (string segment in segments)
+            {
+                Transform? next = null;
+
+                for (int i = 0;
+                     i < current.childCount;
+                     ++i)
+                {
+                    Transform child =
+                        current.GetChild(i);
+
+                    if (string.Equals(
+                            child.gameObject.name,
+                            segment,
+                            StringComparison.Ordinal))
+                    {
+                        next = child;
+                        break;
+                    }
+                }
+
+                if (next == null)
+                    return null;
+
+                current = next;
+            }
+
+            return current;
+        }
+
+        public void DetachChildren()
+        {
+            while (childCount > 0)
+            {
+                Transform child =
+                    GetChild(
+                        childCount - 1);
+
+                child.parent = null;
+            }
+        }
+
         public Vector3 forward => Vector3.forward;
     }
 

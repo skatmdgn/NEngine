@@ -246,6 +246,8 @@ int main() {
             std::string::npos &&
         api.find("IsChildOf") !=
             std::string::npos &&
+        api.find("DetachChildren") !=
+            std::string::npos &&
         api.find(
             "InternalsVisibleTo(\"NEngine.Bridge\")") !=
                 std::string::npos,
@@ -598,9 +600,12 @@ int main() {
                 << "        if (p.childCount != 1) throw new System.Exception(\"child count mismatch\");\n"
                 << "        Transform c = p.GetChild(0);\n"
                 << "        if (c.gameObject.GetInstanceID() != gameObject.GetInstanceID()) throw new System.Exception(\"child identity mismatch\");\n"
+                << "        Transform? found = p.Find(gameObject.name);\n"
+                << "        if (found == null || found.gameObject.GetInstanceID() != gameObject.GetInstanceID()) throw new System.Exception(\"Transform.Find mismatch\");\n"
                 << "        p.gameObject.name = \"Managed Parent\";\n"
                 << "        p.localPosition = p.localPosition + new Vector3(2, 0, 0);\n"
-                << "        transform.parent = null;\n"
+                << "        p.DetachChildren();\n"
+                << "        if (transform.parent != null) throw new System.Exception(\"DetachChildren mismatch\");\n"
                 << "    }\n"
                 << "}\n"
                 << "public class InputProbe : Behaviour {\n"
