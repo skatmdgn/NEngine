@@ -313,9 +313,24 @@ int main() {
         mix_world.create(
             "Listener");
 
+    const auto source_parent =
+        mix_world.create(
+            "Spatial Parent");
+
     const auto source_entity =
         mix_world.create(
             "Spatial Source");
+
+    mix_world.set_parent(
+        source_entity,
+        source_parent);
+
+    if (auto* transform =
+            mix_world.transform(
+                source_parent)) {
+        transform->local_position =
+            {1.0f, 0.0f, 0.0f};
+    }
 
     auto* mix_listener =
         mix_world.add_component<
@@ -357,7 +372,7 @@ int main() {
             mix_world.transform(
                 source_entity)) {
         transform->local_position =
-            {1.0f, 0.0f, 0.0f};
+            {0.0f, 0.0f, 0.0f};
     }
 
     const auto mix_snapshot =
@@ -386,7 +401,7 @@ int main() {
         std::abs(
             mix_snapshot.sources.front().pitch -
             1.25f) < 0.0001f,
-        "audio mix snapshot selects listener and computes spatial stereo attenuation");
+        "audio mix snapshot resolves hierarchy world positions and computes spatial stereo attenuation");
 
     const auto wav_bytes =
         make_pcm16_wav();

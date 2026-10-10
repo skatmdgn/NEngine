@@ -22,6 +22,147 @@ float clamp_pan(float value) noexcept {
         1.0f);
 }
 
+core::Quat multiply(
+    core::Quat a,
+    core::Quat b) noexcept {
+
+    return {
+        a.w * b.x +
+            a.x * b.w +
+            a.y * b.z -
+            a.z * b.y,
+        a.w * b.y -
+            a.x * b.z +
+            a.y * b.w +
+            a.z * b.x,
+        a.w * b.z +
+            a.x * b.y -
+            a.y * b.x +
+            a.z * b.w,
+        a.w * b.w -
+            a.x * b.x -
+            a.y * b.y -
+            a.z * b.z
+    };
+}
+
+core::Vec3 rotate(
+    core::Quat q,
+    core::Vec3 v) noexcept {
+
+    const core::Quat point{
+        v.x,
+        v.y,
+        v.z,
+        0.0f};
+
+    const core::Quat inverse{
+        -q.x,
+        -q.y,
+        -q.z,
+        q.w};
+
+    const auto rotated =
+        multiply(
+            multiply(q, point),
+            inverse);
+
+    return {
+        rotated.x,
+        rotated.y,
+        rotated.z
+    };
+}
+
+struct WorldTransform {
+    core::Vec3 position{};
+    core::Quat rotation{};
+    core::Vec3 scale{
+        1.0f,
+        1.0f,
+        1.0f
+    };
+};
+
+WorldTransform resolve_world_transform(
+    const core::World& world,
+    core::Entity entity) noexcept {
+
+    WorldTransform result;
+
+    const auto* local =
+        world.transform(entity);
+
+    if (!local) {
+        return result;
+    }
+
+    result.position =
+        local->local_position;
+    result.rotation =
+        local->local_rotation;
+    result.scale =
+        local->local_scale;
+
+    core::Entity parent =
+        local->parent;
+
+    for (std::size_t depth = 0;
+         parent.valid() &&
+         depth < 256u;
+         ++depth) {
+
+        const auto* ancestor =
+            world.transform(parent);
+
+        if (!ancestor) {
+            break;
+        }
+
+        const core::Vec3 scaled{
+            result.position.x *
+                ancestor->local_scale.x,
+            result.position.y *
+                ancestor->local_scale.y,
+            result.position.z *
+                ancestor->local_scale.z
+        };
+
+        const auto rotated =
+            rotate(
+                ancestor->local_rotation,
+                scaled);
+
+        result.position = {
+            ancestor->local_position.x +
+                rotated.x,
+            ancestor->local_position.y +
+                rotated.y,
+            ancestor->local_position.z +
+                rotated.z
+        };
+
+        result.rotation =
+            multiply(
+                ancestor->local_rotation,
+                result.rotation);
+
+        result.scale = {
+            ancestor->local_scale.x *
+                result.scale.x,
+            ancestor->local_scale.y *
+                result.scale.y,
+            ancestor->local_scale.z *
+                result.scale.z
+        };
+
+        parent =
+            ancestor->parent;
+    }
+
+    return result;
+}
+
 float distance_gain(
     core::Vec3 source,
     core::Vec3 listener) noexcept {
@@ -107,12 +248,8 @@ AudioMixSnapshot build_mix_snapshot(
                     entity,
                     audio_listener_type());
 
-        const auto* transform =
-            world.transform(entity);
-
         if (!listener ||
-            !listener->enabled ||
-            !transform) {
+            !listener->enabled) {
             continue;
         }
 
@@ -120,7 +257,10 @@ AudioMixSnapshot build_mix_snapshot(
         snapshot.listener.entity =
             entity;
         snapshot.listener.position =
-            transform->local_position;
+            resolve_world_transform(
+                world,
+                entity)
+                .position;
         snapshot.listener.volume =
             clamp_unit(
                 listener->volume);
@@ -150,15 +290,16 @@ AudioMixSnapshot build_mix_snapshot(
                     entity,
                     audio_source_type());
 
-        const auto* transform =
-            world.transform(entity);
-
         if (!source ||
             !source->enabled ||
-            !source->clip.valid() ||
-            !transform) {
+            !source->clip.valid()) {
             continue;
         }
+
+        const auto world_transform =
+            resolve_world_transform(
+                world,
+                entity);
 
         float gain =
             clamp_unit(
@@ -172,14 +313,14 @@ AudioMixSnapshot build_mix_snapshot(
         if (source->spatialize) {
             gain *=
                 distance_gain(
-                    transform->local_position,
+                    world_transform.position,
                     listener_position);
 
             pan =
                 clamp_pan(
                     pan +
                     spatial_pan(
-                        transform->local_position,
+                        world_transform.position,
                         listener_position));
         }
 
@@ -187,7 +328,7 @@ AudioMixSnapshot build_mix_snapshot(
         state.entity = entity;
         state.clip = source->clip;
         state.position =
-            transform->local_position;
+            world_transform.position;
         state.spatialized =
             source->spatialize;
         state.playing =
