@@ -35,7 +35,7 @@ The repository currently includes:
 - managed Camera/Light, MeshRenderer/SpriteRenderer scalar+AssetGuid properties, and SpriteAnimator clip/playback/time controls through the generic PropertyAccessRegistry-backed native property bridge
 - managed keyboard/mouse Input, global Time frame clock, coroutines and WaitForSeconds
 - NEnginePhysics foundation with 3D/2D Rigidbody + BoxCollider components, fixed-step AABB contact resolution, managed collision/trigger Enter-Stay-Exit callbacks, native overlap queries, and managed Physics/Physics2D raycasts
-- NEngineAudio AudioSource/AudioListener data + Editor/C# bindings, deterministic playback clock, spatial stereo mix snapshots, cached WAV PCM/float decode, and AssetGuid audio clip caching
+- NEngineAudio AudioSource/AudioListener data + Editor/C# bindings, deterministic playback clock, hierarchy/listener-oriented spatial stereo mixing, cached WAV PCM/float decode, software stereo rendering, and Windows WASAPI shared-mode output
 - Camera/Light/MeshRenderer components
 - RenderSnapshot with resolved world matrices
 - camera matrix math and stable built-in Cube/Quad mesh AssetGuids

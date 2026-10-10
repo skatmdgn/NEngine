@@ -117,7 +117,7 @@ Not yet implemented:
 - Remote/nonlocal or outside-model-directory glTF resource policy/support; local percent-encoded sidecars are implemented.
 - FBX decoding/cooking.
 - HLSL compiler-path parity/validation; GLSL -> SPIR-V compile/embed tooling is implemented and exercised in CI.
-- OS/device audio output backend and streaming decode; WAV PCM/float runtime decode is implemented, while OGG/MP3/FLAC runtime decode remains.
+- Streaming decode and OGG/MP3/FLAC runtime decode remain; Windows WASAPI shared-mode device output and WAV PCM/float runtime decode are implemented.
 - Dependency extraction from asset contents.
 
 ## C# / IDE foundation
@@ -319,17 +319,21 @@ Implemented:
 - Managed AudioSource / AudioListener proxies over the ABI v13 generic native property bridge.
 - Managed AudioSource Play / Pause / UnPause / Stop, isPlaying and runtime time controls.
 - Deterministic AudioPlaybackSystem with play-on-awake, pitch-scaled time, loop wrapping and non-loop end-of-clip stopping.
-- AudioMixSnapshot extracts the active listener plus source state and computes listener volume, stereo pan and initial distance attenuation for spatialized sources.
+- AudioMixSnapshot extracts the active listener plus source state using hierarchy-resolved world transforms, listener orientation, configurable min/max distance attenuation and stereo pan.
 - RIFF/WAVE runtime decode supports PCM 8/16/24/32-bit and IEEE float32 into normalized interleaved float samples.
 - AudioClipCache resolves ProjectSession cached NEngine.Audio source artifacts by AssetGuid + import fingerprint and supplies real WAV duration to Play Mode playback.
 - Existing NEngine.Audio import pipeline stages WAV/OGG/MP3/FLAC sources and records WAV metadata.
-- Cross-platform NEngineAudioTests cover serialization, validation, mix extraction, playback timing, WAV decode and clip-cache reuse.
+- Software stereo renderer mixes cached clip PCM with pitch/resampling/loop/gain into interleaved output buffers.
+- AudioOutputDevice provides a portable output boundary; Windows uses WASAPI shared mode with frame-pumped padding-aware buffer fills and a null fallback when no endpoint is available.
+- Editor Play Mode pumps the audio output device from the current mix snapshot, and new project Main Camera objects receive an AudioListener by default.
+- Cross-platform NEngineAudioTests cover serialization, validation, hierarchy/orientation spatial mixing, playback timing, WAV/WAVEFORMATEXTENSIBLE decode, clip-cache reuse, software rendering and device abstraction.
 
 Not yet implemented:
-- OS/device audio output backend, realtime callback/mixer thread and hardware buffer queue.
+- Event/callback-driven realtime device thread; the current WASAPI path is intentionally frame-pumped and padding-aware.
 - Streaming audio decode.
 - OGG/MP3/FLAC runtime decoders.
-- Production 3D audio using hierarchy-resolved world transforms, orientation/HRTF, Doppler, reverb and mixer buses/effects.
+- Production 3D audio additions such as HRTF, Doppler, reverb and mixer buses/effects.
+- User-side Windows audible-output acceptance test on a real audio endpoint.
 
 ## Input foundation
 - Cross-platform InputState tracks held/pressed/released key and mouse-button transitions per frame.
@@ -347,8 +351,8 @@ Not yet implemented:
 
 ## Immediate next work
 
-1. Add a real OS audio device/output backend consuming AudioMixSnapshot + AudioClipCache PCM, then add streaming and OGG/MP3/FLAC runtime decode.
-2. Replace the O(n²) AABB pair scan with a scalable broad-phase and add rotated/extra collider shapes plus friction/restitution/sleeping.
+1. Replace the O(n²) AABB pair scan with a scalable broad-phase and add rotated/extra collider shapes plus friction/restitution/sleeping.
+2. Extend audio with streaming + OGG/MP3/FLAC runtime decode and a callback-driven device path after real-Windows audible acceptance.
 3. Extend managed physics queries with overlap/cast APIs, filtering/layers and richer hit data.
 4. Package/version the managed NEngine API surface and add debugger attach/symbol workflow.
 5. Finish production PBR validation: sampler state, lights/shadows and remaining material behavior.

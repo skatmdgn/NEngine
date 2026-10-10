@@ -395,11 +395,11 @@ Implemented foundation:
 - managed Camera/Light plus MeshRenderer/SpriteRenderer scalar and AssetGuid properties over the generic native property bridge.
 - managed SpriteAnimator clip/playback/time properties plus Play/Pause/Stop/Restart controls.
 - NEnginePhysics 3D/2D Rigidbody + BoxCollider data/Scene/Editor/C# bindings with fixed-step AABB contact resolution, managed collision/trigger Enter-Stay-Exit callbacks, native overlap queries, and managed 3D/2D raycasts over the injected ABI v13 query bridge.
-- NEngineAudio AudioSource/AudioListener Scene/Editor/C# bindings, deterministic playback timing, spatial stereo mix snapshots, WAV PCM/float runtime decode and AssetGuid/fingerprint clip caching; OS device output and compressed/streaming decode remain.
+- NEngineAudio AudioSource/AudioListener Scene/Editor/C# bindings, deterministic playback timing, hierarchy/listener-oriented spatial stereo mixing, WAV PCM/float runtime decode, software stereo rendering, AssetGuid/fingerprint clip caching and Windows WASAPI shared-mode output; compressed/streaming decode and production DSP remain.
 - coroutine scheduling including WaitForSeconds.
 
 Remaining major work:
-- scalable/rotated physics backend, richer query APIs and a production audio device/streaming backend.
+- scalable/rotated physics backend, richer query APIs, streaming/compressed audio decode and production DSP/device scheduling.
 - packaged/versioned managed API distribution.
 - debugger symbols/attach workflow.
 - NuGet runtime/package integration.
@@ -457,7 +457,7 @@ The active development line is now crossing from **0.5 — C# scripting + IDE** 
 
 The immediate sequence is:
 
-`audio playback/mix boundary -> audio device backend + scalable physics/query expansion -> debugger/IDE polish`
+`scalable physics/query expansion -> streaming/compressed audio + production device scheduling -> debugger/IDE polish`
 
 Renderer work continues as a secondary line around production PBR, Scene/Game Vulkan presentation, WebP/transcoding, HLSL/reflection and Android Vulkan support.
 

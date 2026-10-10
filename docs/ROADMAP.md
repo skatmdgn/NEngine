@@ -159,7 +159,9 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [ ] Gamepad/touch input backends and production action-map persistence
 - [x] NEngineAudio AudioSource/AudioListener + deterministic playback clock + spatial stereo mix snapshot
 - [x] Cached WAV PCM/float runtime decode + AssetGuid AudioClipCache
-- [ ] OS audio output backend, streaming decode and OGG/MP3/FLAC runtime decode
+- [x] Software stereo renderer + Windows WASAPI shared-mode output + Play Mode device pump
+- [x] Hierarchy/listener-oriented spatial pan + configurable min/max distance attenuation
+- [ ] Streaming decode + OGG/MP3/FLAC runtime decode + production realtime device scheduling
 
 ## 0.7 — Animation/UI/navigation
 - [ ] animation clips/state machine/blend tree subset
