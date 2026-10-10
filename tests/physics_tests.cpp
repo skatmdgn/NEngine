@@ -497,12 +497,12 @@ int main() {
 
     check(
         detection.tested_pairs_3d ==
-            3u &&
+            1u &&
         detection.tested_pairs_2d ==
             1u &&
         detection.overlaps.size() ==
             2u,
-        "box overlap detection separates 3D and 2D pair scans");
+        "sweep-and-prune broad phase culls separated 3D pairs while preserving 2D overlap scans");
 
     bool saw_3d_trigger = false;
     bool saw_2d_contact = false;
@@ -549,6 +549,44 @@ int main() {
         saw_3d_trigger &&
         saw_2d_contact,
         "AABB overlap records minimum penetration axis and trigger semantics");
+
+    core::World sparse_broad_phase_world;
+
+    for (int index = 0;
+         index < 32;
+         ++index) {
+
+        const auto entity =
+            sparse_broad_phase_world.create(
+                "Sparse Box");
+
+        sparse_broad_phase_world
+            .add_component<
+                physics::BoxCollider>(
+                    entity,
+                    physics::box_collider_type());
+
+        sparse_broad_phase_world
+            .transform(entity)
+            ->local_position = {
+                static_cast<float>(
+                    index * 4),
+                0.0f,
+                0.0f
+            };
+    }
+
+    const auto sparse_detection =
+        physics::detect_box_overlaps(
+            sparse_broad_phase_world);
+
+    check(
+        sparse_detection
+            .tested_pairs_3d == 0u &&
+        sparse_detection
+            .overlaps
+            .empty(),
+        "sweep-and-prune broad phase avoids quadratic narrow-phase tests for sparse colliders");
 
     physics::ContactTracker
         contact_tracker;

@@ -197,18 +197,51 @@ void append_overlaps(
     std::vector<BoxOverlap>& overlaps,
     std::size_t& tested_pairs) {
 
-    const auto bounds =
+    auto bounds =
         collect_bounds<Collider>(
             world,
             type,
             is_2d);
 
+    std::sort(
+        bounds.begin(),
+        bounds.end(),
+        [](const ColliderBounds& a,
+           const ColliderBounds& b) {
+
+            const float a_min =
+                a.center.x - a.half.x;
+
+            const float b_min =
+                b.center.x - b.half.x;
+
+            if (a_min != b_min) {
+                return a_min < b_min;
+            }
+
+            return a.entity.value <
+                b.entity.value;
+        });
+
     for (std::size_t i = 0;
          i < bounds.size();
          ++i) {
+
+        const float maximum_x =
+            bounds[i].center.x +
+            bounds[i].half.x;
+
         for (std::size_t j = i + 1;
              j < bounds.size();
              ++j) {
+
+            const float minimum_x =
+                bounds[j].center.x -
+                bounds[j].half.x;
+
+            if (minimum_x >= maximum_x) {
+                break;
+            }
 
             ++tested_pairs;
 
