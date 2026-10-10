@@ -8,6 +8,7 @@
 #include "nengine/core/component_serialization.hpp"
 #include "nengine/core/world.hpp"
 #include "nengine/physics/components.hpp"
+#include "nengine/physics/collision.hpp"
 #include "nengine/physics/registration.hpp"
 #include "nengine/physics/simulation.hpp"
 
@@ -420,6 +421,127 @@ int main() {
         invalid_step.integrated_3d == 0u &&
         invalid_step.integrated_2d == 0u,
         "physics fixed-step foundation ignores invalid negative delta");
+
+    core::World collision_world;
+
+    const auto box_a =
+        collision_world.create(
+            "Box A");
+    const auto box_b =
+        collision_world.create(
+            "Box B");
+    const auto box_c =
+        collision_world.create(
+            "Box C");
+
+    collision_world.add_component<
+        physics::BoxCollider>(
+            box_a,
+            physics::box_collider_type());
+
+    auto* box_b_collider =
+        collision_world.add_component<
+            physics::BoxCollider>(
+                box_b,
+                physics::box_collider_type());
+
+    collision_world.add_component<
+        physics::BoxCollider>(
+            box_c,
+            physics::box_collider_type());
+
+    collision_world.transform(
+        box_b)->local_position =
+            {0.75f, 0.0f, 0.0f};
+
+    collision_world.transform(
+        box_c)->local_position =
+            {4.0f, 0.0f, 0.0f};
+
+    if (box_b_collider) {
+        box_b_collider->is_trigger =
+            true;
+    }
+
+    const auto box2d_a =
+        collision_world.create(
+            "Box2D A");
+    const auto box2d_b =
+        collision_world.create(
+            "Box2D B");
+
+    collision_world.add_component<
+        physics::BoxCollider2D>(
+            box2d_a,
+            physics::box_collider2d_type());
+
+    collision_world.add_component<
+        physics::BoxCollider2D>(
+            box2d_b,
+            physics::box_collider2d_type());
+
+    collision_world.transform(
+        box2d_b)->local_position =
+            {0.0f, 0.6f, 10.0f};
+
+    const auto detection =
+        physics::detect_box_overlaps(
+            collision_world);
+
+    check(
+        detection.tested_pairs_3d ==
+            3u &&
+        detection.tested_pairs_2d ==
+            1u &&
+        detection.overlaps.size() ==
+            2u,
+        "box overlap detection separates 3D and 2D pair scans");
+
+    bool saw_3d_trigger = false;
+    bool saw_2d_contact = false;
+
+    for (const auto& overlap :
+         detection.overlaps) {
+
+        if (!overlap.is_2d &&
+            overlap.is_trigger &&
+            overlap.first == box_a &&
+            overlap.second == box_b) {
+
+            saw_3d_trigger =
+                overlap.normal ==
+                    core::Vec3{
+                        1.0f,
+                        0.0f,
+                        0.0f} &&
+                std::abs(
+                    overlap.penetration -
+                    0.25f) <
+                    0.0001f;
+        }
+
+        if (overlap.is_2d &&
+            !overlap.is_trigger &&
+            overlap.first == box2d_a &&
+            overlap.second == box2d_b) {
+
+            saw_2d_contact =
+                overlap.normal ==
+                    core::Vec3{
+                        0.0f,
+                        1.0f,
+                        0.0f} &&
+                std::abs(
+                    overlap.penetration -
+                    0.4f) <
+                    0.0001f;
+        }
+    }
+
+    check(
+        saw_3d_trigger &&
+        saw_2d_contact,
+        "AABB overlap records minimum penetration axis and trigger semantics");
 
     if (failures != 0) {
         std::cerr
