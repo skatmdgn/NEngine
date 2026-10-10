@@ -682,4 +682,274 @@ std::vector<core::Entity> overlap_box_2d(
     return result;
 }
 
+
+namespace {
+
+bool ray_bounds(
+    core::Vec3 origin,
+    core::Vec3 direction,
+    const ColliderBounds& bounds,
+    float max_distance,
+    bool is_2d,
+    float& distance,
+    core::Vec3& normal) noexcept {
+
+    const auto minimum =
+        core::Vec3{
+            bounds.center.x - bounds.half.x,
+            bounds.center.y - bounds.half.y,
+            bounds.center.z - bounds.half.z
+        };
+
+    const auto maximum =
+        core::Vec3{
+            bounds.center.x + bounds.half.x,
+            bounds.center.y + bounds.half.y,
+            bounds.center.z + bounds.half.z
+        };
+
+    float t_min = 0.0f;
+    float t_max = max_distance;
+    core::Vec3 hit_normal{};
+
+    const auto test_axis =
+        [&](float o,
+            float d,
+            float min_value,
+            float max_value,
+            core::Vec3 negative_normal,
+            core::Vec3 positive_normal) {
+
+            constexpr float epsilon =
+                0.000001f;
+
+            if (std::abs(d) <= epsilon) {
+                return o >= min_value &&
+                       o <= max_value;
+            }
+
+            float t1 =
+                (min_value - o) / d;
+            float t2 =
+                (max_value - o) / d;
+
+            core::Vec3 enter_normal =
+                negative_normal;
+
+            if (t1 > t2) {
+                std::swap(t1, t2);
+                enter_normal =
+                    positive_normal;
+            }
+
+            if (t1 > t_min) {
+                t_min = t1;
+                hit_normal =
+                    enter_normal;
+            }
+
+            t_max =
+                std::min(
+                    t_max,
+                    t2);
+
+            return t_min <= t_max;
+        };
+
+    if (!test_axis(
+            origin.x,
+            direction.x,
+            minimum.x,
+            maximum.x,
+            {-1.0f, 0.0f, 0.0f},
+            {1.0f, 0.0f, 0.0f}) ||
+        !test_axis(
+            origin.y,
+            direction.y,
+            minimum.y,
+            maximum.y,
+            {0.0f, -1.0f, 0.0f},
+            {0.0f, 1.0f, 0.0f})) {
+        return false;
+    }
+
+    if (!is_2d &&
+        !test_axis(
+            origin.z,
+            direction.z,
+            minimum.z,
+            maximum.z,
+            {0.0f, 0.0f, -1.0f},
+            {0.0f, 0.0f, 1.0f})) {
+        return false;
+    }
+
+    if (t_max < 0.0f ||
+        t_min > max_distance) {
+        return false;
+    }
+
+    distance =
+        std::max(
+            0.0f,
+            t_min);
+
+    normal =
+        hit_normal;
+
+    return true;
+}
+
+core::Vec3 normalized_direction(
+    core::Vec3 direction,
+    bool is_2d) noexcept {
+
+    if (is_2d) {
+        direction.z = 0.0f;
+    }
+
+    const float length_squared =
+        direction.x * direction.x +
+        direction.y * direction.y +
+        direction.z * direction.z;
+
+    if (length_squared <=
+        0.0000000001f) {
+        return {};
+    }
+
+    const float inverse_length =
+        1.0f /
+        std::sqrt(
+            length_squared);
+
+    return {
+        direction.x * inverse_length,
+        direction.y * inverse_length,
+        direction.z * inverse_length
+    };
+}
+
+template <typename Collider>
+std::optional<RaycastHit> raycast_bounds(
+    const core::World& world,
+    core::ComponentTypeId type,
+    core::Vec3 origin,
+    core::Vec3 direction,
+    float max_distance,
+    bool include_triggers,
+    bool is_2d) {
+
+    if (!std::isfinite(max_distance) ||
+        max_distance < 0.0f) {
+        return std::nullopt;
+    }
+
+    const auto normalized =
+        normalized_direction(
+            direction,
+            is_2d);
+
+    if (normalized ==
+        core::Vec3{}) {
+        return std::nullopt;
+    }
+
+    const auto bounds =
+        collect_bounds<Collider>(
+            world,
+            type,
+            is_2d);
+
+    std::optional<RaycastHit>
+        closest;
+
+    for (const auto& candidate :
+         bounds) {
+
+        if (!include_triggers &&
+            candidate.trigger) {
+            continue;
+        }
+
+        float distance = 0.0f;
+        core::Vec3 normal{};
+
+        if (!ray_bounds(
+                origin,
+                normalized,
+                candidate,
+                max_distance,
+                is_2d,
+                distance,
+                normal)) {
+            continue;
+        }
+
+        if (closest &&
+            distance >=
+                closest->distance) {
+            continue;
+        }
+
+        closest =
+            RaycastHit{
+                candidate.entity,
+                {
+                    origin.x +
+                        normalized.x *
+                        distance,
+                    origin.y +
+                        normalized.y *
+                        distance,
+                    origin.z +
+                        normalized.z *
+                        distance
+                },
+                normal,
+                distance,
+                candidate.trigger,
+                is_2d
+            };
+    }
+
+    return closest;
+}
+
+} // namespace
+
+std::optional<RaycastHit> raycast(
+    const core::World& world,
+    core::Vec3 origin,
+    core::Vec3 direction,
+    float max_distance,
+    bool include_triggers) {
+
+    return raycast_bounds<BoxCollider>(
+        world,
+        box_collider_type(),
+        origin,
+        direction,
+        max_distance,
+        include_triggers,
+        false);
+}
+
+std::optional<RaycastHit> raycast_2d(
+    const core::World& world,
+    core::Vec2 origin,
+    core::Vec2 direction,
+    float max_distance,
+    bool include_triggers) {
+
+    return raycast_bounds<BoxCollider2D>(
+        world,
+        box_collider2d_type(),
+        {origin.x, origin.y, 0.0f},
+        {direction.x, direction.y, 0.0f},
+        max_distance,
+        include_triggers,
+        true);
+}
+
 } // namespace nengine::physics

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
 #include <vector>
 
 #include "nengine/core/entity.hpp"
@@ -50,6 +51,30 @@ std::vector<core::Entity> overlap_box_2d(
     const core::World& world,
     core::Vec2 center,
     core::Vec2 size,
+    bool include_triggers = true);
+
+struct RaycastHit {
+    core::Entity entity{
+        core::Entity::invalid()};
+    core::Vec3 point{};
+    core::Vec3 normal{};
+    float distance{0.0f};
+    bool is_trigger{false};
+    bool is_2d{false};
+};
+
+std::optional<RaycastHit> raycast(
+    const core::World& world,
+    core::Vec3 origin,
+    core::Vec3 direction,
+    float max_distance,
+    bool include_triggers = true);
+
+std::optional<RaycastHit> raycast_2d(
+    const core::World& world,
+    core::Vec2 origin,
+    core::Vec2 direction,
+    float max_distance,
     bool include_triggers = true);
 
 } // namespace nengine::physics

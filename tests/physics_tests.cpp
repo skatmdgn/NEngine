@@ -682,6 +682,69 @@ int main() {
             .empty(),
         "OverlapBox queries reject non-positive query dimensions");
 
+    const auto ray_hit =
+        physics::raycast(
+            collision_world,
+            {-3.0f, 0.0f, 0.0f},
+            {1.0f, 0.0f, 0.0f},
+            10.0f,
+            false);
+
+    check(
+        ray_hit &&
+        ray_hit->entity == box_a &&
+        !ray_hit->is_trigger &&
+        !ray_hit->is_2d &&
+        std::abs(
+            ray_hit->distance -
+            2.5f) < 0.0001f &&
+        ray_hit->normal ==
+            core::Vec3{
+                -1.0f,
+                0.0f,
+                0.0f} &&
+        ray_hit->point ==
+            core::Vec3{
+                -0.5f,
+                0.0f,
+                0.0f},
+        "3D Raycast returns nearest non-trigger BoxCollider hit point normal and distance");
+
+    const auto ray_hit_2d =
+        physics::raycast_2d(
+            collision_world,
+            {0.0f, -3.0f},
+            {0.0f, 1.0f},
+            10.0f);
+
+    check(
+        ray_hit_2d &&
+        ray_hit_2d->entity ==
+            box2d_a &&
+        ray_hit_2d->is_2d &&
+        std::abs(
+            ray_hit_2d->distance -
+            2.5f) < 0.0001f &&
+        ray_hit_2d->normal ==
+            core::Vec3{
+                0.0f,
+                -1.0f,
+                0.0f},
+        "2D Raycast returns nearest BoxCollider2D hit on XY");
+
+    check(
+        !physics::raycast(
+            collision_world,
+            {},
+            {},
+            10.0f) &&
+        !physics::raycast_2d(
+            collision_world,
+            {},
+            {1.0f, 0.0f},
+            -1.0f),
+        "Raycast queries reject zero direction and invalid distance");
+
     const auto collision_frame =
         physics::step_physics(
             collision_world,
