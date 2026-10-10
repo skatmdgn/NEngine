@@ -206,6 +206,77 @@ bool register_rigidbody_properties(
 }
 
 template <typename Component>
+bool register_contact_material_properties(
+    PropertyAccessRegistry& properties,
+    core::ComponentTypeId type) {
+
+    bool ok = true;
+
+    const auto bounded_float =
+        [&properties, type, &ok](
+            const char* name,
+            float Component::* member) {
+
+            ok =
+                properties.register_property(
+                    type,
+                    name,
+                    core::PropertyKind::Float,
+                    [type, member](
+                        const core::World& world,
+                        core::Entity entity) {
+                        return read_component_property<Component>(
+                            world,
+                            entity,
+                            type,
+                            [member](const Component& value) {
+                                return core::PropertyValue{
+                                    static_cast<double>(
+                                        value.*member)};
+                            });
+                    },
+                    [type, member](
+                        core::World& world,
+                        core::Entity entity,
+                        const core::PropertyValue& value) {
+                        return write_component_property<Component>(
+                            world,
+                            entity,
+                            type,
+                            value,
+                            [member](
+                                Component& component,
+                                const core::PropertyValue& raw) {
+                                const auto* typed =
+                                    std::get_if<double>(&raw);
+
+                                if (!typed ||
+                                    *typed < 0.0 ||
+                                    *typed > 1.0) {
+                                    return false;
+                                }
+
+                                component.*member =
+                                    static_cast<float>(
+                                        *typed);
+                                return true;
+                            });
+                    }) &&
+                ok;
+        };
+
+    bounded_float(
+        "Friction",
+        &Component::friction);
+
+    bounded_float(
+        "Restitution",
+        &Component::restitution);
+
+    return ok;
+}
+
+template <typename Component>
 bool register_box_properties(
     PropertyAccessRegistry& properties,
     core::ComponentTypeId type,
@@ -331,6 +402,12 @@ bool register_box_properties(
         0,
         static_cast<std::int64_t>(
             0xffffffffu));
+
+    ok =
+        register_contact_material_properties<Component>(
+            properties,
+            type) &&
+        ok;
 
     const auto vec_property =
         [&properties, type, is_2d, &ok](
@@ -524,6 +601,12 @@ bool register_radial_properties(
         0,
         static_cast<std::int64_t>(
             0xffffffffu));
+
+    ok =
+        register_contact_material_properties<Component>(
+            properties,
+            type) &&
+        ok;
 
     ok =
         properties.register_property(

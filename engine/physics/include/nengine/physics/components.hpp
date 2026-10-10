@@ -21,6 +21,8 @@ struct BoxCollider {
     bool is_trigger{false};
     std::uint32_t layer{0};
     std::uint32_t collision_mask{0xffffffffu};
+    float friction{0.5f};
+    float restitution{0.0f};
     core::Vec3 center{};
     core::Vec3 size{1.0f, 1.0f, 1.0f};
 };
@@ -30,6 +32,8 @@ struct SphereCollider {
     bool is_trigger{false};
     std::uint32_t layer{0};
     std::uint32_t collision_mask{0xffffffffu};
+    float friction{0.5f};
+    float restitution{0.0f};
     core::Vec3 center{};
     float radius{0.5f};
 };
@@ -48,6 +52,8 @@ struct BoxCollider2D {
     bool is_trigger{false};
     std::uint32_t layer{0};
     std::uint32_t collision_mask{0xffffffffu};
+    float friction{0.5f};
+    float restitution{0.0f};
     core::Vec3 center{};
     core::Vec3 size{1.0f, 1.0f, 0.0f};
 };
@@ -82,6 +88,8 @@ struct CircleCollider2D {
     bool is_trigger{false};
     std::uint32_t layer{0};
     std::uint32_t collision_mask{0xffffffffu};
+    float friction{0.5f};
+    float restitution{0.0f};
     core::Vec3 center{};
     float radius{0.5f};
 };

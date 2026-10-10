@@ -1190,46 +1190,81 @@ CollisionDetectionResult detect_box_overlaps(
     return result;
 }
 
+namespace {
+
+struct ContactMaterial {
+    float friction{0.5f};
+    float restitution{0.0f};
+};
+
+ContactMaterial contact_material_3d(
+    const core::World& world,
+    core::Entity entity) noexcept {
+
+    if (const auto* collider =
+            world.get_component<BoxCollider>(
+                entity,
+                box_collider_type())) {
+        return {
+            collider->friction,
+            collider->restitution
+        };
+    }
+
+    if (const auto* collider =
+            world.get_component<SphereCollider>(
+                entity,
+                sphere_collider_type())) {
+        return {
+            collider->friction,
+            collider->restitution
+        };
+    }
+
+    return {};
+}
+
+ContactMaterial contact_material_2d(
+    const core::World& world,
+    core::Entity entity) noexcept {
+
+    if (const auto* collider =
+            world.get_component<BoxCollider2D>(
+                entity,
+                box_collider2d_type())) {
+        return {
+            collider->friction,
+            collider->restitution
+        };
+    }
+
+    if (const auto* collider =
+            world.get_component<CircleCollider2D>(
+                entity,
+                circle_collider2d_type())) {
+        return {
+            collider->friction,
+            collider->restitution
+        };
+    }
+
+    return {};
+}
+
+} // namespace
+
 CollisionResolutionStats resolve_box_contacts_3d(
     core::World& world,
     const std::vector<BoxOverlap>& overlaps) {
 
     CollisionResolutionStats stats;
 
-    const auto dot =
+    const auto dot3 =
         [](core::Vec3 a,
            core::Vec3 b) noexcept {
             return a.x * b.x +
                 a.y * b.y +
                 a.z * b.z;
-        };
-
-    const auto subtract_normal_velocity =
-        [&dot](
-            core::Vec3& velocity,
-            core::Vec3 normal,
-            bool first_body) {
-
-            const float along =
-                dot(
-                    velocity,
-                    normal);
-
-            const bool entering =
-                first_body
-                    ? along > 0.0f
-                    : along < 0.0f;
-
-            if (!entering) {
-                return;
-            }
-
-            velocity.x -=
-                normal.x * along;
-            velocity.y -=
-                normal.y * along;
-            velocity.z -=
-                normal.z * along;
         };
 
     for (const auto& overlap :
@@ -1279,39 +1314,35 @@ CollisionResolutionStats resolve_box_contacts_3d(
             continue;
         }
 
-        float first_share = 0.0f;
-        float second_share = 0.0f;
+        const float first_inverse_mass =
+            first_dynamic &&
+            first_body->mass > 0.0f
+                ? 1.0f /
+                    first_body->mass
+                : 0.0f;
 
-        if (first_dynamic &&
-            second_dynamic) {
+        const float second_inverse_mass =
+            second_dynamic &&
+            second_body->mass > 0.0f
+                ? 1.0f /
+                    second_body->mass
+                : 0.0f;
 
-            const float first_inverse_mass =
-                first_body->mass > 0.0f
-                    ? 1.0f / first_body->mass
-                    : 0.0f;
+        const float inverse_mass_sum =
+            first_inverse_mass +
+            second_inverse_mass;
 
-            const float second_inverse_mass =
-                second_body->mass > 0.0f
-                    ? 1.0f / second_body->mass
-                    : 0.0f;
-
-            const float total =
-                first_inverse_mass +
-                second_inverse_mass;
-
-            if (total > 0.0f) {
-                first_share =
-                    first_inverse_mass /
-                    total;
-                second_share =
-                    second_inverse_mass /
-                    total;
-            }
-        } else if (first_dynamic) {
-            first_share = 1.0f;
-        } else {
-            second_share = 1.0f;
+        if (inverse_mass_sum <= 0.0f) {
+            continue;
         }
+
+        const float first_share =
+            first_inverse_mass /
+            inverse_mass_sum;
+
+        const float second_share =
+            second_inverse_mass /
+            inverse_mass_sum;
 
         first_transform->local_position.x -=
             overlap.normal.x *
@@ -1339,18 +1370,190 @@ CollisionResolutionStats resolve_box_contacts_3d(
             overlap.penetration *
             second_share;
 
-        if (first_dynamic) {
-            subtract_normal_velocity(
-                first_body->linear_velocity,
-                overlap.normal,
-                true);
-        }
+        const core::Vec3 first_velocity =
+            first_dynamic
+                ? first_body->linear_velocity
+                : core::Vec3{};
 
-        if (second_dynamic) {
-            subtract_normal_velocity(
-                second_body->linear_velocity,
-                overlap.normal,
-                false);
+        const core::Vec3 second_velocity =
+            second_dynamic
+                ? second_body->linear_velocity
+                : core::Vec3{};
+
+        core::Vec3 relative{
+            second_velocity.x -
+                first_velocity.x,
+            second_velocity.y -
+                first_velocity.y,
+            second_velocity.z -
+                first_velocity.z
+        };
+
+        const float normal_speed =
+            dot3(
+                relative,
+                overlap.normal);
+
+        if (normal_speed < 0.0f) {
+            const auto first_material =
+                contact_material_3d(
+                    world,
+                    overlap.first);
+
+            const auto second_material =
+                contact_material_3d(
+                    world,
+                    overlap.second);
+
+            const float restitution =
+                std::max(
+                    first_material.restitution,
+                    second_material.restitution);
+
+            const float normal_impulse =
+                -(1.0f + restitution) *
+                normal_speed /
+                inverse_mass_sum;
+
+            if (first_dynamic) {
+                first_body->linear_velocity.x -=
+                    overlap.normal.x *
+                    normal_impulse *
+                    first_inverse_mass;
+                first_body->linear_velocity.y -=
+                    overlap.normal.y *
+                    normal_impulse *
+                    first_inverse_mass;
+                first_body->linear_velocity.z -=
+                    overlap.normal.z *
+                    normal_impulse *
+                    first_inverse_mass;
+            }
+
+            if (second_dynamic) {
+                second_body->linear_velocity.x +=
+                    overlap.normal.x *
+                    normal_impulse *
+                    second_inverse_mass;
+                second_body->linear_velocity.y +=
+                    overlap.normal.y *
+                    normal_impulse *
+                    second_inverse_mass;
+                second_body->linear_velocity.z +=
+                    overlap.normal.z *
+                    normal_impulse *
+                    second_inverse_mass;
+            }
+
+            const core::Vec3 post_first =
+                first_dynamic
+                    ? first_body->linear_velocity
+                    : core::Vec3{};
+
+            const core::Vec3 post_second =
+                second_dynamic
+                    ? second_body->linear_velocity
+                    : core::Vec3{};
+
+            relative = {
+                post_second.x -
+                    post_first.x,
+                post_second.y -
+                    post_first.y,
+                post_second.z -
+                    post_first.z
+            };
+
+            const float post_normal_speed =
+                dot3(
+                    relative,
+                    overlap.normal);
+
+            core::Vec3 tangent{
+                relative.x -
+                    overlap.normal.x *
+                    post_normal_speed,
+                relative.y -
+                    overlap.normal.y *
+                    post_normal_speed,
+                relative.z -
+                    overlap.normal.z *
+                    post_normal_speed
+            };
+
+            const float tangent_squared =
+                dot3(
+                    tangent,
+                    tangent);
+
+            if (tangent_squared >
+                0.0000000001f) {
+
+                const float inverse_tangent =
+                    1.0f /
+                    std::sqrt(
+                        tangent_squared);
+
+                tangent.x *=
+                    inverse_tangent;
+                tangent.y *=
+                    inverse_tangent;
+                tangent.z *=
+                    inverse_tangent;
+
+                float tangent_impulse =
+                    -dot3(
+                        relative,
+                        tangent) /
+                    inverse_mass_sum;
+
+                const float friction =
+                    std::sqrt(
+                        std::max(
+                            0.0f,
+                            first_material.friction *
+                            second_material.friction));
+
+                const float limit =
+                    normal_impulse *
+                    friction;
+
+                tangent_impulse =
+                    std::clamp(
+                        tangent_impulse,
+                        -limit,
+                        limit);
+
+                if (first_dynamic) {
+                    first_body->linear_velocity.x -=
+                        tangent.x *
+                        tangent_impulse *
+                        first_inverse_mass;
+                    first_body->linear_velocity.y -=
+                        tangent.y *
+                        tangent_impulse *
+                        first_inverse_mass;
+                    first_body->linear_velocity.z -=
+                        tangent.z *
+                        tangent_impulse *
+                        first_inverse_mass;
+                }
+
+                if (second_dynamic) {
+                    second_body->linear_velocity.x +=
+                        tangent.x *
+                        tangent_impulse *
+                        second_inverse_mass;
+                    second_body->linear_velocity.y +=
+                        tangent.y *
+                        tangent_impulse *
+                        second_inverse_mass;
+                    second_body->linear_velocity.z +=
+                        tangent.z *
+                        tangent_impulse *
+                        second_inverse_mass;
+                }
+            }
         }
 
         ++stats.resolved_3d;
@@ -1370,32 +1573,6 @@ CollisionResolutionStats resolve_box_contacts_2d(
            core::Vec3 b) noexcept {
             return a.x * b.x +
                 a.y * b.y;
-        };
-
-    const auto remove_normal_velocity =
-        [&dot2](
-            core::Vec3& velocity,
-            core::Vec3 normal,
-            bool first_body) {
-
-            const float along =
-                dot2(
-                    velocity,
-                    normal);
-
-            const bool entering =
-                first_body
-                    ? along > 0.0f
-                    : along < 0.0f;
-
-            if (entering) {
-                velocity.x -=
-                    normal.x * along;
-                velocity.y -=
-                    normal.y * along;
-            }
-
-            velocity.z = 0.0f;
         };
 
     for (const auto& overlap :
@@ -1445,39 +1622,35 @@ CollisionResolutionStats resolve_box_contacts_2d(
             continue;
         }
 
-        float first_share = 0.0f;
-        float second_share = 0.0f;
+        const float first_inverse_mass =
+            first_dynamic &&
+            first_body->mass > 0.0f
+                ? 1.0f /
+                    first_body->mass
+                : 0.0f;
 
-        if (first_dynamic &&
-            second_dynamic) {
+        const float second_inverse_mass =
+            second_dynamic &&
+            second_body->mass > 0.0f
+                ? 1.0f /
+                    second_body->mass
+                : 0.0f;
 
-            const float first_inverse_mass =
-                first_body->mass > 0.0f
-                    ? 1.0f / first_body->mass
-                    : 0.0f;
+        const float inverse_mass_sum =
+            first_inverse_mass +
+            second_inverse_mass;
 
-            const float second_inverse_mass =
-                second_body->mass > 0.0f
-                    ? 1.0f / second_body->mass
-                    : 0.0f;
-
-            const float total =
-                first_inverse_mass +
-                second_inverse_mass;
-
-            if (total > 0.0f) {
-                first_share =
-                    first_inverse_mass /
-                    total;
-                second_share =
-                    second_inverse_mass /
-                    total;
-            }
-        } else if (first_dynamic) {
-            first_share = 1.0f;
-        } else {
-            second_share = 1.0f;
+        if (inverse_mass_sum <= 0.0f) {
+            continue;
         }
+
+        const float first_share =
+            first_inverse_mass /
+            inverse_mass_sum;
+
+        const float second_share =
+            second_inverse_mass /
+            inverse_mass_sum;
 
         first_transform->local_position.x -=
             overlap.normal.x *
@@ -1497,18 +1670,178 @@ CollisionResolutionStats resolve_box_contacts_2d(
             overlap.penetration *
             second_share;
 
+        const core::Vec3 first_velocity =
+            first_dynamic
+                ? first_body->linear_velocity
+                : core::Vec3{};
+
+        const core::Vec3 second_velocity =
+            second_dynamic
+                ? second_body->linear_velocity
+                : core::Vec3{};
+
+        core::Vec3 relative{
+            second_velocity.x -
+                first_velocity.x,
+            second_velocity.y -
+                first_velocity.y,
+            0.0f
+        };
+
+        const float normal_speed =
+            dot2(
+                relative,
+                overlap.normal);
+
+        if (normal_speed < 0.0f) {
+            const auto first_material =
+                contact_material_2d(
+                    world,
+                    overlap.first);
+
+            const auto second_material =
+                contact_material_2d(
+                    world,
+                    overlap.second);
+
+            const float restitution =
+                std::max(
+                    first_material.restitution,
+                    second_material.restitution);
+
+            const float normal_impulse =
+                -(1.0f + restitution) *
+                normal_speed /
+                inverse_mass_sum;
+
+            if (first_dynamic) {
+                first_body->linear_velocity.x -=
+                    overlap.normal.x *
+                    normal_impulse *
+                    first_inverse_mass;
+                first_body->linear_velocity.y -=
+                    overlap.normal.y *
+                    normal_impulse *
+                    first_inverse_mass;
+            }
+
+            if (second_dynamic) {
+                second_body->linear_velocity.x +=
+                    overlap.normal.x *
+                    normal_impulse *
+                    second_inverse_mass;
+                second_body->linear_velocity.y +=
+                    overlap.normal.y *
+                    normal_impulse *
+                    second_inverse_mass;
+            }
+
+            const core::Vec3 post_first =
+                first_dynamic
+                    ? first_body->linear_velocity
+                    : core::Vec3{};
+
+            const core::Vec3 post_second =
+                second_dynamic
+                    ? second_body->linear_velocity
+                    : core::Vec3{};
+
+            relative = {
+                post_second.x -
+                    post_first.x,
+                post_second.y -
+                    post_first.y,
+                0.0f
+            };
+
+            const float post_normal_speed =
+                dot2(
+                    relative,
+                    overlap.normal);
+
+            core::Vec3 tangent{
+                relative.x -
+                    overlap.normal.x *
+                    post_normal_speed,
+                relative.y -
+                    overlap.normal.y *
+                    post_normal_speed,
+                0.0f
+            };
+
+            const float tangent_squared =
+                dot2(
+                    tangent,
+                    tangent);
+
+            if (tangent_squared >
+                0.0000000001f) {
+
+                const float inverse_tangent =
+                    1.0f /
+                    std::sqrt(
+                        tangent_squared);
+
+                tangent.x *=
+                    inverse_tangent;
+                tangent.y *=
+                    inverse_tangent;
+
+                float tangent_impulse =
+                    -dot2(
+                        relative,
+                        tangent) /
+                    inverse_mass_sum;
+
+                const float friction =
+                    std::sqrt(
+                        std::max(
+                            0.0f,
+                            first_material.friction *
+                            second_material.friction));
+
+                const float limit =
+                    normal_impulse *
+                    friction;
+
+                tangent_impulse =
+                    std::clamp(
+                        tangent_impulse,
+                        -limit,
+                        limit);
+
+                if (first_dynamic) {
+                    first_body->linear_velocity.x -=
+                        tangent.x *
+                        tangent_impulse *
+                        first_inverse_mass;
+                    first_body->linear_velocity.y -=
+                        tangent.y *
+                        tangent_impulse *
+                        first_inverse_mass;
+                }
+
+                if (second_dynamic) {
+                    second_body->linear_velocity.x +=
+                        tangent.x *
+                        tangent_impulse *
+                        second_inverse_mass;
+                    second_body->linear_velocity.y +=
+                        tangent.y *
+                        tangent_impulse *
+                        second_inverse_mass;
+                }
+            }
+        }
+
         if (first_dynamic) {
-            remove_normal_velocity(
-                first_body->linear_velocity,
-                overlap.normal,
-                true);
+            first_body->linear_velocity.z =
+                0.0f;
         }
 
         if (second_dynamic) {
-            remove_normal_velocity(
-                second_body->linear_velocity,
-                overlap.normal,
-                false);
+            second_body->linear_velocity.z =
+                0.0f;
         }
 
         ++stats.resolved_2d;

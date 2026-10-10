@@ -288,13 +288,13 @@ The concrete Vulkan backend currently grows beneath this contract. The long-term
 Implemented:
 - Dedicated NEnginePhysics module.
 - Native Rigidbody / BoxCollider / SphereCollider and Rigidbody2D / BoxCollider2D / CircleCollider2D components.
-- Reflection metadata and Scene serialization for mass, gravity, velocity, trigger, collider layer/collision-mask, center, box size and radial radius state, with legacy Scene defaults for the filter fields.
+- Reflection metadata and Scene serialization for mass, gravity, velocity, trigger, collider layer/collision-mask, friction/restitution, center, box size and radial radius state, with legacy Scene defaults for filter and contact-material fields.
 - Editor Add Component, Inspector and generic PropertyAccess integration for all six physics components.
 - Managed Rigidbody / BoxCollider / SphereCollider / Rigidbody2D / BoxCollider2D / CircleCollider2D proxies over ABI v15, including Unity-familiar velocity/useGravity/isKinematic naming.
 - Fixed-step rigidbody foundation runs after managed FixedUpdate so script velocity changes affect the same simulation step.
 - 3D gravity/linear-velocity Transform integration and 2D XY integration with kinematic/inactive bodies skipped.
 - BoxCollider/SphereCollider and BoxCollider2D/CircleCollider2D share the X-axis sweep-and-prune broad phase; rotated boxes contribute conservative world AABBs while SAT narrow phase handles OBB-OBB, sphere-sphere/circle-circle and oriented box-radial pairs with layer/collision-mask filtering and trigger separation.
-- Basic 3D/2D position contact resolution removes entering normal velocity; dynamic/dynamic correction is inverse-mass weighted.
+- 3D/2D contact resolution uses inverse-mass-weighted positional correction plus normal restitution impulses and Coulomb-limited tangential friction impulses; collider friction uses geometric-mean combination and restitution uses the larger value.
 - ContactTracker derives Enter/Stay/Exit phases for collision and trigger pairs.
 - Editor Play Mode dispatches tracked contact phases to both active managed Behaviours with side-correct contact normals.
 - Generated C# exposes Collision/Collision2D plus Collider/Collider2D callback payloads for OnCollisionEnter/Stay/Exit, OnTriggerEnter/Stay/Exit and their 2D variants.
@@ -306,7 +306,7 @@ Implemented:
 
 Not yet implemented:
 - Production broad-phase tuning beyond the initial sweep-and-prune plus remaining shapes such as capsule/polygon variants.
-- Production contact solving, friction, restitution and sleeping.
+- Production contact solving beyond the current single-contact impulse foundation, plus sleeping.
 - Additional shape casts and richer hit semantics/query filtering policy.
 - Physics materials and joints.
 - Production 3D/2D backend selection/integration.
@@ -352,7 +352,7 @@ Not yet implemented:
 
 ## Immediate next work
 
-1. Extend the rotated box/sphere/circle sweep-and-prune path with remaining collider shapes and friction/restitution/sleeping.
+1. Extend the rotated box/sphere/circle sweep-and-prune path with sleeping, remaining collider shapes and production contact-solver iteration/warm-starting.
 2. Extend audio with streaming + OGG/MP3/FLAC runtime decode and a callback-driven device path after real-Windows audible acceptance.
 3. Extend managed physics queries with additional shape casts and richer hit/filtering semantics.
 4. Package/version the managed NEngine API surface and add debugger attach/symbol workflow.

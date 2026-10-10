@@ -142,6 +142,8 @@ int main() {
         collider->layer = 3u;
         collider->collision_mask =
             0x000000a5u;
+        collider->friction = 0.25f;
+        collider->restitution = 0.75f;
         collider->center =
             {0.25f, 0.5f, 0.75f};
         collider->size =
@@ -153,6 +155,8 @@ int main() {
         sphere->layer = 9u;
         sphere->collision_mask =
             0x00000f0fu;
+        sphere->friction = 0.8f;
+        sphere->restitution = 0.3f;
         sphere->center =
             {1.0f, 2.0f, 3.0f};
         sphere->radius = 1.25f;
@@ -169,8 +173,15 @@ int main() {
         collider2d->layer = 7u;
         collider2d->collision_mask =
             0x0000ff00u;
+        collider2d->friction = 0.6f;
+        collider2d->restitution = 0.2f;
         collider2d->size =
             {6.0f, 7.0f, 0.0f};
+    }
+
+    if (circle2d) {
+        circle2d->friction = 0.4f;
+        circle2d->restitution = 0.9f;
     }
 
     const auto captured_body =
@@ -312,6 +323,12 @@ int main() {
         restored_collider->layer == 3u &&
         restored_collider->collision_mask ==
             0x000000a5u &&
+        std::abs(
+            restored_collider->friction -
+            0.25f) < 0.0001f &&
+        std::abs(
+            restored_collider->restitution -
+            0.75f) < 0.0001f &&
         restored_collider->size ==
             core::Vec3{2.0f, 3.0f, 4.0f} &&
         restored_sphere &&
@@ -319,6 +336,12 @@ int main() {
         restored_sphere->layer == 9u &&
         restored_sphere->collision_mask ==
             0x00000f0fu &&
+        std::abs(
+            restored_sphere->friction -
+            0.8f) < 0.0001f &&
+        std::abs(
+            restored_sphere->restitution -
+            0.3f) < 0.0001f &&
         restored_sphere->center ==
             core::Vec3{1.0f, 2.0f, 3.0f} &&
         std::abs(
@@ -332,11 +355,23 @@ int main() {
         restored_collider2d->layer == 7u &&
         restored_collider2d->collision_mask ==
             0x0000ff00u &&
+        std::abs(
+            restored_collider2d->friction -
+            0.6f) < 0.0001f &&
+        std::abs(
+            restored_collider2d->restitution -
+            0.2f) < 0.0001f &&
         restored_collider2d->size ==
             core::Vec3{6.0f, 7.0f, 0.0f} &&
         restored_circle2d &&
         restored_circle2d->radius ==
-            0.5f,
+            0.5f &&
+        std::abs(
+            restored_circle2d->friction -
+            0.4f) < 0.0001f &&
+        std::abs(
+            restored_circle2d->restitution -
+            0.9f) < 0.0001f,
         "physics Scene roundtrip preserves configured values");
 
     if (captured_collider) {
@@ -349,7 +384,9 @@ int main() {
                 legacy.properties.end(),
                 [](const auto& property) {
                     return property.name == "Layer" ||
-                           property.name == "Collision Mask";
+                           property.name == "Collision Mask" ||
+                           property.name == "Friction" ||
+                           property.name == "Restitution";
                 }),
             legacy.properties.end());
 
@@ -376,8 +413,14 @@ int main() {
             legacy_collider &&
             legacy_collider->layer == 0u &&
             legacy_collider->collision_mask ==
-                0xffffffffu,
-            "legacy BoxCollider data defaults to layer zero and all collision layers");
+                0xffffffffu &&
+            std::abs(
+                legacy_collider->friction -
+                0.5f) < 0.0001f &&
+            std::abs(
+                legacy_collider->restitution) <
+                0.0001f,
+            "legacy BoxCollider data defaults layer filtering and contact material values");
     }
 
     if (captured_body) {
@@ -418,6 +461,24 @@ int main() {
                 invalid,
                 &error),
             "BoxCollider codec rejects non-positive dimensions");
+    }
+
+    if (captured_collider) {
+        auto invalid =
+            *captured_collider;
+
+        set_property(
+            invalid,
+            "Restitution",
+            core::PropertyValue{1.5});
+
+        check(
+            !serialization.restore(
+                restored,
+                restored_entity,
+                invalid,
+                &error),
+            "BoxCollider codec rejects contact material values outside zero to one");
     }
 
     if (captured_sphere) {
@@ -1532,6 +1593,192 @@ int main() {
         "2D box contact resolution separates only on XY and clears entering normal velocity without moving Z");
 
 
+
+
+    core::World material_world;
+
+    const auto material_floor =
+        material_world.create(
+            "Material Floor");
+
+    const auto material_body_entity =
+        material_world.create(
+            "Material Body");
+
+    auto* material_floor_collider =
+        material_world.add_component<
+            physics::BoxCollider>(
+                material_floor,
+                physics::box_collider_type());
+
+    auto* material_body_collider =
+        material_world.add_component<
+            physics::BoxCollider>(
+                material_body_entity,
+                physics::box_collider_type());
+
+    auto* material_body =
+        material_world.add_component<
+            physics::Rigidbody>(
+                material_body_entity,
+                physics::rigidbody_type());
+
+    material_floor_collider =
+        material_world.get_component<
+            physics::BoxCollider>(
+                material_floor,
+                physics::box_collider_type());
+
+    material_body_collider =
+        material_world.get_component<
+            physics::BoxCollider>(
+                material_body_entity,
+                physics::box_collider_type());
+
+    if (material_floor_collider) {
+        material_floor_collider->friction =
+            1.0f;
+        material_floor_collider->restitution =
+            0.5f;
+    }
+
+    if (material_body_collider) {
+        material_body_collider->friction =
+            1.0f;
+        material_body_collider->restitution =
+            0.25f;
+    }
+
+    if (material_body) {
+        material_body->use_gravity = false;
+        material_body->linear_velocity =
+            {2.0f, -3.0f, 0.0f};
+    }
+
+    material_world.transform(
+        material_body_entity)->local_position =
+            {0.0f, 0.75f, 0.0f};
+
+    const auto material_detection =
+        physics::detect_box_overlaps(
+            material_world);
+
+    const auto material_resolution =
+        physics::resolve_box_contacts_3d(
+            material_world,
+            material_detection.overlaps);
+
+    material_body =
+        material_world.get_component<
+            physics::Rigidbody>(
+                material_body_entity,
+                physics::rigidbody_type());
+
+    check(
+        material_resolution.resolved_3d ==
+            1u &&
+        material_body &&
+        std::abs(
+            material_body->linear_velocity.x) <
+            0.0001f &&
+        std::abs(
+            material_body->linear_velocity.y -
+            1.5f) < 0.0001f,
+        "3D contact solver applies max restitution and Coulomb friction impulse");
+
+    core::World material_2d_world;
+
+    const auto material_floor_2d =
+        material_2d_world.create(
+            "Material Floor 2D");
+
+    const auto material_body_2d_entity =
+        material_2d_world.create(
+            "Material Body 2D");
+
+    auto* material_floor_collider_2d =
+        material_2d_world.add_component<
+            physics::BoxCollider2D>(
+                material_floor_2d,
+                physics::box_collider2d_type());
+
+    auto* material_body_collider_2d =
+        material_2d_world.add_component<
+            physics::BoxCollider2D>(
+                material_body_2d_entity,
+                physics::box_collider2d_type());
+
+    auto* material_body_2d =
+        material_2d_world.add_component<
+            physics::Rigidbody2D>(
+                material_body_2d_entity,
+                physics::rigidbody2d_type());
+
+    material_floor_collider_2d =
+        material_2d_world.get_component<
+            physics::BoxCollider2D>(
+                material_floor_2d,
+                physics::box_collider2d_type());
+
+    material_body_collider_2d =
+        material_2d_world.get_component<
+            physics::BoxCollider2D>(
+                material_body_2d_entity,
+                physics::box_collider2d_type());
+
+    if (material_floor_collider_2d) {
+        material_floor_collider_2d->friction =
+            0.0f;
+        material_floor_collider_2d->restitution =
+            1.0f;
+    }
+
+    if (material_body_collider_2d) {
+        material_body_collider_2d->friction =
+            1.0f;
+        material_body_collider_2d->restitution =
+            0.0f;
+    }
+
+    if (material_body_2d) {
+        material_body_2d->use_gravity = false;
+        material_body_2d->linear_velocity =
+            {2.0f, -3.0f, 9.0f};
+    }
+
+    material_2d_world.transform(
+        material_body_2d_entity)->local_position =
+            {0.0f, 0.75f, 4.0f};
+
+    const auto material_detection_2d =
+        physics::detect_box_overlaps(
+            material_2d_world);
+
+    const auto material_resolution_2d =
+        physics::resolve_box_contacts_2d(
+            material_2d_world,
+            material_detection_2d.overlaps);
+
+    material_body_2d =
+        material_2d_world.get_component<
+            physics::Rigidbody2D>(
+                material_body_2d_entity,
+                physics::rigidbody2d_type());
+
+    check(
+        material_resolution_2d.resolved_2d ==
+            1u &&
+        material_body_2d &&
+        std::abs(
+            material_body_2d->linear_velocity.x -
+            2.0f) < 0.0001f &&
+        std::abs(
+            material_body_2d->linear_velocity.y -
+            3.0f) < 0.0001f &&
+        std::abs(
+            material_body_2d->linear_velocity.z) <
+            0.0001f,
+        "2D contact solver combines zero friction with full restitution and keeps velocity on XY");
 
     core::World rotated_box_world;
 

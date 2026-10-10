@@ -2568,6 +2568,18 @@ std::string api_stub(
         public abstract bool isTrigger { get; set; }
         public abstract int layer { get; set; }
         public abstract uint collisionMask { get; set; }
+
+        public float friction
+        {
+            get => NativeFloat("Friction", 0.5f);
+            set => SetNativeFloat("Friction", value);
+        }
+
+        public float restitution
+        {
+            get => NativeFloat("Restitution", 0);
+            set => SetNativeFloat("Restitution", value);
+        }
     }
 
     public sealed class BoxCollider : Collider
@@ -2730,6 +2742,18 @@ std::string api_stub(
         public abstract bool isTrigger { get; set; }
         public abstract int layer { get; set; }
         public abstract uint collisionMask { get; set; }
+
+        public float friction
+        {
+            get => NativeFloat("Friction", 0.5f);
+            set => SetNativeFloat("Friction", value);
+        }
+
+        public float restitution
+        {
+            get => NativeFloat("Restitution", 0);
+            set => SetNativeFloat("Restitution", value);
+        }
     }
 
     public sealed class BoxCollider2D : Collider2D

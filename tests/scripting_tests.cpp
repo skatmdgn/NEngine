@@ -82,6 +82,8 @@ struct ManagedBoxColliderFixture {
     bool is_trigger{false};
     std::int64_t layer{0};
     std::int64_t collision_mask{0xffffffffLL};
+    float friction{0.5f};
+    float restitution{0.0f};
     nengine::core::Vec3 center{};
     nengine::core::Vec3 size{1.0f, 1.0f, 1.0f};
 };
@@ -91,6 +93,8 @@ struct ManagedSphereColliderFixture {
     bool is_trigger{false};
     std::int64_t layer{0};
     std::int64_t collision_mask{0xffffffffLL};
+    float friction{0.5f};
+    float restitution{0.0f};
     nengine::core::Vec3 center{};
     float radius{0.5f};
 };
@@ -109,6 +113,8 @@ struct ManagedBoxCollider2DFixture {
     bool is_trigger{false};
     std::int64_t layer{0};
     std::int64_t collision_mask{0xffffffffLL};
+    float friction{0.5f};
+    float restitution{0.0f};
     nengine::core::Vec3 center{};
     nengine::core::Vec3 size{1.0f, 1.0f, 0.0f};
 };
@@ -118,6 +124,8 @@ struct ManagedCircleCollider2DFixture {
     bool is_trigger{false};
     std::int64_t layer{0};
     std::int64_t collision_mask{0xffffffffLL};
+    float friction{0.5f};
+    float restitution{0.0f};
     nengine::core::Vec3 center{};
     float radius{0.5f};
 };
@@ -607,6 +615,12 @@ bool read_managed_render_property(
             output = value->layer;
         else if (property == "Collision Mask")
             output = value->collision_mask;
+        else if (property == "Friction")
+            output = static_cast<double>(
+                value->friction);
+        else if (property == "Restitution")
+            output = static_cast<double>(
+                value->restitution);
         else if (property == "Center")
             output = value->center;
         else if (property == "Size")
@@ -634,6 +648,12 @@ bool read_managed_render_property(
             output = value->layer;
         else if (property == "Collision Mask")
             output = value->collision_mask;
+        else if (property == "Friction")
+            output = static_cast<double>(
+                value->friction);
+        else if (property == "Restitution")
+            output = static_cast<double>(
+                value->restitution);
         else if (property == "Center")
             output = value->center;
         else if (property == "Radius")
@@ -689,6 +709,12 @@ bool read_managed_render_property(
             output = value->layer;
         else if (property == "Collision Mask")
             output = value->collision_mask;
+        else if (property == "Friction")
+            output = static_cast<double>(
+                value->friction);
+        else if (property == "Restitution")
+            output = static_cast<double>(
+                value->restitution);
         else if (property == "Center")
             output = value->center;
         else if (property == "Size")
@@ -716,6 +742,12 @@ bool read_managed_render_property(
             output = value->layer;
         else if (property == "Collision Mask")
             output = value->collision_mask;
+        else if (property == "Friction")
+            output = static_cast<double>(
+                value->friction);
+        else if (property == "Restitution")
+            output = static_cast<double>(
+                value->restitution);
         else if (property == "Center")
             output = value->center;
         else if (property == "Radius")
@@ -1141,6 +1173,23 @@ bool write_managed_render_property(
                     return false;
                 value->collision_mask = *typed;
             }
+        } else if (property == "Friction" ||
+                   property == "Restitution") {
+            const auto* typed =
+                std::get_if<double>(&input);
+
+            if (!typed ||
+                *typed < 0.0 ||
+                *typed > 1.0) {
+                return false;
+            }
+
+            if (property == "Friction")
+                value->friction =
+                    static_cast<float>(*typed);
+            else
+                value->restitution =
+                    static_cast<float>(*typed);
         } else if (property == "Center" ||
                    property == "Size") {
             const auto* typed =
@@ -1237,6 +1286,23 @@ bool write_managed_render_property(
                     return false;
                 value->collision_mask = *typed;
             }
+        } else if (property == "Friction" ||
+                   property == "Restitution") {
+            const auto* typed =
+                std::get_if<double>(&input);
+
+            if (!typed ||
+                *typed < 0.0 ||
+                *typed > 1.0) {
+                return false;
+            }
+
+            if (property == "Friction")
+                value->friction =
+                    static_cast<float>(*typed);
+            else
+                value->restitution =
+                    static_cast<float>(*typed);
         } else if (property == "Center" ||
                    property == "Size") {
             const auto* typed =
@@ -1524,6 +1590,10 @@ int main() {
         api.find("sealed class Collision2D") !=
             std::string::npos &&
         api.find("abstract class Collider") !=
+            std::string::npos &&
+        api.find("public float friction") !=
+            std::string::npos &&
+        api.find("public float restitution") !=
             std::string::npos &&
         api.find("sealed class SphereCollider") !=
             std::string::npos &&
@@ -1953,9 +2023,9 @@ int main() {
                 << "        mesh.mesh = nextMesh; mesh.material = nextMaterial; mesh.enabled = false; mesh.castShadows = false; mesh.receiveShadows = false;\n"
                 << "        sprite.texture = nextTexture; sprite.enabled = false; sprite.pixelsPerUnit = 64f; sprite.sortingOrder = 7; sprite.flipX = true; sprite.flipY = true;\n"
                 << "        if (System.MathF.Abs(body.mass - 1f) > 0.001f || !body.useGravity || body.isKinematic) throw new System.Exception(\"rigidbody read mismatch\"); body.useGravity = false; body.mass = 2.5f; body.gravityScale = 0.5f; body.velocity = new Vector3(1, 2, 3); body.AddForce(new Vector3(2.5f, 0, 0)); body.isKinematic = true; body.enabled = false;\n"
-                << "        box.isTrigger = true; box.layer = 3; box.collisionMask = 0x000000a5u; box.center = new Vector3(0.1f, 0.2f, 0.3f); box.size = new Vector3(2, 3, 4);\n"
+                << "        box.isTrigger = true; box.layer = 3; box.collisionMask = 0x000000a5u; box.friction = 0.25f; box.restitution = 0.75f; box.center = new Vector3(0.1f, 0.2f, 0.3f); box.size = new Vector3(2, 3, 4);\n"
                 << "        body2d.useGravity = false; body2d.mass = 3f; body2d.gravityScale = 0.25f; body2d.velocity = new Vector2(4, 5); body2d.AddForce(new Vector2(3, 0)); body2d.isKinematic = true;\n"
-                << "        box2d.isTrigger = true; box2d.layer = 7; box2d.collisionMask = 0x0000ff00u; box2d.center = new Vector2(0.5f, 0.75f); box2d.size = new Vector2(6, 7);\n"
+                << "        box2d.isTrigger = true; box2d.layer = 7; box2d.collisionMask = 0x0000ff00u; box2d.friction = 0.6f; box2d.restitution = 0.2f; box2d.center = new Vector2(0.5f, 0.75f); box2d.size = new Vector2(6, 7);\n"
                 << "        if (audio.clip.ToString() != \"10101010101010102020202020202020\" || audio.isPlaying || System.MathF.Abs(audio.time - 0.25f) > 0.001f) throw new System.Exception(\"audio initial state mismatch\");\n"
                 << "        audio.Play(); if (!audio.isPlaying || System.MathF.Abs(audio.time) > 0.001f) throw new System.Exception(\"audio play mismatch\"); audio.time = 0.5f; audio.Pause(); if (audio.isPlaying) throw new System.Exception(\"audio pause mismatch\"); audio.UnPause(); if (!audio.isPlaying) throw new System.Exception(\"audio unpause mismatch\"); audio.Stop(); if (audio.isPlaying || System.MathF.Abs(audio.time) > 0.001f) throw new System.Exception(\"audio stop mismatch\");\n"
                 << "        audio.playOnAwake = false; audio.loop = true; audio.spatialize = true; audio.volume = 0.4f; audio.pitch = 1.2f; audio.panStereo = 0.25f; listener.enabled = false; listener.volume = 0.7f;\n"
@@ -2491,6 +2561,12 @@ int main() {
                             box_fixture->layer == 3 &&
                             box_fixture->collision_mask ==
                                 0x000000a5LL &&
+                            std::abs(
+                                box_fixture->friction -
+                                0.25f) < 0.001f &&
+                            std::abs(
+                                box_fixture->restitution -
+                                0.75f) < 0.001f &&
                             box_fixture->center ==
                                 nengine::core::Vec3{0.1f, 0.2f, 0.3f} &&
                             box_fixture->size ==
@@ -2507,6 +2583,12 @@ int main() {
                             box2d_fixture->layer == 7 &&
                             box2d_fixture->collision_mask ==
                                 0x0000ff00LL &&
+                            std::abs(
+                                box2d_fixture->friction -
+                                0.6f) < 0.001f &&
+                            std::abs(
+                                box2d_fixture->restitution -
+                                0.2f) < 0.001f &&
                             box2d_fixture->center ==
                                 nengine::core::Vec3{0.5f, 0.75f, 0.0f} &&
                             box2d_fixture->size ==

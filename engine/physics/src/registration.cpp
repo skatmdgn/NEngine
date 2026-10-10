@@ -47,12 +47,13 @@ bool read_bool(
 bool read_float(
     const core::SerializedComponentData& data,
     std::string_view name,
-    float& value) {
+    float& value,
+    bool optional = false) {
 
     const auto* property =
         find_property(data, name);
 
-    if (!property) return false;
+    if (!property) return optional;
 
     const auto* typed =
         std::get_if<double>(&property->value);
@@ -172,6 +173,16 @@ bool valid_radius(
     return radius > 0.0f;
 }
 
+bool valid_contact_material(
+    float friction,
+    float restitution) noexcept {
+
+    return friction >= 0.0f &&
+        friction <= 1.0f &&
+        restitution >= 0.0f &&
+        restitution <= 1.0f;
+}
+
 template <typename T>
 T* ensure_component(
     core::World& world,
@@ -262,6 +273,8 @@ bool register_box_metadata(
             {"Is Trigger", core::PropertyKind::Boolean},
             {"Layer", core::PropertyKind::Integer},
             {"Collision Mask", core::PropertyKind::Integer},
+            {"Friction", core::PropertyKind::Float},
+            {"Restitution", core::PropertyKind::Float},
             {"Center", core::PropertyKind::Vec3},
             {"Size", core::PropertyKind::Vec3}}) {
 
@@ -305,6 +318,8 @@ bool register_radial_metadata(
             {"Is Trigger", core::PropertyKind::Boolean},
             {"Layer", core::PropertyKind::Integer},
             {"Collision Mask", core::PropertyKind::Integer},
+            {"Friction", core::PropertyKind::Float},
+            {"Restitution", core::PropertyKind::Float},
             {"Center", core::PropertyKind::Vec3},
             {"Radius", core::PropertyKind::Float}}) {
 
@@ -455,6 +470,12 @@ capture_box(
             "Collision Mask",
             static_cast<std::int64_t>(
                 value->collision_mask)),
+        float_property(
+            "Friction",
+            value->friction),
+        float_property(
+            "Restitution",
+            value->restitution),
         vec3_property(
             "Center",
             value->center),
@@ -510,6 +531,19 @@ bool restore_box(
         collision_mask >
             static_cast<std::int64_t>(
                 0xffffffffu) ||
+        !read_float(
+            data,
+            "Friction",
+            value.friction,
+            true) ||
+        !read_float(
+            data,
+            "Restitution",
+            value.restitution,
+            true) ||
+        !valid_contact_material(
+            value.friction,
+            value.restitution) ||
         !read_vec3(
             data,
             "Center",
@@ -583,6 +617,12 @@ capture_radial(
             "Collision Mask",
             static_cast<std::int64_t>(
                 value->collision_mask)),
+        float_property(
+            "Friction",
+            value->friction),
+        float_property(
+            "Restitution",
+            value->restitution),
         vec3_property(
             "Center",
             value->center),
@@ -637,6 +677,19 @@ bool restore_radial(
         collision_mask >
             static_cast<std::int64_t>(
                 0xffffffffu) ||
+        !read_float(
+            data,
+            "Friction",
+            value.friction,
+            true) ||
+        !read_float(
+            data,
+            "Restitution",
+            value.restitution,
+            true) ||
+        !valid_contact_material(
+            value.friction,
+            value.restitution) ||
         !read_vec3(
             data,
             "Center",
@@ -770,7 +823,7 @@ bool register_component_serializers(
     ok =
         registry.register_codec({
             box_collider_type(),
-            1,
+            2,
             "NEngine.BoxCollider",
             [](const core::World& world,
                core::Entity entity) {
@@ -798,7 +851,7 @@ bool register_component_serializers(
     ok =
         registry.register_codec({
             sphere_collider_type(),
-            1,
+            2,
             "NEngine.SphereCollider",
             [](const core::World& world,
                core::Entity entity) {
@@ -852,7 +905,7 @@ bool register_component_serializers(
     ok =
         registry.register_codec({
             box_collider2d_type(),
-            1,
+            2,
             "NEngine.BoxCollider2D",
             [](const core::World& world,
                core::Entity entity) {
@@ -880,7 +933,7 @@ bool register_component_serializers(
     ok =
         registry.register_codec({
             circle_collider2d_type(),
-            1,
+            2,
             "NEngine.CircleCollider2D",
             [](const core::World& world,
                core::Entity entity) {
