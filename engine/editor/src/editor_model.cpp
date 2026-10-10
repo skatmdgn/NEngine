@@ -1,5 +1,6 @@
 #include "nengine/editor/editor_model.hpp"
 #include "nengine/editor/render_integration.hpp"
+#include "nengine/editor/physics_integration.hpp"
 #include "nengine/editor/scripting_integration.hpp"
 
 namespace nengine::editor {
@@ -179,6 +180,24 @@ EditorModel::EditorModel() {
         console_.warning(
             "Editor",
             "Render component factories were only partially registered.");
+    }
+
+    if (!register_physics_integration(
+            component_registry_,
+            component_serialization_,
+            property_access_)) {
+
+        console_.warning(
+            "Editor",
+            "Physics component integration was only partially registered.");
+    }
+
+    if (!register_physics_component_factories(
+            component_factories_)) {
+
+        console_.warning(
+            "Editor",
+            "Physics component factories were only partially registered.");
     }
 
     if (!register_scripting_integration(
