@@ -168,7 +168,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Fixed-capacity native ContactManifold + representative contact-point tracking foundation
 - [x] Box/Box2D facing-vertex multi-point manifold foundation (up to 4 points / 2 points)
 - [x] Reference/incident face polygon clipping for Box/Box2D manifolds
-- [x] Accumulated eight-pass sequential velocity solver foundation for 3D/2D contact chains
+- [x] Accumulated sixteen-pass sequential velocity solver foundation for 3D/2D contact chains
 - [x] Rigidbody/Rigidbody2D angular velocity Scene/Editor/C# + quaternion integration foundation
 - [x] Collider-derived inertia + per-manifold-point rotational sequential constraints
 - [ ] Cross-frame warm starting, island-aware sleeping, remaining collider shapes and production broad-phase/solver tuning

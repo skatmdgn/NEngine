@@ -2421,6 +2421,18 @@ int main() {
                 iterative_b,
                 physics::rigidbody_type());
 
+    iterative_body_a =
+        iterative_solver_world.get_component<
+            physics::Rigidbody>(
+                iterative_a,
+                physics::rigidbody_type());
+
+    iterative_body_b =
+        iterative_solver_world.get_component<
+            physics::Rigidbody>(
+                iterative_b,
+                physics::rigidbody_type());
+
     iterative_solver_world.transform(
         iterative_b)->local_position =
             {0.75f, 0.0f, 0.0f};
@@ -2516,6 +2528,20 @@ int main() {
     auto* iterative_body_2d_b =
         iterative_solver_2d_world
             .add_component<
+                physics::Rigidbody2D>(
+                    iterative_2d_b,
+                    physics::rigidbody2d_type());
+
+    iterative_body_2d_a =
+        iterative_solver_2d_world
+            .get_component<
+                physics::Rigidbody2D>(
+                    iterative_2d_a,
+                    physics::rigidbody2d_type());
+
+    iterative_body_2d_b =
+        iterative_solver_2d_world
+            .get_component<
                 physics::Rigidbody2D>(
                     iterative_2d_b,
                     physics::rigidbody2d_type());
