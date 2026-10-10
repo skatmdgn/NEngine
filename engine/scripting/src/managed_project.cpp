@@ -1868,6 +1868,35 @@ std::string api_stub(
             get => NativeFloat("Time", 0);
             set => SetNativeFloat("Time", value);
         }
+
+        public void Play()
+        {
+            playing = true;
+        }
+
+        public void Play(
+            AssetGuid nextClip)
+        {
+            clip = nextClip;
+            playing = true;
+        }
+
+        public void Pause()
+        {
+            playing = false;
+        }
+
+        public void Stop()
+        {
+            playing = false;
+            time = 0;
+        }
+
+        public void Restart()
+        {
+            time = 0;
+            playing = true;
+        }
     }
 
     public sealed class SpriteRenderer : Component
