@@ -102,6 +102,9 @@ bool register_rigidbody_properties(
     bool_property(
         "Is Kinematic",
         &Component::is_kinematic);
+    bool_property(
+        "Allow Sleep",
+        &Component::allow_sleep);
 
     const auto positive_float_property =
         [&properties, type, &ok](
@@ -165,6 +168,11 @@ bool register_rigidbody_properties(
         &Component::gravity_scale,
         true);
 
+    positive_float_property(
+        "Sleep Threshold",
+        &Component::sleep_threshold,
+        true);
+
     ok =
         properties.register_property(
             type,
@@ -197,6 +205,58 @@ bool register_rigidbody_properties(
                             std::get_if<core::Vec3>(&raw);
                         if (!typed) return false;
                         component.linear_velocity = *typed;
+                        component.sleeping = false;
+                        component.sleep_timer = 0.0f;
+                        return true;
+                    });
+            }) &&
+        ok;
+
+    ok =
+        properties.register_property(
+            type,
+            "Sleeping",
+            core::PropertyKind::Boolean,
+            [type](
+                const core::World& world,
+                core::Entity entity) {
+                return read_component_property<Component>(
+                    world,
+                    entity,
+                    type,
+                    [](const Component& value) {
+                        return core::PropertyValue{
+                            value.sleeping};
+                    });
+            },
+            [type](
+                core::World& world,
+                core::Entity entity,
+                const core::PropertyValue& value) {
+                return write_component_property<Component>(
+                    world,
+                    entity,
+                    type,
+                    value,
+                    [](Component& component,
+                       const core::PropertyValue& raw) {
+                        const auto* typed =
+                            std::get_if<bool>(&raw);
+
+                        if (!typed) return false;
+
+                        component.sleeping =
+                            *typed &&
+                            component.allow_sleep;
+
+                        component.sleep_timer =
+                            0.0f;
+
+                        if (component.sleeping) {
+                            component.linear_velocity =
+                                {};
+                        }
+
                         return true;
                     });
             }) &&

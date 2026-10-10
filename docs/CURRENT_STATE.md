@@ -288,13 +288,14 @@ The concrete Vulkan backend currently grows beneath this contract. The long-term
 Implemented:
 - Dedicated NEnginePhysics module.
 - Native Rigidbody / BoxCollider / SphereCollider and Rigidbody2D / BoxCollider2D / CircleCollider2D components.
-- Reflection metadata and Scene serialization for mass, gravity, velocity, trigger, collider layer/collision-mask, friction/restitution, center, box size and radial radius state, with legacy Scene defaults for filter and contact-material fields.
+- Reflection metadata and Scene serialization for mass, gravity, velocity, Rigidbody sleep enable/threshold, trigger, collider layer/collision-mask, friction/restitution, center, box size and radial radius state, with legacy Scene defaults for sleep, filter and contact-material fields; runtime sleep state/timers are intentionally transient.
 - Editor Add Component, Inspector and generic PropertyAccess integration for all six physics components.
 - Managed Rigidbody / BoxCollider / SphereCollider / Rigidbody2D / BoxCollider2D / CircleCollider2D proxies over ABI v15, including Unity-familiar velocity/useGravity/isKinematic naming.
-- Fixed-step rigidbody foundation runs after managed FixedUpdate so script velocity changes affect the same simulation step.
+- Fixed-step rigidbody foundation runs after managed FixedUpdate so script velocity changes affect the same simulation step; sleeping bodies skip gravity/integration until velocity, impact or support changes wake them.
 - 3D gravity/linear-velocity Transform integration and 2D XY integration with kinematic/inactive bodies skipped.
 - BoxCollider/SphereCollider and BoxCollider2D/CircleCollider2D share the X-axis sweep-and-prune broad phase; rotated boxes contribute conservative world AABBs while SAT narrow phase handles OBB-OBB, sphere-sphere/circle-circle and oriented box-radial pairs with layer/collision-mask filtering and trigger separation.
-- 3D/2D contact resolution uses inverse-mass-weighted positional correction plus normal restitution impulses and Coulomb-limited tangential friction impulses; collider friction uses geometric-mean combination and restitution uses the larger value.
+- 3D/2D contact resolution uses inverse-mass-weighted positional correction with a tiny persistent contact slop plus normal restitution impulses and Coulomb-limited tangential friction impulses; collider friction uses geometric-mean combination and restitution uses the larger value.
+- Contact-supported Rigidbody/Rigidbody2D sleeping enters after 0.5 seconds at or below the configurable speed threshold, never sleeps unsupported bodies, wakes on externally assigned velocity/impact/support loss, and exposes managed allowSleep, sleepThreshold, Sleep(), WakeUp() and IsSleeping().
 - ContactTracker derives Enter/Stay/Exit phases for collision and trigger pairs.
 - Editor Play Mode dispatches tracked contact phases to both active managed Behaviours with side-correct contact normals.
 - Generated C# exposes Collision/Collision2D plus Collider/Collider2D callback payloads for OnCollisionEnter/Stay/Exit, OnTriggerEnter/Stay/Exit and their 2D variants.
@@ -306,7 +307,7 @@ Implemented:
 
 Not yet implemented:
 - Production broad-phase tuning beyond the initial sweep-and-prune plus remaining shapes such as capsule/polygon variants.
-- Production contact solving beyond the current single-contact impulse foundation, plus sleeping.
+- Production contact solving beyond the current single-contact impulse foundation, including iterative manifolds, warm starting and island-aware sleeping/wake propagation.
 - Additional shape casts and richer hit semantics/query filtering policy.
 - Physics materials and joints.
 - Production 3D/2D backend selection/integration.
@@ -352,7 +353,7 @@ Not yet implemented:
 
 ## Immediate next work
 
-1. Extend the rotated box/sphere/circle sweep-and-prune path with sleeping, remaining collider shapes and production contact-solver iteration/warm-starting.
+1. Extend the rotated box/sphere/circle sweep-and-prune path with remaining collider shapes plus production contact manifolds, iterative solving/warm-starting and island-aware sleep propagation.
 2. Extend audio with streaming + OGG/MP3/FLAC runtime decode and a callback-driven device path after real-Windows audible acceptance.
 3. Extend managed physics queries with additional shape casts and richer hit/filtering semantics.
 4. Package/version the managed NEngine API surface and add debugger attach/symbol workflow.

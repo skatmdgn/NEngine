@@ -11,8 +11,12 @@ struct Rigidbody {
     bool enabled{true};
     bool use_gravity{true};
     bool is_kinematic{false};
+    bool allow_sleep{true};
+    bool sleeping{false};
     float mass{1.0f};
     float gravity_scale{1.0f};
+    float sleep_threshold{0.05f};
+    float sleep_timer{0.0f};
     core::Vec3 linear_velocity{};
 };
 
@@ -42,8 +46,12 @@ struct Rigidbody2D {
     bool enabled{true};
     bool use_gravity{true};
     bool is_kinematic{false};
+    bool allow_sleep{true};
+    bool sleeping{false};
     float mass{1.0f};
     float gravity_scale{1.0f};
+    float sleep_threshold{0.05f};
+    float sleep_timer{0.0f};
     core::Vec3 linear_velocity{};
 };
 

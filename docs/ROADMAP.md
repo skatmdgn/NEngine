@@ -161,7 +161,8 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Rotated BoxCollider/BoxCollider2D SAT contacts + rotation-aware Raycast/OverlapBox/BoxCast target queries
 - [ ] Additional shape casts + richer hit semantics/query filtering policy
 - [x] Collider friction/restitution authoring + 3D/2D impulse response foundation
-- [ ] Sleeping, remaining collider shapes and production broad-phase/contact-solver tuning
+- [x] Contact-supported Rigidbody/Rigidbody2D sleeping + managed Sleep/WakeUp/IsSleeping foundation
+- [ ] Remaining collider shapes and production broad-phase/contact-manifold/solver tuning
 - [x] Keyboard/mouse InputState transitions + Win32 message capture
 - [x] Named action-map binding/query foundation
 - [x] Managed KeyCode/GetKey/GetKeyDown/GetKeyUp + mouse position/delta/wheel

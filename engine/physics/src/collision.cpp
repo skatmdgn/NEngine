@@ -1344,30 +1344,39 @@ CollisionResolutionStats resolve_box_contacts_3d(
             second_inverse_mass /
             inverse_mass_sum;
 
+        constexpr float contact_slop =
+            0.00001f;
+
+        const float correction =
+            std::max(
+                0.0f,
+                overlap.penetration -
+                    contact_slop);
+
         first_transform->local_position.x -=
             overlap.normal.x *
-            overlap.penetration *
+            correction *
             first_share;
         first_transform->local_position.y -=
             overlap.normal.y *
-            overlap.penetration *
+            correction *
             first_share;
         first_transform->local_position.z -=
             overlap.normal.z *
-            overlap.penetration *
+            correction *
             first_share;
 
         second_transform->local_position.x +=
             overlap.normal.x *
-            overlap.penetration *
+            correction *
             second_share;
         second_transform->local_position.y +=
             overlap.normal.y *
-            overlap.penetration *
+            correction *
             second_share;
         second_transform->local_position.z +=
             overlap.normal.z *
-            overlap.penetration *
+            correction *
             second_share;
 
         const core::Vec3 first_velocity =
@@ -1652,22 +1661,31 @@ CollisionResolutionStats resolve_box_contacts_2d(
             second_inverse_mass /
             inverse_mass_sum;
 
+        constexpr float contact_slop =
+            0.00001f;
+
+        const float correction =
+            std::max(
+                0.0f,
+                overlap.penetration -
+                    contact_slop);
+
         first_transform->local_position.x -=
             overlap.normal.x *
-            overlap.penetration *
+            correction *
             first_share;
         first_transform->local_position.y -=
             overlap.normal.y *
-            overlap.penetration *
+            correction *
             first_share;
 
         second_transform->local_position.x +=
             overlap.normal.x *
-            overlap.penetration *
+            correction *
             second_share;
         second_transform->local_position.y +=
             overlap.normal.y *
-            overlap.penetration *
+            correction *
             second_share;
 
         const core::Vec3 first_velocity =

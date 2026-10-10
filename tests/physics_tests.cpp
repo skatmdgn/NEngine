@@ -133,6 +133,8 @@ int main() {
     if (body) {
         body->mass = 2.5f;
         body->gravity_scale = 0.75f;
+        body->allow_sleep = false;
+        body->sleep_threshold = 0.12f;
         body->linear_velocity =
             {1.0f, 2.0f, 3.0f};
     }
@@ -165,6 +167,7 @@ int main() {
     if (body2d) {
         body2d->use_gravity = false;
         body2d->mass = 3.0f;
+        body2d->sleep_threshold = 0.2f;
         body2d->linear_velocity =
             {4.0f, 5.0f, 0.0f};
     }
@@ -316,6 +319,11 @@ int main() {
         std::abs(
             restored_body->mass -
             2.5f) < 0.0001f &&
+        !restored_body->allow_sleep &&
+        std::abs(
+            restored_body->sleep_threshold -
+            0.12f) < 0.0001f &&
+        !restored_body->sleeping &&
         restored_body->linear_velocity ==
             core::Vec3{1.0f, 2.0f, 3.0f} &&
         restored_collider &&
@@ -349,6 +357,11 @@ int main() {
             1.25f) < 0.0001f &&
         restored_body2d &&
         !restored_body2d->use_gravity &&
+        restored_body2d->allow_sleep &&
+        std::abs(
+            restored_body2d->sleep_threshold -
+            0.2f) < 0.0001f &&
+        !restored_body2d->sleeping &&
         restored_body2d->linear_velocity ==
             core::Vec3{4.0f, 5.0f, 0.0f} &&
         restored_collider2d &&
@@ -424,6 +437,53 @@ int main() {
     }
 
     if (captured_body) {
+        auto legacy =
+            *captured_body;
+
+        legacy.version = 1;
+
+        legacy.properties.erase(
+            std::remove_if(
+                legacy.properties.begin(),
+                legacy.properties.end(),
+                [](const auto& property) {
+                    return property.name ==
+                               "Allow Sleep" ||
+                           property.name ==
+                               "Sleep Threshold";
+                }),
+            legacy.properties.end());
+
+        core::World legacy_world;
+        const auto legacy_entity =
+            legacy_world.create(
+                "Legacy Rigidbody");
+
+        check(
+            serialization.restore(
+                legacy_world,
+                legacy_entity,
+                legacy,
+                &error),
+            "Rigidbody restore remains compatible with pre-sleep Scene data");
+
+        const auto* legacy_body =
+            legacy_world.get_component<
+                physics::Rigidbody>(
+                    legacy_entity,
+                    physics::rigidbody_type());
+
+        check(
+            legacy_body &&
+            legacy_body->allow_sleep &&
+            std::abs(
+                legacy_body->sleep_threshold -
+                0.05f) < 0.0001f &&
+            !legacy_body->sleeping,
+            "legacy Rigidbody data defaults sleeping authoring fields without persisting runtime sleep state");
+    }
+
+    if (captured_body) {
         auto invalid =
             *captured_body;
 
@@ -439,6 +499,24 @@ int main() {
                 invalid,
                 &error),
             "Rigidbody codec rejects non-positive mass");
+    }
+
+    if (captured_body) {
+        auto invalid =
+            *captured_body;
+
+        set_property(
+            invalid,
+            "Sleep Threshold",
+            core::PropertyValue{-0.01});
+
+        check(
+            !serialization.restore(
+                restored,
+                restored_entity,
+                invalid,
+                &error),
+            "Rigidbody codec rejects negative sleep threshold");
     }
 
     if (captured_collider) {
@@ -1594,6 +1672,263 @@ int main() {
 
 
 
+
+
+    core::World sleeping_world;
+
+    const auto sleeping_floor =
+        sleeping_world.create(
+            "Sleeping Floor");
+
+    const auto sleeping_body_entity =
+        sleeping_world.create(
+            "Sleeping Body");
+
+    sleeping_world.add_component<
+        physics::BoxCollider>(
+            sleeping_floor,
+            physics::box_collider_type());
+
+    sleeping_world.add_component<
+        physics::BoxCollider>(
+            sleeping_body_entity,
+            physics::box_collider_type());
+
+    auto* sleeping_body =
+        sleeping_world.add_component<
+            physics::Rigidbody>(
+                sleeping_body_entity,
+                physics::rigidbody_type());
+
+    sleeping_world.transform(
+        sleeping_body_entity)->local_position =
+            {0.0f, 0.99f, 0.0f};
+
+    if (sleeping_body) {
+        sleeping_body->use_gravity = false;
+    }
+
+    for (int frame = 0;
+         frame < 30;
+         ++frame) {
+        physics::step_physics(
+            sleeping_world,
+            0.02f);
+    }
+
+    sleeping_body =
+        sleeping_world.get_component<
+            physics::Rigidbody>(
+                sleeping_body_entity,
+                physics::rigidbody_type());
+
+    const auto* sleeping_transform =
+        sleeping_world.transform(
+            sleeping_body_entity);
+
+    const float sleeping_y =
+        sleeping_transform
+            ? sleeping_transform
+                ->local_position.y
+            : 0.0f;
+
+    check(
+        sleeping_body &&
+        sleeping_body->sleeping &&
+        sleeping_body
+            ->linear_velocity ==
+            core::Vec3{} &&
+        sleeping_transform &&
+        std::abs(
+            sleeping_y -
+            0.99999f) < 0.0001f,
+        "supported low-speed Rigidbody enters sleep after the fixed quiet delay");
+
+    const auto sleeping_hold =
+        physics::step_physics(
+            sleeping_world,
+            0.02f);
+
+    sleeping_body =
+        sleeping_world.get_component<
+            physics::Rigidbody>(
+                sleeping_body_entity,
+                physics::rigidbody_type());
+
+    sleeping_transform =
+        sleeping_world.transform(
+            sleeping_body_entity);
+
+    check(
+        sleeping_body &&
+        sleeping_body->sleeping &&
+        sleeping_hold.integration
+            .integrated_3d == 0u &&
+        sleeping_transform &&
+        std::abs(
+            sleeping_transform
+                ->local_position.y -
+            sleeping_y) < 0.00001f,
+        "sleeping Rigidbody skips integration while retained contact slop preserves support");
+
+    if (sleeping_body) {
+        sleeping_body->linear_velocity =
+            {1.0f, 0.0f, 0.0f};
+    }
+
+    const auto wake_step =
+        physics::step_physics(
+            sleeping_world,
+            0.02f);
+
+    sleeping_body =
+        sleeping_world.get_component<
+            physics::Rigidbody>(
+                sleeping_body_entity,
+                physics::rigidbody_type());
+
+    check(
+        sleeping_body &&
+        !sleeping_body->sleeping &&
+        wake_step.integration
+            .integrated_3d == 1u &&
+        sleeping_world.transform(
+            sleeping_body_entity)
+            ->local_position.x >
+            0.019f,
+        "external Rigidbody velocity wakes a sleeping body before integration");
+
+    if (sleeping_body) {
+        sleeping_body->linear_velocity = {};
+        sleeping_body->allow_sleep = false;
+        sleeping_body->sleeping = false;
+        sleeping_body->sleep_timer = 0.0f;
+    }
+
+    sleeping_world.transform(
+        sleeping_body_entity)->local_position =
+            {0.0f, 0.99999f, 0.0f};
+
+    for (int frame = 0;
+         frame < 30;
+         ++frame) {
+        physics::step_physics(
+            sleeping_world,
+            0.02f);
+    }
+
+    sleeping_body =
+        sleeping_world.get_component<
+            physics::Rigidbody>(
+                sleeping_body_entity,
+                physics::rigidbody_type());
+
+    check(
+        sleeping_body &&
+        !sleeping_body->sleeping &&
+        std::abs(
+            sleeping_body->sleep_timer) <
+            0.0001f,
+        "Rigidbody allow_sleep false prevents automatic sleep accumulation");
+
+    if (sleeping_body) {
+        sleeping_body->allow_sleep = true;
+    }
+
+    for (int frame = 0;
+         frame < 30;
+         ++frame) {
+        physics::step_physics(
+            sleeping_world,
+            0.02f);
+    }
+
+    sleeping_world.transform(
+        sleeping_floor)->local_position =
+            {10.0f, 0.0f, 0.0f};
+
+    physics::step_physics(
+        sleeping_world,
+        0.02f);
+
+    sleeping_body =
+        sleeping_world.get_component<
+            physics::Rigidbody>(
+                sleeping_body_entity,
+                physics::rigidbody_type());
+
+    check(
+        sleeping_body &&
+        !sleeping_body->sleeping &&
+        std::abs(
+            sleeping_body->sleep_timer) <
+            0.0001f,
+        "removing solid support wakes a sleeping Rigidbody on the contact update");
+
+    core::World sleeping_2d_world;
+
+    const auto sleeping_floor_2d =
+        sleeping_2d_world.create(
+            "Sleeping Floor 2D");
+
+    const auto sleeping_body_2d_entity =
+        sleeping_2d_world.create(
+            "Sleeping Body 2D");
+
+    sleeping_2d_world.add_component<
+        physics::BoxCollider2D>(
+            sleeping_floor_2d,
+            physics::box_collider2d_type());
+
+    sleeping_2d_world.add_component<
+        physics::BoxCollider2D>(
+            sleeping_body_2d_entity,
+            physics::box_collider2d_type());
+
+    auto* sleeping_body_2d =
+        sleeping_2d_world.add_component<
+            physics::Rigidbody2D>(
+                sleeping_body_2d_entity,
+                physics::rigidbody2d_type());
+
+    sleeping_2d_world.transform(
+        sleeping_body_2d_entity)
+        ->local_position =
+            {0.0f, 0.99f, 4.0f};
+
+    if (sleeping_body_2d) {
+        sleeping_body_2d->use_gravity =
+            false;
+        sleeping_body_2d->linear_velocity.z =
+            8.0f;
+    }
+
+    for (int frame = 0;
+         frame < 30;
+         ++frame) {
+        physics::step_physics(
+            sleeping_2d_world,
+            0.02f);
+    }
+
+    sleeping_body_2d =
+        sleeping_2d_world.get_component<
+            physics::Rigidbody2D>(
+                sleeping_body_2d_entity,
+                physics::rigidbody2d_type());
+
+    check(
+        sleeping_body_2d &&
+        sleeping_body_2d->sleeping &&
+        sleeping_body_2d
+            ->linear_velocity ==
+            core::Vec3{} &&
+        std::abs(
+            sleeping_2d_world.transform(
+                sleeping_body_2d_entity)
+                ->local_position.z -
+            4.0f) < 0.0001f,
+        "supported Rigidbody2D sleeps on XY while preserving Transform Z");
 
     core::World material_world;
 

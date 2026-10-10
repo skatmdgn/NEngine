@@ -28,12 +28,13 @@ const core::SerializedPropertyData* find_property(
 bool read_bool(
     const core::SerializedComponentData& data,
     std::string_view name,
-    bool& value) {
+    bool& value,
+    bool optional = false) {
 
     const auto* property =
         find_property(data, name);
 
-    if (!property) return false;
+    if (!property) return optional;
 
     const auto* typed =
         std::get_if<bool>(&property->value);
@@ -152,10 +153,12 @@ core::SerializedPropertyData vec3_property(
 
 bool valid_rigidbody(
     float mass,
-    float gravity_scale) noexcept {
+    float gravity_scale,
+    float sleep_threshold) noexcept {
 
     return mass > 0.0f &&
-           gravity_scale >= 0.0f;
+        gravity_scale >= 0.0f &&
+        sleep_threshold >= 0.0f;
 }
 
 bool valid_box_size(
@@ -229,8 +232,10 @@ bool register_rigidbody_metadata(
             {"Enabled", core::PropertyKind::Boolean},
             {"Use Gravity", core::PropertyKind::Boolean},
             {"Is Kinematic", core::PropertyKind::Boolean},
+            {"Allow Sleep", core::PropertyKind::Boolean},
             {"Mass", core::PropertyKind::Float},
             {"Gravity Scale", core::PropertyKind::Float},
+            {"Sleep Threshold", core::PropertyKind::Float},
             {"Linear Velocity", core::PropertyKind::Vec3}}) {
 
         ok =
@@ -364,12 +369,18 @@ capture_rigidbody(
         bool_property(
             "Is Kinematic",
             value->is_kinematic),
+        bool_property(
+            "Allow Sleep",
+            value->allow_sleep),
         float_property(
             "Mass",
             value->mass),
         float_property(
             "Gravity Scale",
             value->gravity_scale),
+        float_property(
+            "Sleep Threshold",
+            value->sleep_threshold),
         vec3_property(
             "Linear Velocity",
             value->linear_velocity)
@@ -401,6 +412,11 @@ bool restore_rigidbody(
             data,
             "Is Kinematic",
             value.is_kinematic) ||
+        !read_bool(
+            data,
+            "Allow Sleep",
+            value.allow_sleep,
+            true) ||
         !read_float(
             data,
             "Mass",
@@ -409,13 +425,19 @@ bool restore_rigidbody(
             data,
             "Gravity Scale",
             value.gravity_scale) ||
+        !read_float(
+            data,
+            "Sleep Threshold",
+            value.sleep_threshold,
+            true) ||
         !read_vec3(
             data,
             "Linear Velocity",
             value.linear_velocity) ||
         !valid_rigidbody(
             value.mass,
-            value.gravity_scale)) {
+            value.gravity_scale,
+            value.sleep_threshold)) {
 
         if (error) {
             *error =
@@ -796,7 +818,7 @@ bool register_component_serializers(
     ok =
         registry.register_codec({
             rigidbody_type(),
-            1,
+            2,
             "NEngine.Rigidbody",
             [](const core::World& world,
                core::Entity entity) {
@@ -878,7 +900,7 @@ bool register_component_serializers(
     ok =
         registry.register_codec({
             rigidbody2d_type(),
-            1,
+            2,
             "NEngine.Rigidbody2D",
             [](const core::World& world,
                core::Entity entity) {

@@ -72,8 +72,11 @@ struct ManagedRigidbodyFixture {
     bool enabled{true};
     bool use_gravity{true};
     bool is_kinematic{false};
+    bool allow_sleep{true};
+    bool sleeping{false};
     float mass{1.0f};
     float gravity_scale{1.0f};
+    float sleep_threshold{0.05f};
     nengine::core::Vec3 linear_velocity{};
 };
 
@@ -103,8 +106,11 @@ struct ManagedRigidbody2DFixture {
     bool enabled{true};
     bool use_gravity{true};
     bool is_kinematic{false};
+    bool allow_sleep{true};
+    bool sleeping{false};
     float mass{1.0f};
     float gravity_scale{1.0f};
+    float sleep_threshold{0.05f};
     nengine::core::Vec3 linear_velocity{};
 };
 
@@ -586,10 +592,17 @@ bool read_managed_render_property(
             output = value->use_gravity;
         else if (property == "Is Kinematic")
             output = value->is_kinematic;
+        else if (property == "Allow Sleep")
+            output = value->allow_sleep;
+        else if (property == "Sleeping")
+            output = value->sleeping;
         else if (property == "Mass")
             output = static_cast<double>(value->mass);
         else if (property == "Gravity Scale")
             output = static_cast<double>(value->gravity_scale);
+        else if (property == "Sleep Threshold")
+            output = static_cast<double>(
+                value->sleep_threshold);
         else if (property == "Linear Velocity")
             output = value->linear_velocity;
         else
@@ -680,10 +693,17 @@ bool read_managed_render_property(
             output = value->use_gravity;
         else if (property == "Is Kinematic")
             output = value->is_kinematic;
+        else if (property == "Allow Sleep")
+            output = value->allow_sleep;
+        else if (property == "Sleeping")
+            output = value->sleeping;
         else if (property == "Mass")
             output = static_cast<double>(value->mass);
         else if (property == "Gravity Scale")
             output = static_cast<double>(value->gravity_scale);
+        else if (property == "Sleep Threshold")
+            output = static_cast<double>(
+                value->sleep_threshold);
         else if (property == "Linear Velocity")
             output = value->linear_velocity;
         else
@@ -1105,7 +1125,9 @@ bool write_managed_render_property(
 
         if (property == "Enabled" ||
             property == "Use Gravity" ||
-            property == "Is Kinematic") {
+            property == "Is Kinematic" ||
+            property == "Allow Sleep" ||
+            property == "Sleeping") {
             const auto* typed =
                 std::get_if<bool>(&input);
             if (!typed) return false;
@@ -1114,23 +1136,42 @@ bool write_managed_render_property(
                 value->enabled = *typed;
             else if (property == "Use Gravity")
                 value->use_gravity = *typed;
-            else
+            else if (property == "Is Kinematic")
                 value->is_kinematic = *typed;
+            else if (property == "Allow Sleep") {
+                value->allow_sleep = *typed;
+                if (!*typed)
+                    value->sleeping = false;
+            } else {
+                value->sleeping =
+                    *typed &&
+                    value->allow_sleep;
+                if (value->sleeping)
+                    value->linear_velocity = {};
+            }
         } else if (property == "Mass" ||
-                   property == "Gravity Scale") {
+                   property == "Gravity Scale" ||
+                   property == "Sleep Threshold") {
             const auto* typed =
                 std::get_if<double>(&input);
             if (!typed) return false;
 
             if (property == "Mass")
                 value->mass = static_cast<float>(*typed);
-            else
+            else if (property == "Gravity Scale")
                 value->gravity_scale = static_cast<float>(*typed);
+            else {
+                if (*typed < 0.0)
+                    return false;
+                value->sleep_threshold =
+                    static_cast<float>(*typed);
+            }
         } else if (property == "Linear Velocity") {
             const auto* typed =
                 std::get_if<nengine::core::Vec3>(&input);
             if (!typed) return false;
             value->linear_velocity = *typed;
+            value->sleeping = false;
         } else {
             return false;
         }
@@ -1218,7 +1259,9 @@ bool write_managed_render_property(
 
         if (property == "Enabled" ||
             property == "Use Gravity" ||
-            property == "Is Kinematic") {
+            property == "Is Kinematic" ||
+            property == "Allow Sleep" ||
+            property == "Sleeping") {
             const auto* typed =
                 std::get_if<bool>(&input);
             if (!typed) return false;
@@ -1227,23 +1270,42 @@ bool write_managed_render_property(
                 value->enabled = *typed;
             else if (property == "Use Gravity")
                 value->use_gravity = *typed;
-            else
+            else if (property == "Is Kinematic")
                 value->is_kinematic = *typed;
+            else if (property == "Allow Sleep") {
+                value->allow_sleep = *typed;
+                if (!*typed)
+                    value->sleeping = false;
+            } else {
+                value->sleeping =
+                    *typed &&
+                    value->allow_sleep;
+                if (value->sleeping)
+                    value->linear_velocity = {};
+            }
         } else if (property == "Mass" ||
-                   property == "Gravity Scale") {
+                   property == "Gravity Scale" ||
+                   property == "Sleep Threshold") {
             const auto* typed =
                 std::get_if<double>(&input);
             if (!typed) return false;
 
             if (property == "Mass")
                 value->mass = static_cast<float>(*typed);
-            else
+            else if (property == "Gravity Scale")
                 value->gravity_scale = static_cast<float>(*typed);
+            else {
+                if (*typed < 0.0)
+                    return false;
+                value->sleep_threshold =
+                    static_cast<float>(*typed);
+            }
         } else if (property == "Linear Velocity") {
             const auto* typed =
                 std::get_if<nengine::core::Vec3>(&input);
             if (!typed) return false;
             value->linear_velocity = *typed;
+            value->sleeping = false;
         } else {
             return false;
         }
@@ -1568,6 +1630,14 @@ int main() {
         api.find("Restart") !=
             std::string::npos &&
         api.find("Rigidbody2D") !=
+            std::string::npos &&
+        api.find("allowSleep") !=
+            std::string::npos &&
+        api.find("sleepThreshold") !=
+            std::string::npos &&
+        api.find("IsSleeping") !=
+            std::string::npos &&
+        api.find("WakeUp") !=
             std::string::npos &&
         api.find("AddForce") !=
             std::string::npos &&
@@ -2022,9 +2092,9 @@ int main() {
                 << "        animator.Play(nextClip); if (!animator.playing || animator.clip != nextClip || System.MathF.Abs(animator.time) > 0.001f) throw new System.Exception(\"animator Play clip mismatch\"); animator.speed = 1.5f; animator.loop = false; animator.enabled = false; animator.Stop();\n"
                 << "        mesh.mesh = nextMesh; mesh.material = nextMaterial; mesh.enabled = false; mesh.castShadows = false; mesh.receiveShadows = false;\n"
                 << "        sprite.texture = nextTexture; sprite.enabled = false; sprite.pixelsPerUnit = 64f; sprite.sortingOrder = 7; sprite.flipX = true; sprite.flipY = true;\n"
-                << "        if (System.MathF.Abs(body.mass - 1f) > 0.001f || !body.useGravity || body.isKinematic) throw new System.Exception(\"rigidbody read mismatch\"); body.useGravity = false; body.mass = 2.5f; body.gravityScale = 0.5f; body.velocity = new Vector3(1, 2, 3); body.AddForce(new Vector3(2.5f, 0, 0)); body.isKinematic = true; body.enabled = false;\n"
+                << "        if (System.MathF.Abs(body.mass - 1f) > 0.001f || !body.useGravity || body.isKinematic || !body.allowSleep || body.IsSleeping()) throw new System.Exception(\"rigidbody read mismatch\"); body.sleepThreshold = 0.1f; body.Sleep(); if (!body.IsSleeping()) throw new System.Exception(\"rigidbody sleep mismatch\"); body.WakeUp(); body.allowSleep = false; body.useGravity = false; body.mass = 2.5f; body.gravityScale = 0.5f; body.velocity = new Vector3(1, 2, 3); body.AddForce(new Vector3(2.5f, 0, 0)); body.isKinematic = true; body.enabled = false;\n"
                 << "        box.isTrigger = true; box.layer = 3; box.collisionMask = 0x000000a5u; box.friction = 0.25f; box.restitution = 0.75f; box.center = new Vector3(0.1f, 0.2f, 0.3f); box.size = new Vector3(2, 3, 4);\n"
-                << "        body2d.useGravity = false; body2d.mass = 3f; body2d.gravityScale = 0.25f; body2d.velocity = new Vector2(4, 5); body2d.AddForce(new Vector2(3, 0)); body2d.isKinematic = true;\n"
+                << "        if (!body2d.allowSleep || body2d.IsSleeping()) throw new System.Exception(\"rigidbody2d sleep read mismatch\"); body2d.sleepThreshold = 0.2f; body2d.Sleep(); if (!body2d.IsSleeping()) throw new System.Exception(\"rigidbody2d sleep mismatch\"); body2d.WakeUp(); body2d.useGravity = false; body2d.mass = 3f; body2d.gravityScale = 0.25f; body2d.velocity = new Vector2(4, 5); body2d.AddForce(new Vector2(3, 0)); body2d.isKinematic = true;\n"
                 << "        box2d.isTrigger = true; box2d.layer = 7; box2d.collisionMask = 0x0000ff00u; box2d.friction = 0.6f; box2d.restitution = 0.2f; box2d.center = new Vector2(0.5f, 0.75f); box2d.size = new Vector2(6, 7);\n"
                 << "        if (audio.clip.ToString() != \"10101010101010102020202020202020\" || audio.isPlaying || System.MathF.Abs(audio.time - 0.25f) > 0.001f) throw new System.Exception(\"audio initial state mismatch\");\n"
                 << "        audio.Play(); if (!audio.isPlaying || System.MathF.Abs(audio.time) > 0.001f) throw new System.Exception(\"audio play mismatch\"); audio.time = 0.5f; audio.Pause(); if (audio.isPlaying) throw new System.Exception(\"audio pause mismatch\"); audio.UnPause(); if (!audio.isPlaying) throw new System.Exception(\"audio unpause mismatch\"); audio.Stop(); if (audio.isPlaying || System.MathF.Abs(audio.time) > 0.001f) throw new System.Exception(\"audio stop mismatch\");\n"
@@ -2552,8 +2622,11 @@ int main() {
                             !rigidbody_fixture->enabled &&
                             !rigidbody_fixture->use_gravity &&
                             rigidbody_fixture->is_kinematic &&
+                            !rigidbody_fixture->allow_sleep &&
+                            !rigidbody_fixture->sleeping &&
                             std::abs(rigidbody_fixture->mass - 2.5f) < 0.001f &&
                             std::abs(rigidbody_fixture->gravity_scale - 0.5f) < 0.001f &&
+                            std::abs(rigidbody_fixture->sleep_threshold - 0.1f) < 0.001f &&
                             rigidbody_fixture->linear_velocity ==
                                 nengine::core::Vec3{2.0f, 2.0f, 3.0f} &&
                             box_fixture &&
@@ -2574,8 +2647,11 @@ int main() {
                             rigidbody2d_fixture &&
                             !rigidbody2d_fixture->use_gravity &&
                             rigidbody2d_fixture->is_kinematic &&
+                            rigidbody2d_fixture->allow_sleep &&
+                            !rigidbody2d_fixture->sleeping &&
                             std::abs(rigidbody2d_fixture->mass - 3.0f) < 0.001f &&
                             std::abs(rigidbody2d_fixture->gravity_scale - 0.25f) < 0.001f &&
+                            std::abs(rigidbody2d_fixture->sleep_threshold - 0.2f) < 0.001f &&
                             rigidbody2d_fixture->linear_velocity ==
                                 nengine::core::Vec3{5.0f, 5.0f, 0.0f} &&
                             box2d_fixture &&

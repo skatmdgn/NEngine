@@ -2151,6 +2151,33 @@ std::string api_stub(
             set => SetNativeBool("Is Kinematic", value);
         }
 
+        public bool allowSleep
+        {
+            get => NativeBool("Allow Sleep", true);
+            set => SetNativeBool("Allow Sleep", value);
+        }
+
+        public float sleepThreshold
+        {
+            get => NativeFloat("Sleep Threshold", 0.05f);
+            set => SetNativeFloat("Sleep Threshold", value);
+        }
+
+        public bool IsSleeping()
+        {
+            return NativeBool("Sleeping", false);
+        }
+
+        public void Sleep()
+        {
+            SetNativeBool("Sleeping", true);
+        }
+
+        public void WakeUp()
+        {
+            SetNativeBool("Sleeping", false);
+        }
+
         public float mass
         {
             get => NativeFloat("Mass", 1);
@@ -2690,6 +2717,33 @@ std::string api_stub(
         {
             get => NativeBool("Is Kinematic", false);
             set => SetNativeBool("Is Kinematic", value);
+        }
+
+        public bool allowSleep
+        {
+            get => NativeBool("Allow Sleep", true);
+            set => SetNativeBool("Allow Sleep", value);
+        }
+
+        public float sleepThreshold
+        {
+            get => NativeFloat("Sleep Threshold", 0.05f);
+            set => SetNativeFloat("Sleep Threshold", value);
+        }
+
+        public bool IsSleeping()
+        {
+            return NativeBool("Sleeping", false);
+        }
+
+        public void Sleep()
+        {
+            SetNativeBool("Sleeping", true);
+        }
+
+        public void WakeUp()
+        {
+            SetNativeBool("Sleeping", false);
         }
 
         public float mass
