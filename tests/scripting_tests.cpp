@@ -665,6 +665,8 @@ int main() {
                     ManagedRuntime
                         managed_runtime;
 
+                    std::cerr << "TRACE scripting: before runtime initialize" << std::endl;
+
                     const bool initialized =
                         managed_runtime.initialize(
                             runtime->hostfxr_path,
@@ -673,6 +675,8 @@ int main() {
                             build.plan
                                 .assembly_path,
                             "IntegrationScripts");
+
+                    std::cerr << "TRACE scripting: after runtime initialize = " << initialized << std::endl;
 
                     check(
                         initialized,
@@ -746,8 +750,13 @@ int main() {
                                 "managed lifecycle invokes OnDestroy path and releases instance handle");
                         }
 
+                        std::cerr << "TRACE scripting: before first reset_time" << std::endl;
+                        const bool first_time_reset =
+                            managed_runtime.reset_time();
+                        std::cerr << "TRACE scripting: after first reset_time = " << first_time_reset << std::endl;
+
                         check(
-                            managed_runtime.reset_time(),
+                            first_time_reset,
                             "managed Time clock resets explicitly before simulation");
 
                         ManagedScriptSystem
@@ -792,11 +801,14 @@ int main() {
                         std::string
                             time_error;
 
+                        std::cerr << "TRACE scripting: before time tick 1" << std::endl;
                         const auto time_tick_1 =
                             time_system.update(
                                 time_world,
                                 0.25f,
                                 &time_error);
+
+                        std::cerr << "TRACE scripting: after time tick 1" << std::endl;
 
                         const auto* time_transform_a =
                             time_world.transform(
@@ -823,11 +835,14 @@ int main() {
                             time_transform_b->local_position.z == 0.25f,
                             "managed Time advances once per simulation tick regardless of Behaviour count");
 
+                        std::cerr << "TRACE scripting: before time tick 2" << std::endl;
                         const auto time_tick_2 =
                             time_system.update(
                                 time_world,
                                 0.5f,
                                 &time_error);
+
+                        std::cerr << "TRACE scripting: after time tick 2" << std::endl;
 
                         check(
                             time_tick_2.created == 0u &&
@@ -843,10 +858,17 @@ int main() {
                             time_transform_b->local_position.z == 0.5f,
                             "managed Time frame count and accumulated time stay global across multiple Behaviours");
 
+                        std::cerr << "TRACE scripting: before time clear" << std::endl;
                         time_system.clear();
+                        std::cerr << "TRACE scripting: after time clear" << std::endl;
+
+                        std::cerr << "TRACE scripting: before second reset_time" << std::endl;
+                        const bool second_time_reset =
+                            managed_runtime.reset_time();
+                        std::cerr << "TRACE scripting: after second reset_time = " << second_time_reset << std::endl;
 
                         check(
-                            managed_runtime.reset_time(),
+                            second_time_reset,
                             "managed Time clock resets after multi-Behaviour regression probe");
 
                         ManagedScriptSystem
