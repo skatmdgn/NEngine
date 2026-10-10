@@ -68,6 +68,38 @@ struct ManagedSpriteAnimatorFixture {
     float time_seconds{0.5f};
 };
 
+struct ManagedRigidbodyFixture {
+    bool enabled{true};
+    bool use_gravity{true};
+    bool is_kinematic{false};
+    float mass{1.0f};
+    float gravity_scale{1.0f};
+    nengine::core::Vec3 linear_velocity{};
+};
+
+struct ManagedBoxColliderFixture {
+    bool enabled{true};
+    bool is_trigger{false};
+    nengine::core::Vec3 center{};
+    nengine::core::Vec3 size{1.0f, 1.0f, 1.0f};
+};
+
+struct ManagedRigidbody2DFixture {
+    bool enabled{true};
+    bool use_gravity{true};
+    bool is_kinematic{false};
+    float mass{1.0f};
+    float gravity_scale{1.0f};
+    nengine::core::Vec3 linear_velocity{};
+};
+
+struct ManagedBoxCollider2DFixture {
+    bool enabled{true};
+    bool is_trigger{false};
+    nengine::core::Vec3 center{};
+    nengine::core::Vec3 size{1.0f, 1.0f, 0.0f};
+};
+
 bool read_managed_render_property(
     void*,
     const nengine::core::World& world,
@@ -209,6 +241,107 @@ bool read_managed_render_property(
             output = static_cast<double>(value->speed);
         else if (property == "Time")
             output = static_cast<double>(value->time_seconds);
+        else
+            return false;
+
+        return true;
+    }
+
+
+    if (component == "NEngine.Rigidbody") {
+        const auto* value =
+            world.get_component<
+                ManagedRigidbodyFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Enabled")
+            output = value->enabled;
+        else if (property == "Use Gravity")
+            output = value->use_gravity;
+        else if (property == "Is Kinematic")
+            output = value->is_kinematic;
+        else if (property == "Mass")
+            output = static_cast<double>(value->mass);
+        else if (property == "Gravity Scale")
+            output = static_cast<double>(value->gravity_scale);
+        else if (property == "Linear Velocity")
+            output = value->linear_velocity;
+        else
+            return false;
+
+        return true;
+    }
+
+    if (component == "NEngine.BoxCollider") {
+        const auto* value =
+            world.get_component<
+                ManagedBoxColliderFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Enabled")
+            output = value->enabled;
+        else if (property == "Is Trigger")
+            output = value->is_trigger;
+        else if (property == "Center")
+            output = value->center;
+        else if (property == "Size")
+            output = value->size;
+        else
+            return false;
+
+        return true;
+    }
+
+    if (component == "NEngine.Rigidbody2D") {
+        const auto* value =
+            world.get_component<
+                ManagedRigidbody2DFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Enabled")
+            output = value->enabled;
+        else if (property == "Use Gravity")
+            output = value->use_gravity;
+        else if (property == "Is Kinematic")
+            output = value->is_kinematic;
+        else if (property == "Mass")
+            output = static_cast<double>(value->mass);
+        else if (property == "Gravity Scale")
+            output = static_cast<double>(value->gravity_scale);
+        else if (property == "Linear Velocity")
+            output = value->linear_velocity;
+        else
+            return false;
+
+        return true;
+    }
+
+    if (component == "NEngine.BoxCollider2D") {
+        const auto* value =
+            world.get_component<
+                ManagedBoxCollider2DFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Enabled")
+            output = value->enabled;
+        else if (property == "Is Trigger")
+            output = value->is_trigger;
+        else if (property == "Center")
+            output = value->center;
+        else if (property == "Size")
+            output = value->size;
         else
             return false;
 
@@ -445,6 +578,167 @@ bool write_managed_render_property(
             else
                 value->time_seconds =
                     static_cast<float>(*typed);
+        } else {
+            return false;
+        }
+
+        return true;
+    }
+
+
+    if (component == "NEngine.Rigidbody") {
+        auto* value =
+            world.get_component<
+                ManagedRigidbodyFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Enabled" ||
+            property == "Use Gravity" ||
+            property == "Is Kinematic") {
+            const auto* typed =
+                std::get_if<bool>(&input);
+            if (!typed) return false;
+
+            if (property == "Enabled")
+                value->enabled = *typed;
+            else if (property == "Use Gravity")
+                value->use_gravity = *typed;
+            else
+                value->is_kinematic = *typed;
+        } else if (property == "Mass" ||
+                   property == "Gravity Scale") {
+            const auto* typed =
+                std::get_if<double>(&input);
+            if (!typed) return false;
+
+            if (property == "Mass")
+                value->mass = static_cast<float>(*typed);
+            else
+                value->gravity_scale = static_cast<float>(*typed);
+        } else if (property == "Linear Velocity") {
+            const auto* typed =
+                std::get_if<nengine::core::Vec3>(&input);
+            if (!typed) return false;
+            value->linear_velocity = *typed;
+        } else {
+            return false;
+        }
+
+        return true;
+    }
+
+    if (component == "NEngine.BoxCollider") {
+        auto* value =
+            world.get_component<
+                ManagedBoxColliderFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Enabled" ||
+            property == "Is Trigger") {
+            const auto* typed =
+                std::get_if<bool>(&input);
+            if (!typed) return false;
+
+            if (property == "Enabled")
+                value->enabled = *typed;
+            else
+                value->is_trigger = *typed;
+        } else if (property == "Center" ||
+                   property == "Size") {
+            const auto* typed =
+                std::get_if<nengine::core::Vec3>(&input);
+            if (!typed) return false;
+
+            if (property == "Center")
+                value->center = *typed;
+            else
+                value->size = *typed;
+        } else {
+            return false;
+        }
+
+        return true;
+    }
+
+    if (component == "NEngine.Rigidbody2D") {
+        auto* value =
+            world.get_component<
+                ManagedRigidbody2DFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Enabled" ||
+            property == "Use Gravity" ||
+            property == "Is Kinematic") {
+            const auto* typed =
+                std::get_if<bool>(&input);
+            if (!typed) return false;
+
+            if (property == "Enabled")
+                value->enabled = *typed;
+            else if (property == "Use Gravity")
+                value->use_gravity = *typed;
+            else
+                value->is_kinematic = *typed;
+        } else if (property == "Mass" ||
+                   property == "Gravity Scale") {
+            const auto* typed =
+                std::get_if<double>(&input);
+            if (!typed) return false;
+
+            if (property == "Mass")
+                value->mass = static_cast<float>(*typed);
+            else
+                value->gravity_scale = static_cast<float>(*typed);
+        } else if (property == "Linear Velocity") {
+            const auto* typed =
+                std::get_if<nengine::core::Vec3>(&input);
+            if (!typed) return false;
+            value->linear_velocity = *typed;
+        } else {
+            return false;
+        }
+
+        return true;
+    }
+
+    if (component == "NEngine.BoxCollider2D") {
+        auto* value =
+            world.get_component<
+                ManagedBoxCollider2DFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Enabled" ||
+            property == "Is Trigger") {
+            const auto* typed =
+                std::get_if<bool>(&input);
+            if (!typed) return false;
+
+            if (property == "Enabled")
+                value->enabled = *typed;
+            else
+                value->is_trigger = *typed;
+        } else if (property == "Center" ||
+                   property == "Size") {
+            const auto* typed =
+                std::get_if<nengine::core::Vec3>(&input);
+            if (!typed) return false;
+
+            if (property == "Center")
+                value->center = *typed;
+            else
+                value->size = *typed;
         } else {
             return false;
         }
@@ -698,6 +992,10 @@ int main() {
         api.find("SpriteAnimator") !=
             std::string::npos &&
         api.find("Restart") !=
+            std::string::npos &&
+        api.find("Rigidbody2D") !=
+            std::string::npos &&
+        api.find("BoxCollider2D") !=
             std::string::npos &&
         api.find("readonly struct AssetGuid") !=
             std::string::npos &&
@@ -1097,7 +1395,8 @@ int main() {
                 << "        MeshRenderer? mesh = GetComponent<MeshRenderer>();\n"
                 << "        SpriteRenderer? sprite = GetComponent<SpriteRenderer>();\n"
                 << "        SpriteAnimator? animator = GetComponent<SpriteAnimator>();\n"
-                << "        if (camera == null || light == null || mesh == null || sprite == null || animator == null) throw new System.Exception(\"render component proxy missing\");\n"
+                << "        Rigidbody? body = GetComponent<Rigidbody>(); BoxCollider? box = GetComponent<BoxCollider>(); Rigidbody2D? body2d = GetComponent<Rigidbody2D>(); BoxCollider2D? box2d = GetComponent<BoxCollider2D>();\n"
+                << "        if (camera == null || light == null || mesh == null || sprite == null || animator == null || body == null || box == null || body2d == null || box2d == null) throw new System.Exception(\"component proxy missing\");\n"
                 << "        if (!camera.enabled || camera.orthographic || System.MathF.Abs(camera.fieldOfView - 60f) > 0.001f) throw new System.Exception(\"camera read mismatch\");\n"
                 << "        camera.enabled = false; camera.orthographic = true; camera.fieldOfView = 72f; camera.nearClipPlane = 0.25f; camera.farClipPlane = 750f; camera.orthographicSize = 8f;\n"
                 << "        if (light.type != LightType.Directional || System.MathF.Abs(light.intensity - 1f) > 0.001f) throw new System.Exception(\"light read mismatch\");\n"
@@ -1109,7 +1408,11 @@ int main() {
                 << "        animator.Play(nextClip); if (!animator.playing || animator.clip != nextClip || System.MathF.Abs(animator.time) > 0.001f) throw new System.Exception(\"animator Play clip mismatch\"); animator.speed = 1.5f; animator.loop = false; animator.enabled = false; animator.Stop();\n"
                 << "        mesh.mesh = nextMesh; mesh.material = nextMaterial; mesh.enabled = false; mesh.castShadows = false; mesh.receiveShadows = false;\n"
                 << "        sprite.texture = nextTexture; sprite.enabled = false; sprite.pixelsPerUnit = 64f; sprite.sortingOrder = 7; sprite.flipX = true; sprite.flipY = true;\n"
-                << "        gameObject.name = \"Render Properties Passed\";\n"
+                << "        if (System.MathF.Abs(body.mass - 1f) > 0.001f || !body.useGravity || body.isKinematic) throw new System.Exception(\"rigidbody read mismatch\"); body.enabled = false; body.useGravity = false; body.isKinematic = true; body.mass = 2.5f; body.gravityScale = 0.5f; body.velocity = new Vector3(1, 2, 3);\n"
+                << "        box.isTrigger = true; box.center = new Vector3(0.1f, 0.2f, 0.3f); box.size = new Vector3(2, 3, 4);\n"
+                << "        body2d.useGravity = false; body2d.isKinematic = true; body2d.mass = 3f; body2d.gravityScale = 0.25f; body2d.velocity = new Vector2(4, 5);\n"
+                << "        box2d.isTrigger = true; box2d.center = new Vector2(0.5f, 0.75f); box2d.size = new Vector2(6, 7);\n"
+                << "        gameObject.name = \"Render Physics Properties Passed\";\n"
                 << "    }\n"
                 << "}\n"
                 << "public class FixedSystemProbe : Behaviour {\n"
@@ -1372,6 +1675,22 @@ int main() {
                             nengine::core::ComponentRegistry::stable_id(
                                 "NEngine.SpriteAnimator");
 
+                        const auto rigidbody_type =
+                            nengine::core::ComponentRegistry::stable_id(
+                                "NEngine.Rigidbody");
+
+                        const auto box_type =
+                            nengine::core::ComponentRegistry::stable_id(
+                                "NEngine.BoxCollider");
+
+                        const auto rigidbody2d_type =
+                            nengine::core::ComponentRegistry::stable_id(
+                                "NEngine.Rigidbody2D");
+
+                        const auto box2d_type =
+                            nengine::core::ComponentRegistry::stable_id(
+                                "NEngine.BoxCollider2D");
+
                         property_world.add_component<
                             ManagedCameraFixture>(
                                 property_entity,
@@ -1396,6 +1715,26 @@ int main() {
                             ManagedSpriteAnimatorFixture>(
                                 property_entity,
                                 animator_type);
+
+                        property_world.add_component<
+                            ManagedRigidbodyFixture>(
+                                property_entity,
+                                rigidbody_type);
+
+                        property_world.add_component<
+                            ManagedBoxColliderFixture>(
+                                property_entity,
+                                box_type);
+
+                        property_world.add_component<
+                            ManagedRigidbody2DFixture>(
+                                property_entity,
+                                rigidbody2d_type);
+
+                        property_world.add_component<
+                            ManagedBoxCollider2DFixture>(
+                                property_entity,
+                                box2d_type);
 
                         auto* property_script =
                             property_world.add_component<
@@ -1446,6 +1785,30 @@ int main() {
                                     property_entity,
                                     animator_type);
 
+                        const auto* rigidbody_fixture =
+                            property_world.get_component<
+                                ManagedRigidbodyFixture>(
+                                    property_entity,
+                                    rigidbody_type);
+
+                        const auto* box_fixture =
+                            property_world.get_component<
+                                ManagedBoxColliderFixture>(
+                                    property_entity,
+                                    box_type);
+
+                        const auto* rigidbody2d_fixture =
+                            property_world.get_component<
+                                ManagedRigidbody2DFixture>(
+                                    property_entity,
+                                    rigidbody2d_type);
+
+                        const auto* box2d_fixture =
+                            property_world.get_component<
+                                ManagedBoxCollider2DFixture>(
+                                    property_entity,
+                                    box2d_type);
+
                         check(
                             property_script &&
                             property_tick.created == 1u &&
@@ -1454,7 +1817,7 @@ int main() {
                             property_tick.unresolved == 0u &&
                             property_world.name(
                                 property_entity) ==
-                                "Render Properties Passed" &&
+                                "Render Physics Properties Passed" &&
                             camera_fixture &&
                             !camera_fixture->enabled &&
                             camera_fixture->projection == 1 &&
@@ -1495,8 +1858,35 @@ int main() {
                             !animator_fixture->playing &&
                             !animator_fixture->loop &&
                             std::abs(animator_fixture->speed - 1.5f) < 0.001f &&
-                            std::abs(animator_fixture->time_seconds) < 0.001f,
-                            "managed render and SpriteAnimator property proxies round-trip through generic native property ABI");
+                            std::abs(animator_fixture->time_seconds) < 0.001f &&
+                            rigidbody_fixture &&
+                            !rigidbody_fixture->enabled &&
+                            !rigidbody_fixture->use_gravity &&
+                            rigidbody_fixture->is_kinematic &&
+                            std::abs(rigidbody_fixture->mass - 2.5f) < 0.001f &&
+                            std::abs(rigidbody_fixture->gravity_scale - 0.5f) < 0.001f &&
+                            rigidbody_fixture->linear_velocity ==
+                                nengine::core::Vec3{1.0f, 2.0f, 3.0f} &&
+                            box_fixture &&
+                            box_fixture->is_trigger &&
+                            box_fixture->center ==
+                                nengine::core::Vec3{0.1f, 0.2f, 0.3f} &&
+                            box_fixture->size ==
+                                nengine::core::Vec3{2.0f, 3.0f, 4.0f} &&
+                            rigidbody2d_fixture &&
+                            !rigidbody2d_fixture->use_gravity &&
+                            rigidbody2d_fixture->is_kinematic &&
+                            std::abs(rigidbody2d_fixture->mass - 3.0f) < 0.001f &&
+                            std::abs(rigidbody2d_fixture->gravity_scale - 0.25f) < 0.001f &&
+                            rigidbody2d_fixture->linear_velocity ==
+                                nengine::core::Vec3{4.0f, 5.0f, 0.0f} &&
+                            box2d_fixture &&
+                            box2d_fixture->is_trigger &&
+                            box2d_fixture->center ==
+                                nengine::core::Vec3{0.5f, 0.75f, 0.0f} &&
+                            box2d_fixture->size ==
+                                nengine::core::Vec3{6.0f, 7.0f, 0.0f},
+                            "managed render and physics component proxies round-trip through generic native property ABI");
 
                         property_system.clear(
                             &property_world);
