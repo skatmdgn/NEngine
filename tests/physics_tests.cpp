@@ -341,6 +341,24 @@ int main() {
             simulation_world,
             0.5f);
 
+    simulated_body =
+        simulation_world.get_component<
+            physics::Rigidbody>(
+                body_entity,
+                physics::rigidbody_type());
+
+    simulated_body2d =
+        simulation_world.get_component<
+            physics::Rigidbody2D>(
+                body2d_entity,
+                physics::rigidbody2d_type());
+
+    kinematic_body =
+        simulation_world.get_component<
+            physics::Rigidbody>(
+                kinematic_entity,
+                physics::rigidbody_type());
+
     const auto* body_transform =
         simulation_world.transform(
             body_entity);
@@ -385,6 +403,8 @@ int main() {
                 1.5f,
                 2.0f,
                 0.0f} &&
+        kinematic_body &&
+        kinematic_body->is_kinematic &&
         kinematic_transform &&
         kinematic_transform
             ->local_position ==
