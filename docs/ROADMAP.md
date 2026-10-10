@@ -166,7 +166,8 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Collider friction/restitution authoring + 3D/2D impulse response foundation
 - [x] Contact-supported Rigidbody/Rigidbody2D sleeping + managed Sleep/WakeUp/IsSleeping foundation
 - [x] Fixed-capacity native ContactManifold + representative contact-point tracking foundation
-- [ ] Multi-point clipped manifolds, remaining collider shapes and production broad-phase/iterative-solver tuning
+- [x] Box/Box2D facing-vertex multi-point manifold foundation (up to 4 points / 2 points)
+- [ ] Full reference/incident face clipping, remaining collider shapes and production broad-phase/iterative-solver tuning
 - [x] Keyboard/mouse InputState transitions + Win32 message capture
 - [x] Named action-map binding/query foundation
 - [x] Managed KeyCode/GetKey/GetKeyDown/GetKeyUp + mouse position/delta/wheel

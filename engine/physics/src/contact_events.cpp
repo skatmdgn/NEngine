@@ -5,6 +5,42 @@
 #include <utility>
 
 namespace nengine::physics {
+namespace {
+
+core::Vec3 representative_point(
+    const ContactManifold& manifold) noexcept {
+
+    if (manifold.count == 0u) {
+        return {};
+    }
+
+    core::Vec3 sum{};
+
+    for (std::size_t index = 0;
+         index < manifold.count;
+         ++index) {
+
+        sum.x +=
+            manifold.points[index].point.x;
+        sum.y +=
+            manifold.points[index].point.y;
+        sum.z +=
+            manifold.points[index].point.z;
+    }
+
+    const float inverse =
+        1.0f /
+        static_cast<float>(
+            manifold.count);
+
+    return {
+        sum.x * inverse,
+        sum.y * inverse,
+        sum.z * inverse
+    };
+}
+
+} // namespace
 
 std::size_t ContactTracker::PairKeyHash::operator()(
     const PairKey& key) const noexcept {
@@ -91,11 +127,8 @@ std::vector<ContactEvent> ContactTracker::update(
             previous_.end();
 
         const core::Vec3 point =
-            overlap.manifold.count > 0u
-                ? overlap.manifold
-                    .points[0]
-                    .point
-                : core::Vec3{};
+            representative_point(
+                overlap.manifold);
 
         events.push_back({
             overlap.first,
@@ -121,11 +154,8 @@ std::vector<ContactEvent> ContactTracker::update(
         }
 
         const core::Vec3 point =
-            overlap.manifold.count > 0u
-                ? overlap.manifold
-                    .points[0]
-                    .point
-                : core::Vec3{};
+            representative_point(
+                overlap.manifold);
 
         events.push_back({
             overlap.first,

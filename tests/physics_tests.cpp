@@ -1008,6 +1008,20 @@ int main() {
                 std::abs(
                     overlap.penetration -
                     0.4f) <
+                    0.0001f &&
+                overlap.manifold.count ==
+                    2u &&
+                std::abs(
+                    overlap.manifold
+                        .points[0]
+                        .point.y -
+                    0.3f) <
+                    0.0001f &&
+                std::abs(
+                    overlap.manifold
+                        .points[1]
+                        .point.y -
+                    0.3f) <
                     0.0001f;
         }
     }
@@ -1016,6 +1030,88 @@ int main() {
         saw_3d_trigger &&
         saw_2d_contact,
         "AABB overlap records minimum penetration axis and trigger semantics");
+
+
+    core::World manifold_world;
+
+    const auto manifold_box_a =
+        manifold_world.create(
+            "Manifold Box A");
+
+    const auto manifold_box_b =
+        manifold_world.create(
+            "Manifold Box B");
+
+    manifold_world.add_component<
+        physics::BoxCollider>(
+            manifold_box_a,
+            physics::box_collider_type());
+
+    manifold_world.add_component<
+        physics::BoxCollider>(
+            manifold_box_b,
+            physics::box_collider_type());
+
+    manifold_world.transform(
+        manifold_box_b)->local_position =
+            {0.75f, 0.0f, 0.0f};
+
+    const auto manifold_detection =
+        physics::detect_box_overlaps(
+            manifold_world);
+
+    bool manifold_plane_valid = false;
+
+    if (manifold_detection.overlaps.size() ==
+        1u) {
+
+        const auto& manifold_overlap =
+            manifold_detection
+                .overlaps.front();
+
+        manifold_plane_valid =
+            manifold_overlap
+                .manifold.count == 4u;
+
+        for (std::size_t index = 0;
+             manifold_plane_valid &&
+             index <
+                 manifold_overlap
+                     .manifold.count;
+             ++index) {
+
+            const auto& contact =
+                manifold_overlap
+                    .manifold
+                    .points[index];
+
+            manifold_plane_valid =
+                std::abs(
+                    contact.point.x -
+                    0.375f) <
+                    0.0002f &&
+                std::abs(
+                    contact.penetration -
+                    0.25f) <
+                    0.0002f &&
+                std::abs(
+                    std::abs(
+                        contact.point.y) -
+                    0.5f) <
+                    0.0002f &&
+                std::abs(
+                    std::abs(
+                        contact.point.z) -
+                    0.5f) <
+                    0.0002f;
+        }
+    }
+
+    check(
+        manifold_detection.overlaps.size() ==
+            1u &&
+        manifold_plane_valid,
+        "3D BoxCollider face overlap clips four persistent contact manifold points");
 
     core::World sparse_broad_phase_world;
 
@@ -1188,7 +1284,7 @@ int main() {
             !event.is_trigger) {
 
             saw_contact_point_event =
-                event.contact_count == 1u &&
+                event.contact_count == 2u &&
                 std::abs(
                     event.point.x) <
                     0.0001f &&

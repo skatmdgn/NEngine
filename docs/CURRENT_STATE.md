@@ -294,10 +294,10 @@ Implemented:
 - Fixed-step rigidbody foundation runs after managed FixedUpdate so script velocity changes affect the same simulation step; sleeping bodies skip gravity/integration until velocity, impact or support changes wake them.
 - 3D gravity/linear-velocity Transform integration and 2D XY integration with kinematic/inactive bodies skipped.
 - BoxCollider/SphereCollider/CapsuleCollider and BoxCollider2D/CircleCollider2D/CapsuleCollider2D share the X-axis sweep-and-prune broad phase; rotated boxes and capsules contribute conservative world AABBs while narrow phase handles OBB-OBB, radial-radial, oriented box-radial, capsule-radial, capsule-capsule and oriented box-capsule pairs with layer/collision-mask filtering and trigger separation.
-- Collision detection now records a fixed-capacity ContactManifold (up to four ContactPoints) on each solid overlap; current narrow phases seed one representative support-midpoint contact with per-point penetration, providing the stable data shape for future clipped multi-point manifolds.
+- Collision detection records a fixed-capacity ContactManifold (up to four ContactPoints) on each solid overlap. Box/Box2D pairs now clip facing box vertices against the opposing OBB to retain up to four 3D or two 2D face contacts; edge/vertex cases and non-box shape pairs fall back to a representative support-midpoint contact. Each point carries penetration.
 - 3D/2D contact resolution uses inverse-mass-weighted positional correction with a tiny persistent contact slop plus normal restitution impulses and Coulomb-limited tangential friction impulses; collider friction uses geometric-mean combination and restitution uses the larger value.
 - Contact-supported Rigidbody/Rigidbody2D sleeping enters after 0.5 seconds at or below the configurable speed threshold, never sleeps unsupported bodies, wakes on externally assigned velocity/impact/support loss, and exposes managed allowSleep, sleepThreshold, Sleep(), WakeUp() and IsSleeping().
-- ContactTracker derives Enter/Stay/Exit phases for collision and trigger pairs; solid Enter/Stay events carry the representative native contact point/count, trigger events keep zero contacts, and Exit retains the prior representative point with zero active contacts.
+- ContactTracker derives Enter/Stay/Exit phases for collision and trigger pairs; solid Enter/Stay events carry the active manifold count plus its centroid as the representative native point, trigger events keep zero contacts, and Exit retains the prior manifold centroid with zero active contacts.
 - Editor Play Mode dispatches tracked contact phases to both active managed Behaviours with side-correct contact normals.
 - Generated C# exposes Collision/Collision2D plus Collider/Collider2D callback payloads for OnCollisionEnter/Stay/Exit, OnTriggerEnter/Stay/Exit and their 2D variants.
 - Native Raycast/Raycast2D transform rays into BoxCollider/BoxCollider2D local axes for exact rotated-box hits and analytically intersect capsule segment+radii, selecting the nearest box/radial/capsule result; OverlapBox/OverlapBox2D use the same OBB/radial/capsule narrow phase.
@@ -308,7 +308,7 @@ Implemented:
 
 Not yet implemented:
 - Production broad-phase tuning and remaining polygon-style collider variants remain; additional cast shapes such as SphereCast/CapsuleCast are not yet exposed.
-- Production contact solving beyond the current representative single-point manifold seed: box/face clipping into 2-4 contacts, iterative constraint solving, warm starting and island-aware sleeping/wake propagation.
+- Production contact solving beyond the current box-vertex multi-point manifold foundation: full incident/reference face polygon clipping for rotated edge cases, per-contact iterative constraint solving, warm starting and island-aware sleeping/wake propagation.
 - Additional shape casts and richer hit semantics/query filtering policy.
 - Physics materials and joints.
 - Production 3D/2D backend selection/integration.
@@ -354,7 +354,7 @@ Not yet implemented:
 
 ## Immediate next work
 
-1. Expand the fixed-capacity contact-manifold seed into clipped multi-point contacts, iterative solving/warm-starting and island-aware sleep propagation, then continue remaining polygon-style collider work.
+1. Expand box-vertex multi-point contacts into full reference/incident face clipping, then add per-contact iterative solving/warm-starting and island-aware sleep propagation before continuing polygon-style collider work.
 2. Extend audio with streaming + OGG/MP3/FLAC runtime decode and a callback-driven device path after real-Windows audible acceptance.
 3. Extend managed physics queries with additional shape casts and richer hit/filtering semantics.
 4. Package/version the managed NEngine API surface and add debugger attach/symbol workflow.

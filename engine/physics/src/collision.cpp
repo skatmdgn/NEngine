@@ -1110,6 +1110,261 @@ core::Vec3 support_point(
     return result;
 }
 
+core::Vec3 box_vertex(
+    const ColliderBounds& box,
+    float x_sign,
+    float y_sign,
+    float z_sign,
+    bool is_2d) noexcept {
+
+    auto result =
+        added(
+            box.center,
+            scaled(
+                box.axis_x,
+                box.half.x *
+                    x_sign));
+
+    result =
+        added(
+            result,
+            scaled(
+                box.axis_y,
+                box.half.y *
+                    y_sign));
+
+    if (!is_2d) {
+        result =
+            added(
+                result,
+                scaled(
+                    box.axis_z,
+                    box.half.z *
+                        z_sign));
+    } else {
+        result.z = 0.0f;
+    }
+
+    return result;
+}
+
+bool point_inside_box(
+    core::Vec3 point,
+    const ColliderBounds& box,
+    bool is_2d,
+    float tolerance = 0.0001f) noexcept {
+
+    const core::Vec3 delta{
+        point.x - box.center.x,
+        point.y - box.center.y,
+        is_2d
+            ? 0.0f
+            : point.z - box.center.z
+    };
+
+    if (std::abs(
+            dot(
+                delta,
+                box.axis_x)) >
+        box.half.x +
+            tolerance) {
+        return false;
+    }
+
+    if (std::abs(
+            dot(
+                delta,
+                box.axis_y)) >
+        box.half.y +
+            tolerance) {
+        return false;
+    }
+
+    if (!is_2d &&
+        std::abs(
+            dot(
+                delta,
+                box.axis_z)) >
+            box.half.z +
+                tolerance) {
+        return false;
+    }
+
+    return true;
+}
+
+void append_manifold_point(
+    ContactManifold& manifold,
+    core::Vec3 point,
+    float penetration,
+    bool is_2d) noexcept {
+
+    if (is_2d) {
+        point.z = 0.0f;
+    }
+
+    constexpr float duplicate_epsilon =
+        0.0001f;
+
+    for (std::size_t index = 0;
+         index < manifold.count;
+         ++index) {
+
+        const core::Vec3 delta{
+            manifold.points[index]
+                    .point.x -
+                point.x,
+            manifold.points[index]
+                    .point.y -
+                point.y,
+            is_2d
+                ? 0.0f
+                : manifold.points[index]
+                          .point.z -
+                      point.z
+        };
+
+        if (length_squared(
+                delta,
+                is_2d) <=
+            duplicate_epsilon *
+                duplicate_epsilon) {
+            return;
+        }
+    }
+
+    if (manifold.count >=
+        ContactManifold::max_points) {
+        return;
+    }
+
+    manifold.points[
+        manifold.count++] = {
+        point,
+        penetration
+    };
+}
+
+bool populate_box_pair_manifold(
+    const ColliderBounds& first,
+    const ColliderBounds& second,
+    bool is_2d,
+    BoxOverlap& overlap) noexcept {
+
+    if (first.shape !=
+            ColliderShape::Box ||
+        second.shape !=
+            ColliderShape::Box ||
+        overlap.is_trigger ||
+        overlap.penetration <=
+            0.0f) {
+        return false;
+    }
+
+    const auto collect_face =
+        [&](const ColliderBounds& source,
+            const ColliderBounds& other,
+            core::Vec3 face_direction,
+            float projection_shift) {
+
+            const auto support =
+                support_point(
+                    source,
+                    face_direction,
+                    is_2d);
+
+            const float support_projection =
+                dot(
+                    support,
+                    face_direction);
+
+            constexpr float face_epsilon =
+                0.0002f;
+
+            const float signs[]{
+                -1.0f,
+                1.0f
+            };
+
+            for (const float x_sign :
+                 signs) {
+                for (const float y_sign :
+                     signs) {
+
+                    const int z_count =
+                        is_2d
+                            ? 1
+                            : 2;
+
+                    for (int z_index = 0;
+                         z_index < z_count;
+                         ++z_index) {
+
+                        const float z_sign =
+                            is_2d ||
+                                    z_index == 0
+                                ? -1.0f
+                                : 1.0f;
+
+                        const auto vertex =
+                            box_vertex(
+                                source,
+                                x_sign,
+                                y_sign,
+                                z_sign,
+                                is_2d);
+
+                        if (std::abs(
+                                dot(
+                                    vertex,
+                                    face_direction) -
+                                support_projection) >
+                            face_epsilon) {
+                            continue;
+                        }
+
+                        if (!point_inside_box(
+                                vertex,
+                                other,
+                                is_2d,
+                                overlap.penetration +
+                                    0.0002f)) {
+                            continue;
+                        }
+
+                        append_manifold_point(
+                            overlap.manifold,
+                            added(
+                                vertex,
+                                scaled(
+                                    overlap.normal,
+                                    projection_shift)),
+                            overlap.penetration,
+                            is_2d);
+                    }
+                }
+            }
+        };
+
+    collect_face(
+        first,
+        second,
+        overlap.normal,
+        -overlap.penetration *
+            0.5f);
+
+    collect_face(
+        second,
+        first,
+        scaled(
+            overlap.normal,
+            -1.0f),
+        overlap.penetration *
+            0.5f);
+
+    return overlap.manifold.count > 0u;
+}
+
 void populate_contact_manifold(
     const ColliderBounds& first,
     const ColliderBounds& second,
@@ -1119,6 +1374,14 @@ void populate_contact_manifold(
     if (overlap.penetration <=
             0.0f ||
         overlap.is_trigger) {
+        return;
+    }
+
+    if (populate_box_pair_manifold(
+            first,
+            second,
+            is_2d,
+            overlap)) {
         return;
     }
 
