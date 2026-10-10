@@ -385,18 +385,18 @@ Implemented foundation:
 - generated NEngine.API / NEngine.Bridge / gameplay projects and solution.
 - deterministic dotnet gameplay DLL/PDB build.
 - ScriptBehaviour Scene/Inspector integration and Play Mode execution.
-- stable ABI v11 native World callback table.
+- stable ABI v12 native World callback table.
 - GameObject name/active, Transform hierarchy/TRS and component presence.
 - native-backed GameObject create/find plus deferred destroy.
 - collectible gameplay AssemblyLoadContext reload without restarting hostfxr.
 - keyboard/mouse managed Input.
 - global managed Time frame clock with fixedDeltaTime support.
 - FixedUpdate fixed-step scheduling separated from host-frame Update/LateUpdate.
-- managed Camera/Light plus non-asset MeshRenderer/SpriteRenderer properties over the generic native property bridge.
+- managed Camera/Light plus MeshRenderer/SpriteRenderer scalar and AssetGuid properties over the generic native property bridge.
 - coroutine scheduling including WaitForSeconds.
 
 Remaining major work:
-- AssetReference render properties plus broader physics/audio managed component APIs.
+- SpriteAnimator plus broader physics/audio managed component APIs.
 - packaged/versioned managed API distribution.
 - debugger symbols/attach workflow.
 - NuGet runtime/package integration.
