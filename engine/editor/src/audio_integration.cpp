@@ -1,5 +1,6 @@
 #include "nengine/editor/audio_integration.hpp"
 
+#include <limits>
 #include <optional>
 #include <string>
 #include <variant>
@@ -147,6 +148,10 @@ bool register_source_properties(
         "Spatialize",
         &audio::AudioSource::spatialize);
 
+    bool_property(
+        "Playing",
+        &audio::AudioSource::playing);
+
     ok =
         properties.register_property(
             type,
@@ -178,9 +183,21 @@ bool register_source_properties(
                         value,
                         [](audio::AudioSource& source,
                            const core::PropertyValue& raw) {
-                            return parse_asset_reference(
-                                raw,
-                                source.clip);
+                            assets::AssetGuid next;
+
+                            if (!parse_asset_reference(
+                                    raw,
+                                    next)) {
+                                return false;
+                            }
+
+                            if (source.clip != next) {
+                                source.clip = next;
+                                source.playing = false;
+                                source.time_seconds = 0.0f;
+                            }
+
+                            return true;
                         });
             }) &&
         ok;
@@ -259,6 +276,12 @@ bool register_source_properties(
         &audio::AudioSource::pan_stereo,
         -1.0f,
         1.0f);
+
+    float_property(
+        "Time",
+        &audio::AudioSource::time_seconds,
+        0.0f,
+        std::numeric_limits<float>::max());
 
     return ok;
 }

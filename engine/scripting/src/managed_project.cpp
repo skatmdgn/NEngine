@@ -2364,6 +2364,41 @@ std::string api_stub(
             get => NativeFloat("Pan Stereo", 0);
             set => SetNativeFloat("Pan Stereo", value);
         }
+
+        public bool isPlaying =>
+            NativeBool("Playing", false);
+
+        public float time
+        {
+            get => NativeFloat("Time", 0);
+            set => SetNativeFloat("Time", value);
+        }
+
+        public void Play()
+        {
+            if (!clip.valid)
+                return;
+
+            time = 0;
+            SetNativeBool("Playing", true);
+        }
+
+        public void Pause()
+        {
+            SetNativeBool("Playing", false);
+        }
+
+        public void UnPause()
+        {
+            if (clip.valid)
+                SetNativeBool("Playing", true);
+        }
+
+        public void Stop()
+        {
+            SetNativeBool("Playing", false);
+            time = 0;
+        }
     }
 
     public sealed class AudioListener : Component

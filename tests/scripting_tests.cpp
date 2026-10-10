@@ -100,6 +100,25 @@ struct ManagedBoxCollider2DFixture {
     nengine::core::Vec3 size{1.0f, 1.0f, 0.0f};
 };
 
+struct ManagedAudioSourceFixture {
+    std::string clip{
+        "10101010101010102020202020202020"};
+    bool enabled{true};
+    bool play_on_awake{true};
+    bool loop{false};
+    bool spatialize{false};
+    float volume{1.0f};
+    float pitch{1.0f};
+    float pan_stereo{0.0f};
+    bool playing{false};
+    float time_seconds{0.25f};
+};
+
+struct ManagedAudioListenerFixture {
+    bool enabled{true};
+    float volume{1.0f};
+};
+
 struct ManagedPhysicsQueryFixture {
     nengine::core::Entity hit_3d{
         nengine::core::Entity::invalid()};
@@ -306,6 +325,60 @@ bool read_managed_render_property(
         return true;
     }
 
+
+    if (component == "NEngine.AudioSource") {
+        const auto* value =
+            world.get_component<
+                ManagedAudioSourceFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Clip")
+            output = value->clip;
+        else if (property == "Enabled")
+            output = value->enabled;
+        else if (property == "Play On Awake")
+            output = value->play_on_awake;
+        else if (property == "Loop")
+            output = value->loop;
+        else if (property == "Spatialize")
+            output = value->spatialize;
+        else if (property == "Volume")
+            output = static_cast<double>(value->volume);
+        else if (property == "Pitch")
+            output = static_cast<double>(value->pitch);
+        else if (property == "Pan Stereo")
+            output = static_cast<double>(value->pan_stereo);
+        else if (property == "Playing")
+            output = value->playing;
+        else if (property == "Time")
+            output = static_cast<double>(value->time_seconds);
+        else
+            return false;
+
+        return true;
+    }
+
+    if (component == "NEngine.AudioListener") {
+        const auto* value =
+            world.get_component<
+                ManagedAudioListenerFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Enabled")
+            output = value->enabled;
+        else if (property == "Volume")
+            output = static_cast<double>(value->volume);
+        else
+            return false;
+
+        return true;
+    }
 
     if (component == "NEngine.Rigidbody") {
         const auto* value =
@@ -644,6 +717,103 @@ bool write_managed_render_property(
         return true;
     }
 
+
+    if (component == "NEngine.AudioSource") {
+        auto* value =
+            world.get_component<
+                ManagedAudioSourceFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Clip") {
+            const auto* typed =
+                std::get_if<std::string>(
+                    &input);
+            if (!typed) return false;
+            value->clip = *typed;
+            value->playing = false;
+            value->time_seconds = 0.0f;
+        } else if (property == "Enabled" ||
+                   property == "Play On Awake" ||
+                   property == "Loop" ||
+                   property == "Spatialize" ||
+                   property == "Playing") {
+            const auto* typed =
+                std::get_if<bool>(
+                    &input);
+            if (!typed) return false;
+
+            if (property == "Enabled")
+                value->enabled = *typed;
+            else if (property == "Play On Awake")
+                value->play_on_awake = *typed;
+            else if (property == "Loop")
+                value->loop = *typed;
+            else if (property == "Spatialize")
+                value->spatialize = *typed;
+            else
+                value->playing = *typed;
+        } else if (property == "Volume" ||
+                   property == "Pitch" ||
+                   property == "Pan Stereo" ||
+                   property == "Time") {
+            const auto* typed =
+                std::get_if<double>(
+                    &input);
+            if (!typed) return false;
+
+            if (property == "Volume")
+                value->volume =
+                    static_cast<float>(*typed);
+            else if (property == "Pitch")
+                value->pitch =
+                    static_cast<float>(*typed);
+            else if (property == "Pan Stereo")
+                value->pan_stereo =
+                    static_cast<float>(*typed);
+            else {
+                if (*typed < 0.0)
+                    return false;
+                value->time_seconds =
+                    static_cast<float>(*typed);
+            }
+        } else {
+            return false;
+        }
+
+        return true;
+    }
+
+    if (component == "NEngine.AudioListener") {
+        auto* value =
+            world.get_component<
+                ManagedAudioListenerFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Enabled") {
+            const auto* typed =
+                std::get_if<bool>(
+                    &input);
+            if (!typed) return false;
+            value->enabled = *typed;
+        } else if (property == "Volume") {
+            const auto* typed =
+                std::get_if<double>(
+                    &input);
+            if (!typed) return false;
+            value->volume =
+                static_cast<float>(*typed);
+        } else {
+            return false;
+        }
+
+        return true;
+    }
 
     if (component == "NEngine.Rigidbody") {
         auto* value =
@@ -1476,8 +1646,8 @@ int main() {
                 << "        MeshRenderer? mesh = GetComponent<MeshRenderer>();\n"
                 << "        SpriteRenderer? sprite = GetComponent<SpriteRenderer>();\n"
                 << "        SpriteAnimator? animator = GetComponent<SpriteAnimator>();\n"
-                << "        Rigidbody? body = GetComponent<Rigidbody>(); BoxCollider? box = GetComponent<BoxCollider>(); Rigidbody2D? body2d = GetComponent<Rigidbody2D>(); BoxCollider2D? box2d = GetComponent<BoxCollider2D>();\n"
-                << "        if (camera == null || light == null || mesh == null || sprite == null || animator == null || body == null || box == null || body2d == null || box2d == null) throw new System.Exception(\"component proxy missing\");\n"
+                << "        Rigidbody? body = GetComponent<Rigidbody>(); BoxCollider? box = GetComponent<BoxCollider>(); Rigidbody2D? body2d = GetComponent<Rigidbody2D>(); BoxCollider2D? box2d = GetComponent<BoxCollider2D>(); AudioSource? audio = GetComponent<AudioSource>(); AudioListener? listener = GetComponent<AudioListener>();\n"
+                << "        if (camera == null || light == null || mesh == null || sprite == null || animator == null || body == null || box == null || body2d == null || box2d == null || audio == null || listener == null) throw new System.Exception(\"component proxy missing\");\n"
                 << "        if (!camera.enabled || camera.orthographic || System.MathF.Abs(camera.fieldOfView - 60f) > 0.001f) throw new System.Exception(\"camera read mismatch\");\n"
                 << "        camera.enabled = false; camera.orthographic = true; camera.fieldOfView = 72f; camera.nearClipPlane = 0.25f; camera.farClipPlane = 750f; camera.orthographicSize = 8f;\n"
                 << "        if (light.type != LightType.Directional || System.MathF.Abs(light.intensity - 1f) > 0.001f) throw new System.Exception(\"light read mismatch\");\n"
@@ -1493,7 +1663,10 @@ int main() {
                 << "        box.isTrigger = true; box.center = new Vector3(0.1f, 0.2f, 0.3f); box.size = new Vector3(2, 3, 4);\n"
                 << "        body2d.useGravity = false; body2d.mass = 3f; body2d.gravityScale = 0.25f; body2d.velocity = new Vector2(4, 5); body2d.AddForce(new Vector2(3, 0)); body2d.isKinematic = true;\n"
                 << "        box2d.isTrigger = true; box2d.center = new Vector2(0.5f, 0.75f); box2d.size = new Vector2(6, 7);\n"
-                << "        gameObject.name = \"Render Physics Properties Passed\";\n"
+                << "        if (audio.clip.ToString() != \"10101010101010102020202020202020\" || audio.isPlaying || System.MathF.Abs(audio.time - 0.25f) > 0.001f) throw new System.Exception(\"audio initial state mismatch\");\n"
+                << "        audio.Play(); if (!audio.isPlaying || System.MathF.Abs(audio.time) > 0.001f) throw new System.Exception(\"audio play mismatch\"); audio.time = 0.5f; audio.Pause(); if (audio.isPlaying) throw new System.Exception(\"audio pause mismatch\"); audio.UnPause(); if (!audio.isPlaying) throw new System.Exception(\"audio unpause mismatch\"); audio.Stop(); if (audio.isPlaying || System.MathF.Abs(audio.time) > 0.001f) throw new System.Exception(\"audio stop mismatch\");\n"
+                << "        audio.playOnAwake = false; audio.loop = true; audio.spatialize = true; audio.volume = 0.4f; audio.pitch = 1.2f; audio.panStereo = 0.25f; listener.enabled = false; listener.volume = 0.7f;\n"
+                << "        gameObject.name = \"Render Physics Audio Properties Passed\";\n"
                 << "    }\n"
                 << "}\n"
                 << "public class PhysicsEventProbe : Behaviour {\n"
@@ -1804,6 +1977,14 @@ int main() {
                             nengine::core::ComponentRegistry::stable_id(
                                 "NEngine.BoxCollider2D");
 
+                        const auto audio_source_type =
+                            nengine::core::ComponentRegistry::stable_id(
+                                "NEngine.AudioSource");
+
+                        const auto audio_listener_type =
+                            nengine::core::ComponentRegistry::stable_id(
+                                "NEngine.AudioListener");
+
                         property_world.add_component<
                             ManagedCameraFixture>(
                                 property_entity,
@@ -1848,6 +2029,16 @@ int main() {
                             ManagedBoxCollider2DFixture>(
                                 property_entity,
                                 box2d_type);
+
+                        property_world.add_component<
+                            ManagedAudioSourceFixture>(
+                                property_entity,
+                                audio_source_type);
+
+                        property_world.add_component<
+                            ManagedAudioListenerFixture>(
+                                property_entity,
+                                audio_listener_type);
 
                         auto* property_script =
                             property_world.add_component<
@@ -1922,6 +2113,18 @@ int main() {
                                     property_entity,
                                     box2d_type);
 
+                        const auto* audio_source_fixture =
+                            property_world.get_component<
+                                ManagedAudioSourceFixture>(
+                                    property_entity,
+                                    audio_source_type);
+
+                        const auto* audio_listener_fixture =
+                            property_world.get_component<
+                                ManagedAudioListenerFixture>(
+                                    property_entity,
+                                    audio_listener_type);
+
                         check(
                             property_script &&
                             property_tick.created == 1u &&
@@ -1930,7 +2133,7 @@ int main() {
                             property_tick.unresolved == 0u &&
                             property_world.name(
                                 property_entity) ==
-                                "Render Physics Properties Passed" &&
+                                "Render Physics Audio Properties Passed" &&
                             camera_fixture &&
                             !camera_fixture->enabled &&
                             camera_fixture->projection == 1 &&
@@ -1998,8 +2201,20 @@ int main() {
                             box2d_fixture->center ==
                                 nengine::core::Vec3{0.5f, 0.75f, 0.0f} &&
                             box2d_fixture->size ==
-                                nengine::core::Vec3{6.0f, 7.0f, 0.0f},
-                            "managed render and physics component proxies round-trip through generic native property ABI");
+                                nengine::core::Vec3{6.0f, 7.0f, 0.0f} &&
+                            audio_source_fixture &&
+                            !audio_source_fixture->play_on_awake &&
+                            audio_source_fixture->loop &&
+                            audio_source_fixture->spatialize &&
+                            !audio_source_fixture->playing &&
+                            std::abs(audio_source_fixture->time_seconds) < 0.001f &&
+                            std::abs(audio_source_fixture->volume - 0.4f) < 0.001f &&
+                            std::abs(audio_source_fixture->pitch - 1.2f) < 0.001f &&
+                            std::abs(audio_source_fixture->pan_stereo - 0.25f) < 0.001f &&
+                            audio_listener_fixture &&
+                            !audio_listener_fixture->enabled &&
+                            std::abs(audio_listener_fixture->volume - 0.7f) < 0.001f,
+                            "managed render physics and audio component proxies round-trip through generic native property ABI");
 
                         property_system.clear(
                             &property_world);
