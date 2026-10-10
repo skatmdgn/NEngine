@@ -1,5 +1,6 @@
 add_library(NEngineAudio STATIC
   src/audio_clip.cpp
+  src/audio_device_null.cpp
   src/audio_renderer.cpp
   src/clip_cache.cpp
   src/mix_snapshot.cpp

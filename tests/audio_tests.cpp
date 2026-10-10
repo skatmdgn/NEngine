@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "nengine/audio/audio_clip.hpp"
+#include "nengine/audio/audio_device.hpp"
 #include "nengine/audio/audio_renderer.hpp"
 #include "nengine/audio/clip_cache.hpp"
 #include "nengine/audio/components.hpp"
@@ -653,6 +654,45 @@ int main() {
         std::abs(rendered_audio[6] + 0.5f) < 0.0001f &&
         std::abs(rendered_audio[7] + 1.0f) < 0.0001f,
         "software audio renderer mixes mono PCM into stereo gains");
+
+    audio::AudioOutputDevice output_device;
+    std::string device_error;
+
+    check(
+        output_device.open(&device_error) &&
+        output_device.is_open(),
+        "audio output device abstraction opens");
+
+    const auto output_info =
+        output_device.info();
+
+    check(
+        output_info.open &&
+        output_info.sample_rate > 0u &&
+        output_info.channels == 2u &&
+        output_info.buffer_frames > 0u,
+        "audio output device reports usable stereo format");
+
+    const auto device_stats =
+        output_device.pump(
+            render_snapshot,
+            [&render_clip](assets::AssetGuid) {
+                return &render_clip;
+            },
+            &device_error);
+
+    check(
+        device_stats.frames_rendered ==
+            output_info.buffer_frames &&
+        output_device.info().submitted_frames ==
+            output_info.buffer_frames,
+        "audio output device pumps mixed PCM and tracks submitted frames");
+
+    output_device.close();
+
+    check(
+        !output_device.is_open(),
+        "audio output device closes cleanly");
 
     if (failures == 0) {
         std::cout
