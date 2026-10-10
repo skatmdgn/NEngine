@@ -156,8 +156,10 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Managed 3D/2D overlap-box queries + query layer-mask filtering
 - [x] Native axis-aligned BoxCast/BoxCast2D foundation
 - [x] Managed Physics.BoxCast + Physics2D.BoxCast bindings over ABI v15
+- [x] SphereCollider + CircleCollider2D Scene/Editor/C# authoring foundation
+- [x] Sphere/Circle + mixed Box-radial sweep-and-prune contacts and Raycast/OverlapBox participation
 - [ ] Additional shape casts + richer hit semantics/query filtering policy
-- [ ] Rotated/extra collider shapes, friction/restitution, sleeping and production broad-phase tuning
+- [ ] Rotated boxes, remaining collider shapes, friction/restitution, sleeping and production broad-phase tuning
 - [x] Keyboard/mouse InputState transitions + Win32 message capture
 - [x] Named action-map binding/query foundation
 - [x] Managed KeyCode/GetKey/GetKeyDown/GetKeyUp + mouse position/delta/wheel

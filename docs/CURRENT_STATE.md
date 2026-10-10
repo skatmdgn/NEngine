@@ -287,25 +287,25 @@ The concrete Vulkan backend currently grows beneath this contract. The long-term
 
 Implemented:
 - Dedicated NEnginePhysics module.
-- Native Rigidbody / BoxCollider and Rigidbody2D / BoxCollider2D components.
-- Reflection metadata and Scene serialization for mass, gravity, velocity, trigger, collider layer/collision-mask, center and size state, with legacy Scene defaults for the new filter fields.
-- Editor Add Component, Inspector and generic PropertyAccess integration for all four physics components.
-- Managed Rigidbody / BoxCollider / Rigidbody2D / BoxCollider2D proxies over ABI v15, including Unity-familiar velocity/useGravity/isKinematic naming.
+- Native Rigidbody / BoxCollider / SphereCollider and Rigidbody2D / BoxCollider2D / CircleCollider2D components.
+- Reflection metadata and Scene serialization for mass, gravity, velocity, trigger, collider layer/collision-mask, center, box size and radial radius state, with legacy Scene defaults for the filter fields.
+- Editor Add Component, Inspector and generic PropertyAccess integration for all six physics components.
+- Managed Rigidbody / BoxCollider / SphereCollider / Rigidbody2D / BoxCollider2D / CircleCollider2D proxies over ABI v15, including Unity-familiar velocity/useGravity/isKinematic naming.
 - Fixed-step rigidbody foundation runs after managed FixedUpdate so script velocity changes affect the same simulation step.
 - 3D gravity/linear-velocity Transform integration and 2D XY integration with kinematic/inactive bodies skipped.
-- Axis-aligned BoxCollider/BoxCollider2D overlap detection uses an initial X-axis sweep-and-prune broad phase, reports minimum penetration normal, separates trigger from solid pairs and applies mutual layer/collision-mask filtering before narrow phase.
+- BoxCollider/SphereCollider and BoxCollider2D/CircleCollider2D share the X-axis sweep-and-prune broad phase; narrow phase handles box-box, sphere-sphere/circle-circle and mixed box-radial pairs with layer/collision-mask filtering and trigger separation.
 - Basic 3D/2D position contact resolution removes entering normal velocity; dynamic/dynamic correction is inverse-mass weighted.
 - ContactTracker derives Enter/Stay/Exit phases for collision and trigger pairs.
 - Editor Play Mode dispatches tracked contact phases to both active managed Behaviours with side-correct contact normals.
 - Generated C# exposes Collision/Collision2D plus Collider/Collider2D callback payloads for OnCollisionEnter/Stay/Exit, OnTriggerEnter/Stay/Exit and their 2D variants.
-- Native Raycast/Raycast2D queries return nearest BoxCollider hit entity, point, normal, distance, trigger state and collider layer with layer-mask filtering.
+- Native Raycast/Raycast2D select the nearest box or sphere/circle hit and return entity, point, normal, distance, trigger state and collider layer with layer-mask filtering; OverlapBox/OverlapBox2D also include radial colliders.
 - ABI v15 carries raycast/box-cast layer masks plus multi-hit overlap query callbacks without introducing a Scripting -> Physics dependency.
-- Generated Physics.Raycast / Physics2D.Raycast, Physics.OverlapBox / Physics2D.OverlapBoxAll and Physics.BoxCast / Physics2D.BoxCast expose trigger/layer-filtered managed queries.
+- Generated Physics.Raycast / Physics2D.Raycast and Physics.OverlapBox / Physics2D.OverlapBoxAll resolve Box/Sphere and Box2D/Circle2D collider proxies; Physics.BoxCast / Physics2D.BoxCast remain axis-aligned box-target casts with trigger/layer filtering.
 - Native axis-aligned BoxCast / BoxCast2D use Minkowski-expanded AABBs to return nearest time-of-impact, normal and cast-center position; managed casts preserve those semantics.
 - Native serialization/property tests and real managed C# property round-trip coverage.
 
 Not yet implemented:
-- Production broad-phase tuning beyond the initial sweep-and-prune plus oriented/rotated narrow-phase collision detection.
+- Production broad-phase tuning beyond the initial sweep-and-prune plus oriented/rotated BoxCollider narrow phase and remaining shapes such as capsule/polygon variants.
 - Production contact solving, friction, restitution and sleeping.
 - Additional shape casts and richer hit semantics/query filtering policy.
 - Physics materials and joints.
@@ -352,7 +352,7 @@ Not yet implemented:
 
 ## Immediate next work
 
-1. Extend the new sweep-and-prune/layer-filtered physics path with rotated/extra collider shapes and friction/restitution/sleeping.
+1. Extend the box/sphere/circle sweep-and-prune path with rotated boxes, remaining collider shapes and friction/restitution/sleeping.
 2. Extend audio with streaming + OGG/MP3/FLAC runtime decode and a callback-driven device path after real-Windows audible acceptance.
 3. Extend managed physics queries with additional shape casts and richer hit/filtering semantics.
 4. Package/version the managed NEngine API surface and add debugger attach/symbol workflow.

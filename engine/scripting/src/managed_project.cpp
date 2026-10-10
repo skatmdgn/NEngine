@@ -2061,7 +2061,9 @@ std::string api_stub(
             this.gameObject = gameObject;
             this.normal = normal;
             this.penetration = penetration;
-            collider = gameObject.GetComponent<BoxCollider>();
+            collider =
+                gameObject.GetComponent<BoxCollider>() ??
+                (Collider?)gameObject.GetComponent<SphereCollider>();
             rigidbody = gameObject.GetComponent<Rigidbody>();
         }
     }
@@ -2083,7 +2085,9 @@ std::string api_stub(
             this.gameObject = gameObject;
             this.normal = normal;
             this.penetration = penetration;
-            collider = gameObject.GetComponent<BoxCollider2D>();
+            collider =
+                gameObject.GetComponent<BoxCollider2D>() ??
+                (Collider2D?)gameObject.GetComponent<CircleCollider2D>();
             rigidbody = gameObject.GetComponent<Rigidbody2D>();
         }
     }
@@ -2208,7 +2212,9 @@ std::string api_stub(
             bool isTrigger)
         {
             this.gameObject = gameObject;
-            collider = gameObject.GetComponent<BoxCollider>();
+            collider =
+                gameObject.GetComponent<BoxCollider>() ??
+                (Collider?)gameObject.GetComponent<SphereCollider>();
             this.point = point;
             this.normal = normal;
             this.distance = distance;
@@ -2233,7 +2239,9 @@ std::string api_stub(
             bool isTrigger)
         {
             this.gameObject = gameObject;
-            collider = gameObject.GetComponent<BoxCollider2D>();
+            collider =
+                gameObject.GetComponent<BoxCollider2D>() ??
+                (Collider2D?)gameObject.GetComponent<CircleCollider2D>();
             this.point = point;
             this.normal = normal;
             this.distance = distance;
@@ -2379,9 +2387,11 @@ std::string api_stub(
                     GameObject.FromNative(
                         entity);
 
-                BoxCollider? collider =
+                Collider? collider =
                     gameObject?.GetComponent<
-                        BoxCollider>();
+                        BoxCollider>() ??
+                    (Collider?)gameObject?.GetComponent<
+                        SphereCollider>();
 
                 if (collider != null)
                     colliders.Add(collider);
@@ -2538,9 +2548,11 @@ std::string api_stub(
                     GameObject.FromNative(
                         entity);
 
-                BoxCollider2D? collider =
+                Collider2D? collider =
                     gameObject?.GetComponent<
-                        BoxCollider2D>();
+                        BoxCollider2D>() ??
+                    (Collider2D?)gameObject?.GetComponent<
+                        CircleCollider2D>();
 
                 if (collider != null)
                     colliders.Add(collider);

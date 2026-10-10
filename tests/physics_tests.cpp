@@ -1332,6 +1332,246 @@ int main() {
             core::Vec3{},
         "2D box contact resolution separates only on XY and clears entering normal velocity without moving Z");
 
+
+    core::World sphere_world;
+
+    const auto sphere_static =
+        sphere_world.create(
+            "Sphere Static");
+
+    const auto sphere_dynamic =
+        sphere_world.create(
+            "Sphere Dynamic");
+
+    sphere_world.add_component<
+        physics::SphereCollider>(
+            sphere_static,
+            physics::sphere_collider_type());
+
+    sphere_world.add_component<
+        physics::SphereCollider>(
+            sphere_dynamic,
+            physics::sphere_collider_type());
+
+    auto* sphere_body =
+        sphere_world.add_component<
+            physics::Rigidbody>(
+                sphere_dynamic,
+                physics::rigidbody_type());
+
+    sphere_world.transform(
+        sphere_dynamic)->local_position =
+            {0.75f, 0.0f, 0.0f};
+
+    if (sphere_body) {
+        sphere_body->use_gravity =
+            false;
+        sphere_body->linear_velocity =
+            {-2.0f, 0.0f, 0.0f};
+    }
+
+    const auto sphere_detection =
+        physics::detect_box_overlaps(
+            sphere_world);
+
+    check(
+        sphere_detection.overlaps.size() ==
+            1u &&
+        sphere_detection.tested_pairs_3d ==
+            1u &&
+        !sphere_detection.overlaps.front()
+            .is_2d &&
+        std::abs(
+            sphere_detection.overlaps.front()
+                .penetration -
+            0.25f) < 0.0001f &&
+        sphere_detection.overlaps.front()
+            .normal ==
+            core::Vec3{
+                1.0f,
+                0.0f,
+                0.0f},
+        "SphereCollider pairs participate in the shared sweep-and-prune narrow phase");
+
+    const auto sphere_resolution =
+        physics::resolve_box_contacts_3d(
+            sphere_world,
+            sphere_detection.overlaps);
+
+    sphere_body =
+        sphere_world.get_component<
+            physics::Rigidbody>(
+                sphere_dynamic,
+                physics::rigidbody_type());
+
+    const auto* sphere_transform =
+        sphere_world.transform(
+            sphere_dynamic);
+
+    check(
+        sphere_resolution.resolved_3d ==
+            1u &&
+        sphere_transform &&
+        std::abs(
+            sphere_transform
+                ->local_position.x -
+            1.0f) < 0.0001f &&
+        sphere_body &&
+        std::abs(
+            sphere_body
+                ->linear_velocity.x) <
+            0.0001f,
+        "SphereCollider contact resolution reuses Rigidbody separation and normal-velocity removal");
+
+    const auto sphere_query =
+        physics::overlap_box(
+            sphere_world,
+            {},
+            {0.5f, 0.5f, 0.5f});
+
+    const auto sphere_ray =
+        physics::raycast(
+            sphere_world,
+            {-2.0f, 0.0f, 0.0f},
+            {1.0f, 0.0f, 0.0f},
+            10.0f);
+
+    check(
+        sphere_query.size() == 1u &&
+        sphere_query.front() ==
+            sphere_static &&
+        sphere_ray &&
+        sphere_ray->entity ==
+            sphere_static &&
+        std::abs(
+            sphere_ray->distance -
+            1.5f) < 0.0001f &&
+        sphere_ray->normal ==
+            core::Vec3{
+                -1.0f,
+                0.0f,
+                0.0f},
+        "OverlapBox and Raycast include SphereCollider candidates");
+
+    core::World mixed_world;
+
+    const auto mixed_box =
+        mixed_world.create(
+            "Mixed Box");
+
+    const auto mixed_sphere =
+        mixed_world.create(
+            "Mixed Sphere");
+
+    mixed_world.add_component<
+        physics::BoxCollider>(
+            mixed_box,
+            physics::box_collider_type());
+
+    mixed_world.add_component<
+        physics::SphereCollider>(
+            mixed_sphere,
+            physics::sphere_collider_type());
+
+    mixed_world.transform(
+        mixed_sphere)->local_position =
+            {0.75f, 0.0f, 0.0f};
+
+    const auto mixed_detection =
+        physics::detect_box_overlaps(
+            mixed_world);
+
+    check(
+        mixed_detection.overlaps.size() ==
+            1u &&
+        mixed_detection.tested_pairs_3d ==
+            1u &&
+        std::abs(
+            mixed_detection.overlaps.front()
+                .penetration -
+            0.25f) < 0.0001f &&
+        mixed_detection.overlaps.front()
+            .normal ==
+            core::Vec3{
+                1.0f,
+                0.0f,
+                0.0f},
+        "BoxCollider and SphereCollider use closest-point mixed narrow phase");
+
+    core::World circle_world;
+
+    const auto circle_static =
+        circle_world.create(
+            "Circle Static");
+
+    const auto circle_dynamic =
+        circle_world.create(
+            "Circle Dynamic");
+
+    circle_world.add_component<
+        physics::CircleCollider2D>(
+            circle_static,
+            physics::circle_collider2d_type());
+
+    circle_world.add_component<
+        physics::CircleCollider2D>(
+            circle_dynamic,
+            physics::circle_collider2d_type());
+
+    circle_world.transform(
+        circle_dynamic)->local_position =
+            {0.0f, 0.75f, 4.0f};
+
+    const auto circle_detection =
+        physics::detect_box_overlaps(
+            circle_world);
+
+    const auto circle_query =
+        physics::overlap_box_2d(
+            circle_world,
+            {},
+            {0.5f, 0.5f});
+
+    const auto circle_ray =
+        physics::raycast_2d(
+            circle_world,
+            {0.0f, -2.0f},
+            {0.0f, 1.0f},
+            10.0f);
+
+    check(
+        circle_detection.overlaps.size() ==
+            1u &&
+        circle_detection.tested_pairs_2d ==
+            1u &&
+        circle_detection.overlaps.front()
+            .is_2d &&
+        std::abs(
+            circle_detection.overlaps.front()
+                .penetration -
+            0.25f) < 0.0001f &&
+        circle_detection.overlaps.front()
+            .normal ==
+            core::Vec3{
+                0.0f,
+                1.0f,
+                0.0f} &&
+        circle_query.size() == 1u &&
+        circle_query.front() ==
+            circle_static &&
+        circle_ray &&
+        circle_ray->entity ==
+            circle_static &&
+        std::abs(
+            circle_ray->distance -
+            1.5f) < 0.0001f &&
+        circle_ray->normal ==
+            core::Vec3{
+                0.0f,
+                -1.0f,
+                0.0f},
+        "CircleCollider2D participates in XY contacts OverlapBox2D and Raycast2D");
+
     if (failures != 0) {
         std::cerr
             << failures

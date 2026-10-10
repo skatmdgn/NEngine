@@ -394,12 +394,12 @@ Implemented foundation:
 - FixedUpdate fixed-step scheduling separated from host-frame Update/LateUpdate.
 - managed Camera/Light plus MeshRenderer/SpriteRenderer scalar and AssetGuid properties over the generic native property bridge.
 - managed SpriteAnimator clip/playback/time properties plus Play/Pause/Stop/Restart controls.
-- NEnginePhysics 3D/2D Rigidbody + BoxCollider data/Scene/Editor/C# bindings with sweep-and-prune AABB contact resolution, collider layer/mask filtering, managed collision/trigger callbacks, and managed raycast/overlap-box/BoxCast queries over the ABI v15 query bridge.
+- NEnginePhysics 3D/2D Rigidbody plus BoxCollider/SphereCollider and BoxCollider2D/CircleCollider2D data/Scene/Editor/C# bindings, shared sweep-and-prune box/radial contact resolution, collider layer/mask filtering, managed collision/trigger callbacks, and managed raycast/overlap-box/BoxCast queries over the ABI v15 query bridge.
 - NEngineAudio AudioSource/AudioListener Scene/Editor/C# bindings, deterministic playback timing, hierarchy/listener-oriented spatial stereo mixing, WAV PCM/float runtime decode, software stereo rendering, AssetGuid/fingerprint clip caching and Windows WASAPI shared-mode output; compressed/streaming decode and production DSP remain.
 - coroutine scheduling including WaitForSeconds.
 
 Remaining major work:
-- rotated/extra physics shapes, production contact solving and managed cast/richer query APIs, plus streaming/compressed audio decode and production DSP/device scheduling.
+- rotated boxes and remaining physics shapes, production contact solving and managed cast/richer query APIs, plus streaming/compressed audio decode and production DSP/device scheduling.
 - packaged/versioned managed API distribution.
 - debugger symbols/attach workflow.
 - NuGet runtime/package integration.

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 #include <vector>
 
 #include "nengine/physics/components.hpp"
@@ -9,11 +10,18 @@
 namespace nengine::physics {
 namespace {
 
+enum class ColliderShape {
+    Box,
+    Radial
+};
+
 struct ColliderBounds {
     core::Entity entity{
         core::Entity::invalid()};
     core::Vec3 center{};
     core::Vec3 half{};
+    float radius{0.0f};
+    ColliderShape shape{ColliderShape::Box};
     bool trigger{false};
     std::uint32_t layer{0};
     std::uint32_t collision_mask{0xffffffffu};
@@ -46,6 +54,8 @@ ColliderBounds make_bounds(
 
     ColliderBounds result;
     result.entity = entity;
+    result.shape =
+        ColliderShape::Box;
     result.trigger =
         collider.is_trigger;
     result.layer =
@@ -108,7 +118,7 @@ bool collision_layers_allow(
                a.layer);
 }
 
-bool overlap_pair(
+bool overlap_box_pair(
     const ColliderBounds& a,
     const ColliderBounds& b,
     bool is_2d,
@@ -181,6 +191,356 @@ bool overlap_pair(
 }
 
 template <typename Collider>
+ColliderBounds make_radial_bounds(
+    const core::World& world,
+    core::Entity entity,
+    const Collider& collider,
+    bool is_2d) {
+
+    ColliderBounds result;
+    result.entity = entity;
+    result.shape =
+        ColliderShape::Radial;
+    result.trigger =
+        collider.is_trigger;
+    result.layer =
+        collider.layer;
+    result.collision_mask =
+        collider.collision_mask;
+
+    const auto* transform =
+        world.transform(entity);
+
+    if (!transform) {
+        return result;
+    }
+
+    const auto scale =
+        abs_scale(
+            transform->local_scale);
+
+    const float radial_scale =
+        is_2d
+            ? std::max(
+                scale.x,
+                scale.y)
+            : std::max(
+                scale.x,
+                std::max(
+                    scale.y,
+                    scale.z));
+
+    result.center = {
+        transform->local_position.x +
+            collider.center.x * scale.x,
+        transform->local_position.y +
+            collider.center.y * scale.y,
+        transform->local_position.z +
+            collider.center.z * scale.z
+    };
+
+    result.radius =
+        std::abs(collider.radius) *
+        radial_scale;
+
+    result.half = {
+        result.radius,
+        result.radius,
+        is_2d
+            ? 0.0f
+            : result.radius
+    };
+
+    return result;
+}
+
+float length_squared(
+    core::Vec3 value,
+    bool is_2d) noexcept {
+
+    return value.x * value.x +
+        value.y * value.y +
+        (is_2d
+            ? 0.0f
+            : value.z * value.z);
+}
+
+core::Vec3 normalized_or_axis(
+    core::Vec3 value,
+    bool is_2d) noexcept {
+
+    if (is_2d) {
+        value.z = 0.0f;
+    }
+
+    const float squared =
+        length_squared(
+            value,
+            is_2d);
+
+    if (squared <= 0.0000000001f) {
+        return {
+            1.0f,
+            0.0f,
+            0.0f
+        };
+    }
+
+    const float inverse =
+        1.0f /
+        std::sqrt(
+            squared);
+
+    return {
+        value.x * inverse,
+        value.y * inverse,
+        is_2d
+            ? 0.0f
+            : value.z * inverse
+    };
+}
+
+bool overlap_radial_pair(
+    const ColliderBounds& a,
+    const ColliderBounds& b,
+    bool is_2d,
+    BoxOverlap& overlap) noexcept {
+
+    const core::Vec3 delta{
+        b.center.x - a.center.x,
+        b.center.y - a.center.y,
+        is_2d
+            ? 0.0f
+            : b.center.z - a.center.z
+    };
+
+    const float radii =
+        a.radius +
+        b.radius;
+
+    const float squared =
+        length_squared(
+            delta,
+            is_2d);
+
+    if (squared >=
+        radii * radii) {
+        return false;
+    }
+
+    const float distance =
+        std::sqrt(
+            std::max(
+                0.0f,
+                squared));
+
+    overlap = {
+        a.entity,
+        b.entity,
+        normalized_or_axis(
+            delta,
+            is_2d),
+        radii - distance,
+        a.trigger || b.trigger,
+        is_2d
+    };
+
+    return overlap.penetration > 0.0f;
+}
+
+bool overlap_box_radial(
+    const ColliderBounds& box,
+    const ColliderBounds& radial,
+    bool is_2d,
+    bool box_is_first,
+    BoxOverlap& overlap) noexcept {
+
+    const core::Vec3 delta{
+        radial.center.x -
+            box.center.x,
+        radial.center.y -
+            box.center.y,
+        is_2d
+            ? 0.0f
+            : radial.center.z -
+                box.center.z
+    };
+
+    const core::Vec3 closest{
+        std::clamp(
+            delta.x,
+            -box.half.x,
+            box.half.x),
+        std::clamp(
+            delta.y,
+            -box.half.y,
+            box.half.y),
+        is_2d
+            ? 0.0f
+            : std::clamp(
+                delta.z,
+                -box.half.z,
+                box.half.z)
+    };
+
+    core::Vec3 separation{
+        delta.x - closest.x,
+        delta.y - closest.y,
+        is_2d
+            ? 0.0f
+            : delta.z - closest.z
+    };
+
+    const float squared =
+        length_squared(
+            separation,
+            is_2d);
+
+    core::Vec3 normal{};
+    float penetration = 0.0f;
+
+    if (squared >
+        0.0000000001f) {
+
+        const float distance =
+            std::sqrt(squared);
+
+        if (distance >=
+            radial.radius) {
+            return false;
+        }
+
+        normal = {
+            separation.x / distance,
+            separation.y / distance,
+            is_2d
+                ? 0.0f
+                : separation.z / distance
+        };
+
+        penetration =
+            radial.radius -
+            distance;
+    } else {
+        float face_distance =
+            box.half.x -
+            std::abs(delta.x);
+
+        normal = {
+            axis_sign(delta.x),
+            0.0f,
+            0.0f
+        };
+
+        const float y_distance =
+            box.half.y -
+            std::abs(delta.y);
+
+        if (y_distance <
+            face_distance) {
+            face_distance =
+                y_distance;
+            normal = {
+                0.0f,
+                axis_sign(delta.y),
+                0.0f
+            };
+        }
+
+        if (!is_2d) {
+            const float z_distance =
+                box.half.z -
+                std::abs(delta.z);
+
+            if (z_distance <
+                face_distance) {
+                face_distance =
+                    z_distance;
+                normal = {
+                    0.0f,
+                    0.0f,
+                    axis_sign(delta.z)
+                };
+            }
+        }
+
+        penetration =
+            radial.radius +
+            std::max(
+                0.0f,
+                face_distance);
+    }
+
+    if (!box_is_first) {
+        normal.x = -normal.x;
+        normal.y = -normal.y;
+        normal.z = -normal.z;
+    }
+
+    overlap = {
+        box_is_first
+            ? box.entity
+            : radial.entity,
+        box_is_first
+            ? radial.entity
+            : box.entity,
+        normal,
+        penetration,
+        box.trigger ||
+            radial.trigger,
+        is_2d
+    };
+
+    return penetration > 0.0f;
+}
+
+bool overlap_pair(
+    const ColliderBounds& a,
+    const ColliderBounds& b,
+    bool is_2d,
+    BoxOverlap& overlap) noexcept {
+
+    if (a.shape ==
+            ColliderShape::Box &&
+        b.shape ==
+            ColliderShape::Box) {
+        return overlap_box_pair(
+            a,
+            b,
+            is_2d,
+            overlap);
+    }
+
+    if (a.shape ==
+            ColliderShape::Radial &&
+        b.shape ==
+            ColliderShape::Radial) {
+        return overlap_radial_pair(
+            a,
+            b,
+            is_2d,
+            overlap);
+    }
+
+    if (a.shape ==
+        ColliderShape::Box) {
+        return overlap_box_radial(
+            a,
+            b,
+            is_2d,
+            true,
+            overlap);
+    }
+
+    return overlap_box_radial(
+        b,
+        a,
+        is_2d,
+        false,
+        overlap);
+}
+
+template <typename Collider>
 std::vector<ColliderBounds> collect_bounds(
     const core::World& world,
     core::ComponentTypeId type,
@@ -217,18 +577,48 @@ std::vector<ColliderBounds> collect_bounds(
 }
 
 template <typename Collider>
-void append_overlaps(
+std::vector<ColliderBounds>
+collect_radial_bounds(
     const core::World& world,
     core::ComponentTypeId type,
+    bool is_2d) {
+
+    std::vector<ColliderBounds> result;
+
+    for (const auto entity :
+         world.entities()) {
+
+        if (!world.active(entity)) {
+            continue;
+        }
+
+        const auto* collider =
+            world.get_component<Collider>(
+                entity,
+                type);
+
+        if (!collider ||
+            !collider->enabled ||
+            collider->radius <= 0.0f) {
+            continue;
+        }
+
+        result.push_back(
+            make_radial_bounds(
+                world,
+                entity,
+                *collider,
+                is_2d));
+    }
+
+    return result;
+}
+
+void append_overlaps(
+    std::vector<ColliderBounds> bounds,
     bool is_2d,
     std::vector<BoxOverlap>& overlaps,
     std::size_t& tested_pairs) {
-
-    auto bounds =
-        collect_bounds<Collider>(
-            world,
-            type,
-            is_2d);
 
     std::sort(
         bounds.begin(),
@@ -270,7 +660,9 @@ void append_overlaps(
                 break;
             }
 
-            if (!collision_layers_allow(
+            if (bounds[i].entity ==
+                    bounds[j].entity ||
+                !collision_layers_allow(
                     bounds[i],
                     bounds[j])) {
                 continue;
@@ -299,16 +691,48 @@ CollisionDetectionResult detect_box_overlaps(
 
     CollisionDetectionResult result;
 
-    append_overlaps<BoxCollider>(
-        world,
-        box_collider_type(),
+    auto bounds_3d =
+        collect_bounds<BoxCollider>(
+            world,
+            box_collider_type(),
+            false);
+
+    auto spheres =
+        collect_radial_bounds<SphereCollider>(
+            world,
+            sphere_collider_type(),
+            false);
+
+    bounds_3d.insert(
+        bounds_3d.end(),
+        spheres.begin(),
+        spheres.end());
+
+    append_overlaps(
+        std::move(bounds_3d),
         false,
         result.overlaps,
         result.tested_pairs_3d);
 
-    append_overlaps<BoxCollider2D>(
-        world,
-        box_collider2d_type(),
+    auto bounds_2d =
+        collect_bounds<BoxCollider2D>(
+            world,
+            box_collider2d_type(),
+            true);
+
+    auto circles =
+        collect_radial_bounds<CircleCollider2D>(
+            world,
+            circle_collider2d_type(),
+            true);
+
+    bounds_2d.insert(
+        bounds_2d.end(),
+        circles.begin(),
+        circles.end());
+
+    append_overlaps(
+        std::move(bounds_2d),
         true,
         result.overlaps,
         result.tested_pairs_2d);
@@ -666,11 +1090,22 @@ std::vector<core::Entity> overlap_box(
         size.z * 0.5f
     };
 
-    const auto bounds =
+    auto bounds =
         collect_bounds<BoxCollider>(
             world,
             box_collider_type(),
             false);
+
+    auto spheres =
+        collect_radial_bounds<SphereCollider>(
+            world,
+            sphere_collider_type(),
+            false);
+
+    bounds.insert(
+        bounds.end(),
+        spheres.begin(),
+        spheres.end());
 
     for (const auto& candidate :
          bounds) {
@@ -724,11 +1159,22 @@ std::vector<core::Entity> overlap_box_2d(
         0.0f
     };
 
-    const auto bounds =
+    auto bounds =
         collect_bounds<BoxCollider2D>(
             world,
             box_collider2d_type(),
             true);
+
+    auto circles =
+        collect_radial_bounds<CircleCollider2D>(
+            world,
+            circle_collider2d_type(),
+            true);
+
+    bounds.insert(
+        bounds.end(),
+        circles.begin(),
+        circles.end());
 
     for (const auto& candidate :
          bounds) {
@@ -874,6 +1320,119 @@ bool ray_bounds(
     return true;
 }
 
+bool ray_radial(
+    core::Vec3 origin,
+    core::Vec3 direction,
+    const ColliderBounds& bounds,
+    float max_distance,
+    bool is_2d,
+    float& distance,
+    core::Vec3& normal) noexcept {
+
+    core::Vec3 from_center{
+        origin.x -
+            bounds.center.x,
+        origin.y -
+            bounds.center.y,
+        is_2d
+            ? 0.0f
+            : origin.z -
+                bounds.center.z
+    };
+
+    const float c =
+        length_squared(
+            from_center,
+            is_2d) -
+        bounds.radius *
+            bounds.radius;
+
+    const float b =
+        from_center.x *
+            direction.x +
+        from_center.y *
+            direction.y +
+        (is_2d
+            ? 0.0f
+            : from_center.z *
+                direction.z);
+
+    if (c > 0.0f &&
+        b > 0.0f) {
+        return false;
+    }
+
+    const float discriminant =
+        b * b -
+        c;
+
+    if (discriminant < 0.0f) {
+        return false;
+    }
+
+    float hit_distance =
+        -b -
+        std::sqrt(
+            discriminant);
+
+    if (hit_distance < 0.0f) {
+        hit_distance = 0.0f;
+    }
+
+    if (hit_distance >
+        max_distance) {
+        return false;
+    }
+
+    distance =
+        hit_distance;
+
+    const core::Vec3 point{
+        origin.x +
+            direction.x *
+                hit_distance,
+        origin.y +
+            direction.y *
+                hit_distance,
+        is_2d
+            ? 0.0f
+            : origin.z +
+                direction.z *
+                    hit_distance
+    };
+
+    const core::Vec3 outward{
+        point.x -
+            bounds.center.x,
+        point.y -
+            bounds.center.y,
+        is_2d
+            ? 0.0f
+            : point.z -
+                bounds.center.z
+    };
+
+    if (length_squared(
+            outward,
+            is_2d) <=
+        0.0000000001f) {
+        normal = {
+            -direction.x,
+            -direction.y,
+            is_2d
+                ? 0.0f
+                : -direction.z
+        };
+    } else {
+        normal =
+            normalized_or_axis(
+                outward,
+                is_2d);
+    }
+
+    return true;
+}
+
 core::Vec3 normalized_direction(
     core::Vec3 direction,
     bool is_2d) noexcept {
@@ -995,6 +1554,113 @@ std::optional<RaycastHit> raycast_bounds(
     return closest;
 }
 
+template <typename Collider>
+std::optional<RaycastHit>
+raycast_radial_bounds(
+    const core::World& world,
+    core::ComponentTypeId type,
+    core::Vec3 origin,
+    core::Vec3 direction,
+    float max_distance,
+    bool include_triggers,
+    std::uint32_t layer_mask,
+    bool is_2d) {
+
+    if (!std::isfinite(max_distance) ||
+        max_distance < 0.0f) {
+        return std::nullopt;
+    }
+
+    const auto normalized =
+        normalized_direction(
+            direction,
+            is_2d);
+
+    if (normalized ==
+        core::Vec3{}) {
+        return std::nullopt;
+    }
+
+    const auto bounds =
+        collect_radial_bounds<Collider>(
+            world,
+            type,
+            is_2d);
+
+    std::optional<RaycastHit>
+        closest;
+
+    for (const auto& candidate :
+         bounds) {
+
+        if ((!include_triggers &&
+             candidate.trigger) ||
+            !layer_enabled(
+                layer_mask,
+                candidate.layer)) {
+            continue;
+        }
+
+        float distance = 0.0f;
+        core::Vec3 normal{};
+
+        if (!ray_radial(
+                origin,
+                normalized,
+                candidate,
+                max_distance,
+                is_2d,
+                distance,
+                normal)) {
+            continue;
+        }
+
+        if (closest &&
+            distance >=
+                closest->distance) {
+            continue;
+        }
+
+        closest =
+            RaycastHit{
+                candidate.entity,
+                {
+                    origin.x +
+                        normalized.x *
+                        distance,
+                    origin.y +
+                        normalized.y *
+                        distance,
+                    is_2d
+                        ? 0.0f
+                        : origin.z +
+                            normalized.z *
+                            distance
+                },
+                normal,
+                distance,
+                candidate.trigger,
+                is_2d,
+                candidate.layer
+            };
+    }
+
+    return closest;
+}
+
+std::optional<RaycastHit> nearest_hit(
+    std::optional<RaycastHit> first,
+    std::optional<RaycastHit> second) {
+
+    if (!first) return second;
+    if (!second) return first;
+
+    return second->distance <
+            first->distance
+        ? second
+        : first;
+}
+
 } // namespace
 
 std::optional<RaycastHit> raycast(
@@ -1005,15 +1671,25 @@ std::optional<RaycastHit> raycast(
     bool include_triggers,
     std::uint32_t layer_mask) {
 
-    return raycast_bounds<BoxCollider>(
-        world,
-        box_collider_type(),
-        origin,
-        direction,
-        max_distance,
-        include_triggers,
-        layer_mask,
-        false);
+    return nearest_hit(
+        raycast_bounds<BoxCollider>(
+            world,
+            box_collider_type(),
+            origin,
+            direction,
+            max_distance,
+            include_triggers,
+            layer_mask,
+            false),
+        raycast_radial_bounds<SphereCollider>(
+            world,
+            sphere_collider_type(),
+            origin,
+            direction,
+            max_distance,
+            include_triggers,
+            layer_mask,
+            false));
 }
 
 std::optional<RaycastHit> raycast_2d(
@@ -1024,15 +1700,37 @@ std::optional<RaycastHit> raycast_2d(
     bool include_triggers,
     std::uint32_t layer_mask) {
 
-    return raycast_bounds<BoxCollider2D>(
-        world,
-        box_collider2d_type(),
-        {origin.x, origin.y, 0.0f},
-        {direction.x, direction.y, 0.0f},
-        max_distance,
-        include_triggers,
-        layer_mask,
-        true);
+    const core::Vec3 origin_3d{
+        origin.x,
+        origin.y,
+        0.0f
+    };
+
+    const core::Vec3 direction_3d{
+        direction.x,
+        direction.y,
+        0.0f
+    };
+
+    return nearest_hit(
+        raycast_bounds<BoxCollider2D>(
+            world,
+            box_collider2d_type(),
+            origin_3d,
+            direction_3d,
+            max_distance,
+            include_triggers,
+            layer_mask,
+            true),
+        raycast_radial_bounds<CircleCollider2D>(
+            world,
+            circle_collider2d_type(),
+            origin_3d,
+            direction_3d,
+            max_distance,
+            include_triggers,
+            layer_mask,
+            true));
 }
 
 

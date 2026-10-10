@@ -86,6 +86,15 @@ struct ManagedBoxColliderFixture {
     nengine::core::Vec3 size{1.0f, 1.0f, 1.0f};
 };
 
+struct ManagedSphereColliderFixture {
+    bool enabled{true};
+    bool is_trigger{false};
+    std::int64_t layer{0};
+    std::int64_t collision_mask{0xffffffffLL};
+    nengine::core::Vec3 center{};
+    float radius{0.5f};
+};
+
 struct ManagedRigidbody2DFixture {
     bool enabled{true};
     bool use_gravity{true};
@@ -102,6 +111,15 @@ struct ManagedBoxCollider2DFixture {
     std::int64_t collision_mask{0xffffffffLL};
     nengine::core::Vec3 center{};
     nengine::core::Vec3 size{1.0f, 1.0f, 0.0f};
+};
+
+struct ManagedCircleCollider2DFixture {
+    bool enabled{true};
+    bool is_trigger{false};
+    std::int64_t layer{0};
+    std::int64_t collision_mask{0xffffffffLL};
+    nengine::core::Vec3 center{};
+    float radius{0.5f};
 };
 
 struct ManagedAudioSourceFixture {
@@ -599,6 +617,34 @@ bool read_managed_render_property(
         return true;
     }
 
+    if (component == "NEngine.SphereCollider") {
+        const auto* value =
+            world.get_component<
+                ManagedSphereColliderFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Enabled")
+            output = value->enabled;
+        else if (property == "Is Trigger")
+            output = value->is_trigger;
+        else if (property == "Layer")
+            output = value->layer;
+        else if (property == "Collision Mask")
+            output = value->collision_mask;
+        else if (property == "Center")
+            output = value->center;
+        else if (property == "Radius")
+            output = static_cast<double>(
+                value->radius);
+        else
+            return false;
+
+        return true;
+    }
+
     if (component == "NEngine.Rigidbody2D") {
         const auto* value =
             world.get_component<
@@ -647,6 +693,34 @@ bool read_managed_render_property(
             output = value->center;
         else if (property == "Size")
             output = value->size;
+        else
+            return false;
+
+        return true;
+    }
+
+    if (component == "NEngine.CircleCollider2D") {
+        const auto* value =
+            world.get_component<
+                ManagedCircleCollider2DFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Enabled")
+            output = value->enabled;
+        else if (property == "Is Trigger")
+            output = value->is_trigger;
+        else if (property == "Layer")
+            output = value->layer;
+        else if (property == "Collision Mask")
+            output = value->collision_mask;
+        else if (property == "Center")
+            output = value->center;
+        else if (property == "Radius")
+            output = static_cast<double>(
+                value->radius);
         else
             return false;
 
@@ -1451,6 +1525,10 @@ int main() {
             std::string::npos &&
         api.find("abstract class Collider") !=
             std::string::npos &&
+        api.find("sealed class SphereCollider") !=
+            std::string::npos &&
+        api.find("sealed class CircleCollider2D") !=
+            std::string::npos &&
         api.find("static class Physics") !=
             std::string::npos &&
         api.find("static class Physics2D") !=
@@ -1903,13 +1981,13 @@ int main() {
                 << "public class PhysicsQueryProbe : Behaviour {\n"
                 << "    private void Update() {\n"
                 << "        if (!Physics.Raycast(new Vector3(0,0,0), new Vector3(1,0,0), out RaycastHit hit, 100f, false, 1u << 3)) throw new System.Exception(\"3d raycast missing\");\n"
-                << "        if (hit.gameObject.name != \"Physics Query 3D\" || hit.collider == null || hit.isTrigger || System.MathF.Abs(hit.distance - 4f) > 0.001f || System.MathF.Abs(hit.point.x - 1f) > 0.001f || System.MathF.Abs(hit.point.y - 2f) > 0.001f || System.MathF.Abs(hit.point.z - 3f) > 0.001f || System.MathF.Abs(hit.normal.x + 1f) > 0.001f || System.MathF.Abs(hit.normal.y) > 0.001f || System.MathF.Abs(hit.normal.z) > 0.001f) throw new System.Exception(\"3d raycast mismatch\");\n"
+                << "        if (hit.gameObject.name != \"Physics Query 3D\" || hit.collider is not SphereCollider || hit.isTrigger || System.MathF.Abs(hit.distance - 4f) > 0.001f || System.MathF.Abs(hit.point.x - 1f) > 0.001f || System.MathF.Abs(hit.point.y - 2f) > 0.001f || System.MathF.Abs(hit.point.z - 3f) > 0.001f || System.MathF.Abs(hit.normal.x + 1f) > 0.001f || System.MathF.Abs(hit.normal.y) > 0.001f || System.MathF.Abs(hit.normal.z) > 0.001f) throw new System.Exception(\"3d raycast mismatch\");\n"
                 << "        if (!Physics2D.Raycast(new Vector2(0,0), new Vector2(0,1), out RaycastHit2D hit2d, 100f, true, 1u << 7)) throw new System.Exception(\"2d raycast missing\");\n"
-                << "        if (hit2d.gameObject.name != \"Physics Query 2D\" || hit2d.collider == null || !hit2d.isTrigger || System.MathF.Abs(hit2d.distance - 7f) > 0.001f || System.MathF.Abs(hit2d.point.x - 5f) > 0.001f || System.MathF.Abs(hit2d.point.y - 6f) > 0.001f || System.MathF.Abs(hit2d.normal.x) > 0.001f || System.MathF.Abs(hit2d.normal.y + 1f) > 0.001f) throw new System.Exception(\"2d raycast mismatch\");\n"
+                << "        if (hit2d.gameObject.name != \"Physics Query 2D\" || hit2d.collider is not CircleCollider2D || !hit2d.isTrigger || System.MathF.Abs(hit2d.distance - 7f) > 0.001f || System.MathF.Abs(hit2d.point.x - 5f) > 0.001f || System.MathF.Abs(hit2d.point.y - 6f) > 0.001f || System.MathF.Abs(hit2d.normal.x) > 0.001f || System.MathF.Abs(hit2d.normal.y + 1f) > 0.001f) throw new System.Exception(\"2d raycast mismatch\");\n"
                 << "        Collider[] overlaps = Physics.OverlapBox(new Vector3(0,0,0), new Vector3(1,1,1), true, (1u << 3) | (1u << 5));\n"
-                << "        if (overlaps.Length != 2 || overlaps[0].gameObject.name != \"Physics Query 3D\" || overlaps[0].layer != 3 || overlaps[1].gameObject.name != \"Physics Query 3D Extra\" || overlaps[1].layer != 5) throw new System.Exception(\"3d overlap mismatch\");\n"
+                << "        if (overlaps.Length != 2 || overlaps[0] is not SphereCollider || overlaps[0].gameObject.name != \"Physics Query 3D\" || overlaps[0].layer != 3 || overlaps[1] is not BoxCollider || overlaps[1].gameObject.name != \"Physics Query 3D Extra\" || overlaps[1].layer != 5) throw new System.Exception(\"3d overlap mismatch\");\n"
                 << "        Collider2D[] overlaps2d = Physics2D.OverlapBoxAll(new Vector2(0,0), new Vector2(2,2), true, 1u << 7);\n"
-                << "        if (overlaps2d.Length != 1 || overlaps2d[0].gameObject.name != \"Physics Query 2D\" || overlaps2d[0].layer != 7 || !overlaps2d[0].isTrigger) throw new System.Exception(\"2d overlap mismatch\");\n"
+                << "        if (overlaps2d.Length != 1 || overlaps2d[0] is not CircleCollider2D || overlaps2d[0].gameObject.name != \"Physics Query 2D\" || overlaps2d[0].layer != 7 || !overlaps2d[0].isTrigger) throw new System.Exception(\"2d overlap mismatch\");\n"
                 << "        if (!Physics.BoxCast(new Vector3(10,0,0), new Vector3(1,2,3), new Vector3(-1,0,0), out RaycastHit cast, 20f, false, 1u << 3)) throw new System.Exception(\"3d box cast missing\");\n"
                 << "        if (cast.gameObject.name != \"Physics Query 3D\" || cast.collider == null || cast.isTrigger || System.MathF.Abs(cast.distance - 2f) > 0.001f || System.MathF.Abs(cast.point.x - 8f) > 0.001f || System.MathF.Abs(cast.normal.x - 1f) > 0.001f) throw new System.Exception(\"3d box cast mismatch\");\n"
                 << "        if (!Physics2D.BoxCast(new Vector2(0,10), new Vector2(4,2), new Vector2(0,-1), out RaycastHit2D cast2d, 15f, true, 1u << 7)) throw new System.Exception(\"2d box cast missing\");\n"
@@ -2603,20 +2681,22 @@ int main() {
                                 "NEngine.BoxCollider");
 
                         physics_query_world.add_component<
-                            ManagedBoxColliderFixture>(
+                            ManagedSphereColliderFixture>(
                                 physics_query_fixture.hit_3d,
-                                query_box_type);
+                                nengine::core::ComponentRegistry::stable_id(
+                                    "NEngine.SphereCollider"));
 
                         physics_query_world.add_component<
                             ManagedBoxColliderFixture>(
                                 physics_query_fixture.hit_3d_extra,
                                 query_box_type);
 
-                        auto* query_box_3d =
+                        auto* query_sphere_3d =
                             physics_query_world.get_component<
-                                ManagedBoxColliderFixture>(
+                                ManagedSphereColliderFixture>(
                                     physics_query_fixture.hit_3d,
-                                    query_box_type);
+                                    nengine::core::ComponentRegistry::stable_id(
+                                        "NEngine.SphereCollider"));
 
                         auto* query_box_3d_extra =
                             physics_query_world.get_component<
@@ -2624,25 +2704,25 @@ int main() {
                                     physics_query_fixture.hit_3d_extra,
                                     query_box_type);
 
-                        if (query_box_3d) {
-                            query_box_3d->layer = 3;
+                        if (query_sphere_3d) {
+                            query_sphere_3d->layer = 3;
                         }
 
                         if (query_box_3d_extra) {
                             query_box_3d_extra->layer = 5;
                         }
 
-                        auto* query_box_2d =
+                        auto* query_circle_2d =
                             physics_query_world.add_component<
-                                ManagedBoxCollider2DFixture>(
+                                ManagedCircleCollider2DFixture>(
                                     physics_query_fixture.hit_2d,
                                     nengine::core::ComponentRegistry::stable_id(
-                                        "NEngine.BoxCollider2D"));
+                                        "NEngine.CircleCollider2D"));
 
-                        if (query_box_2d) {
-                            query_box_2d->is_trigger =
+                        if (query_circle_2d) {
+                            query_circle_2d->is_trigger =
                                 true;
-                            query_box_2d->layer = 7;
+                            query_circle_2d->layer = 7;
                         }
 
                         auto* query_script =
