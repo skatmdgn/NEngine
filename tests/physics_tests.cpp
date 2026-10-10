@@ -459,6 +459,12 @@ int main() {
         box_c)->local_position =
             {4.0f, 0.0f, 0.0f};
 
+    box_b_collider =
+        collision_world.get_component<
+            physics::BoxCollider>(
+                box_b,
+                physics::box_collider_type());
+
     if (box_b_collider) {
         box_b_collider->is_trigger =
             true;
