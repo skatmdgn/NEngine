@@ -414,7 +414,9 @@ namespace NEngine.Internal
         private static int Invoke(long handle, string methodName)
         {
             if (!Instances.TryGetValue(handle, out var instance)) return -1;
-            if (!instance.enabled && methodName != "OnDestroy") return 0;
+            if (!instance.enabled &&
+                methodName != "Awake" &&
+                methodName != "OnDestroy") return 0;
 
             try
             {
@@ -439,8 +441,13 @@ namespace NEngine.Internal
         }
 
         [UnmanagedCallersOnly]
-        public static int InvokeStart(long handle) =>
-            Invoke(handle, "Start");
+        public static int InvokeStart(long handle)
+        {
+            int awakened = Invoke(handle, "Awake");
+            if (awakened < 0) return awakened;
+
+            return Invoke(handle, "Start");
+        }
 
         [UnmanagedCallersOnly]
         public static int AdvanceFrameClock(float deltaTime)

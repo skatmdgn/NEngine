@@ -539,9 +539,11 @@ int main() {
             script
                 << "using NEngine;\n"
                 << "public class Example : Behaviour {\n"
+                << "    public int awakes;\n"
                 << "    public int starts;\n"
                 << "    public int updates;\n"
-                << "    private void Start() { starts++; gameObject.name = \"Managed Renamed\"; }\n"
+                << "    private void Awake() { awakes++; if (gameObject.name != \"Runtime Object\" && gameObject.name != \"Managed Example\") throw new System.Exception(\"Awake native state mismatch\"); gameObject.name = \"Managed Awakened\"; }\n"
+                << "    private void Start() { if (awakes != 1 || gameObject.name != \"Managed Awakened\") throw new System.Exception(\"Awake/Start order mismatch\"); starts++; gameObject.name = \"Managed Renamed\"; }\n"
                 << "    private void Update() { updates++; var t = GetComponent<Transform>(); if (t == null) throw new System.Exception(\"Transform missing\"); t.localPosition = t.localPosition + new Vector3(1, 2, 3); }\n"
                 << "}\n"
                 << "public class DeactivateOnce : Behaviour {\n"
@@ -749,7 +751,7 @@ int main() {
                             check(
                                 managed_runtime.start(
                                     behaviour),
-                                "managed lifecycle invokes Start");
+                                "managed lifecycle invokes Awake before Start");
 
                             check(
                                 managed_runtime.update(

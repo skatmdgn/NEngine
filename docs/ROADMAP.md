@@ -131,7 +131,8 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Managed keyboard/mouse Input API over native callback table
 - [x] Managed Time.deltaTime/time/frameCount global simulation-tick clock
 - [x] Coroutine/WaitForSeconds scheduler with nested IEnumerator and stop APIs
-- [ ] Awake/OnEnable/OnDisable/FixedUpdate/LateUpdate lifecycle coverage
+- [x] Awake lifecycle before Start with native GameObject/Transform state already bound
+- [ ] OnEnable/OnDisable/FixedUpdate/LateUpdate lifecycle coverage
 - [ ] Wider render/physics/audio managed component/property bindings
 - [ ] Visual Studio attach/debug symbols
 
