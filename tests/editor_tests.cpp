@@ -8,6 +8,7 @@
 #include <sstream>
 #include <string>
 
+#include "nengine/audio/components.hpp"
 #include "nengine/core/scene.hpp"
 #include "nengine/editor/editor_model.hpp"
 #include "nengine/editor/presentation.hpp"
@@ -345,6 +346,14 @@ int main() {
                 startup_camera,
                 render::camera_type()) != nullptr,
         "startup Main Camera owns native Camera component");
+
+    check(
+        startup_camera.valid() &&
+        startup_world.get_component<
+            audio::AudioListener>(
+                startup_camera,
+                audio::audio_listener_type()) != nullptr,
+        "startup Main Camera owns native AudioListener component");
 
     check(
         startup_light.valid() &&

@@ -7,6 +7,8 @@
 
 #include "nengine/assets/builtin_processors.hpp"
 #include "nengine/assets/gltf_sidecars.hpp"
+#include "nengine/audio/components.hpp"
+#include "nengine/audio/registration.hpp"
 #include "nengine/core/scene.hpp"
 #include "nengine/render/builtin_assets.hpp"
 #include "nengine/render/components.hpp"
@@ -262,6 +264,11 @@ bool ProjectSession::open(
                 camera,
                 render::camera_type());
 
+        default_world.add_component<
+            audio::AudioListener>(
+                camera,
+                audio::audio_listener_type());
+
         const auto light =
             default_world.create(
                 "Directional Light");
@@ -317,6 +324,9 @@ bool ProjectSession::open(
             bootstrap_serialization;
 
         render::register_component_serializers(
+            bootstrap_serialization);
+
+        audio::register_component_serializers(
             bootstrap_serialization);
 
         const auto scene =
