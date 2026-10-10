@@ -996,6 +996,10 @@ ManagedRuntime::ManagedRuntime(
           std::exchange(
               other.late_update_,
               nullptr)),
+      physics_event_(
+          std::exchange(
+              other.physics_event_,
+              nullptr)),
       advance_frame_(
           std::exchange(
               other.advance_frame_,
@@ -1123,6 +1127,11 @@ ManagedRuntime::operator=(
     late_update_ =
         std::exchange(
             other.late_update_,
+            nullptr);
+
+    physics_event_ =
+        std::exchange(
+            other.physics_event_,
             nullptr);
 
     advance_frame_ =
@@ -1358,6 +1367,13 @@ bool ManagedRuntime::initialize(
             bridge_type,
             "InvokeLateUpdate");
 
+    physics_event_ =
+        load_entry<PhysicsEventFn>(
+            host_,
+            bridge_assembly_path,
+            bridge_type,
+            "InvokePhysicsEvent");
+
     advance_frame_ =
         load_entry<FrameFn>(
             host_,
@@ -1485,6 +1501,7 @@ bool ManagedRuntime::initialize(
         !update_ ||
         !fixed_update_ ||
         !late_update_ ||
+        !physics_event_ ||
         !advance_frame_ ||
         !reset_time_ ||
         !set_behaviour_enabled_ ||
@@ -1896,6 +1913,46 @@ bool ManagedRuntime::late_update(
     return true;
 }
 
+bool ManagedRuntime::physics_event(
+    ManagedBehaviourHandle handle,
+    core::Entity other,
+    int phase,
+    bool is_trigger,
+    bool is_2d,
+    core::Vec3 normal,
+    float penetration) {
+
+    if (!valid() ||
+        !handle.valid() ||
+        !other.valid() ||
+        phase < 0 ||
+        phase > 2 ||
+        !std::isfinite(penetration) ||
+        penetration < 0.0f) {
+        return false;
+    }
+
+    const int result =
+        physics_event_(
+            handle.value,
+            other.value,
+            phase,
+            is_trigger ? 1 : 0,
+            is_2d ? 1 : 0,
+            normal.x,
+            normal.y,
+            normal.z,
+            penetration);
+
+    if (result < 0) {
+        diagnostic_ =
+            "managed Behaviour physics event invocation failed";
+        return false;
+    }
+
+    return true;
+}
+
 bool ManagedRuntime::destroy(
     ManagedBehaviourHandle handle) {
 
@@ -2208,6 +2265,7 @@ void ManagedRuntime::shutdown() noexcept {
     update_ = nullptr;
     fixed_update_ = nullptr;
     late_update_ = nullptr;
+    physics_event_ = nullptr;
     advance_frame_ = nullptr;
     reset_time_ = nullptr;
     set_behaviour_enabled_ = nullptr;

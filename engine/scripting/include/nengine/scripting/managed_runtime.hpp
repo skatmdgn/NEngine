@@ -82,6 +82,15 @@ public:
     bool late_update(
         ManagedBehaviourHandle handle);
 
+    bool physics_event(
+        ManagedBehaviourHandle handle,
+        core::Entity other,
+        int phase,
+        bool is_trigger,
+        bool is_2d,
+        core::Vec3 normal,
+        float penetration);
+
     bool advance_frame(
         float delta_seconds);
 
@@ -180,6 +189,7 @@ public:
             update_ != nullptr &&
             fixed_update_ != nullptr &&
             late_update_ != nullptr &&
+            physics_event_ != nullptr &&
             advance_frame_ != nullptr &&
             reset_time_ != nullptr &&
             set_behaviour_enabled_ != nullptr &&
@@ -220,6 +230,18 @@ private:
     using UpdateFn =
         int (*)(
             std::int64_t,
+            float);
+
+    using PhysicsEventFn =
+        int (*)(
+            std::int64_t,
+            std::uint64_t,
+            int,
+            int,
+            int,
+            float,
+            float,
+            float,
             float);
 
     using FrameFn =
@@ -557,6 +579,7 @@ private:
     UpdateFn update_{nullptr};
     UpdateFn fixed_update_{nullptr};
     InvokeFn late_update_{nullptr};
+    PhysicsEventFn physics_event_{nullptr};
     FrameFn advance_frame_{nullptr};
     SimpleFn reset_time_{nullptr};
     SetEnabledFn set_behaviour_enabled_{nullptr};
