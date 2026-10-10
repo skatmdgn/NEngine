@@ -1764,6 +1764,21 @@ std::string api_stub(
             get => linearVelocity;
             set => linearVelocity = value;
         }
+
+        public void AddForce(
+            Vector3 force)
+        {
+            if (!enabled ||
+                isKinematic ||
+                mass <= 0)
+            {
+                return;
+            }
+
+            linearVelocity =
+                linearVelocity +
+                force * (1.0f / mass);
+        }
     }
 
     public sealed class BoxCollider : Component
@@ -1847,6 +1862,21 @@ std::string api_stub(
         {
             get => linearVelocity;
             set => linearVelocity = value;
+        }
+
+        public void AddForce(
+            Vector2 force)
+        {
+            if (!enabled ||
+                isKinematic ||
+                mass <= 0)
+            {
+                return;
+            }
+
+            linearVelocity =
+                linearVelocity +
+                force * (1.0f / mass);
         }
     }
 

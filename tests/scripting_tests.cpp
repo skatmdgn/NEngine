@@ -995,6 +995,8 @@ int main() {
             std::string::npos &&
         api.find("Rigidbody2D") !=
             std::string::npos &&
+        api.find("AddForce") !=
+            std::string::npos &&
         api.find("BoxCollider2D") !=
             std::string::npos &&
         api.find("readonly struct AssetGuid") !=
@@ -1408,9 +1410,9 @@ int main() {
                 << "        animator.Play(nextClip); if (!animator.playing || animator.clip != nextClip || System.MathF.Abs(animator.time) > 0.001f) throw new System.Exception(\"animator Play clip mismatch\"); animator.speed = 1.5f; animator.loop = false; animator.enabled = false; animator.Stop();\n"
                 << "        mesh.mesh = nextMesh; mesh.material = nextMaterial; mesh.enabled = false; mesh.castShadows = false; mesh.receiveShadows = false;\n"
                 << "        sprite.texture = nextTexture; sprite.enabled = false; sprite.pixelsPerUnit = 64f; sprite.sortingOrder = 7; sprite.flipX = true; sprite.flipY = true;\n"
-                << "        if (System.MathF.Abs(body.mass - 1f) > 0.001f || !body.useGravity || body.isKinematic) throw new System.Exception(\"rigidbody read mismatch\"); body.enabled = false; body.useGravity = false; body.isKinematic = true; body.mass = 2.5f; body.gravityScale = 0.5f; body.velocity = new Vector3(1, 2, 3);\n"
+                << "        if (System.MathF.Abs(body.mass - 1f) > 0.001f || !body.useGravity || body.isKinematic) throw new System.Exception(\"rigidbody read mismatch\"); body.useGravity = false; body.mass = 2.5f; body.gravityScale = 0.5f; body.velocity = new Vector3(1, 2, 3); body.AddForce(new Vector3(2.5f, 0, 0)); body.isKinematic = true; body.enabled = false;\n"
                 << "        box.isTrigger = true; box.center = new Vector3(0.1f, 0.2f, 0.3f); box.size = new Vector3(2, 3, 4);\n"
-                << "        body2d.useGravity = false; body2d.isKinematic = true; body2d.mass = 3f; body2d.gravityScale = 0.25f; body2d.velocity = new Vector2(4, 5);\n"
+                << "        body2d.useGravity = false; body2d.mass = 3f; body2d.gravityScale = 0.25f; body2d.velocity = new Vector2(4, 5); body2d.AddForce(new Vector2(3, 0)); body2d.isKinematic = true;\n"
                 << "        box2d.isTrigger = true; box2d.center = new Vector2(0.5f, 0.75f); box2d.size = new Vector2(6, 7);\n"
                 << "        gameObject.name = \"Render Physics Properties Passed\";\n"
                 << "    }\n"
@@ -1866,7 +1868,7 @@ int main() {
                             std::abs(rigidbody_fixture->mass - 2.5f) < 0.001f &&
                             std::abs(rigidbody_fixture->gravity_scale - 0.5f) < 0.001f &&
                             rigidbody_fixture->linear_velocity ==
-                                nengine::core::Vec3{1.0f, 2.0f, 3.0f} &&
+                                nengine::core::Vec3{2.0f, 2.0f, 3.0f} &&
                             box_fixture &&
                             box_fixture->is_trigger &&
                             box_fixture->center ==
@@ -1879,7 +1881,7 @@ int main() {
                             std::abs(rigidbody2d_fixture->mass - 3.0f) < 0.001f &&
                             std::abs(rigidbody2d_fixture->gravity_scale - 0.25f) < 0.001f &&
                             rigidbody2d_fixture->linear_velocity ==
-                                nengine::core::Vec3{4.0f, 5.0f, 0.0f} &&
+                                nengine::core::Vec3{5.0f, 5.0f, 0.0f} &&
                             box2d_fixture &&
                             box2d_fixture->is_trigger &&
                             box2d_fixture->center ==
