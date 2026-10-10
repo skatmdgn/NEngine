@@ -13,7 +13,8 @@ namespace {
 
 enum class ColliderShape {
     Box,
-    Radial
+    Radial,
+    Capsule
 };
 
 struct ColliderBounds {
@@ -25,6 +26,8 @@ struct ColliderBounds {
     core::Vec3 axis_x{1.0f, 0.0f, 0.0f};
     core::Vec3 axis_y{0.0f, 1.0f, 0.0f};
     core::Vec3 axis_z{0.0f, 0.0f, 1.0f};
+    core::Vec3 segment_a{};
+    core::Vec3 segment_b{};
     float radius{0.0f};
     ColliderShape shape{ColliderShape::Box};
     bool trigger{false};
@@ -294,6 +297,47 @@ void update_broad_half(
             is_2d
                 ? 0.0f
                 : bounds.radius
+        };
+        return;
+    }
+
+    if (bounds.shape ==
+        ColliderShape::Capsule) {
+        const core::Vec3 half_segment{
+            std::max(
+                std::abs(
+                    bounds.segment_a.x -
+                    bounds.center.x),
+                std::abs(
+                    bounds.segment_b.x -
+                    bounds.center.x)),
+            std::max(
+                std::abs(
+                    bounds.segment_a.y -
+                    bounds.center.y),
+                std::abs(
+                    bounds.segment_b.y -
+                    bounds.center.y)),
+            is_2d
+                ? 0.0f
+                : std::max(
+                    std::abs(
+                        bounds.segment_a.z -
+                        bounds.center.z),
+                    std::abs(
+                        bounds.segment_b.z -
+                        bounds.center.z))
+        };
+
+        bounds.broad_half = {
+            half_segment.x +
+                bounds.radius,
+            half_segment.y +
+                bounds.radius,
+            is_2d
+                ? 0.0f
+                : half_segment.z +
+                    bounds.radius
         };
         return;
     }
@@ -660,6 +704,245 @@ ColliderBounds make_radial_bounds(
     return result;
 }
 
+
+ColliderBounds make_capsule_bounds(
+    const core::World& world,
+    core::Entity entity,
+    const CapsuleCollider& collider) {
+
+    ColliderBounds result;
+    result.entity = entity;
+    result.shape =
+        ColliderShape::Capsule;
+    result.trigger =
+        collider.is_trigger;
+    result.layer =
+        collider.layer;
+    result.collision_mask =
+        collider.collision_mask;
+
+    const auto* transform =
+        world.transform(entity);
+
+    if (!transform) return result;
+
+    const auto scale =
+        abs_scale(
+            transform->local_scale);
+
+    box_axes(
+        transform->local_rotation,
+        false,
+        result.axis_x,
+        result.axis_y,
+        result.axis_z);
+
+    const core::Vec3 scaled_center{
+        collider.center.x * scale.x,
+        collider.center.y * scale.y,
+        collider.center.z * scale.z
+    };
+
+    const auto offset =
+        oriented_offset(
+            scaled_center,
+            result,
+            false);
+
+    result.center = {
+        transform->local_position.x +
+            offset.x,
+        transform->local_position.y +
+            offset.y,
+        transform->local_position.z +
+            offset.z
+    };
+
+    core::Vec3 axis =
+        result.axis_y;
+    float axial_scale =
+        scale.y;
+    float radial_scale =
+        std::max(
+            scale.x,
+            scale.z);
+
+    if (collider.direction == 0u) {
+        axis = result.axis_x;
+        axial_scale = scale.x;
+        radial_scale =
+            std::max(
+                scale.y,
+                scale.z);
+    } else if (collider.direction == 2u) {
+        axis = result.axis_z;
+        axial_scale = scale.z;
+        radial_scale =
+            std::max(
+                scale.x,
+                scale.y);
+    }
+
+    result.radius =
+        std::abs(
+            collider.radius) *
+        radial_scale;
+
+    const float scaled_height =
+        std::max(
+            std::abs(
+                collider.height) *
+                axial_scale,
+            result.radius * 2.0f);
+
+    const float half_segment =
+        std::max(
+            0.0f,
+            scaled_height * 0.5f -
+                result.radius);
+
+    result.segment_a =
+        added(
+            result.center,
+            scaled(
+                axis,
+                -half_segment));
+
+    result.segment_b =
+        added(
+            result.center,
+            scaled(
+                axis,
+                half_segment));
+
+    result.half = {
+        result.radius,
+        result.radius,
+        result.radius
+    };
+
+    update_broad_half(
+        result,
+        false);
+
+    return result;
+}
+
+ColliderBounds make_capsule2d_bounds(
+    const core::World& world,
+    core::Entity entity,
+    const CapsuleCollider2D& collider) {
+
+    ColliderBounds result;
+    result.entity = entity;
+    result.shape =
+        ColliderShape::Capsule;
+    result.trigger =
+        collider.is_trigger;
+    result.layer =
+        collider.layer;
+    result.collision_mask =
+        collider.collision_mask;
+
+    const auto* transform =
+        world.transform(entity);
+
+    if (!transform) return result;
+
+    const auto scale =
+        abs_scale(
+            transform->local_scale);
+
+    box_axes(
+        transform->local_rotation,
+        true,
+        result.axis_x,
+        result.axis_y,
+        result.axis_z);
+
+    const core::Vec3 scaled_center{
+        collider.center.x * scale.x,
+        collider.center.y * scale.y,
+        0.0f
+    };
+
+    const auto offset =
+        oriented_offset(
+            scaled_center,
+            result,
+            true);
+
+    result.center = {
+        transform->local_position.x +
+            offset.x,
+        transform->local_position.y +
+            offset.y,
+        0.0f
+    };
+
+    const bool horizontal =
+        collider.direction == 1u;
+
+    const core::Vec3 axis =
+        horizontal
+            ? result.axis_x
+            : result.axis_y;
+
+    const float axial_size =
+        horizontal
+            ? std::abs(collider.size.x) *
+                scale.x
+            : std::abs(collider.size.y) *
+                scale.y;
+
+    const float cross_size =
+        horizontal
+            ? std::abs(collider.size.y) *
+                scale.y
+            : std::abs(collider.size.x) *
+                scale.x;
+
+    result.radius =
+        std::min(
+            cross_size * 0.5f,
+            axial_size * 0.5f);
+
+    const float half_segment =
+        std::max(
+            0.0f,
+            axial_size * 0.5f -
+                result.radius);
+
+    result.segment_a =
+        added(
+            result.center,
+            scaled(
+                axis,
+                -half_segment));
+
+    result.segment_b =
+        added(
+            result.center,
+            scaled(
+                axis,
+                half_segment));
+
+    result.segment_a.z = 0.0f;
+    result.segment_b.z = 0.0f;
+
+    result.half = {
+        result.radius,
+        result.radius,
+        0.0f
+    };
+
+    update_broad_half(
+        result,
+        true);
+
+    return result;
+}
+
 float length_squared(
     core::Vec3 value,
     bool is_2d) noexcept {
@@ -704,6 +987,237 @@ core::Vec3 normalized_or_axis(
             ? 0.0f
             : value.z * inverse
     };
+}
+
+core::Vec3 closest_point_on_segment(
+    core::Vec3 a,
+    core::Vec3 b,
+    core::Vec3 point,
+    bool is_2d) noexcept {
+
+    core::Vec3 ab{
+        b.x - a.x,
+        b.y - a.y,
+        is_2d
+            ? 0.0f
+            : b.z - a.z
+    };
+
+    core::Vec3 ap{
+        point.x - a.x,
+        point.y - a.y,
+        is_2d
+            ? 0.0f
+            : point.z - a.z
+    };
+
+    const float denominator =
+        length_squared(
+            ab,
+            is_2d);
+
+    if (denominator <=
+        0.0000000001f) {
+        return a;
+    }
+
+    const float t =
+        std::clamp(
+            dot(ap, ab) /
+                denominator,
+            0.0f,
+            1.0f);
+
+    return {
+        a.x + ab.x * t,
+        a.y + ab.y * t,
+        is_2d
+            ? 0.0f
+            : a.z + ab.z * t
+    };
+}
+
+void closest_segment_pair(
+    core::Vec3 p1,
+    core::Vec3 q1,
+    core::Vec3 p2,
+    core::Vec3 q2,
+    bool is_2d,
+    core::Vec3& first,
+    core::Vec3& second) noexcept {
+
+    if (is_2d) {
+        p1.z = 0.0f;
+        q1.z = 0.0f;
+        p2.z = 0.0f;
+        q2.z = 0.0f;
+    }
+
+    const core::Vec3 d1{
+        q1.x - p1.x,
+        q1.y - p1.y,
+        q1.z - p1.z
+    };
+
+    const core::Vec3 d2{
+        q2.x - p2.x,
+        q2.y - p2.y,
+        q2.z - p2.z
+    };
+
+    const core::Vec3 r{
+        p1.x - p2.x,
+        p1.y - p2.y,
+        p1.z - p2.z
+    };
+
+    const float a =
+        dot(d1, d1);
+    const float e =
+        dot(d2, d2);
+    const float f =
+        dot(d2, r);
+
+    constexpr float epsilon =
+        0.0000000001f;
+
+    float first_t = 0.0f;
+    float second_t = 0.0f;
+
+    if (a <= epsilon &&
+        e <= epsilon) {
+        first = p1;
+        second = p2;
+        return;
+    }
+
+    if (a <= epsilon) {
+        second_t =
+            std::clamp(
+                f / e,
+                0.0f,
+                1.0f);
+    } else {
+        const float c =
+            dot(d1, r);
+
+        if (e <= epsilon) {
+            first_t =
+                std::clamp(
+                    -c / a,
+                    0.0f,
+                    1.0f);
+        } else {
+            const float b =
+                dot(d1, d2);
+
+            const float denominator =
+                a * e -
+                b * b;
+
+            if (std::abs(denominator) >
+                epsilon) {
+                first_t =
+                    std::clamp(
+                        (b * f -
+                         c * e) /
+                            denominator,
+                        0.0f,
+                        1.0f);
+            }
+
+            second_t =
+                (b * first_t +
+                 f) /
+                e;
+
+            if (second_t < 0.0f) {
+                second_t = 0.0f;
+                first_t =
+                    std::clamp(
+                        -c / a,
+                        0.0f,
+                        1.0f);
+            } else if (
+                second_t > 1.0f) {
+                second_t = 1.0f;
+                first_t =
+                    std::clamp(
+                        (b - c) / a,
+                        0.0f,
+                        1.0f);
+            }
+        }
+    }
+
+    first = {
+        p1.x + d1.x * first_t,
+        p1.y + d1.y * first_t,
+        is_2d
+            ? 0.0f
+            : p1.z + d1.z * first_t
+    };
+
+    second = {
+        p2.x + d2.x * second_t,
+        p2.y + d2.y * second_t,
+        is_2d
+            ? 0.0f
+            : p2.z + d2.z * second_t
+    };
+}
+
+core::Vec3 box_local_point(
+    const ColliderBounds& box,
+    core::Vec3 point,
+    bool is_2d) noexcept {
+
+    const core::Vec3 delta{
+        point.x - box.center.x,
+        point.y - box.center.y,
+        is_2d
+            ? 0.0f
+            : point.z - box.center.z
+    };
+
+    return {
+        dot(delta, box.axis_x),
+        dot(delta, box.axis_y),
+        is_2d
+            ? 0.0f
+            : dot(delta, box.axis_z)
+    };
+}
+
+core::Vec3 box_world_point(
+    const ColliderBounds& box,
+    core::Vec3 local,
+    bool is_2d) noexcept {
+
+    auto result =
+        added(
+            box.center,
+            scaled(
+                box.axis_x,
+                local.x));
+
+    result =
+        added(
+            result,
+            scaled(
+                box.axis_y,
+                local.y));
+
+    if (!is_2d) {
+        result =
+            added(
+                result,
+                scaled(
+                    box.axis_z,
+                    local.z));
+    }
+
+    return result;
 }
 
 bool overlap_radial_pair(
@@ -944,16 +1458,446 @@ bool overlap_box_radial(
     return penetration > 0.0f;
 }
 
+bool overlap_capsule_radial(
+    const ColliderBounds& capsule,
+    const ColliderBounds& radial,
+    bool is_2d,
+    bool capsule_is_first,
+    BoxOverlap& overlap) noexcept {
+
+    const auto closest =
+        closest_point_on_segment(
+            capsule.segment_a,
+            capsule.segment_b,
+            radial.center,
+            is_2d);
+
+    const core::Vec3 separation{
+        radial.center.x -
+            closest.x,
+        radial.center.y -
+            closest.y,
+        is_2d
+            ? 0.0f
+            : radial.center.z -
+                closest.z
+    };
+
+    const float radii =
+        capsule.radius +
+        radial.radius;
+
+    const float squared =
+        length_squared(
+            separation,
+            is_2d);
+
+    if (squared >=
+        radii * radii) {
+        return false;
+    }
+
+    const float distance =
+        std::sqrt(
+            std::max(
+                0.0f,
+                squared));
+
+    auto normal =
+        normalized_or_axis(
+            squared >
+                0.0000000001f
+                ? separation
+                : core::Vec3{
+                    radial.center.x -
+                        capsule.center.x,
+                    radial.center.y -
+                        capsule.center.y,
+                    is_2d
+                        ? 0.0f
+                        : radial.center.z -
+                            capsule.center.z
+                },
+            is_2d);
+
+    if (!capsule_is_first) {
+        normal =
+            scaled(normal, -1.0f);
+    }
+
+    overlap = {
+        capsule_is_first
+            ? capsule.entity
+            : radial.entity,
+        capsule_is_first
+            ? radial.entity
+            : capsule.entity,
+        normal,
+        radii - distance,
+        capsule.trigger ||
+            radial.trigger,
+        is_2d
+    };
+
+    return overlap.penetration >
+        0.0f;
+}
+
+bool overlap_capsule_pair(
+    const ColliderBounds& a,
+    const ColliderBounds& b,
+    bool is_2d,
+    BoxOverlap& overlap) noexcept {
+
+    core::Vec3 first{};
+    core::Vec3 second{};
+
+    closest_segment_pair(
+        a.segment_a,
+        a.segment_b,
+        b.segment_a,
+        b.segment_b,
+        is_2d,
+        first,
+        second);
+
+    const core::Vec3 separation{
+        second.x - first.x,
+        second.y - first.y,
+        is_2d
+            ? 0.0f
+            : second.z - first.z
+    };
+
+    const float radii =
+        a.radius +
+        b.radius;
+
+    const float squared =
+        length_squared(
+            separation,
+            is_2d);
+
+    if (squared >=
+        radii * radii) {
+        return false;
+    }
+
+    const float distance =
+        std::sqrt(
+            std::max(
+                0.0f,
+                squared));
+
+    overlap = {
+        a.entity,
+        b.entity,
+        normalized_or_axis(
+            squared >
+                0.0000000001f
+                ? separation
+                : core::Vec3{
+                    b.center.x -
+                        a.center.x,
+                    b.center.y -
+                        a.center.y,
+                    is_2d
+                        ? 0.0f
+                        : b.center.z -
+                            a.center.z
+                },
+            is_2d),
+        radii - distance,
+        a.trigger || b.trigger,
+        is_2d
+    };
+
+    return overlap.penetration >
+        0.0f;
+}
+
+bool overlap_box_capsule(
+    const ColliderBounds& box,
+    const ColliderBounds& capsule,
+    bool is_2d,
+    bool box_is_first,
+    BoxOverlap& overlap) noexcept {
+
+    const auto local_a =
+        box_local_point(
+            box,
+            capsule.segment_a,
+            is_2d);
+
+    const auto local_b =
+        box_local_point(
+            box,
+            capsule.segment_b,
+            is_2d);
+
+    const core::Vec3 local_delta{
+        local_b.x - local_a.x,
+        local_b.y - local_a.y,
+        is_2d
+            ? 0.0f
+            : local_b.z - local_a.z
+    };
+
+    const auto evaluate =
+        [&](float t,
+            core::Vec3* segment_point,
+            core::Vec3* box_point) {
+
+            core::Vec3 point{
+                local_a.x +
+                    local_delta.x * t,
+                local_a.y +
+                    local_delta.y * t,
+                is_2d
+                    ? 0.0f
+                    : local_a.z +
+                        local_delta.z * t
+            };
+
+            core::Vec3 clamped{
+                std::clamp(
+                    point.x,
+                    -box.half.x,
+                    box.half.x),
+                std::clamp(
+                    point.y,
+                    -box.half.y,
+                    box.half.y),
+                is_2d
+                    ? 0.0f
+                    : std::clamp(
+                        point.z,
+                        -box.half.z,
+                        box.half.z)
+            };
+
+            if (segment_point)
+                *segment_point = point;
+            if (box_point)
+                *box_point = clamped;
+
+            const core::Vec3 difference{
+                point.x - clamped.x,
+                point.y - clamped.y,
+                is_2d
+                    ? 0.0f
+                    : point.z - clamped.z
+            };
+
+            return length_squared(
+                difference,
+                is_2d);
+        };
+
+    float low = 0.0f;
+    float high = 1.0f;
+
+    for (int iteration = 0;
+         iteration < 32;
+         ++iteration) {
+
+        const float first_t =
+            (low * 2.0f +
+             high) /
+            3.0f;
+
+        const float second_t =
+            (low +
+             high * 2.0f) /
+            3.0f;
+
+        if (evaluate(
+                first_t,
+                nullptr,
+                nullptr) <
+            evaluate(
+                second_t,
+                nullptr,
+                nullptr)) {
+            high = second_t;
+        } else {
+            low = first_t;
+        }
+    }
+
+    const float t =
+        (low + high) *
+        0.5f;
+
+    core::Vec3 segment_local{};
+    core::Vec3 box_local{};
+
+    const float squared =
+        evaluate(
+            t,
+            &segment_local,
+            &box_local);
+
+    core::Vec3 normal{};
+    float penetration = 0.0f;
+
+    if (squared >
+        0.0000000001f) {
+
+        const float distance =
+            std::sqrt(squared);
+
+        if (distance >=
+            capsule.radius) {
+            return false;
+        }
+
+        const core::Vec3 local_normal{
+            (segment_local.x -
+             box_local.x) /
+                distance,
+            (segment_local.y -
+             box_local.y) /
+                distance,
+            is_2d
+                ? 0.0f
+                : (segment_local.z -
+                   box_local.z) /
+                    distance
+        };
+
+        normal =
+            added(
+                scaled(
+                    box.axis_x,
+                    local_normal.x),
+                scaled(
+                    box.axis_y,
+                    local_normal.y));
+
+        if (!is_2d) {
+            normal =
+                added(
+                    normal,
+                    scaled(
+                        box.axis_z,
+                        local_normal.z));
+        }
+
+        normal =
+            normalized_or_axis(
+                normal,
+                is_2d);
+
+        penetration =
+            capsule.radius -
+            distance;
+    } else {
+        float face_distance =
+            box.half.x -
+            std::abs(
+                segment_local.x);
+
+        core::Vec3 local_normal{
+            axis_sign(
+                segment_local.x),
+            0.0f,
+            0.0f
+        };
+
+        const float y_distance =
+            box.half.y -
+            std::abs(
+                segment_local.y);
+
+        if (y_distance <
+            face_distance) {
+            face_distance =
+                y_distance;
+            local_normal = {
+                0.0f,
+                axis_sign(
+                    segment_local.y),
+                0.0f
+            };
+        }
+
+        if (!is_2d) {
+            const float z_distance =
+                box.half.z -
+                std::abs(
+                    segment_local.z);
+
+            if (z_distance <
+                face_distance) {
+                face_distance =
+                    z_distance;
+                local_normal = {
+                    0.0f,
+                    0.0f,
+                    axis_sign(
+                        segment_local.z)
+                };
+            }
+        }
+
+        normal =
+            added(
+                scaled(
+                    box.axis_x,
+                    local_normal.x),
+                scaled(
+                    box.axis_y,
+                    local_normal.y));
+
+        if (!is_2d) {
+            normal =
+                added(
+                    normal,
+                    scaled(
+                        box.axis_z,
+                        local_normal.z));
+        }
+
+        penetration =
+            capsule.radius +
+            std::max(
+                0.0f,
+                face_distance);
+    }
+
+    if (!box_is_first) {
+        normal =
+            scaled(
+                normal,
+                -1.0f);
+    }
+
+    overlap = {
+        box_is_first
+            ? box.entity
+            : capsule.entity,
+        box_is_first
+            ? capsule.entity
+            : box.entity,
+        normal,
+        penetration,
+        box.trigger ||
+            capsule.trigger,
+        is_2d
+    };
+
+    return penetration > 0.0f;
+}
+
 bool overlap_pair(
     const ColliderBounds& a,
     const ColliderBounds& b,
     bool is_2d,
     BoxOverlap& overlap) noexcept {
 
-    if (a.shape ==
-            ColliderShape::Box &&
-        b.shape ==
-            ColliderShape::Box) {
+    if (a.shape == ColliderShape::Box &&
+        b.shape == ColliderShape::Box) {
         return overlap_box_pair(
             a,
             b,
@@ -961,10 +1905,8 @@ bool overlap_pair(
             overlap);
     }
 
-    if (a.shape ==
-            ColliderShape::Radial &&
-        b.shape ==
-            ColliderShape::Radial) {
+    if (a.shape == ColliderShape::Radial &&
+        b.shape == ColliderShape::Radial) {
         return overlap_radial_pair(
             a,
             b,
@@ -972,8 +1914,56 @@ bool overlap_pair(
             overlap);
     }
 
-    if (a.shape ==
-        ColliderShape::Box) {
+    if (a.shape == ColliderShape::Capsule &&
+        b.shape == ColliderShape::Capsule) {
+        return overlap_capsule_pair(
+            a,
+            b,
+            is_2d,
+            overlap);
+    }
+
+    if (a.shape == ColliderShape::Capsule &&
+        b.shape == ColliderShape::Radial) {
+        return overlap_capsule_radial(
+            a,
+            b,
+            is_2d,
+            true,
+            overlap);
+    }
+
+    if (a.shape == ColliderShape::Radial &&
+        b.shape == ColliderShape::Capsule) {
+        return overlap_capsule_radial(
+            b,
+            a,
+            is_2d,
+            false,
+            overlap);
+    }
+
+    if (a.shape == ColliderShape::Box &&
+        b.shape == ColliderShape::Capsule) {
+        return overlap_box_capsule(
+            a,
+            b,
+            is_2d,
+            true,
+            overlap);
+    }
+
+    if (a.shape == ColliderShape::Capsule &&
+        b.shape == ColliderShape::Box) {
+        return overlap_box_capsule(
+            b,
+            a,
+            is_2d,
+            false,
+            overlap);
+    }
+
+    if (a.shape == ColliderShape::Box) {
         return overlap_box_radial(
             a,
             b,
@@ -1059,6 +2049,81 @@ collect_radial_bounds(
                 entity,
                 *collider,
                 is_2d));
+    }
+
+    return result;
+}
+
+std::vector<ColliderBounds>
+collect_capsule_bounds(
+    const core::World& world) {
+
+    std::vector<ColliderBounds> result;
+
+    for (const auto entity :
+         world.entities()) {
+
+        if (!world.active(entity)) {
+            continue;
+        }
+
+        const auto* collider =
+            world.get_component<
+                CapsuleCollider>(
+                    entity,
+                    capsule_collider_type());
+
+        if (!collider ||
+            !collider->enabled ||
+            collider->radius <= 0.0f ||
+            collider->height <
+                collider->radius * 2.0f ||
+            collider->direction > 2u) {
+            continue;
+        }
+
+        result.push_back(
+            make_capsule_bounds(
+                world,
+                entity,
+                *collider));
+    }
+
+    return result;
+}
+
+std::vector<ColliderBounds>
+collect_capsule2d_bounds(
+    const core::World& world) {
+
+    std::vector<ColliderBounds> result;
+
+    for (const auto entity :
+         world.entities()) {
+
+        if (!world.active(entity)) {
+            continue;
+        }
+
+        const auto* collider =
+            world.get_component<
+                CapsuleCollider2D>(
+                    entity,
+                    capsule_collider2d_type());
+
+        if (!collider ||
+            !collider->enabled ||
+            collider->size.x <= 0.0f ||
+            collider->size.y <= 0.0f ||
+            collider->direction > 1u) {
+            continue;
+        }
+
+        result.push_back(
+            make_capsule2d_bounds(
+                world,
+                entity,
+                *collider));
     }
 
     return result;
@@ -1158,6 +2223,15 @@ CollisionDetectionResult detect_box_overlaps(
         spheres.begin(),
         spheres.end());
 
+    auto capsules =
+        collect_capsule_bounds(
+            world);
+
+    bounds_3d.insert(
+        bounds_3d.end(),
+        capsules.begin(),
+        capsules.end());
+
     append_overlaps(
         std::move(bounds_3d),
         false,
@@ -1180,6 +2254,15 @@ CollisionDetectionResult detect_box_overlaps(
         bounds_2d.end(),
         circles.begin(),
         circles.end());
+
+    auto capsules_2d =
+        collect_capsule2d_bounds(
+            world);
+
+    bounds_2d.insert(
+        bounds_2d.end(),
+        capsules_2d.begin(),
+        capsules_2d.end());
 
     append_overlaps(
         std::move(bounds_2d),
@@ -1221,6 +2304,16 @@ ContactMaterial contact_material_3d(
         };
     }
 
+    if (const auto* collider =
+            world.get_component<CapsuleCollider>(
+                entity,
+                capsule_collider_type())) {
+        return {
+            collider->friction,
+            collider->restitution
+        };
+    }
+
     return {};
 }
 
@@ -1242,6 +2335,16 @@ ContactMaterial contact_material_2d(
             world.get_component<CircleCollider2D>(
                 entity,
                 circle_collider2d_type())) {
+        return {
+            collider->friction,
+            collider->restitution
+        };
+    }
+
+    if (const auto* collider =
+            world.get_component<CapsuleCollider2D>(
+                entity,
+                capsule_collider2d_type())) {
         return {
             collider->friction,
             collider->restitution
@@ -1908,6 +3011,15 @@ std::vector<core::Entity> overlap_box(
         spheres.begin(),
         spheres.end());
 
+    auto capsules =
+        collect_capsule_bounds(
+            world);
+
+    bounds.insert(
+        bounds.end(),
+        capsules.begin(),
+        capsules.end());
+
     for (const auto& candidate :
          bounds) {
 
@@ -1976,6 +3088,15 @@ std::vector<core::Entity> overlap_box_2d(
         bounds.end(),
         circles.begin(),
         circles.end());
+
+    auto capsules =
+        collect_capsule2d_bounds(
+            world);
+
+    bounds.insert(
+        bounds.end(),
+        capsules.begin(),
+        capsules.end());
 
     for (const auto& candidate :
          bounds) {
@@ -2236,6 +3357,240 @@ bool ray_radial(
     return true;
 }
 
+bool ray_capsule(
+    core::Vec3 origin,
+    core::Vec3 direction,
+    const ColliderBounds& bounds,
+    float max_distance,
+    bool is_2d,
+    float& distance,
+    core::Vec3& normal) noexcept {
+
+    const auto closest_origin =
+        closest_point_on_segment(
+            bounds.segment_a,
+            bounds.segment_b,
+            origin,
+            is_2d);
+
+    const core::Vec3 origin_offset{
+        origin.x -
+            closest_origin.x,
+        origin.y -
+            closest_origin.y,
+        is_2d
+            ? 0.0f
+            : origin.z -
+                closest_origin.z
+    };
+
+    if (length_squared(
+            origin_offset,
+            is_2d) <=
+        bounds.radius *
+            bounds.radius) {
+
+        distance = 0.0f;
+        normal = {
+            -direction.x,
+            -direction.y,
+            is_2d
+                ? 0.0f
+                : -direction.z
+        };
+        return true;
+    }
+
+    core::Vec3 ba{
+        bounds.segment_b.x -
+            bounds.segment_a.x,
+        bounds.segment_b.y -
+            bounds.segment_a.y,
+        is_2d
+            ? 0.0f
+            : bounds.segment_b.z -
+                bounds.segment_a.z
+    };
+
+    core::Vec3 oa{
+        origin.x -
+            bounds.segment_a.x,
+        origin.y -
+            bounds.segment_a.y,
+        is_2d
+            ? 0.0f
+            : origin.z -
+                bounds.segment_a.z
+    };
+
+    const float baba =
+        dot(ba, ba);
+
+    if (baba <=
+        0.0000000001f) {
+
+        ColliderBounds radial =
+            bounds;
+        radial.center =
+            bounds.segment_a;
+        radial.shape =
+            ColliderShape::Radial;
+
+        return ray_radial(
+            origin,
+            direction,
+            radial,
+            max_distance,
+            is_2d,
+            distance,
+            normal);
+    }
+
+    const float bard =
+        dot(ba, direction);
+    const float baoa =
+        dot(ba, oa);
+    const float rdoa =
+        dot(direction, oa);
+    const float oaoa =
+        dot(oa, oa);
+
+    const float quadratic_a =
+        baba -
+        bard * bard;
+    const float quadratic_b =
+        baba * rdoa -
+        baoa * bard;
+    const float quadratic_c =
+        baba * oaoa -
+        baoa * baoa -
+        bounds.radius *
+            bounds.radius *
+            baba;
+
+    float best_distance =
+        std::numeric_limits<float>::max();
+    core::Vec3 best_normal{};
+    bool hit = false;
+
+    const float discriminant =
+        quadratic_b *
+            quadratic_b -
+        quadratic_a *
+            quadratic_c;
+
+    if (quadratic_a >
+            0.0000000001f &&
+        discriminant >= 0.0f) {
+
+        const float t =
+            (-quadratic_b -
+             std::sqrt(
+                 discriminant)) /
+            quadratic_a;
+
+        const float y =
+            baoa +
+            t * bard;
+
+        if (t >= 0.0f &&
+            t <= max_distance &&
+            y > 0.0f &&
+            y < baba) {
+
+            const core::Vec3 point{
+                origin.x +
+                    direction.x * t,
+                origin.y +
+                    direction.y * t,
+                is_2d
+                    ? 0.0f
+                    : origin.z +
+                        direction.z * t
+            };
+
+            const float segment_t =
+                y / baba;
+
+            const core::Vec3 axis_point{
+                bounds.segment_a.x +
+                    ba.x * segment_t,
+                bounds.segment_a.y +
+                    ba.y * segment_t,
+                is_2d
+                    ? 0.0f
+                    : bounds.segment_a.z +
+                        ba.z * segment_t
+            };
+
+            best_distance = t;
+            best_normal =
+                normalized_or_axis(
+                    {
+                        point.x -
+                            axis_point.x,
+                        point.y -
+                            axis_point.y,
+                        is_2d
+                            ? 0.0f
+                            : point.z -
+                                axis_point.z
+                    },
+                    is_2d);
+            hit = true;
+        }
+    }
+
+    const core::Vec3 endpoints[]{
+        bounds.segment_a,
+        bounds.segment_b
+    };
+
+    for (const auto endpoint :
+         endpoints) {
+
+        ColliderBounds radial =
+            bounds;
+        radial.center = endpoint;
+        radial.shape =
+            ColliderShape::Radial;
+
+        float endpoint_distance =
+            0.0f;
+        core::Vec3 endpoint_normal{};
+
+        if (!ray_radial(
+                origin,
+                direction,
+                radial,
+                max_distance,
+                is_2d,
+                endpoint_distance,
+                endpoint_normal)) {
+            continue;
+        }
+
+        if (!hit ||
+            endpoint_distance <
+                best_distance) {
+
+            best_distance =
+                endpoint_distance;
+            best_normal =
+                endpoint_normal;
+            hit = true;
+        }
+    }
+
+    if (!hit) return false;
+
+    distance =
+        best_distance;
+    normal =
+        best_normal;
+    return true;
+}
+
 core::Vec3 normalized_direction(
     core::Vec3 direction,
     bool is_2d) noexcept {
@@ -2451,6 +3806,92 @@ raycast_radial_bounds(
     return closest;
 }
 
+std::optional<RaycastHit>
+raycast_capsule_collection(
+    const std::vector<ColliderBounds>& bounds,
+    core::Vec3 origin,
+    core::Vec3 direction,
+    float max_distance,
+    bool include_triggers,
+    std::uint32_t layer_mask,
+    bool is_2d) {
+
+    if (!std::isfinite(max_distance) ||
+        max_distance < 0.0f) {
+        return std::nullopt;
+    }
+
+    const auto normalized =
+        normalized_direction(
+            direction,
+            is_2d);
+
+    if (normalized ==
+        core::Vec3{}) {
+        return std::nullopt;
+    }
+
+    std::optional<RaycastHit>
+        closest;
+
+    for (const auto& candidate :
+         bounds) {
+
+        if ((!include_triggers &&
+             candidate.trigger) ||
+            !layer_enabled(
+                layer_mask,
+                candidate.layer)) {
+            continue;
+        }
+
+        float distance = 0.0f;
+        core::Vec3 normal{};
+
+        if (!ray_capsule(
+                origin,
+                normalized,
+                candidate,
+                max_distance,
+                is_2d,
+                distance,
+                normal)) {
+            continue;
+        }
+
+        if (closest &&
+            distance >=
+                closest->distance) {
+            continue;
+        }
+
+        closest =
+            RaycastHit{
+                candidate.entity,
+                {
+                    origin.x +
+                        normalized.x *
+                        distance,
+                    origin.y +
+                        normalized.y *
+                        distance,
+                    is_2d
+                        ? 0.0f
+                        : origin.z +
+                            normalized.z *
+                                distance
+                },
+                normal,
+                distance,
+                candidate.trigger,
+                is_2d,
+                candidate.layer
+            };
+    }
+
+    return closest;
+}
+
 std::optional<RaycastHit> nearest_hit(
     std::optional<RaycastHit> first,
     std::optional<RaycastHit> second) {
@@ -2475,18 +3916,28 @@ std::optional<RaycastHit> raycast(
     std::uint32_t layer_mask) {
 
     return nearest_hit(
-        raycast_bounds<BoxCollider>(
-            world,
-            box_collider_type(),
-            origin,
-            direction,
-            max_distance,
-            include_triggers,
-            layer_mask,
-            false),
-        raycast_radial_bounds<SphereCollider>(
-            world,
-            sphere_collider_type(),
+        nearest_hit(
+            raycast_bounds<BoxCollider>(
+                world,
+                box_collider_type(),
+                origin,
+                direction,
+                max_distance,
+                include_triggers,
+                layer_mask,
+                false),
+            raycast_radial_bounds<SphereCollider>(
+                world,
+                sphere_collider_type(),
+                origin,
+                direction,
+                max_distance,
+                include_triggers,
+                layer_mask,
+                false)),
+        raycast_capsule_collection(
+            collect_capsule_bounds(
+                world),
             origin,
             direction,
             max_distance,
@@ -2516,18 +3967,28 @@ std::optional<RaycastHit> raycast_2d(
     };
 
     return nearest_hit(
-        raycast_bounds<BoxCollider2D>(
-            world,
-            box_collider2d_type(),
-            origin_3d,
-            direction_3d,
-            max_distance,
-            include_triggers,
-            layer_mask,
-            true),
-        raycast_radial_bounds<CircleCollider2D>(
-            world,
-            circle_collider2d_type(),
+        nearest_hit(
+            raycast_bounds<BoxCollider2D>(
+                world,
+                box_collider2d_type(),
+                origin_3d,
+                direction_3d,
+                max_distance,
+                include_triggers,
+                layer_mask,
+                true),
+            raycast_radial_bounds<CircleCollider2D>(
+                world,
+                circle_collider2d_type(),
+                origin_3d,
+                direction_3d,
+                max_distance,
+                include_triggers,
+                layer_mask,
+                true)),
+        raycast_capsule_collection(
+            collect_capsule2d_bounds(
+                world),
             origin_3d,
             direction_3d,
             max_distance,

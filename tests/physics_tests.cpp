@@ -2723,6 +2723,269 @@ int main() {
                 0.0f},
         "CircleCollider2D participates in XY contacts OverlapBox2D and Raycast2D");
 
+
+    core::World capsule_world;
+
+    const auto capsule_entity =
+        capsule_world.create(
+            "Capsule");
+
+    const auto capsule_sphere =
+        capsule_world.create(
+            "Capsule Sphere");
+
+    capsule_world.add_component<
+        physics::CapsuleCollider>(
+            capsule_entity,
+            physics::capsule_collider_type());
+
+    capsule_world.add_component<
+        physics::SphereCollider>(
+            capsule_sphere,
+            physics::sphere_collider_type());
+
+    capsule_world.transform(
+        capsule_sphere)->local_position =
+            {0.75f, 0.0f, 0.0f};
+
+    const auto capsule_sphere_detection =
+        physics::detect_box_overlaps(
+            capsule_world);
+
+    const auto capsule_overlap_query =
+        physics::overlap_box(
+            capsule_world,
+            {},
+            {0.25f, 0.25f, 0.25f});
+
+    const auto capsule_ray =
+        physics::raycast(
+            capsule_world,
+            {-2.0f, 0.0f, 0.0f},
+            {1.0f, 0.0f, 0.0f},
+            10.0f);
+
+    check(
+        capsule_sphere_detection
+            .tested_pairs_3d == 1u &&
+        capsule_sphere_detection
+            .overlaps.size() == 1u &&
+        std::abs(
+            capsule_sphere_detection
+                .overlaps.front()
+                .penetration -
+            0.25f) < 0.0002f &&
+        std::abs(
+            capsule_sphere_detection
+                .overlaps.front()
+                .normal.x -
+            1.0f) < 0.0002f &&
+        capsule_overlap_query.size() ==
+            1u &&
+        capsule_overlap_query.front() ==
+            capsule_entity &&
+        capsule_ray &&
+        capsule_ray->entity ==
+            capsule_entity &&
+        std::abs(
+            capsule_ray->distance -
+            1.5f) < 0.0002f &&
+        std::abs(
+            capsule_ray->normal.x +
+            1.0f) < 0.0002f,
+        "CapsuleCollider participates in sphere contacts OverlapBox and Raycast");
+
+    core::World capsule_pair_world;
+
+    const auto capsule_a =
+        capsule_pair_world.create(
+            "Capsule A");
+
+    const auto capsule_b =
+        capsule_pair_world.create(
+            "Capsule B");
+
+    capsule_pair_world.add_component<
+        physics::CapsuleCollider>(
+            capsule_a,
+            physics::capsule_collider_type());
+
+    capsule_pair_world.add_component<
+        physics::CapsuleCollider>(
+            capsule_b,
+            physics::capsule_collider_type());
+
+    capsule_pair_world.transform(
+        capsule_b)->local_position =
+            {0.75f, 0.0f, 0.0f};
+
+    const auto capsule_pair_detection =
+        physics::detect_box_overlaps(
+            capsule_pair_world);
+
+    check(
+        capsule_pair_detection
+            .tested_pairs_3d == 1u &&
+        capsule_pair_detection
+            .overlaps.size() == 1u &&
+        std::abs(
+            capsule_pair_detection
+                .overlaps.front()
+                .penetration -
+            0.25f) < 0.0002f &&
+        std::abs(
+            capsule_pair_detection
+                .overlaps.front()
+                .normal.x -
+            1.0f) < 0.0002f,
+        "CapsuleCollider pairs use closest-segment narrow phase");
+
+    core::World box_capsule_world;
+
+    const auto capsule_box =
+        box_capsule_world.create(
+            "Capsule Box");
+
+    const auto mixed_capsule =
+        box_capsule_world.create(
+            "Mixed Capsule");
+
+    box_capsule_world.add_component<
+        physics::BoxCollider>(
+            capsule_box,
+            physics::box_collider_type());
+
+    box_capsule_world.add_component<
+        physics::CapsuleCollider>(
+            mixed_capsule,
+            physics::capsule_collider_type());
+
+    box_capsule_world.transform(
+        mixed_capsule)->local_position =
+            {0.75f, 0.0f, 0.0f};
+
+    const auto box_capsule_detection =
+        physics::detect_box_overlaps(
+            box_capsule_world);
+
+    check(
+        box_capsule_detection
+            .tested_pairs_3d == 1u &&
+        box_capsule_detection
+            .overlaps.size() == 1u &&
+        std::abs(
+            box_capsule_detection
+                .overlaps.front()
+                .penetration -
+            0.25f) < 0.0005f &&
+        std::abs(
+            box_capsule_detection
+                .overlaps.front()
+                .normal.x -
+            1.0f) < 0.0005f,
+        "BoxCollider and CapsuleCollider use oriented segment-box closest-point narrow phase");
+
+    core::World capsule2d_world;
+
+    const auto capsule2d =
+        capsule2d_world.create(
+            "Capsule2D");
+
+    const auto circle_for_capsule =
+        capsule2d_world.create(
+            "Capsule Circle");
+
+    capsule2d_world.add_component<
+        physics::CapsuleCollider2D>(
+            capsule2d,
+            physics::capsule_collider2d_type());
+
+    capsule2d_world.add_component<
+        physics::CircleCollider2D>(
+            circle_for_capsule,
+            physics::circle_collider2d_type());
+
+    capsule2d_world.transform(
+        circle_for_capsule)
+        ->local_position =
+            {0.75f, 0.0f, 7.0f};
+
+    const auto capsule2d_detection =
+        physics::detect_box_overlaps(
+            capsule2d_world);
+
+    const auto capsule2d_query =
+        physics::overlap_box_2d(
+            capsule2d_world,
+            {},
+            {0.25f, 0.25f});
+
+    const auto capsule2d_ray =
+        physics::raycast_2d(
+            capsule2d_world,
+            {-2.0f, 0.0f},
+            {1.0f, 0.0f},
+            10.0f);
+
+    check(
+        capsule2d_detection
+            .tested_pairs_2d == 1u &&
+        capsule2d_detection
+            .overlaps.size() == 1u &&
+        capsule2d_detection
+            .overlaps.front().is_2d &&
+        std::abs(
+            capsule2d_detection
+                .overlaps.front()
+                .penetration -
+            0.25f) < 0.0002f &&
+        capsule2d_query.size() == 1u &&
+        capsule2d_query.front() ==
+            capsule2d &&
+        capsule2d_ray &&
+        capsule2d_ray->entity ==
+            capsule2d &&
+        std::abs(
+            capsule2d_ray->distance -
+            1.5f) < 0.0002f &&
+        std::abs(
+            capsule2d_ray->normal.x +
+            1.0f) < 0.0002f,
+        "CapsuleCollider2D participates in circle contacts OverlapBox2D and Raycast2D");
+
+    core::World rotated_capsule_world;
+
+    const auto rotated_capsule =
+        rotated_capsule_world.create(
+            "Rotated Capsule");
+
+    rotated_capsule_world.add_component<
+        physics::CapsuleCollider>(
+            rotated_capsule,
+            physics::capsule_collider_type());
+
+    rotated_capsule_world.transform(
+        rotated_capsule)->local_rotation =
+            core::Quat{
+                0.0f,
+                0.0f,
+                0.70710678f,
+                0.70710678f
+            };
+
+    const auto rotated_capsule_query =
+        physics::overlap_box(
+            rotated_capsule_world,
+            {0.9f, 0.0f, 0.0f},
+            {0.2f, 0.2f, 0.2f});
+
+    check(
+        rotated_capsule_query.size() ==
+            1u &&
+        rotated_capsule_query.front() ==
+            rotated_capsule,
+        "CapsuleCollider segment follows Transform rotation in spatial queries");
+
     if (failures != 0) {
         std::cerr
             << failures

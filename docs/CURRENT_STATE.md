@@ -293,20 +293,20 @@ Implemented:
 - Managed Rigidbody / BoxCollider / SphereCollider / CapsuleCollider / Rigidbody2D / BoxCollider2D / CircleCollider2D / CapsuleCollider2D proxies over ABI v15, including Unity-familiar velocity/useGravity/isKinematic naming and CapsuleDirection2D.
 - Fixed-step rigidbody foundation runs after managed FixedUpdate so script velocity changes affect the same simulation step; sleeping bodies skip gravity/integration until velocity, impact or support changes wake them.
 - 3D gravity/linear-velocity Transform integration and 2D XY integration with kinematic/inactive bodies skipped.
-- BoxCollider/SphereCollider and BoxCollider2D/CircleCollider2D share the X-axis sweep-and-prune broad phase; rotated boxes contribute conservative world AABBs while SAT narrow phase handles OBB-OBB, sphere-sphere/circle-circle and oriented box-radial pairs with layer/collision-mask filtering and trigger separation.
+- BoxCollider/SphereCollider/CapsuleCollider and BoxCollider2D/CircleCollider2D/CapsuleCollider2D share the X-axis sweep-and-prune broad phase; rotated boxes and capsules contribute conservative world AABBs while narrow phase handles OBB-OBB, radial-radial, oriented box-radial, capsule-radial, capsule-capsule and oriented box-capsule pairs with layer/collision-mask filtering and trigger separation.
 - 3D/2D contact resolution uses inverse-mass-weighted positional correction with a tiny persistent contact slop plus normal restitution impulses and Coulomb-limited tangential friction impulses; collider friction uses geometric-mean combination and restitution uses the larger value.
 - Contact-supported Rigidbody/Rigidbody2D sleeping enters after 0.5 seconds at or below the configurable speed threshold, never sleeps unsupported bodies, wakes on externally assigned velocity/impact/support loss, and exposes managed allowSleep, sleepThreshold, Sleep(), WakeUp() and IsSleeping().
 - ContactTracker derives Enter/Stay/Exit phases for collision and trigger pairs.
 - Editor Play Mode dispatches tracked contact phases to both active managed Behaviours with side-correct contact normals.
 - Generated C# exposes Collision/Collision2D plus Collider/Collider2D callback payloads for OnCollisionEnter/Stay/Exit, OnTriggerEnter/Stay/Exit and their 2D variants.
-- Native Raycast/Raycast2D transform rays into BoxCollider/BoxCollider2D local axes for exact rotated-box hits, while still selecting the nearest box or sphere/circle result; OverlapBox/OverlapBox2D use the same OBB/radial narrow phase.
+- Native Raycast/Raycast2D transform rays into BoxCollider/BoxCollider2D local axes for exact rotated-box hits and analytically intersect capsule segment+radii, selecting the nearest box/radial/capsule result; OverlapBox/OverlapBox2D use the same OBB/radial/capsule narrow phase.
 - ABI v15 carries raycast/box-cast layer masks plus multi-hit overlap query callbacks without introducing a Scripting -> Physics dependency.
-- Generated Physics.Raycast / Physics2D.Raycast and Physics.OverlapBox / Physics2D.OverlapBoxAll resolve Box/Sphere and Box2D/Circle2D collider proxies; Physics.BoxCast / Physics2D.BoxCast keep an axis-aligned moving cast box but now test rotated BoxCollider targets.
+- Generated Physics.Raycast / Physics2D.Raycast and Physics.OverlapBox / Physics2D.OverlapBoxAll resolve Box/Sphere/Capsule and Box2D/Circle2D/Capsule2D collider proxies; Physics.BoxCast / Physics2D.BoxCast keep an axis-aligned moving cast box and currently target rotated box colliders only.
 - Native BoxCast / BoxCast2D use continuous SAT against fixed-orientation box targets to return nearest time-of-impact, oriented hit normal and cast-center position; managed casts preserve those semantics.
 - Native serialization/property tests and real managed C# property round-trip coverage.
 
 Not yet implemented:
-- Capsule runtime collision/query participation is not yet wired; production broad-phase tuning and remaining polygon-style variants also remain.
+- Production broad-phase tuning and remaining polygon-style collider variants remain; BoxCast target coverage still excludes radial/capsule shapes.
 - Production contact solving beyond the current single-contact impulse foundation, including iterative manifolds, warm starting and island-aware sleeping/wake propagation.
 - Additional shape casts and richer hit semantics/query filtering policy.
 - Physics materials and joints.

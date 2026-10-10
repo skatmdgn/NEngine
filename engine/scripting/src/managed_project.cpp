@@ -2065,7 +2065,8 @@ std::string api_stub(
             this.penetration = penetration;
             collider =
                 gameObject.GetComponent<BoxCollider>() ??
-                (Collider?)gameObject.GetComponent<SphereCollider>();
+                (Collider?)gameObject.GetComponent<SphereCollider>() ??
+                gameObject.GetComponent<CapsuleCollider>();
             rigidbody = gameObject.GetComponent<Rigidbody>();
         }
     }
@@ -2089,7 +2090,8 @@ std::string api_stub(
             this.penetration = penetration;
             collider =
                 gameObject.GetComponent<BoxCollider2D>() ??
-                (Collider2D?)gameObject.GetComponent<CircleCollider2D>();
+                (Collider2D?)gameObject.GetComponent<CircleCollider2D>() ??
+                gameObject.GetComponent<CapsuleCollider2D>();
             rigidbody = gameObject.GetComponent<Rigidbody2D>();
         }
     }
@@ -2243,7 +2245,8 @@ std::string api_stub(
             this.gameObject = gameObject;
             collider =
                 gameObject.GetComponent<BoxCollider>() ??
-                (Collider?)gameObject.GetComponent<SphereCollider>();
+                (Collider?)gameObject.GetComponent<SphereCollider>() ??
+                gameObject.GetComponent<CapsuleCollider>();
             this.point = point;
             this.normal = normal;
             this.distance = distance;
@@ -2270,7 +2273,8 @@ std::string api_stub(
             this.gameObject = gameObject;
             collider =
                 gameObject.GetComponent<BoxCollider2D>() ??
-                (Collider2D?)gameObject.GetComponent<CircleCollider2D>();
+                (Collider2D?)gameObject.GetComponent<CircleCollider2D>() ??
+                gameObject.GetComponent<CapsuleCollider2D>();
             this.point = point;
             this.normal = normal;
             this.distance = distance;
@@ -2420,7 +2424,9 @@ std::string api_stub(
                     gameObject?.GetComponent<
                         BoxCollider>() ??
                     (Collider?)gameObject?.GetComponent<
-                        SphereCollider>();
+                        SphereCollider>() ??
+                    gameObject?.GetComponent<
+                        CapsuleCollider>();
 
                 if (collider != null)
                     colliders.Add(collider);
@@ -2581,7 +2587,9 @@ std::string api_stub(
                     gameObject?.GetComponent<
                         BoxCollider2D>() ??
                     (Collider2D?)gameObject?.GetComponent<
-                        CircleCollider2D>();
+                        CircleCollider2D>() ??
+                    gameObject?.GetComponent<
+                        CapsuleCollider2D>();
 
                 if (collider != null)
                     colliders.Add(collider);
