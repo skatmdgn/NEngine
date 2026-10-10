@@ -168,7 +168,7 @@ namespace NEngine.Internal
 
     public static class NativeBridge
     {
-        public const int AbiVersion = 12;
+        public const int AbiVersion = 13;
 
         private static readonly Dictionary<long, NEngine.Behaviour> Instances = new();
         private static long _nextHandle = 1;
@@ -200,6 +200,7 @@ namespace NEngine.Internal
             public nint hasComponent;
             public nint getProperty;
             public nint setProperty;
+            public nint physicsRaycast;
         }
 
         [UnmanagedCallersOnly]
@@ -234,7 +235,8 @@ namespace NEngine.Internal
                     callbacks.getChildAt,
                     callbacks.hasComponent,
                     callbacks.getProperty,
-                    callbacks.setProperty);
+                    callbacks.setProperty,
+                    callbacks.physicsRaycast);
 
                 return 1;
             }
@@ -920,6 +922,20 @@ std::string api_stub(
         public int textLength;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativeRaycastState
+    {
+        public float ox, oy, oz;
+        public float dx, dy, dz;
+        public float maxDistance;
+        public int includeTriggers;
+        public ulong hitEntity;
+        public float px, py, pz;
+        public float nx, ny, nz;
+        public float distance;
+        public int isTrigger;
+    }
+
     internal static class NativeWorld
     {
         internal const ulong InvalidEntity = ulong.MaxValue;
@@ -974,6 +990,12 @@ std::string api_stub(
             nint propertyNameUtf8,
             ref NativePropertyValue value);
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int PhysicsRaycastFn(
+            nint context,
+            int is2D,
+            ref NativeRaycastState state);
+
         private static nint _context;
         private static CreateFn? _create;
         private static DestroyFn? _destroy;
@@ -992,6 +1014,7 @@ std::string api_stub(
         private static HasComponentFn? _hasComponent;
         private static PropertyFn? _getProperty;
         private static PropertyFn? _setProperty;
+        private static PhysicsRaycastFn? _physicsRaycast;
 
         internal static bool available =>
             _context != 0 &&
@@ -1015,7 +1038,8 @@ std::string api_stub(
             nint getChildAt,
             nint hasComponent,
             nint getProperty,
-            nint setProperty)
+            nint setProperty,
+            nint physicsRaycast)
         {
             _context = context;
             _create = Marshal.GetDelegateForFunctionPointer<CreateFn>(create);
@@ -1035,6 +1059,7 @@ std::string api_stub(
             _hasComponent = Marshal.GetDelegateForFunctionPointer<HasComponentFn>(hasComponent);
             _getProperty = Marshal.GetDelegateForFunctionPointer<PropertyFn>(getProperty);
             _setProperty = Marshal.GetDelegateForFunctionPointer<PropertyFn>(setProperty);
+            _physicsRaycast = Marshal.GetDelegateForFunctionPointer<PhysicsRaycastFn>(physicsRaycast);
         }
 
         internal static void Clear()
@@ -1057,6 +1082,7 @@ std::string api_stub(
             _hasComponent = null;
             _getProperty = null;
             _setProperty = null;
+            _physicsRaycast = null;
         }
 
         private static ulong WithUtf8Entity(
@@ -1384,6 +1410,34 @@ std::string api_stub(
                 Marshal.FreeHGlobal(
                     buffer);
             }
+        }
+
+        internal static bool TryRaycast(
+            bool is2D,
+            Vector3 origin,
+            Vector3 direction,
+            float maxDistance,
+            bool includeTriggers,
+            out NativeRaycastState state)
+        {
+            state = new NativeRaycastState
+            {
+                ox = origin.x,
+                oy = origin.y,
+                oz = origin.z,
+                dx = direction.x,
+                dy = direction.y,
+                dz = direction.z,
+                maxDistance = maxDistance,
+                includeTriggers = includeTriggers ? 1 : 0,
+                hitEntity = InvalidEntity
+            };
+
+            return _physicsRaycast?.Invoke(
+                _context,
+                is2D ? 1 : 0,
+                ref state) > 0 &&
+                state.hitEntity != InvalidEntity;
         }
 
         internal static string? NativeComponentName(Type type)
@@ -1964,6 +2018,152 @@ std::string api_stub(
             linearVelocity =
                 linearVelocity +
                 force * (1.0f / mass);
+        }
+    }
+
+    public readonly struct RaycastHit
+    {
+        public GameObject gameObject { get; }
+        public Collider? collider { get; }
+        public Vector3 point { get; }
+        public Vector3 normal { get; }
+        public float distance { get; }
+        public bool isTrigger { get; }
+
+        internal RaycastHit(
+            GameObject gameObject,
+            Vector3 point,
+            Vector3 normal,
+            float distance,
+            bool isTrigger)
+        {
+            this.gameObject = gameObject;
+            collider = gameObject.GetComponent<BoxCollider>();
+            this.point = point;
+            this.normal = normal;
+            this.distance = distance;
+            this.isTrigger = isTrigger;
+        }
+    }
+
+    public readonly struct RaycastHit2D
+    {
+        public GameObject gameObject { get; }
+        public Collider2D? collider { get; }
+        public Vector2 point { get; }
+        public Vector2 normal { get; }
+        public float distance { get; }
+        public bool isTrigger { get; }
+
+        internal RaycastHit2D(
+            GameObject gameObject,
+            Vector2 point,
+            Vector2 normal,
+            float distance,
+            bool isTrigger)
+        {
+            this.gameObject = gameObject;
+            collider = gameObject.GetComponent<BoxCollider2D>();
+            this.point = point;
+            this.normal = normal;
+            this.distance = distance;
+            this.isTrigger = isTrigger;
+        }
+    }
+
+    public static class Physics
+    {
+        public static bool Raycast(
+            Vector3 origin,
+            Vector3 direction,
+            out RaycastHit hit,
+            float maxDistance = float.MaxValue,
+            bool includeTriggers = true)
+        {
+            hit = default;
+
+            if (!NativeWorld.TryRaycast(
+                    false,
+                    origin,
+                    direction,
+                    maxDistance,
+                    includeTriggers,
+                    out NativeRaycastState state))
+            {
+                return false;
+            }
+
+            GameObject? gameObject =
+                GameObject.FromNative(
+                    state.hitEntity);
+
+            if (gameObject == null)
+                return false;
+
+            hit = new RaycastHit(
+                gameObject,
+                new Vector3(
+                    state.px,
+                    state.py,
+                    state.pz),
+                new Vector3(
+                    state.nx,
+                    state.ny,
+                    state.nz),
+                state.distance,
+                state.isTrigger != 0);
+
+            return true;
+        }
+    }
+
+    public static class Physics2D
+    {
+        public static bool Raycast(
+            Vector2 origin,
+            Vector2 direction,
+            out RaycastHit2D hit,
+            float maxDistance = float.MaxValue,
+            bool includeTriggers = true)
+        {
+            hit = default;
+
+            if (!NativeWorld.TryRaycast(
+                    true,
+                    new Vector3(
+                        origin.x,
+                        origin.y,
+                        0),
+                    new Vector3(
+                        direction.x,
+                        direction.y,
+                        0),
+                    maxDistance,
+                    includeTriggers,
+                    out NativeRaycastState state))
+            {
+                return false;
+            }
+
+            GameObject? gameObject =
+                GameObject.FromNative(
+                    state.hitEntity);
+
+            if (gameObject == null)
+                return false;
+
+            hit = new RaycastHit2D(
+                gameObject,
+                new Vector2(
+                    state.px,
+                    state.py),
+                new Vector2(
+                    state.nx,
+                    state.ny),
+                state.distance,
+                state.isTrigger != 0);
+
+            return true;
         }
     }
 

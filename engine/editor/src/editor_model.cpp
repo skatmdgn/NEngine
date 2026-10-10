@@ -69,6 +69,60 @@ void bind_managed_property_access(
         });
 }
 
+void bind_managed_physics_queries(
+    scripting::ManagedRuntime& runtime) {
+
+    runtime.bind_physics_queries(
+        nullptr,
+        [](
+            void*,
+            const core::World& world,
+            bool is_2d,
+            core::Vec3 origin,
+            core::Vec3 direction,
+            float max_distance,
+            bool include_triggers,
+            core::Entity& hit_entity,
+            core::Vec3& point,
+            core::Vec3& normal,
+            float& distance,
+            bool& is_trigger) {
+
+            std::optional<
+                physics::RaycastHit>
+                hit;
+
+            if (is_2d) {
+                hit =
+                    physics::raycast_2d(
+                        world,
+                        {origin.x, origin.y},
+                        {direction.x, direction.y},
+                        max_distance,
+                        include_triggers);
+            } else {
+                hit =
+                    physics::raycast(
+                        world,
+                        origin,
+                        direction,
+                        max_distance,
+                        include_triggers);
+            }
+
+            if (!hit) {
+                return false;
+            }
+
+            hit_entity = hit->entity;
+            point = hit->point;
+            normal = hit->normal;
+            distance = hit->distance;
+            is_trigger = hit->is_trigger;
+            return true;
+        });
+}
+
 } // namespace
 
 EditorModel::EditorModel() {
@@ -287,6 +341,9 @@ bool EditorModel::initialize_managed_runtime(
         managed_runtime_,
         property_access_);
 
+    bind_managed_physics_queries(
+        managed_runtime_);
+
     managed_script_system_.bind(
         &managed_runtime_);
 
@@ -331,6 +388,9 @@ bool EditorModel::reload_managed_runtime(
     bind_managed_property_access(
         managed_runtime_,
         property_access_);
+
+    bind_managed_physics_queries(
+        managed_runtime_);
 
     managed_script_system_.bind(
         &managed_runtime_);

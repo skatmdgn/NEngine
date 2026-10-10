@@ -100,6 +100,65 @@ struct ManagedBoxCollider2DFixture {
     nengine::core::Vec3 size{1.0f, 1.0f, 0.0f};
 };
 
+struct ManagedPhysicsQueryFixture {
+    nengine::core::Entity hit_3d{
+        nengine::core::Entity::invalid()};
+    nengine::core::Entity hit_2d{
+        nengine::core::Entity::invalid()};
+};
+
+bool read_managed_physics_query(
+    void* context,
+    const nengine::core::World& world,
+    bool is_2d,
+    nengine::core::Vec3,
+    nengine::core::Vec3,
+    float,
+    bool,
+    nengine::core::Entity& hit_entity,
+    nengine::core::Vec3& point,
+    nengine::core::Vec3& normal,
+    float& distance,
+    bool& is_trigger) {
+
+    auto* fixture =
+        static_cast<
+            ManagedPhysicsQueryFixture*>(
+                context);
+
+    if (!fixture) {
+        return false;
+    }
+
+    hit_entity =
+        is_2d
+            ? fixture->hit_2d
+            : fixture->hit_3d;
+
+    if (!world.is_alive(
+            hit_entity)) {
+        return false;
+    }
+
+    if (is_2d) {
+        point =
+            {5.0f, 6.0f, 0.0f};
+        normal =
+            {0.0f, -1.0f, 0.0f};
+        distance = 7.0f;
+        is_trigger = true;
+    } else {
+        point =
+            {1.0f, 2.0f, 3.0f};
+        normal =
+            {-1.0f, 0.0f, 0.0f};
+        distance = 4.0f;
+        is_trigger = false;
+    }
+
+    return true;
+}
+
 bool read_managed_render_property(
     void*,
     const nengine::core::World& world,
@@ -1005,6 +1064,12 @@ int main() {
             std::string::npos &&
         api.find("abstract class Collider") !=
             std::string::npos &&
+        api.find("static class Physics") !=
+            std::string::npos &&
+        api.find("static class Physics2D") !=
+            std::string::npos &&
+        api.find("RaycastHit2D") !=
+            std::string::npos &&
         api.find("readonly struct AssetGuid") !=
             std::string::npos &&
         api.find("TryParse") !=
@@ -1027,7 +1092,7 @@ int main() {
             "GetAbiVersion") !=
                 std::string::npos &&
         bridge.find(
-            "AbiVersion = 12") !=
+            "AbiVersion = 13") !=
                 std::string::npos &&
         bridge.find(
             "GameplayLoadContext") !=
@@ -1092,7 +1157,7 @@ int main() {
         bridge.find(
             "GetBehaviourEnabled") !=
                 std::string::npos,
-        "managed bridge exposes activation FixedUpdate LateUpdate native World property input and frame-clock ABI v12 entries");
+        "managed bridge exposes activation FixedUpdate LateUpdate native World property input and frame-clock ABI v13 entries");
 
     const auto runtime_config =
         read_all(
@@ -1439,6 +1504,15 @@ int main() {
                 << "    private void OnTriggerStay2D(Collider2D c) { Mark(1024, c.gameObject.name); }\n"
                 << "    private void OnTriggerExit2D(Collider2D c) { Mark(2048, c.gameObject.name); }\n"
                 << "}\n"
+                << "public class PhysicsQueryProbe : Behaviour {\n"
+                << "    private void Update() {\n"
+                << "        if (!Physics.Raycast(new Vector3(0,0,0), new Vector3(1,0,0), out RaycastHit hit, 100f, false)) throw new System.Exception(\"3d raycast missing\");\n"
+                << "        if (hit.gameObject.name != \"Physics Query 3D\" || hit.collider == null || hit.isTrigger || System.MathF.Abs(hit.distance - 4f) > 0.001f || hit.point != new Vector3(1,2,3) || hit.normal != new Vector3(-1,0,0)) throw new System.Exception(\"3d raycast mismatch\");\n"
+                << "        if (!Physics2D.Raycast(new Vector2(0,0), new Vector2(0,1), out RaycastHit2D hit2d, 100f, true)) throw new System.Exception(\"2d raycast missing\");\n"
+                << "        if (hit2d.gameObject.name != \"Physics Query 2D\" || hit2d.collider == null || !hit2d.isTrigger || System.MathF.Abs(hit2d.distance - 7f) > 0.001f || hit2d.point != new Vector2(5,6) || hit2d.normal != new Vector2(0,-1)) throw new System.Exception(\"2d raycast mismatch\");\n"
+                << "        gameObject.name = \"Physics Query Passed\";\n"
+                << "    }\n"
+                << "}\n"
                 << "public class FixedSystemProbe : Behaviour {\n"
                 << "    private void FixedUpdate() {\n"
                 << "        if (System.MathF.Abs(Time.fixedDeltaTime - 0.02f) > 0.0001f || System.MathF.Abs(Time.deltaTime - 0.02f) > 0.0001f) throw new System.Exception(\"fixed system delta mismatch\");\n"
@@ -1586,6 +1660,13 @@ int main() {
                             nullptr,
                             &read_managed_render_property,
                             &write_managed_render_property);
+
+                        ManagedPhysicsQueryFixture
+                            physics_query_fixture;
+
+                        managed_runtime.bind_physics_queries(
+                            &physics_query_fixture,
+                            &read_managed_physics_query);
 
                         check(
                             managed_runtime.instance_count() == 0,
@@ -2037,6 +2118,79 @@ int main() {
 
                         physics_event_system.clear(
                             &physics_event_world);
+
+                        ManagedScriptSystem
+                            physics_query_system;
+
+                        physics_query_system.bind(
+                            &managed_runtime);
+
+                        nengine::core::World
+                            physics_query_world;
+
+                        const auto query_script_entity =
+                            physics_query_world.create(
+                                "Physics Query Script");
+
+                        physics_query_fixture.hit_3d =
+                            physics_query_world.create(
+                                "Physics Query 3D");
+
+                        physics_query_fixture.hit_2d =
+                            physics_query_world.create(
+                                "Physics Query 2D");
+
+                        physics_query_world.add_component<
+                            ManagedBoxColliderFixture>(
+                                physics_query_fixture.hit_3d,
+                                nengine::core::ComponentRegistry::stable_id(
+                                    "NEngine.BoxCollider"));
+
+                        auto* query_box_2d =
+                            physics_query_world.add_component<
+                                ManagedBoxCollider2DFixture>(
+                                    physics_query_fixture.hit_2d,
+                                    nengine::core::ComponentRegistry::stable_id(
+                                        "NEngine.BoxCollider2D"));
+
+                        if (query_box_2d) {
+                            query_box_2d->is_trigger =
+                                true;
+                        }
+
+                        auto* query_script =
+                            physics_query_world.add_component<
+                                ScriptBehaviour>(
+                                    query_script_entity,
+                                    script_behaviour_type());
+
+                        if (query_script) {
+                            query_script->type_name =
+                                "PhysicsQueryProbe";
+                        }
+
+                        std::string physics_query_error;
+
+                        const auto physics_query_tick =
+                            physics_query_system.update(
+                                physics_query_world,
+                                1.0f / 60.0f,
+                                &physics_query_error);
+
+                        check(
+                            query_script &&
+                            physics_query_tick.created == 1u &&
+                            physics_query_tick.started == 1u &&
+                            physics_query_tick.updated == 1u &&
+                            physics_query_tick.unresolved == 0u &&
+                            physics_query_error.empty() &&
+                            physics_query_world.name(
+                                query_script_entity) ==
+                                "Physics Query Passed",
+                            "managed Physics.Raycast and Physics2D.Raycast consume injected native query callbacks");
+
+                        physics_query_system.clear(
+                            &physics_query_world);
 
                         ManagedScriptSystem
                             fixed_system;

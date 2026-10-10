@@ -759,6 +759,22 @@ void ManagedRuntime::bind_property_access(
         write;
 }
 
+void ManagedRuntime::bind_physics_queries(
+    void* context,
+    PhysicsRaycastQueryFn raycast) noexcept {
+
+    if (!world_context_) {
+        world_context_ =
+            std::make_unique<
+                NativeWorldContext>();
+    }
+
+    world_context_->physics_context =
+        context;
+    world_context_->physics_raycast =
+        raycast;
+}
+
 void ManagedRuntime::bind_world(
     core::World* world) noexcept {
 
@@ -856,6 +872,73 @@ void ManagedRuntime::bind_input(
     world_context_->input =
         input_state;
 }
+
+int ManagedRuntime::callback_physics_raycast(
+    void* context,
+    int is_2d,
+    NativeRaycastState* state) {
+
+    auto* native =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!native ||
+        !native->world ||
+        !native->physics_raycast ||
+        !state) {
+        return -1;
+    }
+
+    core::Entity hit =
+        core::Entity::invalid();
+    core::Vec3 point{};
+    core::Vec3 normal{};
+    float distance = 0.0f;
+    bool trigger = false;
+
+    const bool found =
+        native->physics_raycast(
+            native->physics_context,
+            *native->world,
+            is_2d != 0,
+            {
+                state->ox,
+                state->oy,
+                state->oz
+            },
+            {
+                state->dx,
+                state->dy,
+                state->dz
+            },
+            state->max_distance,
+            state->include_triggers != 0,
+            hit,
+            point,
+            normal,
+            distance,
+            trigger);
+
+    if (!found) {
+        state->hit_entity =
+            core::Entity::invalid_value;
+        return 0;
+    }
+
+    state->hit_entity = hit.value;
+    state->px = point.x;
+    state->py = point.y;
+    state->pz = point.z;
+    state->nx = normal.x;
+    state->ny = normal.y;
+    state->nz = normal.z;
+    state->distance = distance;
+    state->is_trigger =
+        trigger ? 1 : 0;
+
+    return 1;
+}
+
 
 int ManagedRuntime::callback_input_held(
     void* context,
@@ -1302,9 +1385,9 @@ bool ManagedRuntime::initialize(
     const int abi_version =
         abi();
 
-    if (abi_version != 12) {
+    if (abi_version != 13) {
         diagnostic_ =
-            "managed bridge ABI mismatch: expected 12, got " +
+            "managed bridge ABI mismatch: expected 13, got " +
             std::to_string(
                 abi_version);
         shutdown();
@@ -1521,7 +1604,7 @@ bool ManagedRuntime::initialize(
         !count_) {
 
         diagnostic_ =
-            "managed bridge is missing one or more ABI v12 entry points";
+            "managed bridge is missing one or more ABI v13 entry points";
         shutdown();
         return false;
     }
@@ -1569,6 +1652,8 @@ bool ManagedRuntime::initialize(
         &ManagedRuntime::callback_get_property;
     callbacks.set_property =
         &ManagedRuntime::callback_set_property;
+    callbacks.physics_raycast =
+        &ManagedRuntime::callback_physics_raycast;
 
     if (configure_world_callbacks_(
             &callbacks) <= 0) {
@@ -1628,7 +1713,7 @@ bool ManagedRuntime::initialize(
     }
 
     diagnostic_ =
-        "managed gameplay runtime initialized; ABI v12 activation lifecycle native World lifetime input and coroutine callbacks ready";
+        "managed gameplay runtime initialized; ABI v13 activation lifecycle native World lifetime input and coroutine callbacks ready";
 
     return true;
 }
@@ -2254,6 +2339,10 @@ void ManagedRuntime::shutdown() noexcept {
         world_context_->world =
             nullptr;
         world_context_->input =
+            nullptr;
+        world_context_->physics_context =
+            nullptr;
+        world_context_->physics_raycast =
             nullptr;
     }
 

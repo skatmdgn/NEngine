@@ -149,10 +149,29 @@ public:
             std::string_view,
             const core::PropertyValue&);
 
+    using PhysicsRaycastQueryFn =
+        bool (*)(
+            void*,
+            const core::World&,
+            bool,
+            core::Vec3,
+            core::Vec3,
+            float,
+            bool,
+            core::Entity&,
+            core::Vec3&,
+            core::Vec3&,
+            float&,
+            bool&);
+
     void bind_property_access(
         void* context,
         PropertyReadFn read,
         PropertyWriteFn write) noexcept;
+
+    void bind_physics_queries(
+        void* context,
+        PhysicsRaycastQueryFn raycast) noexcept;
 
     void bind_world(
         core::World* world) noexcept;
@@ -301,6 +320,8 @@ private:
         void* property_context{nullptr};
         PropertyReadFn property_read{nullptr};
         PropertyWriteFn property_write{nullptr};
+        void* physics_context{nullptr};
+        PhysicsRaycastQueryFn physics_raycast{nullptr};
         std::vector<core::Entity> pending_destroy{};
     };
 
@@ -317,6 +338,27 @@ private:
         char* text_buffer{nullptr};
         std::int32_t text_capacity{0};
         std::int32_t text_length{0};
+    };
+
+    struct NativeRaycastState {
+        float ox{0.0f};
+        float oy{0.0f};
+        float oz{0.0f};
+        float dx{0.0f};
+        float dy{0.0f};
+        float dz{0.0f};
+        float max_distance{0.0f};
+        std::int32_t include_triggers{1};
+        std::uint64_t hit_entity{
+            core::Entity::invalid_value};
+        float px{0.0f};
+        float py{0.0f};
+        float pz{0.0f};
+        float nx{0.0f};
+        float ny{0.0f};
+        float nz{0.0f};
+        float distance{0.0f};
+        std::int32_t is_trigger{0};
     };
 
     using WorldCreateFn =
@@ -405,6 +447,12 @@ private:
             const char*,
             NativePropertyValue*);
 
+    using WorldPhysicsRaycastFn =
+        int (*)(
+            void*,
+            int,
+            NativeRaycastState*);
+
     struct NativeWorldCallbacks {
         void* context{nullptr};
         WorldCreateFn create{nullptr};
@@ -424,6 +472,7 @@ private:
         WorldHasComponentFn has_component{nullptr};
         WorldPropertyFn get_property{nullptr};
         WorldPropertyFn set_property{nullptr};
+        WorldPhysicsRaycastFn physics_raycast{nullptr};
     };
 
     using ConfigureWorldCallbacksFn =
@@ -512,6 +561,11 @@ private:
         const char* type_name,
         const char* property_name,
         NativePropertyValue* value);
+
+    static int callback_physics_raycast(
+        void* context,
+        int is_2d,
+        NativeRaycastState* state);
 
     using InputKeyFn =
         int (*)(
