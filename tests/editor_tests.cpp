@@ -1786,6 +1786,18 @@ int main() {
             0.034) == 2u,
         "playing PlaySession converts host time into bounded 60 Hz fixed steps");
 
+    check(
+        model.play_session().consume_simulation_steps(
+            0.008) == 0u &&
+        model.play_session().consume_simulation_steps(
+            0.009) == 1u,
+        "playing PlaySession retains sub-step host time until one fixed step accumulates");
+
+    check(
+        model.play_session().consume_simulation_steps(
+            1.0) == 8u,
+        "playing PlaySession clamps long host stalls to the fixed-step catch-up budget");
+
     const auto runtime_inspector = editor::build_inspector(model);
     check(runtime_inspector.name == "Runtime Only", "inspector presents runtime world while playing");
 
