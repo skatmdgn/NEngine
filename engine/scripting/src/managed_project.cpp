@@ -513,6 +513,148 @@ namespace NEngine.Internal
         public static int InvokeLateUpdate(long handle) =>
             Invoke(handle, "LateUpdate");
 
+        private static int InvokePhysics(
+            long handle,
+            ulong otherEntityId,
+            int phase,
+            int isTrigger,
+            int is2D,
+            float nx,
+            float ny,
+            float nz,
+            float penetration)
+        {
+            if (!Instances.TryGetValue(handle, out var instance))
+                return -1;
+
+            if (!instance.enabled)
+                return 0;
+
+            GameObject? other =
+                GameObject.FromNative(otherEntityId);
+
+            if (other == null)
+                return 0;
+
+            string suffix =
+                phase switch
+                {
+                    0 => "Enter",
+                    1 => "Stay",
+                    2 => "Exit",
+                    _ => string.Empty
+                };
+
+            if (suffix.Length == 0)
+                return -1;
+
+            string methodName;
+
+            object argument;
+            Type parameterType;
+
+            if (is2D != 0)
+            {
+                if (isTrigger != 0)
+                {
+                    methodName = "OnTrigger" + suffix + "2D";
+                    argument =
+                        (object?)other.GetComponent<BoxCollider2D>() ??
+                        new Collision2D(
+                            other,
+                            new Vector2(nx, ny),
+                            penetration);
+                    parameterType =
+                        argument is Collider2D
+                            ? typeof(Collider2D)
+                            : typeof(Collision2D);
+                }
+                else
+                {
+                    methodName = "OnCollision" + suffix + "2D";
+                    argument = new Collision2D(
+                        other,
+                        new Vector2(nx, ny),
+                        penetration);
+                    parameterType = typeof(Collision2D);
+                }
+            }
+            else
+            {
+                if (isTrigger != 0)
+                {
+                    methodName = "OnTrigger" + suffix;
+                    argument =
+                        (object?)other.GetComponent<BoxCollider>() ??
+                        new Collision(
+                            other,
+                            new Vector3(nx, ny, nz),
+                            penetration);
+                    parameterType =
+                        argument is Collider
+                            ? typeof(Collider)
+                            : typeof(Collision);
+                }
+                else
+                {
+                    methodName = "OnCollision" + suffix;
+                    argument = new Collision(
+                        other,
+                        new Vector3(nx, ny, nz),
+                        penetration);
+                    parameterType = typeof(Collision);
+                }
+            }
+
+            try
+            {
+                MethodInfo? method =
+                    instance.GetType().GetMethod(
+                        methodName,
+                        BindingFlags.Instance |
+                        BindingFlags.Public |
+                        BindingFlags.NonPublic,
+                        binder: null,
+                        types: new[] { parameterType },
+                        modifiers: null);
+
+                if (method == null)
+                    return 0;
+
+                method.Invoke(
+                    instance,
+                    new[] { argument });
+
+                return 1;
+            }
+            catch
+            {
+                return -2;
+            }
+        }
+
+        [UnmanagedCallersOnly]
+        public static int InvokePhysicsEvent(
+            long handle,
+            ulong otherEntityId,
+            int phase,
+            int isTrigger,
+            int is2D,
+            float nx,
+            float ny,
+            float nz,
+            float penetration) =>
+            InvokePhysics(
+                handle,
+                otherEntityId,
+                phase,
+                isTrigger,
+                is2D,
+                nx,
+                ny,
+                nz,
+                penetration);
+
         [UnmanagedCallersOnly]
         public static int SetBehaviourEnabled(
             long handle,
@@ -1678,6 +1820,50 @@ std::string api_stub(
         }
     }
 
+    public sealed class Collision
+    {
+        public GameObject gameObject { get; }
+        public Transform transform => gameObject.transform;
+        public Collider? collider { get; }
+        public Rigidbody? rigidbody { get; }
+        public Vector3 normal { get; }
+        public float penetration { get; }
+
+        internal Collision(
+            GameObject gameObject,
+            Vector3 normal,
+            float penetration)
+        {
+            this.gameObject = gameObject;
+            this.normal = normal;
+            this.penetration = penetration;
+            collider = gameObject.GetComponent<BoxCollider>();
+            rigidbody = gameObject.GetComponent<Rigidbody>();
+        }
+    }
+
+    public sealed class Collision2D
+    {
+        public GameObject gameObject { get; }
+        public Transform transform => gameObject.transform;
+        public Collider2D? collider { get; }
+        public Rigidbody2D? rigidbody { get; }
+        public Vector2 normal { get; }
+        public float penetration { get; }
+
+        internal Collision2D(
+            GameObject gameObject,
+            Vector2 normal,
+            float penetration)
+        {
+            this.gameObject = gameObject;
+            this.normal = normal;
+            this.penetration = penetration;
+            collider = gameObject.GetComponent<BoxCollider2D>();
+            rigidbody = gameObject.GetComponent<Rigidbody2D>();
+        }
+    }
+
     public abstract class Behaviour : Component
     {
         private readonly List<Coroutine> _coroutines = new();
@@ -1781,15 +1967,21 @@ std::string api_stub(
         }
     }
 
-    public sealed class BoxCollider : Component
+    public abstract class Collider : Component
     {
-        public bool enabled
+        public abstract bool enabled { get; set; }
+        public abstract bool isTrigger { get; set; }
+    }
+
+    public sealed class BoxCollider : Collider
+    {
+        public override bool enabled
         {
             get => NativeBool("Enabled", true);
             set => SetNativeBool("Enabled", value);
         }
 
-        public bool isTrigger
+        public override bool isTrigger
         {
             get => NativeBool("Is Trigger", false);
             set => SetNativeBool("Is Trigger", value);
@@ -1880,15 +2072,21 @@ std::string api_stub(
         }
     }
 
-    public sealed class BoxCollider2D : Component
+    public abstract class Collider2D : Component
     {
-        public bool enabled
+        public abstract bool enabled { get; set; }
+        public abstract bool isTrigger { get; set; }
+    }
+
+    public sealed class BoxCollider2D : Collider2D
+    {
+        public override bool enabled
         {
             get => NativeBool("Enabled", true);
             set => SetNativeBool("Enabled", value);
         }
 
-        public bool isTrigger
+        public override bool isTrigger
         {
             get => NativeBool("Is Trigger", false);
             set => SetNativeBool("Is Trigger", value);
