@@ -262,6 +262,87 @@ std::size_t read_managed_overlap_query(
     return count;
 }
 
+bool read_managed_box_cast_query(
+    void* context,
+    const nengine::core::World& world,
+    bool is_2d,
+    nengine::core::Vec3 origin,
+    nengine::core::Vec3 size,
+    nengine::core::Vec3 direction,
+    float max_distance,
+    bool include_triggers,
+    std::uint32_t layer_mask,
+    nengine::core::Entity& hit_entity,
+    nengine::core::Vec3& point,
+    nengine::core::Vec3& normal,
+    float& distance,
+    bool& is_trigger) {
+
+    auto* fixture =
+        static_cast<
+            ManagedPhysicsQueryFixture*>(
+                context);
+
+    if (!fixture) {
+        return false;
+    }
+
+    constexpr float epsilon = 0.0001f;
+
+    if (is_2d) {
+        if ((layer_mask & (1u << 7u)) == 0u ||
+            !include_triggers ||
+            std::abs(origin.x) > epsilon ||
+            std::abs(origin.y - 10.0f) > epsilon ||
+            std::abs(size.x - 4.0f) > epsilon ||
+            std::abs(size.y - 2.0f) > epsilon ||
+            std::abs(direction.x) > epsilon ||
+            std::abs(direction.y + 1.0f) > epsilon ||
+            std::abs(max_distance - 15.0f) > epsilon) {
+            return false;
+        }
+
+        hit_entity = fixture->hit_2d;
+
+        if (!world.is_alive(hit_entity)) {
+            return false;
+        }
+
+        point = {0.0f, 7.0f, 0.0f};
+        normal = {0.0f, 1.0f, 0.0f};
+        distance = 3.0f;
+        is_trigger = true;
+        return true;
+    }
+
+    if ((layer_mask & (1u << 3u)) == 0u ||
+        include_triggers ||
+        std::abs(origin.x - 10.0f) > epsilon ||
+        std::abs(origin.y) > epsilon ||
+        std::abs(origin.z) > epsilon ||
+        std::abs(size.x - 2.0f) > epsilon ||
+        std::abs(size.y - 4.0f) > epsilon ||
+        std::abs(size.z - 6.0f) > epsilon ||
+        std::abs(direction.x + 1.0f) > epsilon ||
+        std::abs(direction.y) > epsilon ||
+        std::abs(direction.z) > epsilon ||
+        std::abs(max_distance - 20.0f) > epsilon) {
+        return false;
+    }
+
+    hit_entity = fixture->hit_3d;
+
+    if (!world.is_alive(hit_entity)) {
+        return false;
+    }
+
+    point = {8.0f, 0.0f, 0.0f};
+    normal = {1.0f, 0.0f, 0.0f};
+    distance = 2.0f;
+    is_trigger = false;
+    return true;
+}
+
 bool read_managed_render_property(
     void*,
     const nengine::core::World& world,
@@ -1380,6 +1461,8 @@ int main() {
             std::string::npos &&
         api.find("RaycastHit2D") !=
             std::string::npos &&
+        api.find("public static bool BoxCast(") !=
+            std::string::npos &&
         api.find("readonly struct AssetGuid") !=
             std::string::npos &&
         api.find("TryParse") !=
@@ -1402,7 +1485,7 @@ int main() {
             "GetAbiVersion") !=
                 std::string::npos &&
         bridge.find(
-            "AbiVersion = 14") !=
+            "AbiVersion = 15") !=
                 std::string::npos &&
         bridge.find(
             "GameplayLoadContext") !=
@@ -1467,7 +1550,7 @@ int main() {
         bridge.find(
             "GetBehaviourEnabled") !=
                 std::string::npos,
-        "managed bridge exposes activation FixedUpdate LateUpdate native World property input and frame-clock ABI v14 entries");
+        "managed bridge exposes activation FixedUpdate LateUpdate native World property input physics-query and frame-clock ABI v15 entries");
 
     const auto runtime_config =
         read_all(
@@ -1827,6 +1910,10 @@ int main() {
                 << "        if (overlaps.Length != 2 || overlaps[0].gameObject.name != \"Physics Query 3D\" || overlaps[0].layer != 3 || overlaps[1].gameObject.name != \"Physics Query 3D Extra\" || overlaps[1].layer != 5) throw new System.Exception(\"3d overlap mismatch\");\n"
                 << "        Collider2D[] overlaps2d = Physics2D.OverlapBoxAll(new Vector2(0,0), new Vector2(2,2), true, 1u << 7);\n"
                 << "        if (overlaps2d.Length != 1 || overlaps2d[0].gameObject.name != \"Physics Query 2D\" || overlaps2d[0].layer != 7 || !overlaps2d[0].isTrigger) throw new System.Exception(\"2d overlap mismatch\");\n"
+                << "        if (!Physics.BoxCast(new Vector3(10,0,0), new Vector3(1,2,3), new Vector3(-1,0,0), out RaycastHit cast, 20f, false, 1u << 3)) throw new System.Exception(\"3d box cast missing\");\n"
+                << "        if (cast.gameObject.name != \"Physics Query 3D\" || cast.collider == null || cast.isTrigger || System.MathF.Abs(cast.distance - 2f) > 0.001f || System.MathF.Abs(cast.point.x - 8f) > 0.001f || System.MathF.Abs(cast.normal.x - 1f) > 0.001f) throw new System.Exception(\"3d box cast mismatch\");\n"
+                << "        if (!Physics2D.BoxCast(new Vector2(0,10), new Vector2(4,2), new Vector2(0,-1), out RaycastHit2D cast2d, 15f, true, 1u << 7)) throw new System.Exception(\"2d box cast missing\");\n"
+                << "        if (cast2d.gameObject.name != \"Physics Query 2D\" || cast2d.collider == null || !cast2d.isTrigger || System.MathF.Abs(cast2d.distance - 3f) > 0.001f || System.MathF.Abs(cast2d.point.y - 7f) > 0.001f || System.MathF.Abs(cast2d.normal.y - 1f) > 0.001f) throw new System.Exception(\"2d box cast mismatch\");\n"
                 << "        gameObject.name = \"Physics Query Passed\";\n"
                 << "    }\n"
                 << "}\n"
@@ -1984,7 +2071,8 @@ int main() {
                         managed_runtime.bind_physics_queries(
                             &physics_query_fixture,
                             &read_managed_physics_query,
-                            &read_managed_overlap_query);
+                            &read_managed_overlap_query,
+                            &read_managed_box_cast_query);
 
                         check(
                             managed_runtime.instance_count() == 0,
@@ -2586,7 +2674,7 @@ int main() {
                             physics_query_world.name(
                                 query_script_entity) ==
                                 "Physics Query Passed",
-                            "managed raycast layer masks and 3D/2D overlap arrays consume ABI v14 native query callbacks");
+                            "managed raycast overlap and 3D/2D BoxCast queries consume ABI v15 native query callbacks");
 
                         physics_query_system.clear(
                             &physics_query_world);

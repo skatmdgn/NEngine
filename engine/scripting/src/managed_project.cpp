@@ -168,7 +168,7 @@ namespace NEngine.Internal
 
     public static class NativeBridge
     {
-        public const int AbiVersion = 14;
+        public const int AbiVersion = 15;
 
         private static readonly Dictionary<long, NEngine.Behaviour> Instances = new();
         private static long _nextHandle = 1;
@@ -202,6 +202,7 @@ namespace NEngine.Internal
             public nint setProperty;
             public nint physicsRaycast;
             public nint physicsOverlap;
+            public nint physicsBoxCast;
         }
 
         [UnmanagedCallersOnly]
@@ -238,7 +239,8 @@ namespace NEngine.Internal
                     callbacks.getProperty,
                     callbacks.setProperty,
                     callbacks.physicsRaycast,
-                    callbacks.physicsOverlap);
+                    callbacks.physicsOverlap,
+                    callbacks.physicsBoxCast);
 
                 return 1;
             }
@@ -939,6 +941,22 @@ std::string api_stub(
         public int isTrigger;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativeBoxCastState
+    {
+        public float ox, oy, oz;
+        public float sx, sy, sz;
+        public float dx, dy, dz;
+        public float maxDistance;
+        public int includeTriggers;
+        public uint layerMask;
+        public ulong hitEntity;
+        public float px, py, pz;
+        public float nx, ny, nz;
+        public float distance;
+        public int isTrigger;
+    }
+
     internal static class NativeWorld
     {
         internal const ulong InvalidEntity = ulong.MaxValue;
@@ -1000,6 +1018,12 @@ std::string api_stub(
             ref NativeRaycastState state);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int PhysicsBoxCastFn(
+            nint context,
+            int is2D,
+            ref NativeBoxCastState state);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate int PhysicsOverlapFn(
             nint context,
             int is2D,
@@ -1034,6 +1058,7 @@ std::string api_stub(
         private static PropertyFn? _setProperty;
         private static PhysicsRaycastFn? _physicsRaycast;
         private static PhysicsOverlapFn? _physicsOverlap;
+        private static PhysicsBoxCastFn? _physicsBoxCast;
 
         internal static bool available =>
             _context != 0 &&
@@ -1059,7 +1084,8 @@ std::string api_stub(
             nint getProperty,
             nint setProperty,
             nint physicsRaycast,
-            nint physicsOverlap)
+            nint physicsOverlap,
+            nint physicsBoxCast)
         {
             _context = context;
             _create = Marshal.GetDelegateForFunctionPointer<CreateFn>(create);
@@ -1081,6 +1107,7 @@ std::string api_stub(
             _setProperty = Marshal.GetDelegateForFunctionPointer<PropertyFn>(setProperty);
             _physicsRaycast = Marshal.GetDelegateForFunctionPointer<PhysicsRaycastFn>(physicsRaycast);
             _physicsOverlap = Marshal.GetDelegateForFunctionPointer<PhysicsOverlapFn>(physicsOverlap);
+            _physicsBoxCast = Marshal.GetDelegateForFunctionPointer<PhysicsBoxCastFn>(physicsBoxCast);
         }
 
         internal static void Clear()
@@ -1105,6 +1132,7 @@ std::string api_stub(
             _setProperty = null;
             _physicsRaycast = null;
             _physicsOverlap = null;
+            _physicsBoxCast = null;
         }
 
         private static ulong WithUtf8Entity(
@@ -1458,6 +1486,40 @@ std::string api_stub(
             };
 
             return _physicsRaycast?.Invoke(
+                _context,
+                is2D ? 1 : 0,
+                ref state) > 0 &&
+                state.hitEntity != InvalidEntity;
+        }
+
+        internal static bool TryBoxCast(
+            bool is2D,
+            Vector3 origin,
+            Vector3 size,
+            Vector3 direction,
+            float maxDistance,
+            bool includeTriggers,
+            out NativeBoxCastState state,
+            uint layerMask = 0xffffffffu)
+        {
+            state = new NativeBoxCastState
+            {
+                ox = origin.x,
+                oy = origin.y,
+                oz = origin.z,
+                sx = size.x,
+                sy = size.y,
+                sz = size.z,
+                dx = direction.x,
+                dy = direction.y,
+                dz = direction.z,
+                maxDistance = maxDistance,
+                includeTriggers = includeTriggers ? 1 : 0,
+                layerMask = layerMask,
+                hitEntity = InvalidEntity
+            };
+
+            return _physicsBoxCast?.Invoke(
                 _context,
                 is2D ? 1 : 0,
                 ref state) > 0 &&
@@ -2224,6 +2286,63 @@ std::string api_stub(
             return true;
         }
 
+        public static bool BoxCast(
+            Vector3 center,
+            Vector3 halfExtents,
+            Vector3 direction,
+            out RaycastHit hit,
+            float maxDistance = float.MaxValue,
+            bool includeTriggers = true,
+            uint layerMask = 0xffffffffu)
+        {
+            hit = default;
+
+            if (halfExtents.x <= 0 ||
+                halfExtents.y <= 0 ||
+                halfExtents.z <= 0)
+            {
+                return false;
+            }
+
+            if (!NativeWorld.TryBoxCast(
+                    false,
+                    center,
+                    new Vector3(
+                        halfExtents.x * 2,
+                        halfExtents.y * 2,
+                        halfExtents.z * 2),
+                    direction,
+                    maxDistance,
+                    includeTriggers,
+                    out NativeBoxCastState state,
+                    layerMask))
+            {
+                return false;
+            }
+
+            GameObject? gameObject =
+                GameObject.FromNative(
+                    state.hitEntity);
+
+            if (gameObject == null)
+                return false;
+
+            hit = new RaycastHit(
+                gameObject,
+                new Vector3(
+                    state.px,
+                    state.py,
+                    state.pz),
+                new Vector3(
+                    state.nx,
+                    state.ny,
+                    state.nz),
+                state.distance,
+                state.isTrigger != 0);
+
+            return true;
+        }
+
         public static Collider[] OverlapBox(
             Vector3 center,
             Vector3 halfExtents,
@@ -2295,6 +2414,66 @@ std::string api_stub(
                     maxDistance,
                     includeTriggers,
                     out NativeRaycastState state,
+                    layerMask))
+            {
+                return false;
+            }
+
+            GameObject? gameObject =
+                GameObject.FromNative(
+                    state.hitEntity);
+
+            if (gameObject == null)
+                return false;
+
+            hit = new RaycastHit2D(
+                gameObject,
+                new Vector2(
+                    state.px,
+                    state.py),
+                new Vector2(
+                    state.nx,
+                    state.ny),
+                state.distance,
+                state.isTrigger != 0);
+
+            return true;
+        }
+
+        public static bool BoxCast(
+            Vector2 origin,
+            Vector2 size,
+            Vector2 direction,
+            out RaycastHit2D hit,
+            float maxDistance = float.MaxValue,
+            bool includeTriggers = true,
+            uint layerMask = 0xffffffffu)
+        {
+            hit = default;
+
+            if (size.x <= 0 ||
+                size.y <= 0)
+            {
+                return false;
+            }
+
+            if (!NativeWorld.TryBoxCast(
+                    true,
+                    new Vector3(
+                        origin.x,
+                        origin.y,
+                        0),
+                    new Vector3(
+                        size.x,
+                        size.y,
+                        0),
+                    new Vector3(
+                        direction.x,
+                        direction.y,
+                        0),
+                    maxDistance,
+                    includeTriggers,
+                    out NativeBoxCastState state,
                     layerMask))
             {
                 return false;

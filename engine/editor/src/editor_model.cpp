@@ -170,6 +170,59 @@ void bind_managed_physics_queries(
             }
 
             return hits.size();
+        },
+        [](
+            void*,
+            const core::World& world,
+            bool is_2d,
+            core::Vec3 origin,
+            core::Vec3 size,
+            core::Vec3 direction,
+            float max_distance,
+            bool include_triggers,
+            std::uint32_t layer_mask,
+            core::Entity& hit_entity,
+            core::Vec3& point,
+            core::Vec3& normal,
+            float& distance,
+            bool& is_trigger) {
+
+            std::optional<
+                physics::RaycastHit>
+                hit;
+
+            if (is_2d) {
+                hit =
+                    physics::box_cast_2d(
+                        world,
+                        {origin.x, origin.y},
+                        {size.x, size.y},
+                        {direction.x, direction.y},
+                        max_distance,
+                        include_triggers,
+                        layer_mask);
+            } else {
+                hit =
+                    physics::box_cast(
+                        world,
+                        origin,
+                        size,
+                        direction,
+                        max_distance,
+                        include_triggers,
+                        layer_mask);
+            }
+
+            if (!hit) {
+                return false;
+            }
+
+            hit_entity = hit->entity;
+            point = hit->point;
+            normal = hit->normal;
+            distance = hit->distance;
+            is_trigger = hit->is_trigger;
+            return true;
         });
 }
 

@@ -762,7 +762,8 @@ void ManagedRuntime::bind_property_access(
 void ManagedRuntime::bind_physics_queries(
     void* context,
     PhysicsRaycastQueryFn raycast,
-    PhysicsOverlapQueryFn overlap) noexcept {
+    PhysicsOverlapQueryFn overlap,
+    PhysicsBoxCastQueryFn box_cast) noexcept {
 
     if (!world_context_) {
         world_context_ =
@@ -776,6 +777,8 @@ void ManagedRuntime::bind_physics_queries(
         raycast;
     world_context_->physics_overlap =
         overlap;
+    world_context_->physics_box_cast =
+        box_cast;
 }
 
 void ManagedRuntime::bind_world(
@@ -1000,6 +1003,78 @@ int ManagedRuntime::callback_physics_overlap(
         total);
 }
 
+
+int ManagedRuntime::callback_physics_box_cast(
+    void* context,
+    int is_2d,
+    NativeBoxCastState* state) {
+
+    auto* native =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!native ||
+        !native->world ||
+        !native->physics_box_cast ||
+        !state) {
+        return -1;
+    }
+
+    core::Entity hit =
+        core::Entity::invalid();
+    core::Vec3 point{};
+    core::Vec3 normal{};
+    float distance = 0.0f;
+    bool trigger = false;
+
+    const bool found =
+        native->physics_box_cast(
+            native->physics_context,
+            *native->world,
+            is_2d != 0,
+            {
+                state->ox,
+                state->oy,
+                state->oz
+            },
+            {
+                state->sx,
+                state->sy,
+                state->sz
+            },
+            {
+                state->dx,
+                state->dy,
+                state->dz
+            },
+            state->max_distance,
+            state->include_triggers != 0,
+            state->layer_mask,
+            hit,
+            point,
+            normal,
+            distance,
+            trigger);
+
+    if (!found) {
+        state->hit_entity =
+            core::Entity::invalid_value;
+        return 0;
+    }
+
+    state->hit_entity = hit.value;
+    state->px = point.x;
+    state->py = point.y;
+    state->pz = point.z;
+    state->nx = normal.x;
+    state->ny = normal.y;
+    state->nz = normal.z;
+    state->distance = distance;
+    state->is_trigger =
+        trigger ? 1 : 0;
+
+    return 1;
+}
 
 int ManagedRuntime::callback_input_held(
     void* context,
@@ -1446,9 +1521,9 @@ bool ManagedRuntime::initialize(
     const int abi_version =
         abi();
 
-    if (abi_version != 14) {
+    if (abi_version != 15) {
         diagnostic_ =
-            "managed bridge ABI mismatch: expected 14, got " +
+            "managed bridge ABI mismatch: expected 15, got " +
             std::to_string(
                 abi_version);
         shutdown();
@@ -1717,6 +1792,8 @@ bool ManagedRuntime::initialize(
         &ManagedRuntime::callback_physics_raycast;
     callbacks.physics_overlap =
         &ManagedRuntime::callback_physics_overlap;
+    callbacks.physics_box_cast =
+        &ManagedRuntime::callback_physics_box_cast;
 
     if (configure_world_callbacks_(
             &callbacks) <= 0) {
@@ -2408,6 +2485,8 @@ void ManagedRuntime::shutdown() noexcept {
         world_context_->physics_raycast =
             nullptr;
         world_context_->physics_overlap =
+            nullptr;
+        world_context_->physics_box_cast =
             nullptr;
     }
 

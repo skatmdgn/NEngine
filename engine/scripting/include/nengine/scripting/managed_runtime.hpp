@@ -165,6 +165,23 @@ public:
             float&,
             bool&);
 
+    using PhysicsBoxCastQueryFn =
+        bool (*)(
+            void*,
+            const core::World&,
+            bool,
+            core::Vec3,
+            core::Vec3,
+            core::Vec3,
+            float,
+            bool,
+            std::uint32_t,
+            core::Entity&,
+            core::Vec3&,
+            core::Vec3&,
+            float&,
+            bool&);
+
     using PhysicsOverlapQueryFn =
         std::size_t (*)(
             void*,
@@ -185,7 +202,8 @@ public:
     void bind_physics_queries(
         void* context,
         PhysicsRaycastQueryFn raycast,
-        PhysicsOverlapQueryFn overlap) noexcept;
+        PhysicsOverlapQueryFn overlap,
+        PhysicsBoxCastQueryFn box_cast) noexcept;
 
     void bind_world(
         core::World* world) noexcept;
@@ -337,6 +355,7 @@ private:
         void* physics_context{nullptr};
         PhysicsRaycastQueryFn physics_raycast{nullptr};
         PhysicsOverlapQueryFn physics_overlap{nullptr};
+        PhysicsBoxCastQueryFn physics_box_cast{nullptr};
         std::vector<core::Entity> pending_destroy{};
     };
 
@@ -359,6 +378,31 @@ private:
         float ox{0.0f};
         float oy{0.0f};
         float oz{0.0f};
+        float dx{0.0f};
+        float dy{0.0f};
+        float dz{0.0f};
+        float max_distance{0.0f};
+        std::int32_t include_triggers{1};
+        std::uint32_t layer_mask{0xffffffffu};
+        std::uint64_t hit_entity{
+            core::Entity::invalid_value};
+        float px{0.0f};
+        float py{0.0f};
+        float pz{0.0f};
+        float nx{0.0f};
+        float ny{0.0f};
+        float nz{0.0f};
+        float distance{0.0f};
+        std::int32_t is_trigger{0};
+    };
+
+    struct NativeBoxCastState {
+        float ox{0.0f};
+        float oy{0.0f};
+        float oz{0.0f};
+        float sx{0.0f};
+        float sy{0.0f};
+        float sz{0.0f};
         float dx{0.0f};
         float dy{0.0f};
         float dz{0.0f};
@@ -484,6 +528,12 @@ private:
             std::uint64_t*,
             int);
 
+    using WorldPhysicsBoxCastFn =
+        int (*)(
+            void*,
+            int,
+            NativeBoxCastState*);
+
     struct NativeWorldCallbacks {
         void* context{nullptr};
         WorldCreateFn create{nullptr};
@@ -505,6 +555,7 @@ private:
         WorldPropertyFn set_property{nullptr};
         WorldPhysicsRaycastFn physics_raycast{nullptr};
         WorldPhysicsOverlapFn physics_overlap{nullptr};
+        WorldPhysicsBoxCastFn physics_box_cast{nullptr};
     };
 
     using ConfigureWorldCallbacksFn =
@@ -612,6 +663,11 @@ private:
         std::uint32_t layer_mask,
         std::uint64_t* output,
         int capacity);
+
+    static int callback_physics_box_cast(
+        void* context,
+        int is_2d,
+        NativeBoxCastState* state);
 
     using InputKeyFn =
         int (*)(

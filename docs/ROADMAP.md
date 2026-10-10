@@ -126,7 +126,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Native <-> managed Transform local position/rotation/scale synchronization
 - [x] Dedicated generated NEngine.API + stable NEngine.Bridge assemblies
 - [x] Safe collectible AssemblyLoadContext gameplay hot reload/unload
-- [x] Native World callback ABI v14 for GameObject lifetime/name/active, Transform hierarchy/TRS, component properties and physics query injection
+- [x] Native World callback ABI v15 for GameObject lifetime/name/active, Transform hierarchy/TRS, component properties and physics query injection
 - [x] Managed GameObject create/find plus deferred self/foreign destroy
 - [x] Managed keyboard/mouse Input API over native callback table
 - [x] Managed Time.deltaTime/time/frameCount host-frame clock plus fixedDeltaTime fixed-step value
@@ -136,12 +136,12 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] LateUpdate second-pass ordering after all active managed Update calls
 - [x] FixedUpdate fixed-step lifecycle plus host-frame Update/LateUpdate scheduling split
 - [x] Generic native property ABI + managed Camera/Light and non-asset MeshRenderer/SpriteRenderer property bindings
-- [x] ABI v14 UTF-8/AssetGuid transport + SpriteRenderer.texture + MeshRenderer.mesh/material bindings
+- [x] ABI v15 UTF-8/AssetGuid transport + SpriteRenderer.texture + MeshRenderer.mesh/material bindings
 - [x] Managed SpriteAnimator clip/enabled/playing/loop/speed/time bindings + Play/Pause/Stop/Restart helpers
 - [x] Managed Rigidbody/BoxCollider + Rigidbody2D/BoxCollider2D component/property bindings
 - [x] Managed Collision/Trigger Enter/Stay/Exit callbacks + Collision/Collision2D payloads
-- [x] Managed Physics.Raycast + Physics2D.Raycast with layer masks over ABI v14 injected native queries
-- [x] Managed Physics.OverlapBox + Physics2D.OverlapBoxAll multi-hit queries over ABI v14
+- [x] Managed Physics.Raycast + Physics2D.Raycast with layer masks over ABI v15 injected native queries
+- [x] Managed Physics.OverlapBox + Physics2D.OverlapBoxAll multi-hit queries over ABI v15
 - [x] Managed AudioSource/AudioListener properties + AudioSource Play/Pause/UnPause/Stop/isPlaying/runtime time
 - [ ] Visual Studio attach/debug symbols
 
@@ -155,7 +155,8 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Sweep-and-prune broad phase + collider layer/collision-mask contact filtering
 - [x] Managed 3D/2D overlap-box queries + query layer-mask filtering
 - [x] Native axis-aligned BoxCast/BoxCast2D foundation
-- [ ] Managed cast bindings + richer hit semantics/query filtering policy
+- [x] Managed Physics.BoxCast + Physics2D.BoxCast bindings over ABI v15
+- [ ] Additional shape casts + richer hit semantics/query filtering policy
 - [ ] Rotated/extra collider shapes, friction/restitution, sleeping and production broad-phase tuning
 - [x] Keyboard/mouse InputState transitions + Win32 message capture
 - [x] Named action-map binding/query foundation
