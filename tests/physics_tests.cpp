@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <string>
+#include <utility>
 
 #include "nengine/core/component_registry.hpp"
 #include "nengine/core/component_serialization.hpp"
