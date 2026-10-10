@@ -168,7 +168,7 @@ namespace NEngine.Internal
 
     public static class NativeBridge
     {
-        public const int AbiVersion = 13;
+        public const int AbiVersion = 14;
 
         private static readonly Dictionary<long, NEngine.Behaviour> Instances = new();
         private static long _nextHandle = 1;
@@ -201,6 +201,7 @@ namespace NEngine.Internal
             public nint getProperty;
             public nint setProperty;
             public nint physicsRaycast;
+            public nint physicsOverlap;
         }
 
         [UnmanagedCallersOnly]
@@ -236,7 +237,8 @@ namespace NEngine.Internal
                     callbacks.hasComponent,
                     callbacks.getProperty,
                     callbacks.setProperty,
-                    callbacks.physicsRaycast);
+                    callbacks.physicsRaycast,
+                    callbacks.physicsOverlap);
 
                 return 1;
             }
@@ -929,6 +931,7 @@ std::string api_stub(
         public float dx, dy, dz;
         public float maxDistance;
         public int includeTriggers;
+        public uint layerMask;
         public ulong hitEntity;
         public float px, py, pz;
         public float nx, ny, nz;
@@ -996,6 +999,21 @@ std::string api_stub(
             int is2D,
             ref NativeRaycastState state);
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int PhysicsOverlapFn(
+            nint context,
+            int is2D,
+            float centerX,
+            float centerY,
+            float centerZ,
+            float sizeX,
+            float sizeY,
+            float sizeZ,
+            int includeTriggers,
+            uint layerMask,
+            nint output,
+            int capacity);
+
         private static nint _context;
         private static CreateFn? _create;
         private static DestroyFn? _destroy;
@@ -1015,6 +1033,7 @@ std::string api_stub(
         private static PropertyFn? _getProperty;
         private static PropertyFn? _setProperty;
         private static PhysicsRaycastFn? _physicsRaycast;
+        private static PhysicsOverlapFn? _physicsOverlap;
 
         internal static bool available =>
             _context != 0 &&
@@ -1039,7 +1058,8 @@ std::string api_stub(
             nint hasComponent,
             nint getProperty,
             nint setProperty,
-            nint physicsRaycast)
+            nint physicsRaycast,
+            nint physicsOverlap)
         {
             _context = context;
             _create = Marshal.GetDelegateForFunctionPointer<CreateFn>(create);
@@ -1060,6 +1080,7 @@ std::string api_stub(
             _getProperty = Marshal.GetDelegateForFunctionPointer<PropertyFn>(getProperty);
             _setProperty = Marshal.GetDelegateForFunctionPointer<PropertyFn>(setProperty);
             _physicsRaycast = Marshal.GetDelegateForFunctionPointer<PhysicsRaycastFn>(physicsRaycast);
+            _physicsOverlap = Marshal.GetDelegateForFunctionPointer<PhysicsOverlapFn>(physicsOverlap);
         }
 
         internal static void Clear()
@@ -1083,6 +1104,7 @@ std::string api_stub(
             _getProperty = null;
             _setProperty = null;
             _physicsRaycast = null;
+            _physicsOverlap = null;
         }
 
         private static ulong WithUtf8Entity(
@@ -1418,7 +1440,8 @@ std::string api_stub(
             Vector3 direction,
             float maxDistance,
             bool includeTriggers,
-            out NativeRaycastState state)
+            out NativeRaycastState state,
+            uint layerMask = 0xffffffffu)
         {
             state = new NativeRaycastState
             {
@@ -1430,6 +1453,7 @@ std::string api_stub(
                 dz = direction.z,
                 maxDistance = maxDistance,
                 includeTriggers = includeTriggers ? 1 : 0,
+                layerMask = layerMask,
                 hitEntity = InvalidEntity
             };
 

@@ -761,7 +761,8 @@ void ManagedRuntime::bind_property_access(
 
 void ManagedRuntime::bind_physics_queries(
     void* context,
-    PhysicsRaycastQueryFn raycast) noexcept {
+    PhysicsRaycastQueryFn raycast,
+    PhysicsOverlapQueryFn overlap) noexcept {
 
     if (!world_context_) {
         world_context_ =
@@ -773,6 +774,8 @@ void ManagedRuntime::bind_physics_queries(
         context;
     world_context_->physics_raycast =
         raycast;
+    world_context_->physics_overlap =
+        overlap;
 }
 
 void ManagedRuntime::bind_world(
@@ -913,6 +916,7 @@ int ManagedRuntime::callback_physics_raycast(
             },
             state->max_distance,
             state->include_triggers != 0,
+            state->layer_mask,
             hit,
             point,
             normal,
@@ -937,6 +941,63 @@ int ManagedRuntime::callback_physics_raycast(
         trigger ? 1 : 0;
 
     return 1;
+}
+
+int ManagedRuntime::callback_physics_overlap(
+    void* context,
+    int is_2d,
+    float center_x,
+    float center_y,
+    float center_z,
+    float size_x,
+    float size_y,
+    float size_z,
+    int include_triggers,
+    std::uint32_t layer_mask,
+    std::uint64_t* output,
+    int capacity) {
+
+    auto* native =
+        static_cast<NativeWorldContext*>(
+            context);
+
+    if (!native ||
+        !native->world ||
+        !native->physics_overlap ||
+        capacity < 0 ||
+        (capacity > 0 && !output)) {
+        return -1;
+    }
+
+    const auto total =
+        native->physics_overlap(
+            native->physics_context,
+            *native->world,
+            is_2d != 0,
+            {
+                center_x,
+                center_y,
+                center_z
+            },
+            {
+                size_x,
+                size_y,
+                size_z
+            },
+            include_triggers != 0,
+            layer_mask,
+            output,
+            static_cast<std::size_t>(
+                capacity));
+
+    if (total >
+        static_cast<std::size_t>(
+            std::numeric_limits<int>::max())) {
+        return -2;
+    }
+
+    return static_cast<int>(
+        total);
 }
 
 
@@ -1385,9 +1446,9 @@ bool ManagedRuntime::initialize(
     const int abi_version =
         abi();
 
-    if (abi_version != 13) {
+    if (abi_version != 14) {
         diagnostic_ =
-            "managed bridge ABI mismatch: expected 13, got " +
+            "managed bridge ABI mismatch: expected 14, got " +
             std::to_string(
                 abi_version);
         shutdown();
@@ -1604,7 +1665,7 @@ bool ManagedRuntime::initialize(
         !count_) {
 
         diagnostic_ =
-            "managed bridge is missing one or more ABI v13 entry points";
+            "managed bridge is missing one or more ABI v14 entry points";
         shutdown();
         return false;
     }
@@ -1654,6 +1715,8 @@ bool ManagedRuntime::initialize(
         &ManagedRuntime::callback_set_property;
     callbacks.physics_raycast =
         &ManagedRuntime::callback_physics_raycast;
+    callbacks.physics_overlap =
+        &ManagedRuntime::callback_physics_overlap;
 
     if (configure_world_callbacks_(
             &callbacks) <= 0) {
@@ -1713,7 +1776,7 @@ bool ManagedRuntime::initialize(
     }
 
     diagnostic_ =
-        "managed gameplay runtime initialized; ABI v13 activation lifecycle native World lifetime input and coroutine callbacks ready";
+        "managed gameplay runtime initialized; ABI v14 activation lifecycle native World lifetime input and coroutine callbacks ready";
 
     return true;
 }
@@ -2343,6 +2406,8 @@ void ManagedRuntime::shutdown() noexcept {
         world_context_->physics_context =
             nullptr;
         world_context_->physics_raycast =
+            nullptr;
+        world_context_->physics_overlap =
             nullptr;
     }
 

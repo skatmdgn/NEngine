@@ -158,11 +158,24 @@ public:
             core::Vec3,
             float,
             bool,
+            std::uint32_t,
             core::Entity&,
             core::Vec3&,
             core::Vec3&,
             float&,
             bool&);
+
+    using PhysicsOverlapQueryFn =
+        std::size_t (*)(
+            void*,
+            const core::World&,
+            bool,
+            core::Vec3,
+            core::Vec3,
+            bool,
+            std::uint32_t,
+            std::uint64_t*,
+            std::size_t);
 
     void bind_property_access(
         void* context,
@@ -171,7 +184,8 @@ public:
 
     void bind_physics_queries(
         void* context,
-        PhysicsRaycastQueryFn raycast) noexcept;
+        PhysicsRaycastQueryFn raycast,
+        PhysicsOverlapQueryFn overlap) noexcept;
 
     void bind_world(
         core::World* world) noexcept;
@@ -322,6 +336,7 @@ private:
         PropertyWriteFn property_write{nullptr};
         void* physics_context{nullptr};
         PhysicsRaycastQueryFn physics_raycast{nullptr};
+        PhysicsOverlapQueryFn physics_overlap{nullptr};
         std::vector<core::Entity> pending_destroy{};
     };
 
@@ -349,6 +364,7 @@ private:
         float dz{0.0f};
         float max_distance{0.0f};
         std::int32_t include_triggers{1};
+        std::uint32_t layer_mask{0xffffffffu};
         std::uint64_t hit_entity{
             core::Entity::invalid_value};
         float px{0.0f};
@@ -453,6 +469,21 @@ private:
             int,
             NativeRaycastState*);
 
+    using WorldPhysicsOverlapFn =
+        int (*)(
+            void*,
+            int,
+            float,
+            float,
+            float,
+            float,
+            float,
+            float,
+            int,
+            std::uint32_t,
+            std::uint64_t*,
+            int);
+
     struct NativeWorldCallbacks {
         void* context{nullptr};
         WorldCreateFn create{nullptr};
@@ -473,6 +504,7 @@ private:
         WorldPropertyFn get_property{nullptr};
         WorldPropertyFn set_property{nullptr};
         WorldPhysicsRaycastFn physics_raycast{nullptr};
+        WorldPhysicsOverlapFn physics_overlap{nullptr};
     };
 
     using ConfigureWorldCallbacksFn =
@@ -566,6 +598,20 @@ private:
         void* context,
         int is_2d,
         NativeRaycastState* state);
+
+    static int callback_physics_overlap(
+        void* context,
+        int is_2d,
+        float center_x,
+        float center_y,
+        float center_z,
+        float size_x,
+        float size_y,
+        float size_z,
+        int include_triggers,
+        std::uint32_t layer_mask,
+        std::uint64_t* output,
+        int capacity);
 
     using InputKeyFn =
         int (*)(

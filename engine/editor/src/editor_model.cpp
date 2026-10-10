@@ -83,6 +83,7 @@ void bind_managed_physics_queries(
             core::Vec3 direction,
             float max_distance,
             bool include_triggers,
+            std::uint32_t layer_mask,
             core::Entity& hit_entity,
             core::Vec3& point,
             core::Vec3& normal,
@@ -100,7 +101,8 @@ void bind_managed_physics_queries(
                         {origin.x, origin.y},
                         {direction.x, direction.y},
                         max_distance,
-                        include_triggers);
+                        include_triggers,
+                        layer_mask);
             } else {
                 hit =
                     physics::raycast(
@@ -108,7 +110,8 @@ void bind_managed_physics_queries(
                         origin,
                         direction,
                         max_distance,
-                        include_triggers);
+                        include_triggers,
+                        layer_mask);
             }
 
             if (!hit) {
@@ -121,6 +124,52 @@ void bind_managed_physics_queries(
             distance = hit->distance;
             is_trigger = hit->is_trigger;
             return true;
+        },
+        [](
+            void*,
+            const core::World& world,
+            bool is_2d,
+            core::Vec3 center,
+            core::Vec3 size,
+            bool include_triggers,
+            std::uint32_t layer_mask,
+            std::uint64_t* output,
+            std::size_t capacity) {
+
+            std::vector<core::Entity>
+                hits;
+
+            if (is_2d) {
+                hits =
+                    physics::overlap_box_2d(
+                        world,
+                        {center.x, center.y},
+                        {size.x, size.y},
+                        include_triggers,
+                        layer_mask);
+            } else {
+                hits =
+                    physics::overlap_box(
+                        world,
+                        center,
+                        size,
+                        include_triggers,
+                        layer_mask);
+            }
+
+            const auto count =
+                std::min(
+                    capacity,
+                    hits.size());
+
+            for (std::size_t index = 0;
+                 index < count;
+                 ++index) {
+                output[index] =
+                    hits[index].value;
+            }
+
+            return hits.size();
         });
 }
 

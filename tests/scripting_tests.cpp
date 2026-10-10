@@ -138,6 +138,7 @@ bool read_managed_physics_query(
     nengine::core::Vec3,
     float,
     bool,
+    std::uint32_t,
     nengine::core::Entity& hit_entity,
     nengine::core::Vec3& point,
     nengine::core::Vec3& normal,
@@ -180,6 +181,20 @@ bool read_managed_physics_query(
     }
 
     return true;
+}
+
+std::size_t read_managed_overlap_query(
+    void*,
+    const nengine::core::World&,
+    bool,
+    nengine::core::Vec3,
+    nengine::core::Vec3,
+    bool,
+    std::uint32_t,
+    std::uint64_t*,
+    std::size_t) {
+
+    return 0u;
 }
 
 bool read_managed_render_property(
@@ -1318,7 +1333,7 @@ int main() {
             "GetAbiVersion") !=
                 std::string::npos &&
         bridge.find(
-            "AbiVersion = 13") !=
+            "AbiVersion = 14") !=
                 std::string::npos &&
         bridge.find(
             "GameplayLoadContext") !=
@@ -1383,7 +1398,7 @@ int main() {
         bridge.find(
             "GetBehaviourEnabled") !=
                 std::string::npos,
-        "managed bridge exposes activation FixedUpdate LateUpdate native World property input and frame-clock ABI v13 entries");
+        "managed bridge exposes activation FixedUpdate LateUpdate native World property input and frame-clock ABI v14 entries");
 
     const auto runtime_config =
         read_all(
@@ -1895,7 +1910,8 @@ int main() {
 
                         managed_runtime.bind_physics_queries(
                             &physics_query_fixture,
-                            &read_managed_physics_query);
+                            &read_managed_physics_query,
+                            &read_managed_overlap_query);
 
                         check(
                             managed_runtime.instance_count() == 0,
