@@ -399,7 +399,7 @@ Implemented foundation:
 - coroutine scheduling including WaitForSeconds.
 
 Remaining major work:
-- full reference/incident face contact clipping beyond the current box-vertex multi-point manifold foundation, remaining physics shapes, production iterative solving/warm-starting with island-aware sleep propagation, and managed cast/richer query APIs, plus streaming/compressed audio decode and production DSP/device scheduling.
+- remaining physics shapes, production iterative solving/warm-starting over the reference/incident face-clipped manifold foundation with island-aware sleep propagation, and managed cast/richer query APIs, plus streaming/compressed audio decode and production DSP/device scheduling.
 - packaged/versioned managed API distribution.
 - debugger symbols/attach workflow.
 - NuGet runtime/package integration.

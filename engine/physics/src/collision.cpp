@@ -1245,6 +1245,395 @@ void append_manifold_point(
     };
 }
 
+int box_axis_count(
+    bool is_2d) noexcept {
+
+    return is_2d ? 2 : 3;
+}
+
+core::Vec3 box_axis(
+    const ColliderBounds& box,
+    int index) noexcept {
+
+    if (index == 0) return box.axis_x;
+    if (index == 1) return box.axis_y;
+    return box.axis_z;
+}
+
+float box_extent(
+    const ColliderBounds& box,
+    int index) noexcept {
+
+    if (index == 0) return box.half.x;
+    if (index == 1) return box.half.y;
+    return box.half.z;
+}
+
+int best_face_axis(
+    const ColliderBounds& box,
+    core::Vec3 direction,
+    bool is_2d,
+    float& alignment) noexcept {
+
+    int best = 0;
+    alignment = -1.0f;
+
+    for (int index = 0;
+         index < box_axis_count(is_2d);
+         ++index) {
+
+        const float candidate =
+            std::abs(
+                dot(
+                    box_axis(
+                        box,
+                        index),
+                    direction));
+
+        if (candidate >
+            alignment) {
+            alignment = candidate;
+            best = index;
+        }
+    }
+
+    return best;
+}
+
+std::vector<core::Vec3>
+box_face_vertices(
+    const ColliderBounds& box,
+    int face_axis,
+    core::Vec3 outward,
+    bool is_2d) {
+
+    const auto face_center =
+        added(
+            box.center,
+            scaled(
+                outward,
+                box_extent(
+                    box,
+                    face_axis)));
+
+    std::vector<int> tangent_axes;
+
+    for (int index = 0;
+         index < box_axis_count(is_2d);
+         ++index) {
+
+        if (index != face_axis) {
+            tangent_axes.push_back(
+                index);
+        }
+    }
+
+    std::vector<core::Vec3> result;
+
+    if (is_2d) {
+        const auto tangent =
+            box_axis(
+                box,
+                tangent_axes[0]);
+
+        const float extent =
+            box_extent(
+                box,
+                tangent_axes[0]);
+
+        result.push_back(
+            added(
+                face_center,
+                scaled(
+                    tangent,
+                    -extent)));
+
+        result.push_back(
+            added(
+                face_center,
+                scaled(
+                    tangent,
+                    extent)));
+
+        return result;
+    }
+
+    const auto tangent_a =
+        box_axis(
+            box,
+            tangent_axes[0]);
+
+    const auto tangent_b =
+        box_axis(
+            box,
+            tangent_axes[1]);
+
+    const float extent_a =
+        box_extent(
+            box,
+            tangent_axes[0]);
+
+    const float extent_b =
+        box_extent(
+            box,
+            tangent_axes[1]);
+
+    const float signs[]{
+        -1.0f,
+        1.0f
+    };
+
+    for (const float first_sign :
+         signs) {
+        for (const float second_sign :
+             signs) {
+
+            result.push_back(
+                added(
+                    added(
+                        face_center,
+                        scaled(
+                            tangent_a,
+                            extent_a *
+                                first_sign)),
+                    scaled(
+                        tangent_b,
+                        extent_b *
+                            second_sign)));
+        }
+    }
+
+    return result;
+}
+
+std::vector<core::Vec3>
+clip_polygon_against_plane(
+    const std::vector<core::Vec3>& input,
+    core::Vec3 plane_point,
+    core::Vec3 plane_normal) {
+
+    std::vector<core::Vec3> output;
+
+    if (input.empty()) {
+        return output;
+    }
+
+    constexpr float tolerance =
+        0.00001f;
+
+    const auto signed_distance =
+        [&](core::Vec3 point) {
+
+            return dot(
+                {
+                    point.x -
+                        plane_point.x,
+                    point.y -
+                        plane_point.y,
+                    point.z -
+                        plane_point.z
+                },
+                plane_normal);
+        };
+
+    auto previous =
+        input.back();
+
+    float previous_distance =
+        signed_distance(
+            previous);
+
+    bool previous_inside =
+        previous_distance <=
+        tolerance;
+
+    for (const auto current :
+         input) {
+
+        const float current_distance =
+            signed_distance(
+                current);
+
+        const bool current_inside =
+            current_distance <=
+            tolerance;
+
+        if (current_inside !=
+            previous_inside) {
+
+            const float denominator =
+                previous_distance -
+                current_distance;
+
+            if (std::abs(denominator) >
+                0.0000001f) {
+
+                const float t =
+                    std::clamp(
+                        previous_distance /
+                            denominator,
+                        0.0f,
+                        1.0f);
+
+                output.push_back({
+                    previous.x +
+                        (current.x -
+                         previous.x) *
+                            t,
+                    previous.y +
+                        (current.y -
+                         previous.y) *
+                            t,
+                    previous.z +
+                        (current.z -
+                         previous.z) *
+                            t
+                });
+            }
+        }
+
+        if (current_inside) {
+            output.push_back(
+                current);
+        }
+
+        previous =
+            current;
+
+        previous_distance =
+            current_distance;
+
+        previous_inside =
+            current_inside;
+    }
+
+    return output;
+}
+
+void append_reduced_contact_candidates(
+    ContactManifold& manifold,
+    const std::vector<ContactPoint>& candidates,
+    bool is_2d) noexcept {
+
+    if (candidates.empty()) {
+        return;
+    }
+
+    if (candidates.size() <=
+        ContactManifold::max_points) {
+
+        for (const auto& candidate :
+             candidates) {
+
+            append_manifold_point(
+                manifold,
+                candidate.point,
+                candidate.penetration,
+                is_2d);
+        }
+
+        return;
+    }
+
+    std::vector<std::size_t> selected;
+
+    std::size_t deepest = 0u;
+
+    for (std::size_t index = 1u;
+         index < candidates.size();
+         ++index) {
+
+        if (candidates[index]
+                .penetration >
+            candidates[deepest]
+                .penetration) {
+            deepest = index;
+        }
+    }
+
+    selected.push_back(
+        deepest);
+
+    while (selected.size() <
+           ContactManifold::max_points) {
+
+        std::size_t best =
+            candidates.size();
+
+        float best_distance =
+            -1.0f;
+
+        for (std::size_t index = 0u;
+             index < candidates.size();
+             ++index) {
+
+            if (std::find(
+                    selected.begin(),
+                    selected.end(),
+                    index) !=
+                selected.end()) {
+                continue;
+            }
+
+            float minimum_distance =
+                std::numeric_limits<float>::max();
+
+            for (const auto chosen :
+                 selected) {
+
+                const core::Vec3 delta{
+                    candidates[index]
+                            .point.x -
+                        candidates[chosen]
+                            .point.x,
+                    candidates[index]
+                            .point.y -
+                        candidates[chosen]
+                            .point.y,
+                    is_2d
+                        ? 0.0f
+                        : candidates[index]
+                                  .point.z -
+                              candidates[chosen]
+                                  .point.z
+                };
+
+                minimum_distance =
+                    std::min(
+                        minimum_distance,
+                        length_squared(
+                            delta,
+                            is_2d));
+            }
+
+            if (minimum_distance >
+                best_distance) {
+                best_distance =
+                    minimum_distance;
+                best = index;
+            }
+        }
+
+        if (best ==
+            candidates.size()) {
+            break;
+        }
+
+        selected.push_back(
+            best);
+    }
+
+    for (const auto index :
+         selected) {
+
+        append_manifold_point(
+            manifold,
+            candidates[index].point,
+            candidates[index].penetration,
+            is_2d);
+    }
+}
+
 bool populate_box_pair_manifold(
     const ColliderBounds& first,
     const ColliderBounds& second,
@@ -1261,108 +1650,230 @@ bool populate_box_pair_manifold(
         return false;
     }
 
-    const auto collect_face =
-        [&](const ColliderBounds& source,
-            const ColliderBounds& other,
-            core::Vec3 face_direction,
-            float projection_shift) {
+    float first_alignment =
+        0.0f;
 
-            const auto support =
-                support_point(
-                    source,
-                    face_direction,
-                    is_2d);
+    float second_alignment =
+        0.0f;
 
-            const float support_projection =
-                dot(
-                    support,
-                    face_direction);
-
-            constexpr float face_epsilon =
-                0.0002f;
-
-            const float signs[]{
-                -1.0f,
-                1.0f
-            };
-
-            for (const float x_sign :
-                 signs) {
-                for (const float y_sign :
-                     signs) {
-
-                    const int z_count =
-                        is_2d
-                            ? 1
-                            : 2;
-
-                    for (int z_index = 0;
-                         z_index < z_count;
-                         ++z_index) {
-
-                        const float z_sign =
-                            is_2d ||
-                                    z_index == 0
-                                ? -1.0f
-                                : 1.0f;
-
-                        const auto vertex =
-                            box_vertex(
-                                source,
-                                x_sign,
-                                y_sign,
-                                z_sign,
-                                is_2d);
-
-                        if (std::abs(
-                                dot(
-                                    vertex,
-                                    face_direction) -
-                                support_projection) >
-                            face_epsilon) {
-                            continue;
-                        }
-
-                        if (!point_inside_box(
-                                vertex,
-                                other,
-                                is_2d,
-                                overlap.penetration +
-                                    0.0002f)) {
-                            continue;
-                        }
-
-                        append_manifold_point(
-                            overlap.manifold,
-                            added(
-                                vertex,
-                                scaled(
-                                    overlap.normal,
-                                    projection_shift)),
-                            overlap.penetration,
-                            is_2d);
-                    }
-                }
-            }
-        };
-
-    collect_face(
-        first,
-        second,
-        overlap.normal,
-        -overlap.penetration *
-            0.5f);
-
-    collect_face(
-        second,
-        first,
-        scaled(
+    const int first_axis =
+        best_face_axis(
+            first,
             overlap.normal,
-            -1.0f),
-        overlap.penetration *
-            0.5f);
+            is_2d,
+            first_alignment);
 
-    return overlap.manifold.count > 0u;
+    const int second_axis =
+        best_face_axis(
+            second,
+            overlap.normal,
+            is_2d,
+            second_alignment);
+
+    constexpr float face_axis_threshold =
+        0.999f;
+
+    if (std::max(
+            first_alignment,
+            second_alignment) <
+        face_axis_threshold) {
+        return false;
+    }
+
+    const bool reference_is_first =
+        first_alignment >=
+        second_alignment;
+
+    const auto& reference =
+        reference_is_first
+            ? first
+            : second;
+
+    const auto& incident =
+        reference_is_first
+            ? second
+            : first;
+
+    const int reference_axis =
+        reference_is_first
+            ? first_axis
+            : second_axis;
+
+    const core::Vec3 reference_normal =
+        reference_is_first
+            ? overlap.normal
+            : scaled(
+                overlap.normal,
+                -1.0f);
+
+    auto reference_axis_vector =
+        box_axis(
+            reference,
+            reference_axis);
+
+    if (dot(
+            reference_axis_vector,
+            reference_normal) <
+        0.0f) {
+        reference_axis_vector =
+            scaled(
+                reference_axis_vector,
+                -1.0f);
+    }
+
+    const auto reference_face_center =
+        added(
+            reference.center,
+            scaled(
+                reference_axis_vector,
+                box_extent(
+                    reference,
+                    reference_axis)));
+
+    float incident_alignment =
+        0.0f;
+
+    const int incident_axis =
+        best_face_axis(
+            incident,
+            reference_normal,
+            is_2d,
+            incident_alignment);
+
+    auto incident_outward =
+        box_axis(
+            incident,
+            incident_axis);
+
+    if (dot(
+            incident_outward,
+            reference_normal) >
+        0.0f) {
+        incident_outward =
+            scaled(
+                incident_outward,
+                -1.0f);
+    }
+
+    auto polygon =
+        box_face_vertices(
+            incident,
+            incident_axis,
+            incident_outward,
+            is_2d);
+
+    for (int axis_index = 0;
+         axis_index <
+             box_axis_count(is_2d);
+         ++axis_index) {
+
+        if (axis_index ==
+            reference_axis) {
+            continue;
+        }
+
+        const auto tangent =
+            box_axis(
+                reference,
+                axis_index);
+
+        const float extent =
+            box_extent(
+                reference,
+                axis_index);
+
+        polygon =
+            clip_polygon_against_plane(
+                polygon,
+                added(
+                    reference_face_center,
+                    scaled(
+                        tangent,
+                        extent)),
+                tangent);
+
+        if (polygon.empty()) {
+            return false;
+        }
+
+        polygon =
+            clip_polygon_against_plane(
+                polygon,
+                added(
+                    reference_face_center,
+                    scaled(
+                        tangent,
+                        -extent)),
+                scaled(
+                    tangent,
+                    -1.0f));
+
+        if (polygon.empty()) {
+            return false;
+        }
+    }
+
+    std::vector<ContactPoint>
+        candidates;
+
+    candidates.reserve(
+        polygon.size());
+
+    constexpr float separation_tolerance =
+        0.0002f;
+
+    for (auto point :
+         polygon) {
+
+        const float separation =
+            dot(
+                {
+                    point.x -
+                        reference_face_center.x,
+                    point.y -
+                        reference_face_center.y,
+                    point.z -
+                        reference_face_center.z
+                },
+                reference_normal);
+
+        if (separation >
+            separation_tolerance) {
+            continue;
+        }
+
+        const float penetration =
+            std::min(
+                overlap.penetration,
+                std::max(
+                    0.0f,
+                    -separation));
+
+        point =
+            added(
+                point,
+                scaled(
+                    reference_normal,
+                    -separation *
+                        0.5f));
+
+        if (is_2d) {
+            point.z = 0.0f;
+        }
+
+        candidates.push_back({
+            point,
+            penetration
+        });
+    }
+
+    append_reduced_contact_candidates(
+        overlap.manifold,
+        candidates,
+        is_2d);
+
+    return overlap.manifold.count >
+        0u;
 }
 
 void populate_contact_manifold(

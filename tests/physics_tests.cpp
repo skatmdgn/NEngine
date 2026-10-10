@@ -1113,6 +1113,200 @@ int main() {
         manifold_plane_valid,
         "3D BoxCollider face overlap clips four persistent contact manifold points");
 
+
+    core::World clipped_manifold_world;
+
+    const auto clipped_reference =
+        clipped_manifold_world.create(
+            "Clipped Reference");
+
+    const auto clipped_incident =
+        clipped_manifold_world.create(
+            "Clipped Incident");
+
+    auto* clipped_reference_box =
+        clipped_manifold_world.add_component<
+            physics::BoxCollider>(
+                clipped_reference,
+                physics::box_collider_type());
+
+    auto* clipped_incident_box =
+        clipped_manifold_world.add_component<
+            physics::BoxCollider>(
+                clipped_incident,
+                physics::box_collider_type());
+
+    if (clipped_reference_box) {
+        clipped_reference_box->size =
+            {4.0f, 1.0f, 1.0f};
+    }
+
+    if (clipped_incident_box) {
+        clipped_incident_box->size =
+            {1.0f, 4.0f, 1.0f};
+    }
+
+    clipped_manifold_world.transform(
+        clipped_incident)->local_position =
+            {1.0f, 0.0f, 0.0f};
+
+    const auto clipped_detection =
+        physics::detect_box_overlaps(
+            clipped_manifold_world);
+
+    bool clipped_face_valid = false;
+
+    if (clipped_detection.overlaps.size() ==
+        1u) {
+
+        const auto& overlap =
+            clipped_detection
+                .overlaps.front();
+
+        clipped_face_valid =
+            overlap.manifold.count == 4u &&
+            overlap.normal ==
+                core::Vec3{
+                    1.0f,
+                    0.0f,
+                    0.0f};
+
+        for (std::size_t index = 0;
+             clipped_face_valid &&
+             index <
+                 overlap.manifold.count;
+             ++index) {
+
+            const auto& point =
+                overlap.manifold
+                    .points[index];
+
+            clipped_face_valid =
+                std::abs(
+                    point.point.x -
+                    1.25f) <
+                    0.0003f &&
+                std::abs(
+                    std::abs(
+                        point.point.y) -
+                    0.5f) <
+                    0.0003f &&
+                std::abs(
+                    std::abs(
+                        point.point.z) -
+                    0.5f) <
+                    0.0003f &&
+                std::abs(
+                    point.penetration -
+                    1.5f) <
+                    0.0003f;
+        }
+    }
+
+    check(
+        clipped_detection.overlaps.size() ==
+            1u &&
+        clipped_face_valid,
+        "reference incident face clipping finds four contacts even when neither 3D box face contributes contained vertices");
+
+    core::World clipped_manifold_2d_world;
+
+    const auto clipped_reference_2d =
+        clipped_manifold_2d_world.create(
+            "Clipped Reference 2D");
+
+    const auto clipped_incident_2d =
+        clipped_manifold_2d_world.create(
+            "Clipped Incident 2D");
+
+    auto* clipped_reference_box_2d =
+        clipped_manifold_2d_world
+            .add_component<
+                physics::BoxCollider2D>(
+                    clipped_reference_2d,
+                    physics::box_collider2d_type());
+
+    auto* clipped_incident_box_2d =
+        clipped_manifold_2d_world
+            .add_component<
+                physics::BoxCollider2D>(
+                    clipped_incident_2d,
+                    physics::box_collider2d_type());
+
+    if (clipped_reference_box_2d) {
+        clipped_reference_box_2d->size =
+            {4.0f, 1.0f, 0.0f};
+    }
+
+    if (clipped_incident_box_2d) {
+        clipped_incident_box_2d->size =
+            {1.0f, 4.0f, 0.0f};
+    }
+
+    clipped_manifold_2d_world.transform(
+        clipped_incident_2d)
+        ->local_position =
+            {1.0f, 0.0f, 9.0f};
+
+    const auto clipped_detection_2d =
+        physics::detect_box_overlaps(
+            clipped_manifold_2d_world);
+
+    bool clipped_face_2d_valid = false;
+
+    if (clipped_detection_2d
+            .overlaps.size() ==
+        1u) {
+
+        const auto& overlap =
+            clipped_detection_2d
+                .overlaps.front();
+
+        clipped_face_2d_valid =
+            overlap.is_2d &&
+            overlap.manifold.count == 2u &&
+            overlap.normal ==
+                core::Vec3{
+                    1.0f,
+                    0.0f,
+                    0.0f};
+
+        for (std::size_t index = 0;
+             clipped_face_2d_valid &&
+             index <
+                 overlap.manifold.count;
+             ++index) {
+
+            const auto& point =
+                overlap.manifold
+                    .points[index];
+
+            clipped_face_2d_valid =
+                std::abs(
+                    point.point.x -
+                    1.25f) <
+                    0.0003f &&
+                std::abs(
+                    std::abs(
+                        point.point.y) -
+                    0.5f) <
+                    0.0003f &&
+                std::abs(
+                    point.point.z) <
+                    0.0001f &&
+                std::abs(
+                    point.penetration -
+                    1.5f) <
+                    0.0003f;
+        }
+    }
+
+    check(
+        clipped_detection_2d
+            .overlaps.size() == 1u &&
+        clipped_face_2d_valid,
+        "reference incident edge clipping finds two contacts for crossing BoxCollider2D faces");
+
     core::World sparse_broad_phase_world;
 
     for (int index = 0;
