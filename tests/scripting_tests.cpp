@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -16,6 +18,320 @@
 #include "nengine/scripting/script_system.hpp"
 
 namespace {
+
+struct ManagedCameraFixture {
+    bool enabled{true};
+    std::int64_t projection{0};
+    float field_of_view{60.0f};
+    float near_clip{0.1f};
+    float far_clip{1000.0f};
+    float orthographic_size{5.0f};
+};
+
+struct ManagedLightFixture {
+    bool enabled{true};
+    std::int64_t type{0};
+    nengine::core::Vec3 color{1.0f, 1.0f, 1.0f};
+    float intensity{1.0f};
+    float range{10.0f};
+    float spot_angle{30.0f};
+    bool cast_shadows{true};
+};
+
+struct ManagedMeshFixture {
+    bool enabled{true};
+    bool cast_shadows{true};
+    bool receive_shadows{true};
+};
+
+struct ManagedSpriteFixture {
+    bool enabled{true};
+    float pixels_per_unit{100.0f};
+    std::int64_t sort_order{0};
+    bool flip_x{false};
+    bool flip_y{false};
+};
+
+bool read_managed_render_property(
+    void*,
+    const nengine::core::World& world,
+    nengine::core::Entity entity,
+    std::string_view component,
+    std::string_view property,
+    nengine::core::PropertyValue& output) {
+
+    const auto type =
+        nengine::core::ComponentRegistry::stable_id(
+            component);
+
+    if (component == "NEngine.Camera") {
+        const auto* value =
+            world.get_component<
+                ManagedCameraFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Enabled")
+            output = value->enabled;
+        else if (property == "Projection")
+            output = value->projection;
+        else if (property == "Vertical FOV")
+            output = static_cast<double>(value->field_of_view);
+        else if (property == "Near Clip")
+            output = static_cast<double>(value->near_clip);
+        else if (property == "Far Clip")
+            output = static_cast<double>(value->far_clip);
+        else if (property == "Orthographic Size")
+            output = static_cast<double>(value->orthographic_size);
+        else
+            return false;
+
+        return true;
+    }
+
+    if (component == "NEngine.Light") {
+        const auto* value =
+            world.get_component<
+                ManagedLightFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Enabled")
+            output = value->enabled;
+        else if (property == "Type")
+            output = value->type;
+        else if (property == "Color")
+            output = value->color;
+        else if (property == "Intensity")
+            output = static_cast<double>(value->intensity);
+        else if (property == "Range")
+            output = static_cast<double>(value->range);
+        else if (property == "Spot Angle")
+            output = static_cast<double>(value->spot_angle);
+        else if (property == "Cast Shadows")
+            output = value->cast_shadows;
+        else
+            return false;
+
+        return true;
+    }
+
+    if (component == "NEngine.MeshRenderer") {
+        const auto* value =
+            world.get_component<
+                ManagedMeshFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Enabled")
+            output = value->enabled;
+        else if (property == "Cast Shadows")
+            output = value->cast_shadows;
+        else if (property == "Receive Shadows")
+            output = value->receive_shadows;
+        else
+            return false;
+
+        return true;
+    }
+
+    if (component == "NEngine.SpriteRenderer") {
+        const auto* value =
+            world.get_component<
+                ManagedSpriteFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Enabled")
+            output = value->enabled;
+        else if (property == "Pixels Per Unit")
+            output = static_cast<double>(value->pixels_per_unit);
+        else if (property == "Sort Order")
+            output = value->sort_order;
+        else if (property == "Flip X")
+            output = value->flip_x;
+        else if (property == "Flip Y")
+            output = value->flip_y;
+        else
+            return false;
+
+        return true;
+    }
+
+    return false;
+}
+
+bool write_managed_render_property(
+    void*,
+    nengine::core::World& world,
+    nengine::core::Entity entity,
+    std::string_view component,
+    std::string_view property,
+    const nengine::core::PropertyValue& input) {
+
+    const auto type =
+        nengine::core::ComponentRegistry::stable_id(
+            component);
+
+    if (component == "NEngine.Camera") {
+        auto* value =
+            world.get_component<
+                ManagedCameraFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Enabled") {
+            const auto* typed =
+                std::get_if<bool>(&input);
+            if (!typed) return false;
+            value->enabled = *typed;
+        } else if (property == "Projection") {
+            const auto* typed =
+                std::get_if<std::int64_t>(&input);
+            if (!typed) return false;
+            value->projection = *typed;
+        } else {
+            const auto* typed =
+                std::get_if<double>(&input);
+            if (!typed) return false;
+
+            if (property == "Vertical FOV")
+                value->field_of_view = static_cast<float>(*typed);
+            else if (property == "Near Clip")
+                value->near_clip = static_cast<float>(*typed);
+            else if (property == "Far Clip")
+                value->far_clip = static_cast<float>(*typed);
+            else if (property == "Orthographic Size")
+                value->orthographic_size = static_cast<float>(*typed);
+            else
+                return false;
+        }
+
+        return true;
+    }
+
+    if (component == "NEngine.Light") {
+        auto* value =
+            world.get_component<
+                ManagedLightFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Enabled" ||
+            property == "Cast Shadows") {
+            const auto* typed =
+                std::get_if<bool>(&input);
+            if (!typed) return false;
+            if (property == "Enabled")
+                value->enabled = *typed;
+            else
+                value->cast_shadows = *typed;
+        } else if (property == "Type") {
+            const auto* typed =
+                std::get_if<std::int64_t>(&input);
+            if (!typed) return false;
+            value->type = *typed;
+        } else if (property == "Color") {
+            const auto* typed =
+                std::get_if<nengine::core::Vec3>(&input);
+            if (!typed) return false;
+            value->color = *typed;
+        } else {
+            const auto* typed =
+                std::get_if<double>(&input);
+            if (!typed) return false;
+            if (property == "Intensity")
+                value->intensity = static_cast<float>(*typed);
+            else if (property == "Range")
+                value->range = static_cast<float>(*typed);
+            else if (property == "Spot Angle")
+                value->spot_angle = static_cast<float>(*typed);
+            else
+                return false;
+        }
+
+        return true;
+    }
+
+    if (component == "NEngine.MeshRenderer") {
+        auto* value =
+            world.get_component<
+                ManagedMeshFixture>(
+                    entity,
+                    type);
+
+        const auto* typed =
+            std::get_if<bool>(&input);
+
+        if (!value || !typed) return false;
+
+        if (property == "Enabled")
+            value->enabled = *typed;
+        else if (property == "Cast Shadows")
+            value->cast_shadows = *typed;
+        else if (property == "Receive Shadows")
+            value->receive_shadows = *typed;
+        else
+            return false;
+
+        return true;
+    }
+
+    if (component == "NEngine.SpriteRenderer") {
+        auto* value =
+            world.get_component<
+                ManagedSpriteFixture>(
+                    entity,
+                    type);
+
+        if (!value) return false;
+
+        if (property == "Enabled" ||
+            property == "Flip X" ||
+            property == "Flip Y") {
+            const auto* typed =
+                std::get_if<bool>(&input);
+            if (!typed) return false;
+
+            if (property == "Enabled")
+                value->enabled = *typed;
+            else if (property == "Flip X")
+                value->flip_x = *typed;
+            else
+                value->flip_y = *typed;
+        } else if (property == "Pixels Per Unit") {
+            const auto* typed =
+                std::get_if<double>(&input);
+            if (!typed) return false;
+            value->pixels_per_unit =
+                static_cast<float>(*typed);
+        } else if (property == "Sort Order") {
+            const auto* typed =
+                std::get_if<std::int64_t>(&input);
+            if (!typed) return false;
+            value->sort_order = *typed;
+        } else {
+            return false;
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
 int failures = 0;
 
 void check(bool condition, const char* message) {
@@ -247,6 +563,14 @@ int main() {
         api.find("IsChildOf") !=
             std::string::npos &&
         api.find("DetachChildren") !=
+            std::string::npos &&
+        api.find("fieldOfView") !=
+            std::string::npos &&
+        api.find("LightType") !=
+            std::string::npos &&
+        api.find("pixelsPerUnit") !=
+            std::string::npos &&
+        api.find("receiveShadows") !=
             std::string::npos &&
         api.find(
             "InternalsVisibleTo(\"NEngine.Bridge\")") !=
@@ -629,6 +953,22 @@ int main() {
                 << "        frame++;\n"
                 << "    }\n"
                 << "}\n"
+                << "public class RenderPropertyProbe : Behaviour {\n"
+                << "    private void Update() {\n"
+                << "        Camera? camera = GetComponent<Camera>();\n"
+                << "        Light? light = GetComponent<Light>();\n"
+                << "        MeshRenderer? mesh = GetComponent<MeshRenderer>();\n"
+                << "        SpriteRenderer? sprite = GetComponent<SpriteRenderer>();\n"
+                << "        if (camera == null || light == null || mesh == null || sprite == null) throw new System.Exception(\"render component proxy missing\");\n"
+                << "        if (!camera.enabled || camera.orthographic || System.MathF.Abs(camera.fieldOfView - 60f) > 0.001f) throw new System.Exception(\"camera read mismatch\");\n"
+                << "        camera.enabled = false; camera.orthographic = true; camera.fieldOfView = 72f; camera.nearClipPlane = 0.25f; camera.farClipPlane = 750f; camera.orthographicSize = 8f;\n"
+                << "        if (light.type != LightType.Directional || System.MathF.Abs(light.intensity - 1f) > 0.001f) throw new System.Exception(\"light read mismatch\");\n"
+                << "        light.enabled = false; light.type = LightType.Point; light.color = new Color(0.2f, 0.3f, 0.4f); light.intensity = 2.5f; light.range = 20f; light.spotAngle = 45f; light.shadows = false;\n"
+                << "        mesh.enabled = false; mesh.castShadows = false; mesh.receiveShadows = false;\n"
+                << "        sprite.enabled = false; sprite.pixelsPerUnit = 64f; sprite.sortingOrder = 7; sprite.flipX = true; sprite.flipY = true;\n"
+                << "        gameObject.name = \"Render Properties Passed\";\n"
+                << "    }\n"
+                << "}\n"
                 << "public class FixedSystemProbe : Behaviour {\n"
                 << "    private void FixedUpdate() {\n"
                 << "        if (System.MathF.Abs(Time.fixedDeltaTime - 0.02f) > 0.0001f || System.MathF.Abs(Time.deltaTime - 0.02f) > 0.0001f) throw new System.Exception(\"fixed system delta mismatch\");\n"
@@ -772,6 +1112,11 @@ int main() {
                         "ManagedRuntime initializes generated gameplay assembly lifecycle bridge");
 
                     if (initialized) {
+                        managed_runtime.bind_property_access(
+                            nullptr,
+                            &read_managed_render_property,
+                            &write_managed_render_property);
+
                         check(
                             managed_runtime.instance_count() == 0,
                             "managed lifecycle starts with no Behaviour instances");
@@ -850,6 +1195,139 @@ int main() {
                         check(
                             managed_runtime.reset_time(),
                             "managed Time clock resets explicitly before simulation");
+
+                        ManagedScriptSystem
+                            property_system;
+
+                        property_system.bind(
+                            &managed_runtime);
+
+                        nengine::core::World
+                            property_world;
+
+                        const auto property_entity =
+                            property_world.create(
+                                "Render Property Probe");
+
+                        const auto camera_type =
+                            nengine::core::ComponentRegistry::stable_id(
+                                "NEngine.Camera");
+
+                        const auto light_type =
+                            nengine::core::ComponentRegistry::stable_id(
+                                "NEngine.Light");
+
+                        const auto mesh_type =
+                            nengine::core::ComponentRegistry::stable_id(
+                                "NEngine.MeshRenderer");
+
+                        const auto sprite_type =
+                            nengine::core::ComponentRegistry::stable_id(
+                                "NEngine.SpriteRenderer");
+
+                        property_world.add_component<
+                            ManagedCameraFixture>(
+                                property_entity,
+                                camera_type);
+
+                        property_world.add_component<
+                            ManagedLightFixture>(
+                                property_entity,
+                                light_type);
+
+                        property_world.add_component<
+                            ManagedMeshFixture>(
+                                property_entity,
+                                mesh_type);
+
+                        property_world.add_component<
+                            ManagedSpriteFixture>(
+                                property_entity,
+                                sprite_type);
+
+                        auto* property_script =
+                            property_world.add_component<
+                                ScriptBehaviour>(
+                                    property_entity,
+                                    script_behaviour_type());
+
+                        if (property_script) {
+                            property_script->type_name =
+                                "RenderPropertyProbe";
+                        }
+
+                        std::string property_error;
+
+                        const auto property_tick =
+                            property_system.update(
+                                property_world,
+                                1.0f / 60.0f,
+                                &property_error);
+
+                        const auto* camera_fixture =
+                            property_world.get_component<
+                                ManagedCameraFixture>(
+                                    property_entity,
+                                    camera_type);
+
+                        const auto* light_fixture =
+                            property_world.get_component<
+                                ManagedLightFixture>(
+                                    property_entity,
+                                    light_type);
+
+                        const auto* mesh_fixture =
+                            property_world.get_component<
+                                ManagedMeshFixture>(
+                                    property_entity,
+                                    mesh_type);
+
+                        const auto* sprite_fixture =
+                            property_world.get_component<
+                                ManagedSpriteFixture>(
+                                    property_entity,
+                                    sprite_type);
+
+                        check(
+                            property_script &&
+                            property_tick.created == 1u &&
+                            property_tick.started == 1u &&
+                            property_tick.updated == 1u &&
+                            property_tick.unresolved == 0u &&
+                            property_world.name(
+                                property_entity) ==
+                                "Render Properties Passed" &&
+                            camera_fixture &&
+                            !camera_fixture->enabled &&
+                            camera_fixture->projection == 1 &&
+                            std::abs(camera_fixture->field_of_view - 72.0f) < 0.001f &&
+                            std::abs(camera_fixture->near_clip - 0.25f) < 0.001f &&
+                            std::abs(camera_fixture->far_clip - 750.0f) < 0.001f &&
+                            std::abs(camera_fixture->orthographic_size - 8.0f) < 0.001f &&
+                            light_fixture &&
+                            !light_fixture->enabled &&
+                            light_fixture->type == 1 &&
+                            std::abs(light_fixture->color.x - 0.2f) < 0.001f &&
+                            std::abs(light_fixture->color.y - 0.3f) < 0.001f &&
+                            std::abs(light_fixture->color.z - 0.4f) < 0.001f &&
+                            std::abs(light_fixture->intensity - 2.5f) < 0.001f &&
+                            std::abs(light_fixture->range - 20.0f) < 0.001f &&
+                            std::abs(light_fixture->spot_angle - 45.0f) < 0.001f &&
+                            !light_fixture->cast_shadows &&
+                            mesh_fixture &&
+                            !mesh_fixture->enabled &&
+                            !mesh_fixture->cast_shadows &&
+                            !mesh_fixture->receive_shadows &&
+                            sprite_fixture &&
+                            !sprite_fixture->enabled &&
+                            std::abs(sprite_fixture->pixels_per_unit - 64.0f) < 0.001f &&
+                            sprite_fixture->sort_order == 7 &&
+                            sprite_fixture->flip_x &&
+                            sprite_fixture->flip_y,
+                            "managed render component property proxies round-trip through generic native property ABI");
+
+                        property_system.clear(
+                            &property_world);
 
                         ManagedScriptSystem
                             fixed_system;
