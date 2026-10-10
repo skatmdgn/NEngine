@@ -1,12 +1,15 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "nengine/audio/audio_clip.hpp"
+#include "nengine/audio/clip_cache.hpp"
 #include "nengine/audio/components.hpp"
 #include "nengine/audio/mix_snapshot.hpp"
 #include "nengine/audio/playback.hpp"
@@ -527,6 +530,88 @@ int main() {
             .initialized_source_count() ==
             0u,
         "audio playback reset clears play-on-awake state");
+
+    const auto cached_wav_path =
+        std::filesystem::temp_directory_path() /
+        "nengine_audio_clip_cache_test.wav";
+
+    {
+        std::ofstream output(
+            cached_wav_path,
+            std::ios::binary |
+                std::ios::trunc);
+
+        output.write(
+            reinterpret_cast<const char*>(
+                wav_bytes.data()),
+            static_cast<std::streamsize>(
+                wav_bytes.size()));
+    }
+
+    assets::CachedArtifactSet
+        cached_audio;
+
+    cached_audio.fingerprint =
+        "audio-fixture-v1";
+
+    cached_audio.importer_id =
+        "NEngine.Audio";
+
+    cached_audio.importer_version =
+        1u;
+
+    cached_audio.artifacts.push_back({
+        cached_wav_path,
+        "source"
+    });
+
+    audio::AudioClipCache
+        clip_cache;
+
+    std::string cache_error;
+
+    const auto* cached_clip =
+        mix_clip
+            ? clip_cache.load(
+                *mix_clip,
+                cached_audio,
+                &cache_error)
+            : nullptr;
+
+    const auto* cached_again =
+        mix_clip
+            ? clip_cache.load(
+                *mix_clip,
+                cached_audio,
+                &cache_error)
+            : nullptr;
+
+    check(
+        cached_clip &&
+        cached_again ==
+            cached_clip &&
+        cached_clip->valid() &&
+        std::abs(
+            cached_clip->duration_seconds() -
+            1.0f) < 0.0001f &&
+        mix_clip &&
+        clip_cache.find(
+            *mix_clip) ==
+            cached_clip,
+        "AudioClipCache decodes staged WAV source artifacts and reuses matching fingerprints");
+
+    clip_cache.clear();
+
+    check(
+        !mix_clip ||
+        clip_cache.find(
+            *mix_clip) == nullptr,
+        "AudioClipCache clear invalidates decoded clip entries");
+
+    std::error_code remove_error;
+    std::filesystem::remove(
+        cached_wav_path,
+        remove_error);
 
     if (failures == 0) {
         std::cout

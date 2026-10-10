@@ -474,6 +474,39 @@ void EditorModel::tick_runtime(
 
     std::string animation_error;
     std::string script_error;
+    std::string audio_error;
+
+    const auto resolve_audio_duration =
+        [this, &audio_error](
+            assets::AssetGuid guid)
+            -> std::optional<float> {
+
+            const auto artifacts =
+                project_.cached_artifacts(
+                    guid);
+
+            if (!artifacts) {
+                return std::nullopt;
+            }
+
+            std::string load_error;
+
+            const auto* clip =
+                audio_clip_cache_.load(
+                    guid,
+                    *artifacts,
+                    &load_error);
+
+            if (!clip) {
+                if (audio_error.empty()) {
+                    audio_error =
+                        std::move(load_error);
+                }
+                return std::nullopt;
+            }
+
+            return clip->duration_seconds();
+        };
 
     if (managed_runtime_.valid()) {
         managed_runtime_.bind_input(
@@ -573,7 +606,8 @@ void EditorModel::tick_runtime(
 
             audio_playback_system_.update(
                 *runtime,
-                fixed_delta);
+                fixed_delta,
+                resolve_audio_duration);
 
             audio_mix_snapshot_ =
                 audio::build_mix_snapshot(
@@ -608,7 +642,8 @@ void EditorModel::tick_runtime(
 
             audio_playback_system_.update(
                 *runtime,
-                frame_delta);
+                frame_delta,
+                resolve_audio_duration);
 
             audio_mix_snapshot_ =
                 audio::build_mix_snapshot(
@@ -628,6 +663,13 @@ void EditorModel::tick_runtime(
             "Animation",
             std::move(
                 animation_error));
+    }
+
+    if (!audio_error.empty()) {
+        console_.warning(
+            "Audio",
+            std::move(
+                audio_error));
     }
 }
 

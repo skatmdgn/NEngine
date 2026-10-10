@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "nengine/audio/clip_cache.hpp"
 #include "nengine/audio/mix_snapshot.hpp"
 #include "nengine/audio/playback.hpp"
 #include "nengine/core/component_registry.hpp"
@@ -134,11 +135,17 @@ public:
         return audio_mix_snapshot_;
     }
 
+    const audio::AudioClipCache&
+    audio_clip_cache() const noexcept {
+        return audio_clip_cache_;
+    }
+
     void tick_runtime(
         double elapsed_seconds);
 
     void invalidate_runtime_asset_caches() noexcept {
         sprite_animation_cache_.clear();
+        audio_clip_cache_.clear();
     }
 
     void mark_scene_saved() noexcept {
@@ -167,6 +174,9 @@ private:
     PropertyAccessRegistry property_access_{};
     render::SpriteAnimationClipCache
         sprite_animation_cache_{};
+
+    audio::AudioClipCache
+        audio_clip_cache_{};
 
     input::InputState input_state_{};
 
