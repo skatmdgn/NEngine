@@ -393,10 +393,11 @@ Implemented foundation:
 - global managed Time frame clock with fixedDeltaTime support.
 - FixedUpdate fixed-step scheduling separated from host-frame Update/LateUpdate.
 - managed Camera/Light plus MeshRenderer/SpriteRenderer scalar and AssetGuid properties over the generic native property bridge.
+- managed SpriteAnimator clip/playback/time properties plus Play/Pause/Stop/Restart controls.
 - coroutine scheduling including WaitForSeconds.
 
 Remaining major work:
-- SpriteAnimator plus broader physics/audio managed component APIs.
+- broader physics/audio managed component APIs.
 - packaged/versioned managed API distribution.
 - debugger symbols/attach workflow.
 - NuGet runtime/package integration.

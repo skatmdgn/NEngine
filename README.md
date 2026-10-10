@@ -32,7 +32,7 @@ The repository currently includes:
 - ScriptBehaviour Awake/OnEnable/Start/FixedUpdate/Update/LateUpdate/OnDisable/OnDestroy execution in the cloned Play Mode World with fixed-step and host-frame scheduling split
 - dedicated NEngine.API and stable NEngine.Bridge assemblies with collectible gameplay hot reload
 - managed GameObject name/active/Transform hierarchy access plus native create/find/deferred-destroy through ABI v12
-- managed Camera/Light plus MeshRenderer/SpriteRenderer scalar and AssetGuid properties through the generic PropertyAccessRegistry-backed native property bridge
+- managed Camera/Light, MeshRenderer/SpriteRenderer scalar+AssetGuid properties, and SpriteAnimator clip/playback/time controls through the generic PropertyAccessRegistry-backed native property bridge
 - managed keyboard/mouse Input, global Time frame clock, coroutines and WaitForSeconds
 - Camera/Light/MeshRenderer components
 - RenderSnapshot with resolved world matrices

@@ -143,10 +143,11 @@ Implemented:
 - Managed Time.deltaTime/time/frameCount advances once per host Update frame regardless of Behaviour count; Time.fixedDeltaTime is supplied on each fixed simulation step without advancing the host frame clock.
 - Coroutine scheduling supports StartCoroutine, StopCoroutine, StopAllCoroutines, nested IEnumerator, yield return null and WaitForSeconds.
 - Generic ABI v12 native component property transport is backed by the Editor PropertyAccessRegistry; bool/integer/float/vector/quaternion/UTF-8 string values round-trip, with public managed AssetGuid support for SpriteRenderer.texture and MeshRenderer.mesh/material.
+- Managed SpriteAnimator exposes enabled/clip/playing/loop/speed/runtime time plus Play/Pause/Stop/Restart helpers; Clip changes reset playback time and negative Time writes are rejected.
 
 Not yet implemented:
 - Packaged/versioned distribution of the NEngine managed API.
-- SpriteAnimator managed properties plus broader physics/audio component property APIs.
+- Broader physics/audio component property APIs.
 - Visual Studio debugger attach integration.
 - NuGet runtime/package loading beyond generated project references.
 
@@ -298,8 +299,8 @@ Not yet implemented:
 
 ## Immediate next work
 
-1. Expose SpriteAnimator clip/playback properties through the ABI v12 generic property bridge.
-2. Continue the generic property bridge into physics/audio components as those runtime systems land.
+1. Continue the ABI v12 generic property bridge into physics/audio components as those runtime systems land.
+2. Package/version the managed NEngine API surface and add debugger attach/symbol workflow.
 3. Finish production PBR validation: sampler state, lights/shadows and remaining material behavior.
 4. Decide and implement the explicit policy for remote/nonlocal or outside-directory glTF resources while preserving sandbox safety.
 5. Add WebP decoding plus texture compression/transcoding policy; mipmap generation/upload is already implemented.

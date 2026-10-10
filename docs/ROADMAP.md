@@ -137,7 +137,8 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] FixedUpdate fixed-step lifecycle plus host-frame Update/LateUpdate scheduling split
 - [x] Generic native property ABI + managed Camera/Light and non-asset MeshRenderer/SpriteRenderer property bindings
 - [x] ABI v12 UTF-8/AssetGuid transport + SpriteRenderer.texture + MeshRenderer.mesh/material bindings
-- [ ] SpriteAnimator plus wider physics/audio managed component/property bindings
+- [x] Managed SpriteAnimator clip/enabled/playing/loop/speed/time bindings + Play/Pause/Stop/Restart helpers
+- [ ] Wider physics/audio managed component/property bindings
 - [ ] Visual Studio attach/debug symbols
 
 ## 0.6 — Physics, input, audio
