@@ -39,12 +39,18 @@ struct ManagedLightFixture {
 };
 
 struct ManagedMeshFixture {
+    std::string mesh{
+        "11111111111111112222222222222222"};
+    std::string material{
+        "33333333333333334444444444444444"};
     bool enabled{true};
     bool cast_shadows{true};
     bool receive_shadows{true};
 };
 
 struct ManagedSpriteFixture {
+    std::string texture{
+        "55555555555555556666666666666666"};
     bool enabled{true};
     float pixels_per_unit{100.0f};
     std::int64_t sort_order{0};
@@ -129,7 +135,11 @@ bool read_managed_render_property(
 
         if (!value) return false;
 
-        if (property == "Enabled")
+        if (property == "Mesh")
+            output = value->mesh;
+        else if (property == "Material")
+            output = value->material;
+        else if (property == "Enabled")
             output = value->enabled;
         else if (property == "Cast Shadows")
             output = value->cast_shadows;
@@ -150,7 +160,9 @@ bool read_managed_render_property(
 
         if (!value) return false;
 
-        if (property == "Enabled")
+        if (property == "Texture")
+            output = value->texture;
+        else if (property == "Enabled")
             output = value->enabled;
         else if (property == "Pixels Per Unit")
             output = static_cast<double>(value->pixels_per_unit);
@@ -272,19 +284,36 @@ bool write_managed_render_property(
                     entity,
                     type);
 
-        const auto* typed =
-            std::get_if<bool>(&input);
+        if (!value) return false;
 
-        if (!value || !typed) return false;
+        if (property == "Mesh" ||
+            property == "Material") {
+            const auto* typed =
+                std::get_if<std::string>(
+                    &input);
 
-        if (property == "Enabled")
-            value->enabled = *typed;
-        else if (property == "Cast Shadows")
-            value->cast_shadows = *typed;
-        else if (property == "Receive Shadows")
-            value->receive_shadows = *typed;
-        else
-            return false;
+            if (!typed) return false;
+
+            if (property == "Mesh")
+                value->mesh = *typed;
+            else
+                value->material = *typed;
+        } else {
+            const auto* typed =
+                std::get_if<bool>(
+                    &input);
+
+            if (!typed) return false;
+
+            if (property == "Enabled")
+                value->enabled = *typed;
+            else if (property == "Cast Shadows")
+                value->cast_shadows = *typed;
+            else if (property == "Receive Shadows")
+                value->receive_shadows = *typed;
+            else
+                return false;
+        }
 
         return true;
     }
@@ -298,7 +327,13 @@ bool write_managed_render_property(
 
         if (!value) return false;
 
-        if (property == "Enabled" ||
+        if (property == "Texture") {
+            const auto* typed =
+                std::get_if<std::string>(
+                    &input);
+            if (!typed) return false;
+            value->texture = *typed;
+        } else if (property == "Enabled" ||
             property == "Flip X" ||
             property == "Flip Y") {
             const auto* typed =
@@ -974,8 +1009,10 @@ int main() {
                 << "        camera.enabled = false; camera.orthographic = true; camera.fieldOfView = 72f; camera.nearClipPlane = 0.25f; camera.farClipPlane = 750f; camera.orthographicSize = 8f;\n"
                 << "        if (light.type != LightType.Directional || System.MathF.Abs(light.intensity - 1f) > 0.001f) throw new System.Exception(\"light read mismatch\");\n"
                 << "        light.enabled = false; light.type = LightType.Point; light.color = new Color(0.2f, 0.3f, 0.4f); light.intensity = 2.5f; light.range = 20f; light.spotAngle = 45f; light.shadows = false;\n"
-                << "        mesh.enabled = false; mesh.castShadows = false; mesh.receiveShadows = false;\n"
-                << "        sprite.enabled = false; sprite.pixelsPerUnit = 64f; sprite.sortingOrder = 7; sprite.flipX = true; sprite.flipY = true;\n"
+                << "        if (mesh.mesh.ToString() != \"11111111111111112222222222222222\" || mesh.material.ToString() != \"33333333333333334444444444444444\" || sprite.texture.ToString() != \"55555555555555556666666666666666\") throw new System.Exception(\"asset guid read mismatch\");\n"
+                << "        if (!AssetGuid.TryParse(\"aaaaaaaaaaaaaaaabbbbbbbbbbbbbbbb\", out AssetGuid nextMesh) || !AssetGuid.TryParse(\"ccccccccccccccccdddddddddddddddd\", out AssetGuid nextMaterial) || !AssetGuid.TryParse(\"eeeeeeeeeeeeeeeeffffffffffffffff\", out AssetGuid nextTexture)) throw new System.Exception(\"asset guid parse mismatch\");\n"
+                << "        mesh.mesh = nextMesh; mesh.material = nextMaterial; mesh.enabled = false; mesh.castShadows = false; mesh.receiveShadows = false;\n"
+                << "        sprite.texture = nextTexture; sprite.enabled = false; sprite.pixelsPerUnit = 64f; sprite.sortingOrder = 7; sprite.flipX = true; sprite.flipY = true;\n"
                 << "        gameObject.name = \"Render Properties Passed\";\n"
                 << "    }\n"
                 << "}\n"
@@ -1325,10 +1362,16 @@ int main() {
                             std::abs(light_fixture->spot_angle - 45.0f) < 0.001f &&
                             !light_fixture->cast_shadows &&
                             mesh_fixture &&
+                            mesh_fixture->mesh ==
+                                "aaaaaaaaaaaaaaaabbbbbbbbbbbbbbbb" &&
+                            mesh_fixture->material ==
+                                "ccccccccccccccccdddddddddddddddd" &&
                             !mesh_fixture->enabled &&
                             !mesh_fixture->cast_shadows &&
                             !mesh_fixture->receive_shadows &&
                             sprite_fixture &&
+                            sprite_fixture->texture ==
+                                "eeeeeeeeeeeeeeeeffffffffffffffff" &&
                             !sprite_fixture->enabled &&
                             std::abs(sprite_fixture->pixels_per_unit - 64.0f) < 0.001f &&
                             sprite_fixture->sort_order == 7 &&
