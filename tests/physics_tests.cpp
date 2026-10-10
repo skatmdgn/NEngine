@@ -1168,6 +1168,201 @@ int main() {
             10.0f),
         "BoxCast rejects invalid dimensions and zero direction");
 
+
+    core::World rotated_query_world;
+
+    const auto rotated_query_target =
+        rotated_query_world.create(
+            "Rotated Query Target");
+
+    auto* rotated_query_box =
+        rotated_query_world.add_component<
+            physics::BoxCollider>(
+                rotated_query_target,
+                physics::box_collider_type());
+
+    if (rotated_query_box) {
+        rotated_query_box->size =
+            {2.0f, 0.5f, 1.0f};
+    }
+
+    rotated_query_world.transform(
+        rotated_query_target)->local_rotation =
+            core::Quat{
+                0.0f,
+                0.0f,
+                0.70710678f,
+                0.70710678f
+            };
+
+    const auto rotated_ray_hit =
+        physics::raycast(
+            rotated_query_world,
+            {-3.0f, 0.0f, 0.0f},
+            {1.0f, 0.0f, 0.0f},
+            10.0f);
+
+    check(
+        rotated_ray_hit &&
+        rotated_ray_hit->entity ==
+            rotated_query_target &&
+        std::abs(
+            rotated_ray_hit->distance -
+            2.75f) < 0.0002f &&
+        rotated_ray_hit->normal ==
+            core::Vec3{
+                -1.0f,
+                0.0f,
+                0.0f},
+        "3D Raycast transforms the ray into rotated BoxCollider local axes");
+
+    check(
+        physics::overlap_box(
+            rotated_query_world,
+            {0.6f, 0.0f, 0.0f},
+            {0.5f, 0.5f, 0.5f})
+            .empty() &&
+        physics::overlap_box(
+            rotated_query_world,
+            {0.4f, 0.0f, 0.0f},
+            {0.5f, 0.5f, 0.5f})
+            .size() == 1u,
+        "3D OverlapBox uses OBB SAT instead of rotated target AABB approximation");
+
+    const auto rotated_cast_hit =
+        physics::box_cast(
+            rotated_query_world,
+            {-3.0f, 0.0f, 0.0f},
+            {1.0f, 1.0f, 1.0f},
+            {1.0f, 0.0f, 0.0f},
+            10.0f);
+
+    check(
+        rotated_cast_hit &&
+        rotated_cast_hit->entity ==
+            rotated_query_target &&
+        std::abs(
+            rotated_cast_hit->distance -
+            2.25f) < 0.0002f &&
+        rotated_cast_hit->normal ==
+            core::Vec3{
+                -1.0f,
+                0.0f,
+                0.0f} &&
+        std::abs(
+            rotated_cast_hit->point.x +
+            0.75f) < 0.0002f,
+        "3D BoxCast continuous SAT returns time of impact against rotated BoxCollider");
+
+    core::World rotated_query_2d_world;
+
+    const auto rotated_query_2d_target =
+        rotated_query_2d_world.create(
+            "Rotated Query Target 2D");
+
+    auto* rotated_query_box_2d =
+        rotated_query_2d_world.add_component<
+            physics::BoxCollider2D>(
+                rotated_query_2d_target,
+                physics::box_collider2d_type());
+
+    if (rotated_query_box_2d) {
+        rotated_query_box_2d->size =
+            {2.0f, 0.5f, 0.0f};
+    }
+
+    rotated_query_2d_world.transform(
+        rotated_query_2d_target)->local_rotation =
+            core::Quat{
+                0.0f,
+                0.0f,
+                0.70710678f,
+                0.70710678f
+            };
+
+    const auto rotated_ray_hit_2d =
+        physics::raycast_2d(
+            rotated_query_2d_world,
+            {-3.0f, 0.0f},
+            {1.0f, 0.0f},
+            10.0f);
+
+    const auto rotated_cast_hit_2d =
+        physics::box_cast_2d(
+            rotated_query_2d_world,
+            {-3.0f, 0.0f},
+            {1.0f, 1.0f},
+            {1.0f, 0.0f},
+            10.0f);
+
+    check(
+        rotated_ray_hit_2d &&
+        rotated_ray_hit_2d->entity ==
+            rotated_query_2d_target &&
+        std::abs(
+            rotated_ray_hit_2d->distance -
+            2.75f) < 0.0002f &&
+        rotated_cast_hit_2d &&
+        rotated_cast_hit_2d->entity ==
+            rotated_query_2d_target &&
+        std::abs(
+            rotated_cast_hit_2d->distance -
+            2.25f) < 0.0002f &&
+        rotated_cast_hit_2d->is_2d,
+        "2D Raycast and BoxCast use rotated BoxCollider2D axes");
+
+    core::World rotated_radial_query_world;
+
+    const auto offset_sphere =
+        rotated_radial_query_world.create(
+            "Rotated Offset Sphere");
+
+    auto* offset_sphere_collider =
+        rotated_radial_query_world.add_component<
+            physics::SphereCollider>(
+                offset_sphere,
+                physics::sphere_collider_type());
+
+    if (offset_sphere_collider) {
+        offset_sphere_collider->center =
+            {1.0f, 0.0f, 0.0f};
+    }
+
+    rotated_radial_query_world.transform(
+        offset_sphere)->local_rotation =
+            core::Quat{
+                0.0f,
+                0.0f,
+                0.70710678f,
+                0.70710678f
+            };
+
+    const auto offset_sphere_overlaps =
+        physics::overlap_box(
+            rotated_radial_query_world,
+            {0.0f, 1.0f, 0.0f},
+            {0.2f, 0.2f, 0.2f});
+
+    const auto offset_sphere_ray =
+        physics::raycast(
+            rotated_radial_query_world,
+            {0.0f, -2.0f, 0.0f},
+            {0.0f, 1.0f, 0.0f},
+            10.0f);
+
+    check(
+        offset_sphere_overlaps.size() ==
+            1u &&
+        offset_sphere_overlaps.front() ==
+            offset_sphere &&
+        offset_sphere_ray &&
+        offset_sphere_ray->entity ==
+            offset_sphere &&
+        std::abs(
+            offset_sphere_ray->distance -
+            2.5f) < 0.0002f,
+        "rotated SphereCollider center offsets participate in physics queries");
+
     const auto collision_frame =
         physics::step_physics(
             collision_world,

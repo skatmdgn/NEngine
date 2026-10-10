@@ -1664,52 +1664,65 @@ bool ray_bounds(
     float& distance,
     core::Vec3& normal) noexcept {
 
-    const auto minimum =
-        core::Vec3{
-            bounds.center.x - bounds.half.x,
-            bounds.center.y - bounds.half.y,
-            bounds.center.z - bounds.half.z
-        };
-
-    const auto maximum =
-        core::Vec3{
-            bounds.center.x + bounds.half.x,
-            bounds.center.y + bounds.half.y,
-            bounds.center.z + bounds.half.z
-        };
+    const core::Vec3 relative{
+        origin.x -
+            bounds.center.x,
+        origin.y -
+            bounds.center.y,
+        is_2d
+            ? 0.0f
+            : origin.z -
+                bounds.center.z
+    };
 
     float t_min = 0.0f;
-    float t_max = max_distance;
+    float t_max =
+        max_distance;
     core::Vec3 hit_normal{};
 
     const auto test_axis =
-        [&](float o,
-            float d,
-            float min_value,
-            float max_value,
-            core::Vec3 negative_normal,
-            core::Vec3 positive_normal) {
+        [&](core::Vec3 axis,
+            float half_extent) {
+
+            const float o =
+                dot(
+                    relative,
+                    axis);
+
+            const float d =
+                dot(
+                    direction,
+                    axis);
 
             constexpr float epsilon =
                 0.000001f;
 
-            if (std::abs(d) <= epsilon) {
-                return o >= min_value &&
-                       o <= max_value;
+            if (std::abs(d) <=
+                epsilon) {
+                return std::abs(o) <=
+                    half_extent;
             }
 
             float t1 =
-                (min_value - o) / d;
-            float t2 =
-                (max_value - o) / d;
+                (-half_extent - o) /
+                d;
 
-            core::Vec3 enter_normal =
-                negative_normal;
+            float t2 =
+                (half_extent - o) /
+                d;
+
+            auto enter_normal =
+                scaled(
+                    axis,
+                    -1.0f);
 
             if (t1 > t2) {
-                std::swap(t1, t2);
+                std::swap(
+                    t1,
+                    t2);
+
                 enter_normal =
-                    positive_normal;
+                    axis;
             }
 
             if (t1 > t_min) {
@@ -1723,34 +1736,23 @@ bool ray_bounds(
                     t_max,
                     t2);
 
-            return t_min <= t_max;
+            return t_min <=
+                t_max;
         };
 
     if (!test_axis(
-            origin.x,
-            direction.x,
-            minimum.x,
-            maximum.x,
-            {-1.0f, 0.0f, 0.0f},
-            {1.0f, 0.0f, 0.0f}) ||
+            bounds.axis_x,
+            bounds.half.x) ||
         !test_axis(
-            origin.y,
-            direction.y,
-            minimum.y,
-            maximum.y,
-            {0.0f, -1.0f, 0.0f},
-            {0.0f, 1.0f, 0.0f})) {
+            bounds.axis_y,
+            bounds.half.y)) {
         return false;
     }
 
     if (!is_2d &&
         !test_axis(
-            origin.z,
-            direction.z,
-            minimum.z,
-            maximum.z,
-            {0.0f, 0.0f, -1.0f},
-            {0.0f, 0.0f, 1.0f})) {
+            bounds.axis_z,
+            bounds.half.z)) {
         return false;
     }
 
@@ -2186,6 +2188,191 @@ std::optional<RaycastHit> raycast_2d(
 
 namespace {
 
+float axis_aligned_box_radius(
+    core::Vec3 half,
+    core::Vec3 axis,
+    bool is_2d) noexcept {
+
+    return
+        std::abs(axis.x) *
+            half.x +
+        std::abs(axis.y) *
+            half.y +
+        (is_2d
+            ? 0.0f
+            : std::abs(axis.z) *
+                half.z);
+}
+
+bool swept_box_hit(
+    core::Vec3 origin,
+    core::Vec3 cast_half,
+    core::Vec3 direction,
+    const ColliderBounds& target,
+    float max_distance,
+    bool is_2d,
+    float& distance,
+    core::Vec3& normal) noexcept {
+
+    const core::Vec3 separation{
+        target.center.x -
+            origin.x,
+        target.center.y -
+            origin.y,
+        is_2d
+            ? 0.0f
+            : target.center.z -
+                origin.z
+    };
+
+    float enter_time = 0.0f;
+    float exit_time =
+        max_distance;
+    core::Vec3 enter_normal{};
+
+    const auto test_axis =
+        [&](core::Vec3 raw_axis) {
+
+            const auto axis =
+                normalized_axis(
+                    raw_axis);
+
+            if (axis ==
+                core::Vec3{}) {
+                return true;
+            }
+
+            const float center_distance =
+                dot(
+                    separation,
+                    axis);
+
+            const float velocity =
+                dot(
+                    direction,
+                    axis);
+
+            const float radius =
+                axis_aligned_box_radius(
+                    cast_half,
+                    axis,
+                    is_2d) +
+                projected_box_radius(
+                    target,
+                    axis,
+                    is_2d);
+
+            constexpr float epsilon =
+                0.000001f;
+
+            if (std::abs(velocity) <=
+                epsilon) {
+                return std::abs(
+                           center_distance) <=
+                    radius;
+            }
+
+            float t1 =
+                (center_distance -
+                 radius) /
+                velocity;
+
+            float t2 =
+                (center_distance +
+                 radius) /
+                velocity;
+
+            if (t1 > t2) {
+                std::swap(
+                    t1,
+                    t2);
+            }
+
+            if (t1 > enter_time) {
+                enter_time =
+                    t1;
+
+                enter_normal =
+                    velocity > 0.0f
+                        ? scaled(
+                            axis,
+                            -1.0f)
+                        : axis;
+            }
+
+            exit_time =
+                std::min(
+                    exit_time,
+                    t2);
+
+            return enter_time <=
+                exit_time;
+        };
+
+    const core::Vec3 world_axes[]{
+        {1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f}
+    };
+
+    if (!test_axis(
+            world_axes[0]) ||
+        !test_axis(
+            world_axes[1]) ||
+        !test_axis(
+            target.axis_x) ||
+        !test_axis(
+            target.axis_y)) {
+        return false;
+    }
+
+    if (!is_2d) {
+        if (!test_axis(
+                world_axes[2]) ||
+            !test_axis(
+                target.axis_z)) {
+            return false;
+        }
+
+        const core::Vec3 target_axes[]{
+            target.axis_x,
+            target.axis_y,
+            target.axis_z
+        };
+
+        for (const auto world_axis :
+             world_axes) {
+            for (const auto target_axis :
+                 target_axes) {
+                if (!test_axis(
+                        cross(
+                            world_axis,
+                            target_axis))) {
+                    return false;
+                }
+            }
+        }
+    }
+
+    if (exit_time < 0.0f ||
+        enter_time >
+            max_distance) {
+        return false;
+    }
+
+    distance =
+        std::max(
+            0.0f,
+            enter_time);
+
+    normal =
+        enter_time > 0.0f
+            ? enter_normal
+            : core::Vec3{};
+
+    return true;
+}
+
 template <typename Collider>
 std::optional<RaycastHit> box_cast_bounds(
     const core::World& world,
@@ -2200,8 +2387,10 @@ std::optional<RaycastHit> box_cast_bounds(
 
     if (size.x <= 0.0f ||
         size.y <= 0.0f ||
-        (!is_2d && size.z <= 0.0f) ||
-        !std::isfinite(max_distance) ||
+        (!is_2d &&
+         size.z <= 0.0f) ||
+        !std::isfinite(
+            max_distance) ||
         max_distance < 0.0f) {
         return std::nullopt;
     }
@@ -2244,26 +2433,14 @@ std::optional<RaycastHit> box_cast_bounds(
             continue;
         }
 
-        auto expanded =
-            candidate;
-
-        expanded.half.x +=
-            cast_half.x;
-        expanded.half.y +=
-            cast_half.y;
-
-        if (!is_2d) {
-            expanded.half.z +=
-                cast_half.z;
-        }
-
         float distance = 0.0f;
         core::Vec3 normal{};
 
-        if (!ray_bounds(
+        if (!swept_box_hit(
                 origin,
+                cast_half,
                 normalized,
-                expanded,
+                candidate,
                 max_distance,
                 is_2d,
                 distance,
@@ -2277,8 +2454,6 @@ std::optional<RaycastHit> box_cast_bounds(
             continue;
         }
 
-        // For this initial axis-aligned cast foundation, point is
-        // the cast box center at first time of impact.
         closest =
             RaycastHit{
                 candidate.entity,

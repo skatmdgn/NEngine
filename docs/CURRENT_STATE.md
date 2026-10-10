@@ -293,19 +293,19 @@ Implemented:
 - Managed Rigidbody / BoxCollider / SphereCollider / Rigidbody2D / BoxCollider2D / CircleCollider2D proxies over ABI v15, including Unity-familiar velocity/useGravity/isKinematic naming.
 - Fixed-step rigidbody foundation runs after managed FixedUpdate so script velocity changes affect the same simulation step.
 - 3D gravity/linear-velocity Transform integration and 2D XY integration with kinematic/inactive bodies skipped.
-- BoxCollider/SphereCollider and BoxCollider2D/CircleCollider2D share the X-axis sweep-and-prune broad phase; narrow phase handles box-box, sphere-sphere/circle-circle and mixed box-radial pairs with layer/collision-mask filtering and trigger separation.
+- BoxCollider/SphereCollider and BoxCollider2D/CircleCollider2D share the X-axis sweep-and-prune broad phase; rotated boxes contribute conservative world AABBs while SAT narrow phase handles OBB-OBB, sphere-sphere/circle-circle and oriented box-radial pairs with layer/collision-mask filtering and trigger separation.
 - Basic 3D/2D position contact resolution removes entering normal velocity; dynamic/dynamic correction is inverse-mass weighted.
 - ContactTracker derives Enter/Stay/Exit phases for collision and trigger pairs.
 - Editor Play Mode dispatches tracked contact phases to both active managed Behaviours with side-correct contact normals.
 - Generated C# exposes Collision/Collision2D plus Collider/Collider2D callback payloads for OnCollisionEnter/Stay/Exit, OnTriggerEnter/Stay/Exit and their 2D variants.
-- Native Raycast/Raycast2D select the nearest box or sphere/circle hit and return entity, point, normal, distance, trigger state and collider layer with layer-mask filtering; OverlapBox/OverlapBox2D also include radial colliders.
+- Native Raycast/Raycast2D transform rays into BoxCollider/BoxCollider2D local axes for exact rotated-box hits, while still selecting the nearest box or sphere/circle result; OverlapBox/OverlapBox2D use the same OBB/radial narrow phase.
 - ABI v15 carries raycast/box-cast layer masks plus multi-hit overlap query callbacks without introducing a Scripting -> Physics dependency.
-- Generated Physics.Raycast / Physics2D.Raycast and Physics.OverlapBox / Physics2D.OverlapBoxAll resolve Box/Sphere and Box2D/Circle2D collider proxies; Physics.BoxCast / Physics2D.BoxCast remain axis-aligned box-target casts with trigger/layer filtering.
-- Native axis-aligned BoxCast / BoxCast2D use Minkowski-expanded AABBs to return nearest time-of-impact, normal and cast-center position; managed casts preserve those semantics.
+- Generated Physics.Raycast / Physics2D.Raycast and Physics.OverlapBox / Physics2D.OverlapBoxAll resolve Box/Sphere and Box2D/Circle2D collider proxies; Physics.BoxCast / Physics2D.BoxCast keep an axis-aligned moving cast box but now test rotated BoxCollider targets.
+- Native BoxCast / BoxCast2D use continuous SAT against fixed-orientation box targets to return nearest time-of-impact, oriented hit normal and cast-center position; managed casts preserve those semantics.
 - Native serialization/property tests and real managed C# property round-trip coverage.
 
 Not yet implemented:
-- Production broad-phase tuning beyond the initial sweep-and-prune plus oriented/rotated BoxCollider narrow phase and remaining shapes such as capsule/polygon variants.
+- Production broad-phase tuning beyond the initial sweep-and-prune plus remaining shapes such as capsule/polygon variants.
 - Production contact solving, friction, restitution and sleeping.
 - Additional shape casts and richer hit semantics/query filtering policy.
 - Physics materials and joints.
@@ -352,7 +352,7 @@ Not yet implemented:
 
 ## Immediate next work
 
-1. Extend the box/sphere/circle sweep-and-prune path with rotated boxes, remaining collider shapes and friction/restitution/sleeping.
+1. Extend the rotated box/sphere/circle sweep-and-prune path with remaining collider shapes and friction/restitution/sleeping.
 2. Extend audio with streaming + OGG/MP3/FLAC runtime decode and a callback-driven device path after real-Windows audible acceptance.
 3. Extend managed physics queries with additional shape casts and richer hit/filtering semantics.
 4. Package/version the managed NEngine API surface and add debugger attach/symbol workflow.
