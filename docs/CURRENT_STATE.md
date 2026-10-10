@@ -130,22 +130,21 @@ Implemented:
 - Visual Studio/Rider/default .sln association open path.
 - hostfxr discovery/dynamic loading with generated runtimeconfig.
 - dotnet SDK discovery, deterministic gameplay DLL/PDB build output and Editor **Build C#** action.
-- Managed ABI v9 shared through stable NEngine.API/NEngine.Bridge assemblies.
+- Managed ABI v10 shared through stable NEngine.API/NEngine.Bridge assemblies.
 - Native ScriptBehaviour component with Scene serialization, Add Component and generic Inspector editing.
 - Play Mode ScriptBehaviour instance management against the cloned runtime World.
-- Managed Behaviour Awake / OnEnable / Start / Update / OnDisable / OnDestroy execution with managed instances preserved while disabled or inactive.
+- Managed Behaviour Awake / OnEnable / Start / FixedUpdate / Update / LateUpdate / OnDisable / OnDestroy execution with managed instances preserved while disabled or inactive.
 - Native <-> managed local Transform position/rotation/scale synchronization around lifecycle calls.
 - Generated NEngine.API, stable NEngine.Bridge and gameplay projects are separate assemblies; collectible gameplay AssemblyLoadContext reloads user code without restarting hostfxr.
 - Managed GameObject name/active state, Transform parent/children/TRS and built-in component presence query native World state.
 - Managed GameObject construction and Find route through native World create/find callbacks.
 - GameObject.Destroy uses an end-of-simulation-tick native destroy queue so self-destroy and foreign/duplicate destroy requests do not invalidate ScriptSystem iteration.
 - Cross-platform keyboard/mouse Input callbacks expose KeyCode, GetKey/GetKeyDown/GetKeyUp, mouse position/delta and wheel.
-- Managed Time.deltaTime/time/frameCount advances once per simulation tick regardless of Behaviour count and resets when Play Mode begins.
+- Managed Time.deltaTime/time/frameCount advances once per host Update frame regardless of Behaviour count; Time.fixedDeltaTime is supplied on each fixed simulation step without advancing the host frame clock.
 - Coroutine scheduling supports StartCoroutine, StopCoroutine, StopAllCoroutines, nested IEnumerator, yield return null and WaitForSeconds.
 
 Not yet implemented:
 - Packaged/versioned distribution of the NEngine managed API.
-- FixedUpdate/LateUpdate lifecycle coverage and separation of fixed-step versus host-frame scheduling.
 - Broader native render/physics/audio component property APIs.
 - Visual Studio debugger attach integration.
 - NuGet runtime/package loading beyond generated project references.
@@ -288,7 +287,7 @@ The concrete Vulkan backend currently grows beneath this contract. The long-term
 - Win32 platform event polling feeds keyboard, mouse buttons, focus-loss releases and cursor position into InputState.
 - ActionMap can bind multiple keys/buttons to named actions and query held/pressed/released aggregation.
 - EditorModel receives the platform InputState every frame.
-- Managed ABI v9 has a separate native Input callback table; generated C# exposes Unity-familiar KeyCode, Input.GetKey/GetKeyDown/GetKeyUp, mousePosition, mouseDelta and mouseScrollDelta.
+- Managed ABI v10 has a separate native Input callback table; generated C# exposes Unity-familiar KeyCode, Input.GetKey/GetKeyDown/GetKeyUp, mousePosition, mouseDelta and mouseScrollDelta.
 - Cross-platform tests cover same-frame press/release, focus loss, pointer accumulation, action bindings and real managed C# Input callbacks.
 
 Not yet implemented:
@@ -299,7 +298,7 @@ Not yet implemented:
 ## Immediate next work
 
 1. Split managed simulation scheduling into FixedUpdate versus host-frame Update/LateUpdate while retaining the persistent Awake/OnEnable/OnDisable lifecycle state.
-2. Continue ABI v9 into richer native component/property access, starting with mainstream render components while preserving subsystem dependency boundaries.
+2. Continue ABI v10 into richer native component/property access, starting with mainstream render components while preserving subsystem dependency boundaries.
 3. Finish production PBR validation: sampler state, lights/shadows and remaining material behavior.
 4. Decide and implement the explicit policy for remote/nonlocal or outside-directory glTF resources while preserving sandbox safety.
 5. Add WebP decoding plus texture compression/transcoding policy; mipmap generation/upload is already implemented.

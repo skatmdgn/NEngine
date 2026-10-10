@@ -15,6 +15,7 @@ struct ManagedScriptUpdateStats {
     std::size_t awoken{0};
     std::size_t enabled{0};
     std::size_t started{0};
+    std::size_t fixed_updated{0};
     std::size_t updated{0};
     std::size_t late_updated{0};
     std::size_t disabled{0};
@@ -34,6 +35,11 @@ public:
 
     void bind(
         ManagedRuntime* runtime) noexcept;
+
+    ManagedScriptUpdateStats fixed_update(
+        core::World& world,
+        float fixed_delta_seconds,
+        std::string* error = nullptr);
 
     ManagedScriptUpdateStats update(
         core::World& world,

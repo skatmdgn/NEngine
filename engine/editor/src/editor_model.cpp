@@ -255,7 +255,8 @@ void EditorModel::tick_runtime(
         play_session_.runtime_world();
 
     if (!runtime) {
-        managed_script_system_.clear(play_session_.runtime_world());
+        managed_script_system_.clear(
+            play_session_.runtime_world());
         return;
     }
 
@@ -264,51 +265,101 @@ void EditorModel::tick_runtime(
             .consume_simulation_steps(
                 elapsed_seconds);
 
-    if (steps == 0u) {
+    const auto play_state =
+        play_session_.state();
+
+    const bool run_playing_frame =
+        play_state == PlayState::Playing &&
+        elapsed_seconds > 0.0;
+
+    if (steps == 0u &&
+        !run_playing_frame) {
         return;
     }
 
+    const auto fixed_delta =
+        static_cast<float>(
+            play_session_
+                .fixed_delta_seconds());
+
     std::string animation_error;
+    std::string script_error;
 
-    for (std::uint32_t step = 0u;
-         step < steps;
-         ++step) {
+    if (managed_runtime_.valid()) {
+        managed_runtime_.bind_input(
+            &input_state_);
+    }
 
-        render::update_sprite_animators(
-            *runtime,
-            static_cast<float>(
-                play_session_
-                    .fixed_delta_seconds()),
-            sprite_animation_cache_,
-            [this](
-                assets::AssetGuid guid) {
-                return project_
-                    .cached_artifacts(
-                        guid);
-            },
-            &animation_error);
+    const auto run_fixed_step =
+        [&]() {
+            render::update_sprite_animators(
+                *runtime,
+                fixed_delta,
+                sprite_animation_cache_,
+                [this](
+                    assets::AssetGuid guid) {
+                    return project_
+                        .cached_artifacts(
+                            guid);
+                },
+                &animation_error);
 
+            if (managed_runtime_.valid()) {
+                managed_script_system_
+                    .fixed_update(
+                        *runtime,
+                        fixed_delta,
+                        &script_error);
+            }
+        };
 
-        if (managed_runtime_.valid()) {
-            std::string script_error;
+    if (play_state ==
+        PlayState::Paused) {
 
-            managed_runtime_.bind_input(
-                &input_state_);
+        // Each requested editor Step is one complete simulation frame.
+        for (std::uint32_t step = 0u;
+             step < steps;
+             ++step) {
+
+            run_fixed_step();
+
+            if (managed_runtime_.valid()) {
+                managed_script_system_.update(
+                    *runtime,
+                    fixed_delta,
+                    &script_error);
+            }
+        }
+    } else {
+        // A host frame may contain zero or several fixed simulation steps.
+        for (std::uint32_t step = 0u;
+             step < steps;
+             ++step) {
+
+            run_fixed_step();
+        }
+
+        if (managed_runtime_.valid() &&
+            run_playing_frame) {
+
+            const auto clamped_elapsed =
+                elapsed_seconds > 0.25
+                    ? 0.25
+                    : elapsed_seconds;
 
             managed_script_system_.update(
                 *runtime,
                 static_cast<float>(
-                    play_session_
-                        .fixed_delta_seconds()),
+                    clamped_elapsed),
                 &script_error);
-
-            if (!script_error.empty()) {
-                console_.warning(
-                    "Scripting",
-                    std::move(
-                        script_error));
-            }
         }
+    }
+
+    if (!script_error.empty()) {
+        console_.warning(
+            "Scripting",
+            std::move(
+                script_error));
     }
 
     if (!animation_error.empty()) {

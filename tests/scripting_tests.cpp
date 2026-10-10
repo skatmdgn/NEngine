@@ -611,6 +611,14 @@ int main() {
                 << "        frame++;\n"
                 << "    }\n"
                 << "}\n"
+                << "public class FixedSystemProbe : Behaviour {\n"
+                << "    private void FixedUpdate() {\n"
+                << "        if (System.MathF.Abs(Time.fixedDeltaTime - 0.02f) > 0.0001f || System.MathF.Abs(Time.deltaTime - 0.02f) > 0.0001f) throw new System.Exception(\"fixed system delta mismatch\");\n"
+                << "        transform.localPosition = transform.localPosition + new Vector3(10, 0, 0);\n"
+                << "    }\n"
+                << "    private void Update() { transform.localPosition = transform.localPosition + new Vector3(1, 0, 0); }\n"
+                << "    private void LateUpdate() { transform.localPosition = transform.localPosition + new Vector3(0, 1, 0); }\n"
+                << "}\n"
                 << "public class LateOrderProbe : Behaviour {\n"
                 << "    private static ulong frame;\n"
                 << "    private static int updates;\n"
@@ -824,6 +832,78 @@ int main() {
                         check(
                             managed_runtime.reset_time(),
                             "managed Time clock resets explicitly before simulation");
+
+                        ManagedScriptSystem
+                            fixed_system;
+
+                        fixed_system.bind(
+                            &managed_runtime);
+
+                        nengine::core::World
+                            fixed_world;
+
+                        const auto fixed_entity =
+                            fixed_world.create(
+                                "Fixed System");
+
+                        auto* fixed_script =
+                            fixed_world.add_component<
+                                ScriptBehaviour>(
+                                    fixed_entity,
+                                    script_behaviour_type());
+
+                        if (fixed_script) {
+                            fixed_script->type_name =
+                                "FixedSystemProbe";
+                        }
+
+                        std::string fixed_error;
+
+                        const auto fixed_tick_1 =
+                            fixed_system.fixed_update(
+                                fixed_world,
+                                0.02f,
+                                &fixed_error);
+
+                        const auto fixed_tick_2 =
+                            fixed_system.fixed_update(
+                                fixed_world,
+                                0.02f,
+                                &fixed_error);
+
+                        const auto fixed_frame =
+                            fixed_system.update(
+                                fixed_world,
+                                1.0f / 30.0f,
+                                &fixed_error);
+
+                        const auto* fixed_transform =
+                            fixed_world.transform(
+                                fixed_entity);
+
+                        check(
+                            fixed_script &&
+                            fixed_tick_1.created == 1u &&
+                            fixed_tick_1.awoken == 1u &&
+                            fixed_tick_1.enabled == 1u &&
+                            fixed_tick_1.started == 1u &&
+                            fixed_tick_1.fixed_updated == 1u &&
+                            fixed_tick_1.unresolved == 0u &&
+                            fixed_tick_2.created == 0u &&
+                            fixed_tick_2.started == 0u &&
+                            fixed_tick_2.fixed_updated == 1u &&
+                            fixed_tick_2.unresolved == 0u &&
+                            fixed_frame.fixed_updated == 0u &&
+                            fixed_frame.updated == 1u &&
+                            fixed_frame.late_updated == 1u &&
+                            fixed_frame.unresolved == 0u &&
+                            fixed_transform &&
+                            fixed_transform->local_position.x == 21.0f &&
+                            fixed_transform->local_position.y == 1.0f,
+                            "managed fixed-step callbacks run separately before one host Update and LateUpdate frame");
+
+                        fixed_system.clear(
+                            &fixed_world);
 
                         ManagedScriptSystem
                             late_system;
