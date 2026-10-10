@@ -1207,6 +1207,127 @@ std::string api_stub(
         public GameObject gameObject { get; internal set; } = null!;
         public Transform transform => gameObject.transform;
         public T? GetComponent<T>() where T : Component => gameObject.GetComponent<T>();
+
+        protected bool TryGetNativeProperty(
+            string propertyName,
+            out NativePropertyValue value)
+        {
+            value = new NativePropertyValue();
+
+            if (!gameObject.nativeBound ||
+                !NativeWorld.available)
+            {
+                return false;
+            }
+
+            string? typeName =
+                NativeWorld.NativeComponentName(
+                    GetType());
+
+            return typeName != null &&
+                NativeWorld.TryGetProperty(
+                    gameObject.instanceId,
+                    typeName,
+                    propertyName,
+                    out value);
+        }
+
+        protected bool SetNativeProperty(
+            string propertyName,
+            NativePropertyValue value)
+        {
+            if (!gameObject.nativeBound ||
+                !NativeWorld.available)
+            {
+                return false;
+            }
+
+            string? typeName =
+                NativeWorld.NativeComponentName(
+                    GetType());
+
+            return typeName != null &&
+                NativeWorld.SetProperty(
+                    gameObject.instanceId,
+                    typeName,
+                    propertyName,
+                    value);
+        }
+
+        protected bool NativeBool(
+            string propertyName,
+            bool fallback = false)
+        {
+            return TryGetNativeProperty(
+                    propertyName,
+                    out NativePropertyValue value) &&
+                value.kind == 1
+                    ? value.booleanValue != 0
+                    : fallback;
+        }
+
+        protected float NativeFloat(
+            string propertyName,
+            float fallback = 0)
+        {
+            return TryGetNativeProperty(
+                    propertyName,
+                    out NativePropertyValue value) &&
+                value.kind == 4
+                    ? (float)value.numberValue
+                    : fallback;
+        }
+
+        protected long NativeInteger(
+            string propertyName,
+            long fallback = 0)
+        {
+            return TryGetNativeProperty(
+                    propertyName,
+                    out NativePropertyValue value) &&
+                value.kind == 2
+                    ? value.integerValue
+                    : fallback;
+        }
+
+        protected void SetNativeBool(
+            string propertyName,
+            bool value)
+        {
+            SetNativeProperty(
+                propertyName,
+                new NativePropertyValue
+                {
+                    kind = 1,
+                    booleanValue = value ? 1 : 0
+                });
+        }
+
+        protected void SetNativeFloat(
+            string propertyName,
+            float value)
+        {
+            SetNativeProperty(
+                propertyName,
+                new NativePropertyValue
+                {
+                    kind = 4,
+                    numberValue = value
+                });
+        }
+
+        protected void SetNativeInteger(
+            string propertyName,
+            long value)
+        {
+            SetNativeProperty(
+                propertyName,
+                new NativePropertyValue
+                {
+                    kind = 2,
+                    integerValue = value
+                });
+        }
     }
 
     public sealed class WaitForSeconds
@@ -1343,7 +1464,47 @@ std::string api_stub(
         }
     }
 
-    public sealed class Camera : Component { }
+    public sealed class Camera : Component
+    {
+        public bool enabled
+        {
+            get => NativeBool("Enabled", true);
+            set => SetNativeBool("Enabled", value);
+        }
+
+        public bool orthographic
+        {
+            get => NativeInteger("Projection", 0) == 1;
+            set => SetNativeInteger(
+                "Projection",
+                value ? 1 : 0);
+        }
+
+        public float fieldOfView
+        {
+            get => NativeFloat("Vertical FOV", 60);
+            set => SetNativeFloat("Vertical FOV", value);
+        }
+
+        public float nearClipPlane
+        {
+            get => NativeFloat("Near Clip", 0.1f);
+            set => SetNativeFloat("Near Clip", value);
+        }
+
+        public float farClipPlane
+        {
+            get => NativeFloat("Far Clip", 1000);
+            set => SetNativeFloat("Far Clip", value);
+        }
+
+        public float orthographicSize
+        {
+            get => NativeFloat("Orthographic Size", 5);
+            set => SetNativeFloat("Orthographic Size", value);
+        }
+    }
+
     public sealed class Light : Component { }
     public sealed class MeshRenderer : Component { }
     public sealed class SpriteRenderer : Component { }
