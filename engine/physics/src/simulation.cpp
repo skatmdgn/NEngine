@@ -118,4 +118,24 @@ PhysicsStepStats step_rigidbodies(
     return stats;
 }
 
+PhysicsFrameResult step_physics(
+    core::World& world,
+    float delta_seconds,
+    core::Vec3 gravity) {
+
+    PhysicsFrameResult result;
+
+    result.integration =
+        step_rigidbodies(
+            world,
+            delta_seconds,
+            gravity);
+
+    result.collisions =
+        detect_box_overlaps(
+            world);
+
+    return result;
+}
+
 } // namespace nengine::physics

@@ -405,7 +405,7 @@ void EditorModel::tick_runtime(
                         &script_error);
             }
 
-            physics::step_rigidbodies(
+            physics::step_physics(
                 *runtime,
                 fixed_delta);
         };

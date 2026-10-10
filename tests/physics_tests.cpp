@@ -543,6 +543,24 @@ int main() {
         saw_2d_contact,
         "AABB overlap records minimum penetration axis and trigger semantics");
 
+    const auto collision_frame =
+        physics::step_physics(
+            collision_world,
+            1.0f / 60.0f);
+
+    check(
+        collision_frame
+            .collisions
+            .overlaps
+            .size() == 2u &&
+        collision_frame
+            .collisions
+            .tested_pairs_3d == 3u &&
+        collision_frame
+            .collisions
+            .tested_pairs_2d == 1u,
+        "full physics frame performs integration before collision detection");
+
     if (failures != 0) {
         std::cerr
             << failures
