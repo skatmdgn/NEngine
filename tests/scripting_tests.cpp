@@ -572,6 +572,10 @@ int main() {
             std::string::npos &&
         api.find("receiveShadows") !=
             std::string::npos &&
+        api.find("readonly struct AssetGuid") !=
+            std::string::npos &&
+        api.find("TryParse") !=
+            std::string::npos &&
         api.find(
             "InternalsVisibleTo(\"NEngine.Bridge\")") !=
                 std::string::npos,

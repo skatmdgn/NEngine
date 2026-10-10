@@ -1430,6 +1430,20 @@ std::string api_stub(
                     : fallback;
         }
 
+        private protected AssetGuid NativeAssetGuid(
+            string propertyName)
+        {
+            string text =
+                NativeString(
+                    propertyName);
+
+            return AssetGuid.TryParse(
+                    text,
+                    out AssetGuid value)
+                ? value
+                : AssetGuid.none;
+        }
+
         private protected Vector3 NativeVector3(
             string propertyName,
             Vector3 fallback)
@@ -1506,6 +1520,17 @@ std::string api_stub(
                     propertyName,
                     value);
             }
+        }
+
+        private protected void SetNativeAssetGuid(
+            string propertyName,
+            AssetGuid value)
+        {
+            SetNativeString(
+                propertyName,
+                value.valid
+                    ? value.ToString()
+                    : string.Empty);
         }
 
         private protected void SetNativeVector3(
@@ -2488,6 +2513,90 @@ std::string api_stub(
 
         public static Vector3 operator *(Vector3 a, float b) =>
             new Vector3(a.x * b, a.y * b, a.z * b);
+    }
+
+    public readonly struct AssetGuid : IEquatable<AssetGuid>
+    {
+        public readonly ulong high;
+        public readonly ulong low;
+
+        public AssetGuid(
+            ulong high,
+            ulong low)
+        {
+            this.high = high;
+            this.low = low;
+        }
+
+        public bool valid =>
+            high != 0 ||
+            low != 0;
+
+        public static AssetGuid none =>
+            new AssetGuid(0, 0);
+
+        public override string ToString() =>
+            high.ToString("x16") +
+            low.ToString("x16");
+
+        public static bool TryParse(
+            string? text,
+            out AssetGuid value)
+        {
+            value = none;
+
+            if (string.IsNullOrEmpty(text) ||
+                text.Length != 32)
+            {
+                return false;
+            }
+
+            if (!ulong.TryParse(
+                    text.AsSpan(0, 16),
+                    System.Globalization.NumberStyles.HexNumber,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out ulong high) ||
+                !ulong.TryParse(
+                    text.AsSpan(16, 16),
+                    System.Globalization.NumberStyles.HexNumber,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out ulong low))
+            {
+                return false;
+            }
+
+            value =
+                new AssetGuid(
+                    high,
+                    low);
+
+            return value.valid;
+        }
+
+        public bool Equals(
+            AssetGuid other) =>
+            high == other.high &&
+            low == other.low;
+
+        public override bool Equals(
+            object? obj) =>
+            obj is AssetGuid other &&
+            Equals(other);
+
+        public override int GetHashCode() =>
+            HashCode.Combine(
+                high,
+                low);
+
+        public static bool operator ==(
+            AssetGuid a,
+            AssetGuid b) =>
+            a.Equals(b);
+
+        public static bool operator !=(
+            AssetGuid a,
+            AssetGuid b) =>
+            !a.Equals(b);
     }
 
     public readonly struct Color
