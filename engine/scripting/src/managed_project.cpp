@@ -1290,6 +1290,21 @@ std::string api_stub(
                     : fallback;
         }
 
+        protected Vector3 NativeVector3(
+            string propertyName,
+            Vector3 fallback)
+        {
+            return TryGetNativeProperty(
+                    propertyName,
+                    out NativePropertyValue value) &&
+                value.kind == 5
+                    ? new Vector3(
+                        value.x,
+                        value.y,
+                        value.z)
+                    : fallback;
+        }
+
         protected void SetNativeBool(
             string propertyName,
             bool value)
@@ -1326,6 +1341,21 @@ std::string api_stub(
                 {
                     kind = 2,
                     integerValue = value
+                });
+        }
+
+        protected void SetNativeVector3(
+            string propertyName,
+            Vector3 value)
+        {
+            SetNativeProperty(
+                propertyName,
+                new NativePropertyValue
+                {
+                    kind = 5,
+                    x = value.x,
+                    y = value.y,
+                    z = value.z
                 });
         }
     }
@@ -1505,7 +1535,79 @@ std::string api_stub(
         }
     }
 
-    public sealed class Light : Component { }
+    public enum LightType
+    {
+        Directional = 0,
+        Point = 1,
+        Spot = 2
+    }
+
+    public sealed class Light : Component
+    {
+        public bool enabled
+        {
+            get => NativeBool("Enabled", true);
+            set => SetNativeBool("Enabled", value);
+        }
+
+        public LightType type
+        {
+            get => (LightType)NativeInteger(
+                "Type",
+                (long)LightType.Directional);
+            set => SetNativeInteger(
+                "Type",
+                (long)value);
+        }
+
+        public Color color
+        {
+            get
+            {
+                Vector3 rgb =
+                    NativeVector3(
+                        "Color",
+                        Vector3.one);
+
+                return new Color(
+                    rgb.x,
+                    rgb.y,
+                    rgb.z,
+                    1);
+            }
+            set => SetNativeVector3(
+                "Color",
+                new Vector3(
+                    value.r,
+                    value.g,
+                    value.b));
+        }
+
+        public float intensity
+        {
+            get => NativeFloat("Intensity", 1);
+            set => SetNativeFloat("Intensity", value);
+        }
+
+        public float range
+        {
+            get => NativeFloat("Range", 10);
+            set => SetNativeFloat("Range", value);
+        }
+
+        public float spotAngle
+        {
+            get => NativeFloat("Spot Angle", 30);
+            set => SetNativeFloat("Spot Angle", value);
+        }
+
+        public bool shadows
+        {
+            get => NativeBool("Cast Shadows", true);
+            set => SetNativeBool("Cast Shadows", value);
+        }
+    }
+
     public sealed class MeshRenderer : Component { }
     public sealed class SpriteRenderer : Component { }
 
@@ -2171,6 +2273,32 @@ std::string api_stub(
 
         public static Vector3 operator *(Vector3 a, float b) =>
             new Vector3(a.x * b, a.y * b, a.z * b);
+    }
+
+    public readonly struct Color
+    {
+        public readonly float r;
+        public readonly float g;
+        public readonly float b;
+        public readonly float a;
+
+        public Color(
+            float r,
+            float g,
+            float b,
+            float a = 1)
+        {
+            this.r = r;
+            this.g = g;
+            this.b = b;
+            this.a = a;
+        }
+
+        public static Color white =>
+            new Color(1, 1, 1, 1);
+
+        public static Color black =>
+            new Color(0, 0, 0, 1);
     }
 
     public readonly struct Quaternion
