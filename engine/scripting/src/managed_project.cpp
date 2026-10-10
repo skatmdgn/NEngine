@@ -1831,7 +1831,38 @@ std::string api_stub(
         }
     }
 
-    public sealed class SpriteAnimator : Component { }
+    public sealed class SpriteAnimator : Component
+    {
+        public bool enabled
+        {
+            get => NativeBool("Enabled", true);
+            set => SetNativeBool("Enabled", value);
+        }
+
+        public AssetGuid clip
+        {
+            get => NativeAssetGuid("Clip");
+            set => SetNativeAssetGuid("Clip", value);
+        }
+
+        public bool playing
+        {
+            get => NativeBool("Playing", true);
+            set => SetNativeBool("Playing", value);
+        }
+
+        public bool loop
+        {
+            get => NativeBool("Loop", true);
+            set => SetNativeBool("Loop", value);
+        }
+
+        public float speed
+        {
+            get => NativeFloat("Speed", 1);
+            set => SetNativeFloat("Speed", value);
+        }
+    }
 
     public sealed class SpriteRenderer : Component
     {
