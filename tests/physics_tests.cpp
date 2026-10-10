@@ -160,6 +160,8 @@ int main() {
         body->sleep_threshold = 0.12f;
         body->linear_velocity =
             {1.0f, 2.0f, 3.0f};
+        body->angular_velocity =
+            {0.1f, 0.2f, 0.3f};
     }
 
     if (collider) {
@@ -206,6 +208,8 @@ int main() {
         body2d->sleep_threshold = 0.2f;
         body2d->linear_velocity =
             {4.0f, 5.0f, 0.0f};
+        body2d->angular_velocity =
+            {0.0f, 0.0f, 0.5f};
     }
 
     if (collider2d) {
@@ -413,6 +417,8 @@ int main() {
         !restored_body->sleeping &&
         restored_body->linear_velocity ==
             core::Vec3{1.0f, 2.0f, 3.0f} &&
+        restored_body->angular_velocity ==
+            core::Vec3{0.1f, 0.2f, 0.3f} &&
         restored_collider &&
         restored_collider->is_trigger &&
         restored_collider->layer == 3u &&
@@ -470,6 +476,8 @@ int main() {
         !restored_body2d->sleeping &&
         restored_body2d->linear_velocity ==
             core::Vec3{4.0f, 5.0f, 0.0f} &&
+        restored_body2d->angular_velocity ==
+            core::Vec3{0.0f, 0.0f, 0.5f} &&
         restored_collider2d &&
         restored_collider2d->layer == 7u &&
         restored_collider2d->collision_mask ==
@@ -571,7 +579,9 @@ int main() {
                     return property.name ==
                                "Allow Sleep" ||
                            property.name ==
-                               "Sleep Threshold";
+                               "Sleep Threshold" ||
+                           property.name ==
+                               "Angular Velocity";
                 }),
             legacy.properties.end());
 
@@ -769,6 +779,8 @@ int main() {
     if (simulated_body) {
         simulated_body->linear_velocity =
             {2.0f, 0.0f, 0.0f};
+        simulated_body->angular_velocity =
+            {0.0f, 0.0f, 3.14159265f};
     }
 
     const auto body2d_entity =
@@ -786,6 +798,8 @@ int main() {
             false;
         simulated_body2d->linear_velocity =
             {3.0f, 4.0f, 0.0f};
+        simulated_body2d->angular_velocity =
+            {5.0f, 6.0f, 3.14159265f};
     }
 
     const auto kinematic_entity =
@@ -803,6 +817,8 @@ int main() {
             true;
         kinematic_body->linear_velocity =
             {100.0f, 100.0f, 100.0f};
+        kinematic_body->angular_velocity =
+            {10.0f, 20.0f, 30.0f};
     }
 
     const auto step =
@@ -858,6 +874,14 @@ int main() {
             body_transform
                 ->local_position.y +
             2.4525f) < 0.0001f &&
+        std::abs(
+            body_transform
+                ->local_rotation.z -
+            0.70710678f) < 0.0002f &&
+        std::abs(
+            body_transform
+                ->local_rotation.w -
+            0.70710678f) < 0.0002f &&
         simulated_body2d &&
         simulated_body2d
             ->linear_velocity ==
@@ -865,6 +889,12 @@ int main() {
                 3.0f,
                 4.0f,
                 0.0f} &&
+        simulated_body2d
+            ->angular_velocity ==
+            core::Vec3{
+                0.0f,
+                0.0f,
+                3.14159265f} &&
         body2d_transform &&
         body2d_transform
             ->local_position ==
@@ -872,13 +902,24 @@ int main() {
                 1.5f,
                 2.0f,
                 0.0f} &&
+        std::abs(
+            body2d_transform
+                ->local_rotation.z -
+            0.70710678f) < 0.0002f &&
+        std::abs(
+            body2d_transform
+                ->local_rotation.w -
+            0.70710678f) < 0.0002f &&
         kinematic_body &&
         kinematic_body->is_kinematic &&
         kinematic_transform &&
         kinematic_transform
             ->local_position ==
-            core::Vec3{},
-        "fixed-step rigidbody foundation integrates gravity velocity and Transform while skipping kinematic bodies");
+            core::Vec3{} &&
+        kinematic_transform
+            ->local_rotation ==
+            core::Quat{},
+        "fixed-step rigidbody foundation integrates linear/angular velocity into Transform while skipping kinematic bodies");
 
     const auto invalid_step =
         physics::step_rigidbodies(

@@ -255,7 +255,8 @@ bool register_rigidbody_metadata(
             {"Mass", core::PropertyKind::Float},
             {"Gravity Scale", core::PropertyKind::Float},
             {"Sleep Threshold", core::PropertyKind::Float},
-            {"Linear Velocity", core::PropertyKind::Vec3}}) {
+            {"Linear Velocity", core::PropertyKind::Vec3},
+            {"Angular Velocity", core::PropertyKind::Vec3}}) {
 
         ok =
             registry.register_property(
@@ -479,7 +480,10 @@ capture_rigidbody(
             value->sleep_threshold),
         vec3_property(
             "Linear Velocity",
-            value->linear_velocity)
+            value->linear_velocity),
+        vec3_property(
+            "Angular Velocity",
+            value->angular_velocity)
     };
 
     return data;
@@ -530,6 +534,11 @@ bool restore_rigidbody(
             data,
             "Linear Velocity",
             value.linear_velocity) ||
+        !read_vec3(
+            data,
+            "Angular Velocity",
+            value.angular_velocity,
+            true) ||
         !valid_rigidbody(
             value.mass,
             value.gravity_scale,
@@ -1173,7 +1182,7 @@ bool register_component_serializers(
     ok =
         registry.register_codec({
             rigidbody_type(),
-            2,
+            3,
             "NEngine.Rigidbody",
             [](const core::World& world,
                core::Entity entity) {
@@ -1279,7 +1288,7 @@ bool register_component_serializers(
     ok =
         registry.register_codec({
             rigidbody2d_type(),
-            2,
+            3,
             "NEngine.Rigidbody2D",
             [](const core::World& world,
                core::Entity entity) {

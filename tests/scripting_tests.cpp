@@ -1635,6 +1635,8 @@ int main() {
             std::string::npos &&
         api.find("sleepThreshold") !=
             std::string::npos &&
+        api.find("angularVelocity") !=
+            std::string::npos &&
         api.find("IsSleeping") !=
             std::string::npos &&
         api.find("WakeUp") !=

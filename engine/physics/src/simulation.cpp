@@ -31,6 +31,137 @@ float speed_squared(
             : value.z * value.z);
 }
 
+float angular_speed_squared(
+    core::Vec3 value,
+    bool is_2d) noexcept {
+
+    if (is_2d) {
+        return value.z * value.z;
+    }
+
+    return value.x * value.x +
+        value.y * value.y +
+        value.z * value.z;
+}
+
+float motion_speed_squared(
+    core::Vec3 linear,
+    core::Vec3 angular,
+    bool is_2d) noexcept {
+
+    return speed_squared(
+               linear,
+               is_2d) +
+        angular_speed_squared(
+               angular,
+               is_2d);
+}
+
+core::Quat normalized_quat(
+    core::Quat value) noexcept {
+
+    const float squared =
+        value.x * value.x +
+        value.y * value.y +
+        value.z * value.z +
+        value.w * value.w;
+
+    if (squared <= 0.0000000001f) {
+        return {};
+    }
+
+    const float inverse =
+        1.0f /
+        std::sqrt(squared);
+
+    return {
+        value.x * inverse,
+        value.y * inverse,
+        value.z * inverse,
+        value.w * inverse
+    };
+}
+
+core::Quat multiplied(
+    core::Quat a,
+    core::Quat b) noexcept {
+
+    return {
+        a.w * b.x +
+            a.x * b.w +
+            a.y * b.z -
+            a.z * b.y,
+        a.w * b.y -
+            a.x * b.z +
+            a.y * b.w +
+            a.z * b.x,
+        a.w * b.z +
+            a.x * b.y -
+            a.y * b.x +
+            a.z * b.w,
+        a.w * b.w -
+            a.x * b.x -
+            a.y * b.y -
+            a.z * b.z
+    };
+}
+
+void integrate_rotation(
+    core::Quat& rotation,
+    core::Vec3 angular_velocity,
+    float delta_seconds,
+    bool is_2d) noexcept {
+
+    if (is_2d) {
+        angular_velocity.x = 0.0f;
+        angular_velocity.y = 0.0f;
+    }
+
+    const float magnitude_squared =
+        angular_velocity.x *
+            angular_velocity.x +
+        angular_velocity.y *
+            angular_velocity.y +
+        angular_velocity.z *
+            angular_velocity.z;
+
+    if (magnitude_squared <=
+        0.0000000001f) {
+        return;
+    }
+
+    const float magnitude =
+        std::sqrt(
+            magnitude_squared);
+
+    const float angle =
+        magnitude *
+        delta_seconds;
+
+    const float half_angle =
+        angle * 0.5f;
+
+    const float axis_scale =
+        std::sin(half_angle) /
+        magnitude;
+
+    const core::Quat delta{
+        angular_velocity.x *
+            axis_scale,
+        angular_velocity.y *
+            axis_scale,
+        angular_velocity.z *
+            axis_scale,
+        std::cos(half_angle)
+    };
+
+    rotation =
+        normalized_quat(
+            multiplied(
+                delta,
+                rotation));
+}
+
 bool has_solid_contact(
     const std::vector<BoxOverlap>& overlaps,
     core::Entity entity,
@@ -75,8 +206,9 @@ void update_body_sleep(
         body.sleep_threshold;
 
     const float body_speed_squared =
-        speed_squared(
+        motion_speed_squared(
             body.linear_velocity,
+            body.angular_velocity,
             is_2d);
 
     if (!supported ||
@@ -103,6 +235,7 @@ void update_body_sleep(
 
     if (body.sleeping) {
         body.linear_velocity = {};
+        body.angular_velocity = {};
     }
 }
 
@@ -146,6 +279,10 @@ void update_sleep_states(
                     rigidbody2d_type())) {
 
             body2d->linear_velocity.z =
+                0.0f;
+            body2d->angular_velocity.x =
+                0.0f;
+            body2d->angular_velocity.y =
                 0.0f;
 
             update_body_sleep(
@@ -203,8 +340,9 @@ PhysicsStepStats step_rigidbodies(
                     body->sleep_threshold;
 
                 if (!body->allow_sleep ||
-                    speed_squared(
+                    motion_speed_squared(
                         body->linear_velocity,
+                        body->angular_velocity,
                         false) >
                         threshold_squared) {
 
@@ -230,6 +368,12 @@ PhysicsStepStats step_rigidbodies(
                 body->linear_velocity,
                 delta_seconds);
 
+            integrate_rotation(
+                transform->local_rotation,
+                body->angular_velocity,
+                delta_seconds,
+                false);
+
             ++stats.integrated_3d;
             continue;
         }
@@ -247,6 +391,10 @@ PhysicsStepStats step_rigidbodies(
 
         body2d->linear_velocity.z =
             0.0f;
+        body2d->angular_velocity.x =
+            0.0f;
+        body2d->angular_velocity.y =
+            0.0f;
 
         if (body2d->sleeping) {
             const float threshold_squared =
@@ -254,8 +402,9 @@ PhysicsStepStats step_rigidbodies(
                 body2d->sleep_threshold;
 
             if (!body2d->allow_sleep ||
-                speed_squared(
+                motion_speed_squared(
                     body2d->linear_velocity,
+                    body2d->angular_velocity,
                     true) >
                     threshold_squared) {
 
@@ -288,7 +437,17 @@ PhysicsStepStats step_rigidbodies(
             body2d->linear_velocity.y *
             delta_seconds;
 
+        integrate_rotation(
+            transform->local_rotation,
+            body2d->angular_velocity,
+            delta_seconds,
+            true);
+
         body2d->linear_velocity.z =
+            0.0f;
+        body2d->angular_velocity.x =
+            0.0f;
+        body2d->angular_velocity.y =
             0.0f;
 
         ++stats.integrated_2d;

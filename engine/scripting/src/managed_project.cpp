@@ -2210,6 +2210,16 @@ std::string api_stub(
             set => linearVelocity = value;
         }
 
+        public Vector3 angularVelocity
+        {
+            get => NativeVector3(
+                "Angular Velocity",
+                Vector3.zero);
+            set => SetNativeVector3(
+                "Angular Velocity",
+                value);
+        }
+
         public void AddForce(
             Vector3 force)
         {
@@ -2841,6 +2851,23 @@ std::string api_stub(
         {
             get => linearVelocity;
             set => linearVelocity = value;
+        }
+
+        public float angularVelocity
+        {
+            get =>
+                NativeVector3(
+                    "Angular Velocity",
+                    Vector3.zero).z *
+                57.2957795f;
+            set =>
+                SetNativeVector3(
+                    "Angular Velocity",
+                    new Vector3(
+                        0,
+                        0,
+                        value *
+                        0.0174532925f));
         }
 
         public void AddForce(

@@ -18,6 +18,7 @@ struct Rigidbody {
     float sleep_threshold{0.05f};
     float sleep_timer{0.0f};
     core::Vec3 linear_velocity{};
+    core::Vec3 angular_velocity{};
 };
 
 struct BoxCollider {
@@ -66,6 +67,7 @@ struct Rigidbody2D {
     float sleep_threshold{0.05f};
     float sleep_timer{0.0f};
     core::Vec3 linear_velocity{};
+    core::Vec3 angular_velocity{};
 };
 
 struct BoxCollider2D {

@@ -215,6 +215,45 @@ bool register_rigidbody_properties(
     ok =
         properties.register_property(
             type,
+            "Angular Velocity",
+            core::PropertyKind::Vec3,
+            [type](
+                const core::World& world,
+                core::Entity entity) {
+                return read_component_property<Component>(
+                    world,
+                    entity,
+                    type,
+                    [](const Component& value) {
+                        return core::PropertyValue{
+                            value.angular_velocity};
+                    });
+            },
+            [type](
+                core::World& world,
+                core::Entity entity,
+                const core::PropertyValue& value) {
+                return write_component_property<Component>(
+                    world,
+                    entity,
+                    type,
+                    value,
+                    [](Component& component,
+                       const core::PropertyValue& raw) {
+                        const auto* typed =
+                            std::get_if<core::Vec3>(&raw);
+                        if (!typed) return false;
+                        component.angular_velocity = *typed;
+                        component.sleeping = false;
+                        component.sleep_timer = 0.0f;
+                        return true;
+                    });
+            }) &&
+        ok;
+
+    ok =
+        properties.register_property(
+            type,
             "Sleeping",
             core::PropertyKind::Boolean,
             [type](
@@ -254,6 +293,8 @@ bool register_rigidbody_properties(
 
                         if (component.sleeping) {
                             component.linear_velocity =
+                                {};
+                            component.angular_velocity =
                                 {};
                         }
 
