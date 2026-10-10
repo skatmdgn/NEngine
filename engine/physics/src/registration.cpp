@@ -89,12 +89,13 @@ bool read_integer(
 bool read_vec3(
     const core::SerializedComponentData& data,
     std::string_view name,
-    core::Vec3& value) {
+    core::Vec3& value,
+    bool optional = false) {
 
     const auto* property =
         find_property(data, name);
 
-    if (!property) return false;
+    if (!property) return optional;
 
     const auto* typed =
         std::get_if<core::Vec3>(
