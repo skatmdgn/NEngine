@@ -168,7 +168,7 @@ namespace NEngine.Internal
 
     public static class NativeBridge
     {
-        public const int AbiVersion = 8;
+        public const int AbiVersion = 9;
 
         private static readonly Dictionary<long, NEngine.Behaviour> Instances = new();
         private static long _nextHandle = 1;
@@ -485,6 +485,10 @@ namespace NEngine.Internal
 
             return invoked;
         }
+
+        [UnmanagedCallersOnly]
+        public static int InvokeLateUpdate(long handle) =>
+            Invoke(handle, "LateUpdate");
 
         [UnmanagedCallersOnly]
         public static int SetBehaviourEnabled(

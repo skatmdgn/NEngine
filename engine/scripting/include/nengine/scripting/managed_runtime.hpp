@@ -73,6 +73,9 @@ public:
         ManagedBehaviourHandle handle,
         float delta_seconds);
 
+    bool late_update(
+        ManagedBehaviourHandle handle);
+
     bool advance_frame(
         float delta_seconds);
 
@@ -146,6 +149,7 @@ public:
             on_disable_ != nullptr &&
             start_ != nullptr &&
             update_ != nullptr &&
+            late_update_ != nullptr &&
             advance_frame_ != nullptr &&
             reset_time_ != nullptr &&
             set_behaviour_enabled_ != nullptr &&
@@ -479,6 +483,7 @@ private:
     InvokeFn on_disable_{nullptr};
     InvokeFn start_{nullptr};
     UpdateFn update_{nullptr};
+    InvokeFn late_update_{nullptr};
     FrameFn advance_frame_{nullptr};
     SimpleFn reset_time_{nullptr};
     SetEnabledFn set_behaviour_enabled_{nullptr};

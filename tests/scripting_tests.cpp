@@ -260,7 +260,7 @@ int main() {
             "GetAbiVersion") !=
                 std::string::npos &&
         bridge.find(
-            "AbiVersion = 8") !=
+            "AbiVersion = 9") !=
                 std::string::npos &&
         bridge.find(
             "GameplayLoadContext") !=
@@ -302,12 +302,15 @@ int main() {
             "InvokeDisable") !=
                 std::string::npos &&
         bridge.find(
+            "InvokeLateUpdate") !=
+                std::string::npos &&
+        bridge.find(
             "SetBehaviourEnabled") !=
                 std::string::npos &&
         bridge.find(
             "GetBehaviourEnabled") !=
                 std::string::npos,
-        "managed bridge exposes activation lifecycle native World input and frame-clock ABI v8 entries");
+        "managed bridge exposes activation and LateUpdate lifecycle native World input and frame-clock ABI v9 entries");
 
     const auto runtime_config =
         read_all(
@@ -604,6 +607,19 @@ int main() {
                 << "        frame++;\n"
                 << "    }\n"
                 << "}\n"
+                << "public class LateOrderProbe : Behaviour {\n"
+                << "    private static ulong frame;\n"
+                << "    private static int updates;\n"
+                << "    private void Update() {\n"
+                << "        if (frame != Time.frameCount) { frame = Time.frameCount; updates = 0; }\n"
+                << "        updates++;\n"
+                << "        transform.localPosition = transform.localPosition + new Vector3(1, 0, 0);\n"
+                << "    }\n"
+                << "    private void LateUpdate() {\n"
+                << "        if (updates != 2) throw new System.Exception(\"LateUpdate ran before all Updates\");\n"
+                << "        transform.localPosition = transform.localPosition + new Vector3(0, 1, 0);\n"
+                << "    }\n"
+                << "}\n"
                 << "public class TimeProbe : Behaviour {\n"
                 << "    private void Update() { transform.localPosition = new Vector3((float)Time.frameCount, Time.time, Time.deltaTime); }\n"
                 << "}\n"
@@ -798,6 +814,82 @@ int main() {
                         check(
                             managed_runtime.reset_time(),
                             "managed Time clock resets explicitly before simulation");
+
+                        ManagedScriptSystem
+                            late_system;
+
+                        late_system.bind(
+                            &managed_runtime);
+
+                        nengine::core::World
+                            late_world;
+
+                        const auto late_entity_a =
+                            late_world.create(
+                                "Late A");
+
+                        const auto late_entity_b =
+                            late_world.create(
+                                "Late B");
+
+                        auto* late_script_a =
+                            late_world.add_component<
+                                ScriptBehaviour>(
+                                    late_entity_a,
+                                    script_behaviour_type());
+
+                        auto* late_script_b =
+                            late_world.add_component<
+                                ScriptBehaviour>(
+                                    late_entity_b,
+                                    script_behaviour_type());
+
+                        if (late_script_a) {
+                            late_script_a->type_name =
+                                "LateOrderProbe";
+                        }
+
+                        if (late_script_b) {
+                            late_script_b->type_name =
+                                "LateOrderProbe";
+                        }
+
+                        std::string late_error;
+
+                        const auto late_tick =
+                            late_system.update(
+                                late_world,
+                                1.0f / 60.0f,
+                                &late_error);
+
+                        const auto* late_transform_a =
+                            late_world.transform(
+                                late_entity_a);
+
+                        const auto* late_transform_b =
+                            late_world.transform(
+                                late_entity_b);
+
+                        check(
+                            late_script_a &&
+                            late_script_b &&
+                            late_tick.created == 2u &&
+                            late_tick.awoken == 2u &&
+                            late_tick.enabled == 2u &&
+                            late_tick.started == 2u &&
+                            late_tick.updated == 2u &&
+                            late_tick.late_updated == 2u &&
+                            late_tick.unresolved == 0u &&
+                            late_transform_a &&
+                            late_transform_b &&
+                            late_transform_a->local_position.x == 1.0f &&
+                            late_transform_a->local_position.y == 1.0f &&
+                            late_transform_b->local_position.x == 1.0f &&
+                            late_transform_b->local_position.y == 1.0f,
+                            "managed LateUpdate runs only after all active Behaviour Updates complete");
+
+                        late_system.clear(
+                            &late_world);
 
                         ManagedScriptSystem
                             time_system;

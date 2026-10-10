@@ -385,7 +385,7 @@ Implemented foundation:
 - generated NEngine.API / NEngine.Bridge / gameplay projects and solution.
 - deterministic dotnet gameplay DLL/PDB build.
 - ScriptBehaviour Scene/Inspector integration and Play Mode execution.
-- stable ABI v8 native World callback table.
+- stable ABI v9 native World callback table.
 - GameObject name/active, Transform hierarchy/TRS and component presence.
 - native-backed GameObject create/find plus deferred destroy.
 - collectible gameplay AssemblyLoadContext reload without restarting hostfxr.

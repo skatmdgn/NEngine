@@ -465,6 +465,100 @@ ManagedScriptSystem::update(
         }
     }
 
+    const auto pending_before_late =
+        runtime_->pending_world_destroys();
+
+    std::unordered_set<
+        core::Entity::value_type>
+        pending_before_late_ids;
+
+    for (const auto entity :
+         pending_before_late) {
+        pending_before_late_ids.insert(
+            entity.value);
+    }
+
+    // Every active Update completes before any active LateUpdate begins.
+    for (const auto entity :
+         world.entities()) {
+
+        if (pending_before_late_ids.contains(
+                entity.value)) {
+            continue;
+        }
+
+        auto existing =
+            instances_.find(
+                entity.value);
+
+        if (existing ==
+                instances_.end() ||
+            !existing->second.active ||
+            !existing->second.started) {
+            continue;
+        }
+
+        auto* behaviour =
+            world.get_component<
+                ScriptBehaviour>(
+                    entity,
+                    script_behaviour_type());
+
+        if (!behaviour ||
+            !behaviour->enabled ||
+            !world.active(
+                entity)) {
+            continue;
+        }
+
+        if (!push_native_state(
+                entity,
+                existing->second.handle) ||
+            !push_enabled(
+                entity,
+                existing->second.handle)) {
+
+            ++stats.unresolved;
+            continue;
+        }
+
+        if (!runtime_->late_update(
+                existing->second.handle)) {
+
+            ++stats.unresolved;
+            runtime_error();
+            continue;
+        }
+
+        ++stats.late_updated;
+
+        if (!pull_all(
+                entity,
+                existing->second.handle)) {
+
+            ++stats.unresolved;
+            continue;
+        }
+
+        behaviour =
+            world.get_component<
+                ScriptBehaviour>(
+                    entity,
+                    script_behaviour_type());
+
+        const bool still_active =
+            behaviour &&
+            behaviour->enabled &&
+            world.active(
+                entity);
+
+        if (!still_active) {
+            invoke_disable(
+                entity,
+                existing->second);
+        }
+    }
+
     const auto pending_destroy =
         runtime_->pending_world_destroys();
 

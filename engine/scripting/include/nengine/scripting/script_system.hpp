@@ -16,6 +16,7 @@ struct ManagedScriptUpdateStats {
     std::size_t enabled{0};
     std::size_t started{0};
     std::size_t updated{0};
+    std::size_t late_updated{0};
     std::size_t disabled{0};
     std::size_t destroyed{0};
     std::size_t unresolved{0};
