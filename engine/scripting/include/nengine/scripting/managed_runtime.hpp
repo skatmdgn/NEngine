@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "nengine/core/entity.hpp"
 #include "nengine/core/transform.hpp"
@@ -97,6 +98,8 @@ public:
 
     void bind_world(
         core::World* world) noexcept;
+
+    bool flush_world_destroys();
 
     void bind_input(
         const input::InputState* input_state) noexcept;
@@ -209,6 +212,7 @@ private:
     struct NativeWorldContext {
         core::World* world{nullptr};
         const input::InputState* input{nullptr};
+        std::vector<core::Entity> pending_destroy{};
     };
 
     using WorldCreateFn =

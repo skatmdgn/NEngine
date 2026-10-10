@@ -210,6 +210,10 @@ int main() {
             std::string::npos &&
         api.find("class GameObject") !=
             std::string::npos &&
+        api.find("GameObject? Find") !=
+            std::string::npos &&
+        api.find("static void Destroy") !=
+            std::string::npos &&
         api.find("class Transform") !=
             std::string::npos &&
         api.find("GetInstanceID") !=
@@ -574,6 +578,17 @@ int main() {
                 << "public class TimeProbe : Behaviour {\n"
                 << "    private void Update() { transform.localPosition = new Vector3((float)Time.frameCount, Time.time, Time.deltaTime); }\n"
                 << "}\n"
+                << "public class LifetimeProbe : Behaviour {\n"
+                << "    private bool ran;\n"
+                << "    private void Update() {\n"
+                << "        if (ran) return;\n"
+                << "        GameObject spawned = new GameObject(\"Managed Spawn\");\n"
+                << "        GameObject? found = GameObject.Find(\"Managed Spawn\");\n"
+                << "        if (found == null || found.GetInstanceID() != spawned.GetInstanceID()) throw new System.Exception(\"find mismatch\");\n"
+                << "        GameObject.Destroy(gameObject);\n"
+                << "        ran = true;\n"
+                << "    }\n"
+                << "}\n"
                 << "public class CoroutineProbe : Behaviour {\n"
                 << "    private System.Collections.IEnumerator Routine() {\n"
                 << "        gameObject.name = \"Coroutine Started\";\n"
@@ -851,6 +866,74 @@ int main() {
                         check(
                             managed_runtime.reset_time(),
                             "managed Time clock resets after multi-Behaviour regression probe");
+
+                        ManagedScriptSystem
+                            lifetime_system;
+
+                        lifetime_system.bind(
+                            &managed_runtime);
+
+                        nengine::core::World
+                            lifetime_world;
+
+                        const auto lifetime_entity =
+                            lifetime_world.create(
+                                "Lifetime Root");
+
+                        auto* lifetime_script =
+                            lifetime_world.add_component<
+                                ScriptBehaviour>(
+                                    lifetime_entity,
+                                    script_behaviour_type());
+
+                        if (lifetime_script) {
+                            lifetime_script->type_name =
+                                "LifetimeProbe";
+                        }
+
+                        std::string
+                            lifetime_error;
+
+                        const auto lifetime_tick =
+                            lifetime_system.update(
+                                lifetime_world,
+                                1.0f / 60.0f,
+                                &lifetime_error);
+
+                        nengine::core::Entity
+                            spawned_entity =
+                                nengine::core::Entity::invalid();
+
+                        for (const auto candidate :
+                             lifetime_world.entities()) {
+
+                            if (lifetime_world.name(
+                                    candidate) ==
+                                "Managed Spawn") {
+
+                                spawned_entity =
+                                    candidate;
+                                break;
+                            }
+                        }
+
+                        check(
+                            lifetime_script &&
+                            lifetime_tick.created == 1u &&
+                            lifetime_tick.started == 1u &&
+                            lifetime_tick.updated == 1u &&
+                            lifetime_tick.destroyed == 1u &&
+                            lifetime_tick.unresolved == 0u &&
+                            !lifetime_world.is_alive(
+                                lifetime_entity) &&
+                            lifetime_world.is_alive(
+                                spawned_entity) &&
+                            lifetime_world.size() == 1u &&
+                            lifetime_system.instance_count() == 0u &&
+                            managed_runtime.instance_count() == 0,
+                            "managed GameObject create/find and deferred self-destroy round-trip through native World");
+
+                        lifetime_system.clear();
 
                         ManagedScriptSystem
                             script_system;

@@ -68,7 +68,7 @@ int ManagedRuntime::callback_destroy(
     void* context,
     std::uint64_t entity_id) {
 
-    const auto* state =
+    auto* state =
         static_cast<NativeWorldContext*>(
             context);
 
@@ -77,10 +77,26 @@ int ManagedRuntime::callback_destroy(
         return -1;
     }
 
-    return state->world->destroy(
-        core::Entity{entity_id})
-        ? 1
-        : -1;
+    const core::Entity entity{
+        entity_id};
+
+    if (!state->world->is_alive(
+            entity)) {
+        return -1;
+    }
+
+    for (const auto queued :
+         state->pending_destroy) {
+
+        if (queued == entity) {
+            return 1;
+        }
+    }
+
+    state->pending_destroy.push_back(
+        entity);
+
+    return 1;
 }
 
 std::uint64_t ManagedRuntime::callback_find(
@@ -489,8 +505,67 @@ void ManagedRuntime::bind_world(
                 NativeWorldContext>();
     }
 
+    if (world_context_->world !=
+            world) {
+        world_context_
+            ->pending_destroy
+            .clear();
+    }
+
     world_context_->world =
         world;
+}
+
+bool ManagedRuntime::flush_world_destroys() {
+    if (!world_context_ ||
+        !world_context_->world) {
+
+        if (world_context_) {
+            world_context_
+                ->pending_destroy
+                .clear();
+        }
+
+        diagnostic_ =
+            "managed runtime has no bound World for deferred destroy flush";
+        return false;
+    }
+
+    auto pending =
+        std::move(
+            world_context_
+                ->pending_destroy);
+
+    world_context_
+        ->pending_destroy
+        .clear();
+
+    bool success = true;
+
+    for (const auto entity :
+         pending) {
+
+        if (!world_context_
+                ->world
+                ->is_alive(
+                    entity)) {
+            continue;
+        }
+
+        if (!world_context_
+                ->world
+                ->destroy(
+                    entity)) {
+            success = false;
+        }
+    }
+
+    if (!success) {
+        diagnostic_ =
+            "one or more deferred managed GameObject destroys failed";
+    }
+
+    return success;
 }
 
 void ManagedRuntime::bind_input(

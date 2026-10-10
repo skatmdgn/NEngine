@@ -365,12 +365,29 @@ ManagedScriptSystem::update(
         }
     }
 
+    if (!runtime_
+            ->flush_world_destroys()) {
+
+        ++stats.unresolved;
+
+        if (error) {
+            *error =
+                runtime_->diagnostic();
+        }
+    }
+
     for (auto it =
              instances_.begin();
          it != instances_.end();) {
 
+        const core::Entity
+            instance_entity{
+                it->first};
+
         if (active.contains(
-                it->first)) {
+                it->first) &&
+            world.is_alive(
+                instance_entity)) {
             ++it;
             continue;
         }

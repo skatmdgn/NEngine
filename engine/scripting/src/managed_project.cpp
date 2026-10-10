@@ -216,6 +216,9 @@ namespace NEngine.Internal
 
                 NEngine.NativeWorld.Configure(
                     callbacks.context,
+                    callbacks.create,
+                    callbacks.destroy,
+                    callbacks.find,
                     callbacks.isAlive,
                     callbacks.copyNameUtf8,
                     callbacks.setNameUtf8,
@@ -389,7 +392,7 @@ namespace NEngine.Internal
                 if (Activator.CreateInstance(type) is not NEngine.Behaviour instance)
                     return 0;
 
-                var gameObject = new NEngine.GameObject { name = type.Name };
+                var gameObject = new NEngine.GameObject(createNative: false) { name = type.Name };
                 gameObject.Attach(instance);
 
                 long handle = _nextHandle++;
@@ -699,6 +702,15 @@ std::string api_stub(
         internal const ulong InvalidEntity = ulong.MaxValue;
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate ulong CreateFn(nint context, nint nameUtf8);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int DestroyFn(nint context, ulong entityId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate ulong FindFn(nint context, nint nameUtf8);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate int IsAliveFn(nint context, ulong entityId);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -732,6 +744,9 @@ std::string api_stub(
         private delegate int HasComponentFn(nint context, ulong entityId, nint typeNameUtf8);
 
         private static nint _context;
+        private static CreateFn? _create;
+        private static DestroyFn? _destroy;
+        private static FindFn? _find;
         private static IsAliveFn? _isAlive;
         private static CopyNameFn? _copyName;
         private static SetNameFn? _setName;
@@ -751,6 +766,9 @@ std::string api_stub(
 
         internal static void Configure(
             nint context,
+            nint create,
+            nint destroy,
+            nint find,
             nint isAlive,
             nint copyName,
             nint setName,
@@ -765,6 +783,9 @@ std::string api_stub(
             nint hasComponent)
         {
             _context = context;
+            _create = Marshal.GetDelegateForFunctionPointer<CreateFn>(create);
+            _destroy = Marshal.GetDelegateForFunctionPointer<DestroyFn>(destroy);
+            _find = Marshal.GetDelegateForFunctionPointer<FindFn>(find);
             _isAlive = Marshal.GetDelegateForFunctionPointer<IsAliveFn>(isAlive);
             _copyName = Marshal.GetDelegateForFunctionPointer<CopyNameFn>(copyName);
             _setName = Marshal.GetDelegateForFunctionPointer<SetNameFn>(setName);
@@ -782,6 +803,9 @@ std::string api_stub(
         internal static void Clear()
         {
             _context = 0;
+            _create = null;
+            _destroy = null;
+            _find = null;
             _isAlive = null;
             _copyName = null;
             _setName = null;
@@ -795,6 +819,43 @@ std::string api_stub(
             _getChildAt = null;
             _hasComponent = null;
         }
+
+        private static ulong WithUtf8Entity(
+            string value,
+            Func<nint, ulong> invoke)
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes((value ?? string.Empty) + "\0");
+            nint buffer = Marshal.AllocHGlobal(bytes.Length);
+
+            try
+            {
+                Marshal.Copy(bytes, 0, buffer, bytes.Length);
+                return invoke(buffer);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+
+        internal static ulong Create(string name) =>
+            _create == null
+                ? InvalidEntity
+                : WithUtf8Entity(
+                    name,
+                    ptr => _create(_context, ptr));
+
+        internal static bool Destroy(ulong entityId) =>
+            _destroy?.Invoke(
+                _context,
+                entityId) > 0;
+
+        internal static ulong Find(string name) =>
+            _find == null
+                ? InvalidEntity
+                : WithUtf8Entity(
+                    name,
+                    ptr => _find(_context, ptr));
 
         internal static bool IsAlive(ulong entityId) =>
             _isAlive?.Invoke(_context, entityId) > 0;
@@ -1163,11 +1224,83 @@ std::string api_stub(
         public ulong instanceId => _instanceId;
         public Transform transform { get; }
 
-        public GameObject()
+        private GameObject(
+            bool createNative,
+            string requestedName)
         {
             transform = new Transform();
             Attach(transform);
+
+            _name =
+                string.IsNullOrEmpty(requestedName)
+                    ? "GameObject"
+                    : requestedName;
+
+            if (createNative &&
+                NativeWorld.available)
+            {
+                ulong entityId =
+                    NativeWorld.Create(
+                        _name);
+
+                if (entityId == NativeWorld.InvalidEntity ||
+                    !NativeWorld.IsAlive(entityId))
+                {
+                    throw new InvalidOperationException(
+                        "native GameObject creation failed");
+                }
+
+                SetNativeState(
+                    entityId,
+                    _name,
+                    true);
+            }
         }
+
+        public GameObject()
+            : this(true, "GameObject")
+        {
+        }
+
+        public GameObject(string name)
+            : this(true, name)
+        {
+        }
+
+        internal GameObject(bool createNative)
+            : this(createNative, "GameObject")
+        {
+        }
+
+        public static GameObject? Find(string name)
+        {
+            if (!NativeWorld.available ||
+                string.IsNullOrEmpty(name))
+            {
+                return null;
+            }
+
+            return FromNative(
+                NativeWorld.Find(
+                    name));
+        }
+
+        public static void Destroy(
+            GameObject? target)
+        {
+            if (target == null ||
+                !target._nativeBound ||
+                !NativeWorld.available)
+            {
+                return;
+            }
+
+            NativeWorld.Destroy(
+                target._instanceId);
+        }
+
+        public void Destroy() =>
+            Destroy(this);
 
         internal static GameObject? FromNative(ulong entityId)
         {
@@ -1177,7 +1310,7 @@ std::string api_stub(
                 return null;
             }
 
-            var result = new GameObject();
+            var result = new GameObject(createNative: false);
             string currentName = string.Empty;
             bool currentActive = true;
             NativeWorld.TryGetName(entityId, out currentName);
