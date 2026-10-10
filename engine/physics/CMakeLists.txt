@@ -1,5 +1,6 @@
 add_library(NEnginePhysics STATIC
   src/components.cpp
+  src/registration.cpp
 )
 
 target_include_directories(NEnginePhysics
