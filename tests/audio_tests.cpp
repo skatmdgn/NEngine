@@ -1,9 +1,12 @@
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <string>
 #include <utility>
+#include <vector>
 
+#include "nengine/audio/audio_clip.hpp"
 #include "nengine/audio/components.hpp"
 #include "nengine/audio/mix_snapshot.hpp"
 #include "nengine/audio/registration.hpp"
@@ -41,6 +44,82 @@ void set_property(
             return;
         }
     }
+}
+
+void append_u16(
+    std::vector<std::uint8_t>& bytes,
+    std::uint16_t value) {
+
+    bytes.push_back(
+        static_cast<std::uint8_t>(
+            value & 0xffu));
+
+    bytes.push_back(
+        static_cast<std::uint8_t>(
+            (value >> 8u) & 0xffu));
+}
+
+void append_u32(
+    std::vector<std::uint8_t>& bytes,
+    std::uint32_t value) {
+
+    bytes.push_back(
+        static_cast<std::uint8_t>(
+            value & 0xffu));
+
+    bytes.push_back(
+        static_cast<std::uint8_t>(
+            (value >> 8u) & 0xffu));
+
+    bytes.push_back(
+        static_cast<std::uint8_t>(
+            (value >> 16u) & 0xffu));
+
+    bytes.push_back(
+        static_cast<std::uint8_t>(
+            (value >> 24u) & 0xffu));
+}
+
+void append_tag(
+    std::vector<std::uint8_t>& bytes,
+    const char (&tag)[5]) {
+
+    for (int index = 0;
+         index < 4;
+         ++index) {
+        bytes.push_back(
+            static_cast<std::uint8_t>(
+                tag[index]));
+    }
+}
+
+std::vector<std::uint8_t>
+make_pcm16_wav() {
+
+    std::vector<std::uint8_t> bytes;
+
+    append_tag(bytes, "RIFF");
+    append_u32(bytes, 44u);
+    append_tag(bytes, "WAVE");
+
+    append_tag(bytes, "fmt ");
+    append_u32(bytes, 16u);
+    append_u16(bytes, 1u);
+    append_u16(bytes, 2u);
+    append_u32(bytes, 2u);
+    append_u32(bytes, 8u);
+    append_u16(bytes, 4u);
+    append_u16(bytes, 16u);
+
+    append_tag(bytes, "data");
+    append_u32(bytes, 8u);
+
+    append_u16(bytes, 0x8000u);
+    append_u16(bytes, 0x0000u);
+    append_u16(bytes, 0x4000u);
+    append_u16(bytes, 0x7fffu);
+
+    return bytes;
 }
 
 } // namespace
@@ -302,6 +381,50 @@ int main() {
             mix_snapshot.sources.front().pitch -
             1.25f) < 0.0001f,
         "audio mix snapshot selects listener and computes spatial stereo attenuation");
+
+    const auto wav_bytes =
+        make_pcm16_wav();
+
+    audio::AudioClipData
+        decoded_clip;
+
+    std::string wav_error;
+
+    check(
+        audio::decode_wav(
+            wav_bytes,
+            decoded_clip,
+            &wav_error) &&
+        decoded_clip.valid() &&
+        decoded_clip.sample_rate == 2u &&
+        decoded_clip.channels == 2u &&
+        decoded_clip.frame_count() == 2u &&
+        std::abs(
+            decoded_clip.duration_seconds() -
+            1.0f) < 0.0001f &&
+        decoded_clip.samples.size() == 4u &&
+        std::abs(
+            decoded_clip.samples[0] +
+            1.0f) < 0.0001f &&
+        std::abs(
+            decoded_clip.samples[2] -
+            0.5f) < 0.0001f,
+        "WAV decoder normalizes interleaved PCM16 samples and exposes clip metadata");
+
+    const std::vector<std::uint8_t>
+        malformed_wav{
+            'R', 'I', 'F', 'F',
+            0, 0, 0, 0,
+            'N', 'O', 'P', 'E'
+        };
+
+    check(
+        !audio::decode_wav(
+            malformed_wav,
+            decoded_clip,
+            &wav_error) &&
+        !wav_error.empty(),
+        "WAV decoder rejects malformed non-WAVE data with diagnostics");
 
     if (failures == 0) {
         std::cout
