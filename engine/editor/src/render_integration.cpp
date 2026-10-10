@@ -937,6 +937,50 @@ bool register_render_integration(
                         });
             }) && ok;
 
+    ok =
+        properties.register_property(
+            animator_type,
+            "Time",
+            core::PropertyKind::Float,
+            [animator_type](
+                const core::World& world,
+                core::Entity entity) {
+                return read_component_property<
+                    render::SpriteAnimator>(
+                        world,
+                        entity,
+                        animator_type,
+                        [](const render::SpriteAnimator& animator) {
+                            return core::PropertyValue{
+                                static_cast<double>(
+                                    animator.time_seconds)};
+                        });
+            },
+            [animator_type](
+                core::World& world,
+                core::Entity entity,
+                const core::PropertyValue& value) {
+                return write_component_property<
+                    render::SpriteAnimator>(
+                        world,
+                        entity,
+                        animator_type,
+                        value,
+                        [](render::SpriteAnimator& animator,
+                           const core::PropertyValue& raw) {
+                            const auto* typed =
+                                std::get_if<double>(&raw);
+                            if (!typed ||
+                                *typed < 0.0) {
+                                return false;
+                            }
+                            animator.time_seconds =
+                                static_cast<float>(
+                                    *typed);
+                            return true;
+                        });
+            }) && ok;
+
     return ok;
 }
 

@@ -1862,6 +1862,12 @@ std::string api_stub(
             get => NativeFloat("Speed", 1);
             set => SetNativeFloat("Speed", value);
         }
+
+        public float time
+        {
+            get => NativeFloat("Time", 0);
+            set => SetNativeFloat("Time", value);
+        }
     }
 
     public sealed class SpriteRenderer : Component
