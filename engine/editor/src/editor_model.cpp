@@ -309,6 +309,8 @@ bool EditorModel::begin_play_mode() {
 
     managed_script_system_.clear(play_session_.runtime_world());
     physics_contact_tracker_.clear();
+    audio_playback_system_.reset();
+    audio_mix_snapshot_ = {};
 
     if (managed_runtime_.valid() &&
         !managed_runtime_.reset_time()) {
@@ -324,6 +326,8 @@ bool EditorModel::begin_play_mode() {
 bool EditorModel::stop_play_mode() {
     managed_script_system_.clear(play_session_.runtime_world());
     physics_contact_tracker_.clear();
+    audio_playback_system_.reset();
+    audio_mix_snapshot_ = {};
     return play_session_.stop();
 }
 
@@ -336,6 +340,8 @@ bool EditorModel::initialize_managed_runtime(
 
     managed_script_system_.clear(play_session_.runtime_world());
     physics_contact_tracker_.clear();
+    audio_playback_system_.reset();
+    audio_mix_snapshot_ = {};
     managed_runtime_.shutdown();
 
     if (!managed_runtime_.initialize(
@@ -387,6 +393,8 @@ bool EditorModel::reload_managed_runtime(
     // Destroy them before requesting unload; Play Mode World state remains.
     managed_script_system_.clear(play_session_.runtime_world());
     physics_contact_tracker_.clear();
+    audio_playback_system_.reset();
+    audio_mix_snapshot_ = {};
 
     if (!managed_runtime_.reload_gameplay(
             assembly_path,
@@ -422,6 +430,8 @@ void EditorModel::shutdown_managed_runtime()
 
     managed_script_system_.clear(play_session_.runtime_world());
     physics_contact_tracker_.clear();
+    audio_playback_system_.reset();
+    audio_mix_snapshot_ = {};
     managed_runtime_.shutdown();
 }
 
@@ -435,6 +445,8 @@ void EditorModel::tick_runtime(
         managed_script_system_.clear(
             play_session_.runtime_world());
         physics_contact_tracker_.clear();
+        audio_playback_system_.reset();
+        audio_mix_snapshot_ = {};
         return;
     }
 
@@ -558,6 +570,14 @@ void EditorModel::tick_runtime(
                     fixed_delta,
                     &script_error);
             }
+
+            audio_playback_system_.update(
+                *runtime,
+                fixed_delta);
+
+            audio_mix_snapshot_ =
+                audio::build_mix_snapshot(
+                    *runtime);
         }
     } else {
         // A host frame may contain zero or several fixed simulation steps.
@@ -568,19 +588,31 @@ void EditorModel::tick_runtime(
             run_fixed_step();
         }
 
-        if (managed_runtime_.valid() &&
-            run_playing_frame) {
+        if (run_playing_frame) {
 
             const auto clamped_elapsed =
                 elapsed_seconds > 0.25
                     ? 0.25
                     : elapsed_seconds;
 
-            managed_script_system_.update(
-                *runtime,
+            const auto frame_delta =
                 static_cast<float>(
-                    clamped_elapsed),
-                &script_error);
+                    clamped_elapsed);
+
+            if (managed_runtime_.valid()) {
+                managed_script_system_.update(
+                    *runtime,
+                    frame_delta,
+                    &script_error);
+            }
+
+            audio_playback_system_.update(
+                *runtime,
+                frame_delta);
+
+            audio_mix_snapshot_ =
+                audio::build_mix_snapshot(
+                    *runtime);
         }
     }
 

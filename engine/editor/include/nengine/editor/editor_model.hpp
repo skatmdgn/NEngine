@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "nengine/audio/mix_snapshot.hpp"
+#include "nengine/audio/playback.hpp"
 #include "nengine/core/component_registry.hpp"
 #include "nengine/core/component_serialization.hpp"
 #include "nengine/core/world.hpp"
@@ -127,6 +129,11 @@ public:
         return input_state_;
     }
 
+    const audio::AudioMixSnapshot&
+    audio_mix_snapshot() const noexcept {
+        return audio_mix_snapshot_;
+    }
+
     void tick_runtime(
         double elapsed_seconds);
 
@@ -171,6 +178,12 @@ private:
 
     physics::ContactTracker
         physics_contact_tracker_{};
+
+    audio::AudioPlaybackSystem
+        audio_playback_system_{};
+
+    audio::AudioMixSnapshot
+        audio_mix_snapshot_{};
 
     std::uint64_t saved_scene_state_id_{0};
 };
