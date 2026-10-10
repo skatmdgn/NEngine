@@ -838,21 +838,27 @@ int main() {
                                     late_entity_a,
                                     script_behaviour_type());
 
+                        if (late_script_a) {
+                            late_script_a->type_name =
+                                "LateOrderProbe";
+                        }
+
                         auto* late_script_b =
                             late_world.add_component<
                                 ScriptBehaviour>(
                                     late_entity_b,
                                     script_behaviour_type());
 
-                        if (late_script_a) {
-                            late_script_a->type_name =
-                                "LateOrderProbe";
-                        }
-
                         if (late_script_b) {
                             late_script_b->type_name =
                                 "LateOrderProbe";
                         }
+
+                        late_script_a =
+                            late_world.get_component<
+                                ScriptBehaviour>(
+                                    late_entity_a,
+                                    script_behaviour_type());
 
                         std::string late_error;
 
