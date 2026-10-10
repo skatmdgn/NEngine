@@ -242,6 +242,10 @@ int main() {
             std::string::npos &&
         api.find("frameCount") !=
             std::string::npos &&
+        api.find("activeInHierarchy") !=
+            std::string::npos &&
+        api.find("IsChildOf") !=
+            std::string::npos &&
         api.find(
             "InternalsVisibleTo(\"NEngine.Bridge\")") !=
                 std::string::npos,
@@ -588,6 +592,9 @@ int main() {
                 << "        Transform? p = transform.parent;\n"
                 << "        if (p == null) throw new System.Exception(\"parent missing\");\n"
                 << "        if (!p.gameObject.HasComponent<Transform>()) throw new System.Exception(\"native transform missing\");\n"
+                << "        if (!gameObject.activeInHierarchy) throw new System.Exception(\"activeInHierarchy mismatch\");\n"
+                << "        if (transform.root.gameObject.GetInstanceID() != p.gameObject.GetInstanceID()) throw new System.Exception(\"root mismatch\");\n"
+                << "        if (!transform.IsChildOf(p) || p.IsChildOf(transform)) throw new System.Exception(\"IsChildOf mismatch\");\n"
                 << "        if (p.childCount != 1) throw new System.Exception(\"child count mismatch\");\n"
                 << "        Transform c = p.GetChild(0);\n"
                 << "        if (c.gameObject.GetInstanceID() != gameObject.GetInstanceID()) throw new System.Exception(\"child identity mismatch\");\n"

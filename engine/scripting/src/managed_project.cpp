@@ -1284,6 +1284,34 @@ std::string api_stub(
             }
         }
 
+        public bool activeInHierarchy
+        {
+            get
+            {
+                if (!_nativeBound ||
+                    !NativeWorld.available)
+                {
+                    return _activeSelf;
+                }
+
+                ulong current = _instanceId;
+
+                while (current != NativeWorld.InvalidEntity)
+                {
+                    if (!NativeWorld.IsAlive(current) ||
+                        !NativeWorld.TryGetActive(current, out bool active) ||
+                        !active)
+                    {
+                        return false;
+                    }
+
+                    current = NativeWorld.GetParent(current);
+                }
+
+                return true;
+            }
+        }
+
         public ulong instanceId => _instanceId;
         public Transform transform { get; }
 
@@ -1622,6 +1650,40 @@ std::string api_stub(
                     gameObject.instanceId,
                     parentId);
             }
+        }
+
+        public Transform root
+        {
+            get
+            {
+                Transform current = this;
+
+                while (current.parent is Transform next)
+                    current = next;
+
+                return current;
+            }
+        }
+
+        public bool IsChildOf(Transform? potentialParent)
+        {
+            if (potentialParent == null)
+                return false;
+
+            Transform? current = this;
+
+            while (current != null)
+            {
+                if (current.gameObject.GetInstanceID() ==
+                    potentialParent.gameObject.GetInstanceID())
+                {
+                    return true;
+                }
+
+                current = current.parent;
+            }
+
+            return false;
         }
 
         public int childCount
