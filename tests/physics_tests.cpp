@@ -3253,9 +3253,8 @@ int main() {
 
     core::World chain_2d_world;
     const auto chain_2d_anchor = chain_2d_world.create("2D Chain Anchor");
-    auto* chain_2d_anchor_collider =
-        chain_2d_world.add_component<physics::BoxCollider2D>(
-            chain_2d_anchor, physics::box_collider2d_type());
+    chain_2d_world.add_component<physics::BoxCollider2D>(
+        chain_2d_anchor, physics::box_collider2d_type());
     std::vector<core::Entity> chain_2d_entities;
     for (std::size_t i = 0u; i < chain_count; ++i) {
         const auto e = chain_2d_world.create(
@@ -3285,6 +3284,10 @@ int main() {
 
     // A trigger is not physical support: the island must wake when its
     // only static contact becomes a trigger.
+    // ComponentPool may relocate as new colliders are added.
+    auto* chain_2d_anchor_collider =
+        chain_2d_world.get_component<physics::BoxCollider2D>(
+            chain_2d_anchor, physics::box_collider2d_type());
     chain_2d_anchor_collider->is_trigger = true;
     for (std::size_t i = 0u; i < chain_count; ++i)
         chain_2d_world.transform(chain_2d_entities[i])->local_position = {
