@@ -2855,6 +2855,102 @@ int main() {
     check(warm_2d_cache.previous.empty(),
         "warm-start cache can be explicitly cleared on scene reset");
 
+
+    // A static anchor lets an entire connected dynamic island sleep.
+    core::World island_world;
+    const auto island_wall = island_world.create("Island Wall");
+    const auto island_a = island_world.create("Island A");
+    const auto island_b = island_world.create("Island B");
+    for (const auto e : {island_wall, island_a, island_b}) {
+        island_world.add_component<physics::BoxCollider>(
+            e, physics::box_collider_type());
+    }
+    island_world.add_component<physics::Rigidbody>(
+        island_a, physics::rigidbody_type());
+    island_world.add_component<physics::Rigidbody>(
+        island_b, physics::rigidbody_type());
+    auto* island_a_body = island_world.get_component<physics::Rigidbody>(
+        island_a, physics::rigidbody_type());
+    auto* island_b_body = island_world.get_component<physics::Rigidbody>(
+        island_b, physics::rigidbody_type());
+    island_a_body->use_gravity = false;
+    island_b_body->use_gravity = false;
+    island_world.transform(island_a)->local_position = {0.75f, 0.0f, 0.0f};
+    island_world.transform(island_b)->local_position = {1.5f, 0.0f, 0.0f};
+    physics::step_physics(island_world, 0.51f, {});
+    check(
+        island_a_body->sleeping && island_b_body->sleeping,
+        "3D anchored contact island sleeps connected bodies together");
+
+    island_world.transform(island_a)->local_position = {0.75f, 0.0f, 0.0f};
+    island_world.transform(island_b)->local_position = {1.5f, 0.0f, 0.0f};
+    island_b_body->linear_velocity = {-2.0f, 0.0f, 0.0f};
+    physics::step_physics(island_world, 1.0f / 60.0f, {});
+    check(
+        !island_a_body->sleeping && !island_b_body->sleeping,
+        "a moving member wakes its entire connected 3D island");
+
+    core::World floating_island_world;
+    const auto float_a = floating_island_world.create("Float A");
+    const auto float_b = floating_island_world.create("Float B");
+    for (const auto e : {float_a, float_b}) {
+        floating_island_world.add_component<physics::BoxCollider>(
+            e, physics::box_collider_type());
+        auto* body = floating_island_world.add_component<physics::Rigidbody>(
+            e, physics::rigidbody_type());
+        body->use_gravity = false;
+    }
+    floating_island_world.transform(float_b)->local_position =
+        {0.75f, 0.0f, 0.0f};
+    physics::step_physics(floating_island_world, 0.6f, {});
+    const auto* floating_a_body =
+        floating_island_world.get_component<physics::Rigidbody>(
+            float_a, physics::rigidbody_type());
+    const auto* floating_b_body =
+        floating_island_world.get_component<physics::Rigidbody>(
+            float_b, physics::rigidbody_type());
+    check(
+        floating_a_body && floating_b_body &&
+        !floating_a_body->sleeping && !floating_b_body->sleeping,
+        "free-floating dynamic-only islands do not sleep without static support");
+
+    core::World island_2d_world;
+    const auto island_2d_wall = island_2d_world.create("Island 2D Wall");
+    const auto island_2d_a = island_2d_world.create("Island 2D A");
+    const auto island_2d_b = island_2d_world.create("Island 2D B");
+    for (const auto e : {island_2d_wall, island_2d_a, island_2d_b}) {
+        island_2d_world.add_component<physics::BoxCollider2D>(
+            e, physics::box_collider2d_type());
+    }
+    island_2d_world.add_component<physics::Rigidbody2D>(
+        island_2d_a, physics::rigidbody2d_type());
+    island_2d_world.add_component<physics::Rigidbody2D>(
+        island_2d_b, physics::rigidbody2d_type());
+    auto* island_2d_a_body = island_2d_world.get_component<physics::Rigidbody2D>(
+        island_2d_a, physics::rigidbody2d_type());
+    auto* island_2d_b_body = island_2d_world.get_component<physics::Rigidbody2D>(
+        island_2d_b, physics::rigidbody2d_type());
+    island_2d_a_body->use_gravity = false;
+    island_2d_b_body->use_gravity = false;
+    island_2d_world.transform(island_2d_a)->local_position =
+        {0.75f, 0.0f, 4.0f};
+    island_2d_world.transform(island_2d_b)->local_position =
+        {1.5f, 0.0f, -4.0f};
+    physics::step_physics(island_2d_world, 0.51f, {});
+    check(
+        island_2d_a_body->sleeping && island_2d_b_body->sleeping,
+        "2D anchored contact island sleeps all members regardless of Z positions");
+
+    island_2d_world.transform(island_2d_a)->local_position =
+        {0.75f, 0.0f, 4.0f};
+    island_2d_world.transform(island_2d_b)->local_position =
+        {1.5f, 0.0f, -4.0f};
+    island_2d_b_body->angular_velocity.z = 1.0f;
+    physics::step_physics(island_2d_world, 1.0f / 60.0f, {});
+    check(
+        !island_2d_a_body->sleeping && !island_2d_b_body->sleeping,
+        "angular motion wakes the whole 2D contact island");
+
     core::World sleeping_world;
 
     const auto sleeping_floor =

@@ -172,7 +172,8 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Rigidbody/Rigidbody2D angular velocity Scene/Editor/C# + quaternion integration foundation
 - [x] Collider-derived inertia + per-manifold-point rotational sequential constraints
 - [x] Per-scene 3D/2D persistent contact impulse warm starting
-- [ ] Island-aware sleeping, remaining collider shapes and production broad-phase/solver tuning
+- [x] Contact-island anchored sleeping and connected-body wake propagation in 3D/2D
+- [ ] Remaining collider shapes and production broad-phase/solver tuning
 - [x] Keyboard/mouse InputState transitions + Win32 message capture
 - [x] Named action-map binding/query foundation
 - [x] Managed KeyCode/GetKey/GetKeyDown/GetKeyUp + mouse position/delta/wheel

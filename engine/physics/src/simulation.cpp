@@ -1,6 +1,10 @@
 #include "nengine/physics/simulation.hpp"
 
+#include <algorithm>
 #include <cmath>
+#include <limits>
+#include <unordered_map>
+#include <vector>
 
 #include "nengine/physics/components.hpp"
 
@@ -162,139 +166,134 @@ void integrate_rotation(
                 rotation));
 }
 
-bool has_solid_contact(
-    const std::vector<BoxOverlap>& overlaps,
-    core::Entity entity,
-    bool is_2d) noexcept {
-
-    for (const auto& overlap :
-         overlaps) {
-
-        if (overlap.is_2d != is_2d ||
-            overlap.is_trigger ||
-            overlap.penetration <= 0.0f) {
-            continue;
-        }
-
-        if (overlap.first == entity ||
-            overlap.second == entity) {
-            return true;
-        }
-    }
-
-    return false;
-}
 
 template <typename Body>
-void update_body_sleep(
-    Body& body,
-    bool supported,
+struct SleepIslandNode {
+    core::Entity entity{core::Entity::invalid()};
+    Body* body{nullptr};
+    std::size_t parent{0};
+    bool supported{false};
+    bool anchored{false};
+};
+
+template <typename Body>
+void update_sleep_islands(
+    core::World& world,
+    const std::vector<BoxOverlap>& overlaps,
     float delta_seconds,
-    bool is_2d) noexcept {
+    bool is_2d) {
 
-    if (!body.enabled ||
-        body.is_kinematic ||
-        !body.allow_sleep) {
+    std::vector<SleepIslandNode<Body>> nodes;
+    std::unordered_map<std::uint64_t, std::size_t> lookup;
 
-        body.sleeping = false;
-        body.sleep_timer = 0.0f;
-        return;
+    for (const auto entity : world.entities()) {
+        if (!world.active(entity)) continue;
+        auto* body = world.get_component<Body>(
+            entity,
+            is_2d ? rigidbody2d_type() : rigidbody_type());
+
+        if (!body || !body->enabled || body->is_kinematic)
+            continue;
+
+        if (is_2d) {
+            body->linear_velocity.z = 0.0f;
+            body->angular_velocity.x = 0.0f;
+            body->angular_velocity.y = 0.0f;
+        }
+
+        const auto index = nodes.size();
+        lookup.emplace(entity.value, index);
+        nodes.push_back({entity, body, index, false, false});
     }
 
-    const float threshold_squared =
-        body.sleep_threshold *
-        body.sleep_threshold;
+    const auto root_of = [&](std::size_t index) {
+        while (nodes[index].parent != index) {
+            nodes[index].parent = nodes[nodes[index].parent].parent;
+            index = nodes[index].parent;
+        }
+        return index;
+    };
 
-    const float body_speed_squared =
-        motion_speed_squared(
-            body.linear_velocity,
-            body.angular_velocity,
-            is_2d);
+    for (const auto& overlap : overlaps) {
+        if (overlap.is_2d != is_2d ||
+            overlap.is_trigger ||
+            overlap.penetration <= 0.0f)
+            continue;
 
-    if (!supported ||
-        body_speed_squared >
-            threshold_squared) {
+        const auto first = lookup.find(overlap.first.value);
+        const auto second = lookup.find(overlap.second.value);
 
-        body.sleeping = false;
-        body.sleep_timer = 0.0f;
-        return;
-    }
+        if (first != lookup.end()) nodes[first->second].supported = true;
+        if (second != lookup.end()) nodes[second->second].supported = true;
 
-    constexpr float sleep_delay_seconds =
-        0.5f;
-
-    if (!body.sleeping) {
-        body.sleep_timer +=
-            delta_seconds;
-
-        if (body.sleep_timer >=
-            sleep_delay_seconds) {
-            body.sleeping = true;
+        if (first != lookup.end() && second != lookup.end()) {
+            const auto a = root_of(first->second);
+            const auto b = root_of(second->second);
+            if (a != b) nodes[b].parent = a;
+        } else {
+            // A static/kinematic collider anchors its connected island.
+            if (first != lookup.end()) nodes[first->second].anchored = true;
+            if (second != lookup.end()) nodes[second->second].anchored = true;
         }
     }
 
-    if (body.sleeping) {
-        body.linear_velocity = {};
-        body.angular_velocity = {};
+    struct IslandState {
+        bool anchored{false};
+        bool can_sleep{true};
+        float minimum_timer{std::numeric_limits<float>::max()};
+    };
+
+    std::vector<IslandState> states(nodes.size());
+    for (std::size_t i = 0; i < nodes.size(); ++i) {
+        const auto root = root_of(i);
+        auto& state = states[root];
+        const auto& node = nodes[i];
+        const auto& body = *node.body;
+
+        state.anchored |= node.anchored;
+        state.minimum_timer = std::min(
+            state.minimum_timer, body.sleep_timer);
+
+        const float threshold = std::max(0.0f, body.sleep_threshold);
+        state.can_sleep &=
+            node.supported && body.allow_sleep &&
+            motion_speed_squared(
+                body.linear_velocity, body.angular_velocity, is_2d) <=
+                threshold * threshold;
+    }
+
+    constexpr float sleep_delay_seconds = 0.5f;
+
+    for (std::size_t i = 0; i < nodes.size(); ++i) {
+        const auto& state = states[root_of(i)];
+        auto& body = *nodes[i].body;
+        const bool quiet_and_supported = state.anchored && state.can_sleep;
+        body.sleep_timer = quiet_and_supported
+            ? state.minimum_timer + delta_seconds
+            : 0.0f;
+        body.sleeping =
+            quiet_and_supported &&
+            body.sleep_timer >= sleep_delay_seconds;
+
+        if (body.sleeping) {
+            body.linear_velocity = {};
+            body.angular_velocity = {};
+        }
     }
 }
 
 void update_sleep_states(
     core::World& world,
     const std::vector<BoxOverlap>& overlaps,
-    float delta_seconds) noexcept {
+    float delta_seconds) {
 
     if (!std::isfinite(delta_seconds) ||
-        delta_seconds <= 0.0f) {
-        return;
-    }
+        delta_seconds <= 0.0f) return;
 
-    for (const auto entity :
-         world.entities()) {
-
-        if (!world.active(entity)) {
-            continue;
-        }
-
-        if (auto* body =
-                world.get_component<Rigidbody>(
-                    entity,
-                    rigidbody_type())) {
-
-            update_body_sleep(
-                *body,
-                has_solid_contact(
-                    overlaps,
-                    entity,
-                    false),
-                delta_seconds,
-                false);
-
-            continue;
-        }
-
-        if (auto* body2d =
-                world.get_component<Rigidbody2D>(
-                    entity,
-                    rigidbody2d_type())) {
-
-            body2d->linear_velocity.z =
-                0.0f;
-            body2d->angular_velocity.x =
-                0.0f;
-            body2d->angular_velocity.y =
-                0.0f;
-
-            update_body_sleep(
-                *body2d,
-                has_solid_contact(
-                    overlaps,
-                    entity,
-                    true),
-                delta_seconds,
-                true);
-        }
-    }
+    update_sleep_islands<Rigidbody>(
+        world, overlaps, delta_seconds, false);
+    update_sleep_islands<Rigidbody2D>(
+        world, overlaps, delta_seconds, true);
 }
 
 } // namespace

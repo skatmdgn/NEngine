@@ -399,7 +399,7 @@ Implemented foundation:
 - coroutine scheduling including WaitForSeconds.
 
 Remaining major work:
-- remaining physics shapes, cross-frame warm starting over the collider-derived inertia/per-contact rotational manifold solver, refined capsule/compound mass properties, island-aware sleep propagation, and managed cast/richer query APIs, plus streaming/compressed audio decode and production DSP/device scheduling.
+- remaining physics shapes, cross-frame warm starting over the collider-derived inertia/per-contact rotational manifold solver, refined capsule/compound mass properties, production sleep-island refinements, and managed cast/richer query APIs, plus streaming/compressed audio decode and production DSP/device scheduling.
 - packaged/versioned managed API distribution.
 - debugger symbols/attach workflow.
 - NuGet runtime/package integration.
