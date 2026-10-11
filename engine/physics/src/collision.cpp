@@ -3580,245 +3580,104 @@ InverseInertia3D inverse_inertia_3d(
     const Rigidbody* body) noexcept {
 
     InverseInertia3D result;
-
-    if (!body ||
-        !body->enabled ||
-        body->is_kinematic ||
-        body->mass <= 0.0f) {
+    if (!body || !body->enabled || body->is_kinematic ||
+        !std::isfinite(body->mass) || body->mass <= 0.0f) {
         result.diagonal = {};
         return result;
     }
 
-    const auto* transform =
-        world.transform(entity);
-
+    const auto* transform = world.transform(entity);
     if (!transform) {
         result.diagonal = {};
         return result;
     }
 
-    box_axes(
-        transform->local_rotation,
-        false,
-        result.axis_x,
-        result.axis_y,
-        result.axis_z);
+    box_axes(transform->local_rotation, false,
+             result.axis_x, result.axis_y, result.axis_z);
+    const auto scale = abs_scale(transform->local_scale);
+    std::array<MassElement3D, 3> parts{};
+    bool has_shape = false;
+    constexpr float pi = 3.14159265358979323846f;
 
-    const auto scale =
-        abs_scale(
-            transform->local_scale);
+    if (const auto* box = world.get_component<BoxCollider>(
+            entity, box_collider_type());
+        box && box->enabled && !box->is_trigger) {
 
-    core::Vec3 size{
-        1.0f,
-        1.0f,
-        1.0f
-    };
-
-    core::Vec3 center{};
-    bool spherical = false;
-    bool capsular = false;
-    float sphere_radius = 0.0f;
-    float capsule_radius = 0.0f;
-    float capsule_segment_length = 0.0f;
-    std::uint32_t capsule_direction = 1u;
-
-    if (const auto* collider =
-            world.get_component<BoxCollider>(
-                entity,
-                box_collider_type());
-        collider &&
-        collider->enabled) {
-
-        size = {
-            std::abs(collider->size.x) *
-                scale.x,
-            std::abs(collider->size.y) *
-                scale.y,
-            std::abs(collider->size.z) *
-                scale.z
+        has_shape = true;
+        const core::Vec3 size{
+            std::abs(box->size.x) * scale.x,
+            std::abs(box->size.y) * scale.y,
+            std::abs(box->size.z) * scale.z
         };
-
-        center = {
-            collider->center.x * scale.x,
-            collider->center.y * scale.y,
-            collider->center.z * scale.z
-        };
-    } else if (
-        const auto* collider =
-            world.get_component<SphereCollider>(
-                entity,
-                sphere_collider_type());
-        collider &&
-        collider->enabled) {
-
-        spherical = true;
-
-        sphere_radius =
-            std::abs(
-                collider->radius) *
-            std::max(
-                scale.x,
-                std::max(
-                    scale.y,
-                    scale.z));
-
-        center = {
-            collider->center.x * scale.x,
-            collider->center.y * scale.y,
-            collider->center.z * scale.z
-        };
-    } else if (
-        const auto* collider =
-            world.get_component<CapsuleCollider>(
-                entity,
-                capsule_collider_type());
-        collider &&
-        collider->enabled) {
-
-        float axial_scale =
-            scale.y;
-
-        float radial_scale =
-            std::max(
-                scale.x,
-                scale.z);
-
-        if (collider->direction == 0u) {
-            axial_scale =
-                scale.x;
-
-            radial_scale =
-                std::max(
-                    scale.y,
-                    scale.z);
-        } else if (
-            collider->direction == 2u) {
-
-            axial_scale =
-                scale.z;
-
-            radial_scale =
-                std::max(
-                    scale.x,
-                    scale.y);
-        }
-
-        const float radius =
-            std::abs(
-                collider->radius) *
-            radial_scale;
-
-        const float height =
-            std::max(
-                std::abs(
-                    collider->height) *
-                    axial_scale,
-                radius * 2.0f);
-
-        capsular = true;
-        capsule_radius = radius;
-        capsule_segment_length = height - radius * 2.0f;
-        capsule_direction = collider->direction;
-
-        const float diameter =
-            radius * 2.0f;
-
-        size = {
-            diameter,
-            height,
-            diameter
-        };
-
-        if (collider->direction == 0u) {
-            size = {
-                height,
-                diameter,
-                diameter
-            };
-        } else if (
-            collider->direction == 2u) {
-
-            size = {
-                diameter,
-                diameter,
-                height
-            };
-        }
-
-        center = {
-            collider->center.x * scale.x,
-            collider->center.y * scale.y,
-            collider->center.z * scale.z
+        parts[0] = {
+            size.x * size.y * size.z,
+            {box->center.x * scale.x, box->center.y * scale.y,
+             box->center.z * scale.z},
+            {(size.y * size.y + size.z * size.z) / 12.0f,
+             (size.x * size.x + size.z * size.z) / 12.0f,
+             (size.x * size.x + size.y * size.y) / 12.0f}
         };
     }
 
-    float inertia_x = 0.0f;
-    float inertia_y = 0.0f;
-    float inertia_z = 0.0f;
+    if (const auto* sphere = world.get_component<SphereCollider>(
+            entity, sphere_collider_type());
+        sphere && sphere->enabled && !sphere->is_trigger) {
 
-    if (spherical) {
-        const float inertia =
-            0.4f *
-            body->mass *
-            sphere_radius *
-            sphere_radius;
-
-        inertia_x = inertia;
-        inertia_y = inertia;
-        inertia_z = inertia;
-    } else if (capsular) {
-        const auto moments = capsule_inertia_3d(
-            body->mass, capsule_radius, capsule_segment_length);
-        inertia_x = moments.transverse;
-        inertia_y = moments.transverse;
-        inertia_z = moments.transverse;
-        if (capsule_direction == 0u)
-            inertia_x = moments.axial;
-        else if (capsule_direction == 2u)
-            inertia_z = moments.axial;
-        else
-            inertia_y = moments.axial;
-    } else {
-        inertia_x =
-            body->mass *
-            (size.y * size.y +
-             size.z * size.z) /
-            12.0f;
-
-        inertia_y =
-            body->mass *
-            (size.x * size.x +
-             size.z * size.z) /
-            12.0f;
-
-        inertia_z =
-            body->mass *
-            (size.x * size.x +
-             size.y * size.y) /
-            12.0f;
+        has_shape = true;
+        const float radius = std::abs(sphere->radius) *
+            std::max(scale.x, std::max(scale.y, scale.z));
+        const float inertia = 0.4f * radius * radius;
+        parts[1] = {
+            (4.0f / 3.0f) * pi * radius * radius * radius,
+            {sphere->center.x * scale.x, sphere->center.y * scale.y,
+             sphere->center.z * scale.z},
+            {inertia, inertia, inertia}
+        };
     }
 
-    inertia_x +=
-        body->mass *
-        (center.y * center.y +
-         center.z * center.z);
+    if (const auto* capsule = world.get_component<CapsuleCollider>(
+            entity, capsule_collider_type());
+        capsule && capsule->enabled && !capsule->is_trigger) {
 
-    inertia_y +=
-        body->mass *
-        (center.x * center.x +
-         center.z * center.z);
+        has_shape = true;
+        const auto axis = capsule->direction;
+        const float axial = axis == 0u ? scale.x :
+            axis == 2u ? scale.z : scale.y;
+        const float radial = axis == 0u
+            ? std::max(scale.y, scale.z)
+            : axis == 2u ? std::max(scale.x, scale.y)
+                         : std::max(scale.x, scale.z);
+        const float radius = std::abs(capsule->radius) * radial;
+        const float height = std::max(
+            std::abs(capsule->height) * axial, 2.0f * radius);
+        const float straight = height - 2.0f * radius;
+        const auto m = capsule_inertia_3d(1.0f, radius, straight);
+        core::Vec3 moments{m.transverse, m.transverse, m.transverse};
+        if (axis == 0u) moments.x = m.axial;
+        else if (axis == 2u) moments.z = m.axial;
+        else moments.y = m.axial;
+        parts[2] = {
+            pi * radius * radius * straight +
+                (4.0f / 3.0f) * pi * radius * radius * radius,
+            {capsule->center.x * scale.x,
+             capsule->center.y * scale.y,
+             capsule->center.z * scale.z},
+            moments
+        };
+    }
 
-    inertia_z +=
-        body->mass *
-        (center.x * center.x +
-         center.y * center.y);
+    // Preserve the historical unit-box fallback if no solid collider is
+    // enabled; trigger-only bodies have no physical rotational mass.
+    if (!has_shape)
+        parts[0] = {1.0f, {}, {1.0f / 6.0f,
+                              1.0f / 6.0f, 1.0f / 6.0f}};
 
+    const auto inertia = compound_inertia_3d(body->mass, parts);
     result.diagonal = {
-        safe_inverse(inertia_x),
-        safe_inverse(inertia_y),
-        safe_inverse(inertia_z)
+        safe_inverse(inertia.x),
+        safe_inverse(inertia.y),
+        safe_inverse(inertia.z)
     };
-
     return result;
 }
 

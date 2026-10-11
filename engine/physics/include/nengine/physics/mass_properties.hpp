@@ -1,6 +1,9 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
+
+#include "nengine/core/math.hpp"
 #include <cmath>
 
 namespace nengine::physics {
@@ -65,6 +68,43 @@ inline float capsule_inertia_2d(
         caps_mass * (0.5f * r2 +
             (4.0f / (3.0f * pi)) * length * radius +
             0.25f * length * length);
+}
+
+// Each element carries its geometric volume, center relative to the
+// Rigidbody Transform pivot, and local inertia *per unit of mass*.
+// Off-diagonal products are not yet represented by the solver's tensor.
+struct MassElement3D {
+    float measure{0.0f};
+    core::Vec3 center{};
+    core::Vec3 unit_inertia{};
+};
+
+inline core::Vec3 compound_inertia_3d(
+    float mass, const std::array<MassElement3D, 3>& elements) noexcept {
+
+    if (!std::isfinite(mass) || mass <= 0.0f) return {};
+    float total = 0.0f;
+    for (const auto& part : elements)
+        if (std::isfinite(part.measure) && part.measure > 0.0f)
+            total += part.measure;
+    if (!std::isfinite(total) || total <= 0.0f) return {};
+
+    core::Vec3 result{};
+    for (const auto& part : elements) {
+        if (!(part.measure > 0.0f) || !std::isfinite(part.measure))
+            continue;
+        const auto& p = part.center;
+        const auto& i = part.unit_inertia;
+        if (!std::isfinite(p.x) || !std::isfinite(p.y) ||
+            !std::isfinite(p.z) || !std::isfinite(i.x) ||
+            !std::isfinite(i.y) || !std::isfinite(i.z))
+            continue;
+        const float portion = mass * part.measure / total;
+        result.x += portion * (i.x + p.y * p.y + p.z * p.z);
+        result.y += portion * (i.y + p.x * p.x + p.z * p.z);
+        result.z += portion * (i.z + p.x * p.x + p.y * p.y);
+    }
+    return result;
 }
 
 } // namespace nengine::physics

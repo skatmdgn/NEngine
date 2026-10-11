@@ -2818,6 +2818,30 @@ int main() {
         physics::capsule_inertia_2d(-1.0f, 0.5f, 2.0f) == 0.0f,
         "2D degenerate capsule mass inputs are guarded");
 
+    // Equal-volume components share mass equally; offsets contribute
+    // via the parallel-axis theorem about the Transform pivot.
+    const auto compound_3d = physics::compound_inertia_3d(
+        2.0f, {{
+            {1.0f, {1.0f, 0.0f, 0.0f}, {0.5f, 0.5f, 0.5f}},
+            {1.0f, {-1.0f, 0.0f, 0.0f}, {0.5f, 0.5f, 0.5f}},
+            {}
+        }});
+    check(
+        std::abs(compound_3d.x - 1.0f) < 0.0001f &&
+        std::abs(compound_3d.y - 3.0f) < 0.0001f &&
+        std::abs(compound_3d.z - 3.0f) < 0.0001f,
+        "3D compound inertia distributes mass and accounts for offsets");
+
+    const auto unequal_3d = physics::compound_inertia_3d(
+        3.0f, {{
+            {1.0f, {}, {1.0f, 1.0f, 1.0f}},
+            {2.0f, {}, {4.0f, 4.0f, 4.0f}}, {}
+        }});
+    check(
+        std::abs(unequal_3d.x - 9.0f) < 0.0001f &&
+        std::abs(unequal_3d.y - 9.0f) < 0.0001f,
+        "3D compound inertia partitions mass by collider volume");
+
     // Frame-to-frame warm starting uses explicit scene-owned state.
     core::World warm_world;
     const auto warm_wall = warm_world.create("Warm Wall");
