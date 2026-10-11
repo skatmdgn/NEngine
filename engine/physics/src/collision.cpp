@@ -3920,11 +3920,15 @@ float inverse_inertia_2d(
                 collider->size.y) *
             scale.y;
 
-        inertia =
-            body->mass *
-            (width * width +
-             height * height) /
-            12.0f;
+        const bool horizontal = collider->direction == 1u;
+        const float axial_size = horizontal ? width : height;
+        const float cross_size = horizontal ? height : width;
+        const float radius = 0.5f *
+            std::min(axial_size, cross_size);
+        const float straight_length =
+            std::max(0.0f, axial_size - 2.0f * radius);
+        inertia = capsule_inertia_2d(
+            body->mass, radius, straight_length);
 
         center = {
             collider->center.x * scale.x,

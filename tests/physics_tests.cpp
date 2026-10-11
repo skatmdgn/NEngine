@@ -2801,6 +2801,22 @@ int main() {
         physics::capsule_inertia_3d(-1.0f, 0.5f, 2.0f).transverse == 0.0f,
         "3D degenerate capsule mass inputs are guarded");
 
+    const float capsule_2d_circle =
+        physics::capsule_inertia_2d(2.0f, 0.5f, 0.0f);
+    check(
+        std::abs(capsule_2d_circle - 0.25f) < 0.0001f,
+        "2D zero-segment capsule reduces to uniform disk inertia");
+    const float capsule_2d_long =
+        physics::capsule_inertia_2d(1.0f, 0.5f, 2.0f);
+    check(
+        std::abs(capsule_2d_long - 0.73606698f) < 0.0001f &&
+        capsule_2d_long > capsule_2d_circle,
+        "2D capsule uses rectangle and semicircle area moments");
+    check(
+        physics::capsule_inertia_2d(1.0f, 0.0f, 2.0f) == 0.0f &&
+        physics::capsule_inertia_2d(-1.0f, 0.5f, 2.0f) == 0.0f,
+        "2D degenerate capsule mass inputs are guarded");
+
     // Frame-to-frame warm starting uses explicit scene-owned state.
     core::World warm_world;
     const auto warm_wall = warm_world.create("Warm Wall");

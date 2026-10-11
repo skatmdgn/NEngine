@@ -41,4 +41,30 @@ inline CapsuleInertia3D capsule_inertia_3d(
     };
 }
 
+// Uniform-density 2D stadium = a rectangle plus two semicircles.
+// The parallel-axis contribution of the semicircles is integrated
+// around their original circle centers.
+inline float capsule_inertia_2d(
+    float mass, float radius, float straight_length) noexcept {
+
+    if (!std::isfinite(mass) || !std::isfinite(radius) ||
+        !std::isfinite(straight_length) || mass <= 0.0f ||
+        radius <= 0.0f)
+        return 0.0f;
+
+    const float length = std::max(0.0f, straight_length);
+    constexpr float pi = 3.14159265358979323846f;
+    const float rectangle_area = 2.0f * radius * length;
+    const float caps_area = pi * radius * radius;
+    const float total_area = rectangle_area + caps_area;
+    const float rectangle_mass = mass * (rectangle_area / total_area);
+    const float caps_mass = mass - rectangle_mass;
+    const float r2 = radius * radius;
+
+    return rectangle_mass * (4.0f * r2 + length * length) / 12.0f +
+        caps_mass * (0.5f * r2 +
+            (4.0f / (3.0f * pi)) * length * radius +
+            0.25f * length * length);
+}
+
 } // namespace nengine::physics
