@@ -11,6 +11,7 @@
 #include "nengine/core/world.hpp"
 #include "nengine/physics/components.hpp"
 #include "nengine/physics/collision.hpp"
+#include "nengine/physics/mass_properties.hpp"
 #include "nengine/physics/contact_events.hpp"
 #include "nengine/physics/registration.hpp"
 #include "nengine/physics/simulation.hpp"
@@ -2779,6 +2780,26 @@ int main() {
             0.0001f,
         "off-center 2D contact impulse changes only Z angular velocity through planar inertia");
 
+
+    // Analytic capsule inertia replaces the bounding-box estimate.
+    const auto solid_sphere_capsule =
+        physics::capsule_inertia_3d(2.0f, 0.5f, 0.0f);
+    check(
+        std::abs(solid_sphere_capsule.axial - 0.2f) < 0.0001f &&
+        std::abs(solid_sphere_capsule.transverse - 0.2f) < 0.0001f,
+        "3D zero-segment capsule reduces to solid-sphere inertia");
+
+    const auto elongated_capsule =
+        physics::capsule_inertia_3d(1.0f, 0.5f, 2.0f);
+    check(
+        std::abs(elongated_capsule.axial - 0.11875f) < 0.0001f &&
+        std::abs(elongated_capsule.transverse - 0.665625f) < 0.0001f &&
+        elongated_capsule.transverse > elongated_capsule.axial,
+        "3D cylinder plus hemispheres has analytic axial/transverse inertia");
+    check(
+        physics::capsule_inertia_3d(1.0f, 0.0f, 2.0f).axial == 0.0f &&
+        physics::capsule_inertia_3d(-1.0f, 0.5f, 2.0f).transverse == 0.0f,
+        "3D degenerate capsule mass inputs are guarded");
 
     // Frame-to-frame warm starting uses explicit scene-owned state.
     core::World warm_world;

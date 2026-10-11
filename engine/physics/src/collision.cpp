@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "nengine/physics/components.hpp"
+#include "nengine/physics/mass_properties.hpp"
 
 namespace nengine::physics {
 namespace {
@@ -3615,7 +3616,11 @@ InverseInertia3D inverse_inertia_3d(
 
     core::Vec3 center{};
     bool spherical = false;
+    bool capsular = false;
     float sphere_radius = 0.0f;
+    float capsule_radius = 0.0f;
+    float capsule_segment_length = 0.0f;
+    std::uint32_t capsule_direction = 1u;
 
     if (const auto* collider =
             world.get_component<BoxCollider>(
@@ -3710,6 +3715,11 @@ InverseInertia3D inverse_inertia_3d(
                     axial_scale,
                 radius * 2.0f);
 
+        capsular = true;
+        capsule_radius = radius;
+        capsule_segment_length = height - radius * 2.0f;
+        capsule_direction = collider->direction;
+
         const float diameter =
             radius * 2.0f;
 
@@ -3756,6 +3766,18 @@ InverseInertia3D inverse_inertia_3d(
         inertia_x = inertia;
         inertia_y = inertia;
         inertia_z = inertia;
+    } else if (capsular) {
+        const auto moments = capsule_inertia_3d(
+            body->mass, capsule_radius, capsule_segment_length);
+        inertia_x = moments.transverse;
+        inertia_y = moments.transverse;
+        inertia_z = moments.transverse;
+        if (capsule_direction == 0u)
+            inertia_x = moments.axial;
+        else if (capsule_direction == 2u)
+            inertia_z = moments.axial;
+        else
+            inertia_y = moments.axial;
     } else {
         inertia_x =
             body->mass *

@@ -171,6 +171,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Accumulated twenty-four-pass sequential velocity solver foundation for 3D/2D contact chains
 - [x] Rigidbody/Rigidbody2D angular velocity Scene/Editor/C# + quaternion integration foundation
 - [x] Collider-derived inertia + per-manifold-point rotational sequential constraints
+- [x] Analytic cylinder + hemispheres inertia for 3D capsules
 - [x] Per-scene 3D/2D persistent contact impulse warm starting
 - [x] One-to-one cached manifold point matching for 3D/2D warm starting
 - [x] Maximum-coverage / minimum-distance cached-point assignment for 3D/2D manifolds
