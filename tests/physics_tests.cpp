@@ -2890,6 +2890,25 @@ int main() {
         !island_a_body->sleeping && !island_b_body->sleeping,
         "a moving member wakes its entire connected 3D island");
 
+    // Explicit Sleep() sets sleeping=true with a zero timer.
+    // An anchored, quiet contact island must honor it immediately.
+    island_world.transform(island_a)->local_position =
+        {0.75f, 0.0f, 0.0f};
+    island_world.transform(island_b)->local_position =
+        {1.5f, 0.0f, 0.0f};
+    island_a_body->linear_velocity = {};
+    island_b_body->linear_velocity = {};
+    island_a_body->angular_velocity = {};
+    island_b_body->angular_velocity = {};
+    island_a_body->sleeping = true;
+    island_a_body->sleep_timer = 0.0f;
+    island_b_body->sleeping = false;
+    island_b_body->sleep_timer = 0.0f;
+    physics::step_physics(island_world, 1.0f / 60.0f, {});
+    check(
+        island_a_body->sleeping && island_b_body->sleeping,
+        "explicit Sleep request is preserved for a quiet anchored island");
+
     core::World floating_island_world;
     const auto float_a = floating_island_world.create("Float A");
     const auto float_b = floating_island_world.create("Float B");

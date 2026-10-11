@@ -240,6 +240,7 @@ void update_sleep_islands(
     struct IslandState {
         bool anchored{false};
         bool can_sleep{true};
+        bool explicitly_sleeping{false};
         float minimum_timer{std::numeric_limits<float>::max()};
     };
 
@@ -251,6 +252,8 @@ void update_sleep_islands(
         const auto& body = *node.body;
 
         state.anchored |= node.anchored;
+        state.explicitly_sleeping |=
+            body.sleeping && body.sleep_timer < 0.5f;
         state.minimum_timer = std::min(
             state.minimum_timer, body.sleep_timer);
 
@@ -269,7 +272,9 @@ void update_sleep_islands(
         auto& body = *nodes[i].body;
         const bool quiet_and_supported = state.anchored && state.can_sleep;
         body.sleep_timer = quiet_and_supported
-            ? state.minimum_timer + delta_seconds
+            ? (state.explicitly_sleeping
+                ? sleep_delay_seconds
+                : state.minimum_timer + delta_seconds)
             : 0.0f;
         body.sleeping =
             quiet_and_supported &&
