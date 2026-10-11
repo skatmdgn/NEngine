@@ -5,6 +5,7 @@
 #include <limits>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "nengine/core/component_registry.hpp"
 #include "nengine/core/component_serialization.hpp"
@@ -3198,6 +3199,107 @@ int main() {
     check(
         !island_2d_a_body->sleeping && !island_2d_b_body->sleeping,
         "angular motion wakes the whole 2D contact island");
+
+    // Connected chains test union-find sleeping over more than two bodies.
+    // Recreate overlaps before the wake step so the test measures topology,
+    // not an incidental gap left by positional correction.
+    constexpr std::size_t chain_count = 16u;
+    core::World chain_3d_world;
+    const auto chain_3d_anchor = chain_3d_world.create("3D Chain Anchor");
+    chain_3d_world.add_component<physics::BoxCollider>(
+        chain_3d_anchor, physics::box_collider_type());
+    std::vector<core::Entity> chain_3d_entities;
+    for (std::size_t i = 0u; i < chain_count; ++i) {
+        const auto e = chain_3d_world.create(
+            "3D Chain " + std::to_string(i));
+        chain_3d_entities.push_back(e);
+        chain_3d_world.add_component<physics::BoxCollider>(
+            e, physics::box_collider_type());
+        auto* b = chain_3d_world.add_component<physics::Rigidbody>(
+            e, physics::rigidbody_type());
+        b->use_gravity = false;
+        chain_3d_world.transform(e)->local_position =
+            {0.75f * static_cast<float>(i + 1u), 0.0f, 0.0f};
+    }
+    const auto chain_3d_sleep = physics::step_physics(
+        chain_3d_world, 0.51f, {});
+    bool all_chain_3d_asleep = true;
+    for (const auto e : chain_3d_entities) {
+        const auto* b = chain_3d_world.get_component<physics::Rigidbody>(
+            e, physics::rigidbody_type());
+        all_chain_3d_asleep &= b && b->sleeping;
+    }
+    check(
+        chain_3d_sleep.collisions.overlaps.size() >= chain_count &&
+        all_chain_3d_asleep,
+        "3D sixteen-body anchored contact chain sleeps as one island");
+
+    for (std::size_t i = 0u; i < chain_count; ++i)
+        chain_3d_world.transform(chain_3d_entities[i])->local_position =
+            {0.75f * static_cast<float>(i + 1u), 0.0f, 0.0f};
+    auto* chain_3d_last = chain_3d_world.get_component<physics::Rigidbody>(
+        chain_3d_entities.back(), physics::rigidbody_type());
+    chain_3d_last->linear_velocity = {-1.5f, 0.0f, 0.0f};
+    physics::step_physics(chain_3d_world, 1.0f / 60.0f, {});
+    bool all_chain_3d_awake = true;
+    for (const auto e : chain_3d_entities) {
+        const auto* b = chain_3d_world.get_component<physics::Rigidbody>(
+            e, physics::rigidbody_type());
+        all_chain_3d_awake &= b && !b->sleeping;
+    }
+    check(
+        all_chain_3d_awake,
+        "3D motion at far end wakes every member of anchored contact island");
+
+    core::World chain_2d_world;
+    const auto chain_2d_anchor = chain_2d_world.create("2D Chain Anchor");
+    auto* chain_2d_anchor_collider =
+        chain_2d_world.add_component<physics::BoxCollider2D>(
+            chain_2d_anchor, physics::box_collider2d_type());
+    std::vector<core::Entity> chain_2d_entities;
+    for (std::size_t i = 0u; i < chain_count; ++i) {
+        const auto e = chain_2d_world.create(
+            "2D Chain " + std::to_string(i));
+        chain_2d_entities.push_back(e);
+        chain_2d_world.add_component<physics::BoxCollider2D>(
+            e, physics::box_collider2d_type());
+        auto* b = chain_2d_world.add_component<physics::Rigidbody2D>(
+            e, physics::rigidbody2d_type());
+        b->use_gravity = false;
+        chain_2d_world.transform(e)->local_position = {
+            0.75f * static_cast<float>(i + 1u), 0.0f,
+            i % 2u == 0u ? -10.0f : 10.0f};
+    }
+    const auto chain_2d_sleep = physics::step_physics(
+        chain_2d_world, 0.51f, {});
+    bool all_chain_2d_asleep = true;
+    for (const auto e : chain_2d_entities) {
+        const auto* b = chain_2d_world.get_component<physics::Rigidbody2D>(
+            e, physics::rigidbody2d_type());
+        all_chain_2d_asleep &= b && b->sleeping;
+    }
+    check(
+        chain_2d_sleep.collisions.overlaps.size() >= chain_count &&
+        all_chain_2d_asleep,
+        "2D sixteen-body contact chain sleeps regardless of varying Z");
+
+    // A trigger is not physical support: the island must wake when its
+    // only static contact becomes a trigger.
+    chain_2d_anchor_collider->is_trigger = true;
+    for (std::size_t i = 0u; i < chain_count; ++i)
+        chain_2d_world.transform(chain_2d_entities[i])->local_position = {
+            0.75f * static_cast<float>(i + 1u), 0.0f,
+            i % 2u == 0u ? -10.0f : 10.0f};
+    physics::step_physics(chain_2d_world, 1.0f / 60.0f, {});
+    bool all_chain_2d_awake = true;
+    for (const auto e : chain_2d_entities) {
+        const auto* b = chain_2d_world.get_component<physics::Rigidbody2D>(
+            e, physics::rigidbody2d_type());
+        all_chain_2d_awake &= b && !b->sleeping;
+    }
+    check(
+        all_chain_2d_awake,
+        "2D contact island loses support and wakes when anchor is a trigger");
 
     core::World sleeping_world;
 
