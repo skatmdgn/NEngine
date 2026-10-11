@@ -2952,6 +2952,37 @@ int main() {
 
 
 
+    // Greedy closest-first matching would consume the only cache entry
+    // available to the second contact and leave it without warm starting.
+    match_3d_overlap.manifold.points[0].point = {0.25f, 0.0f, 0.0f};
+    match_3d_overlap.manifold.points[1].point = {0.25f, -0.08f, 0.0f};
+    match_3d_cache.previous.front().count = 2u;
+    match_3d_cache.previous.front().points[0] =
+        {{0.25f, -0.04f, 0.0f}, 0.5f, {}};
+    match_3d_cache.previous.front().points[1] =
+        {{0.25f, 0.08f, 0.0f}, 0.5f, {}};
+    match_3d_body->linear_velocity = {-2.0f, 0.0f, 0.0f};
+    const auto optimal_3d = physics::resolve_box_contacts_3d(
+        match_3d_world, {match_3d_overlap}, &match_3d_cache);
+    check(
+        optimal_3d.warm_started_contacts == 2u,
+        "3D manifold cache assignment maximizes matches before proximity");
+
+    match_2d_overlap.manifold.points[0].point = {0.25f, 0.0f, 9.0f};
+    match_2d_overlap.manifold.points[1].point = {0.25f, -0.08f, -9.0f};
+    match_2d_cache.previous.front().normal = match_2d_overlap.normal;
+    match_2d_cache.previous.front().count = 2u;
+    match_2d_cache.previous.front().points[0] =
+        {{0.25f, -0.04f, 80.0f}, 0.5f, {}};
+    match_2d_cache.previous.front().points[1] =
+        {{0.25f, 0.08f, -80.0f}, 0.5f, {}};
+    match_2d_body->linear_velocity = {-2.0f, 0.0f, 0.0f};
+    const auto optimal_2d = physics::resolve_box_contacts_2d(
+        match_2d_world, {match_2d_overlap}, &match_2d_cache);
+    check(
+        optimal_2d.warm_started_contacts == 2u,
+        "2D manifold cache assignment maximizes planar matches");
+
     // A static anchor lets an entire connected dynamic island sleep.
     core::World island_world;
     const auto island_wall = island_world.create("Island Wall");

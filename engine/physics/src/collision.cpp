@@ -4242,13 +4242,18 @@ core::Vec3 relative_velocity_2d(
     };
 }
 
-const CachedContactImpulse* find_cached_impulse(
+// Each manifold has at most four points. Exhaustive assignment is cheap
+// and avoids greedy matching stealing the only viable cache entry.
+std::array<const CachedContactImpulse*, ContactManifold::max_points>
+match_cached_impulses(
     const ContactImpulseCache* cache,
     const BoxOverlap& overlap,
-    core::Vec3 point,
-    std::uint32_t& consumed_indices) noexcept {
+    const std::array<core::Vec3, ContactManifold::max_points>& points,
+    std::size_t count) noexcept {
 
-    if (!cache) return nullptr;
+    std::array<const CachedContactImpulse*, ContactManifold::max_points>
+        matches{};
+    if (!cache || count == 0u || count > matches.size()) return matches;
 
     for (const auto& pair : cache->previous) {
         if (pair.first != overlap.first ||
@@ -4258,40 +4263,76 @@ const CachedContactImpulse* find_cached_impulse(
             continue;
         }
 
-        const CachedContactImpulse* nearest = nullptr;
-        std::size_t nearest_index = 0u;
-        float best_squared_distance = 0.01f; // Within 10 cm.
+        const std::size_t cached_count =
+            std::min(pair.count, pair.points.size());
+        const std::size_t base = cached_count + 1u;
+        std::size_t combinations = 1u;
+        for (std::size_t i = 0u; i < count; ++i)
+            combinations *= base;
 
-        for (std::size_t i = 0u;
-             i < std::min(pair.count, pair.points.size());
-             ++i) {
+        std::array<std::size_t, ContactManifold::max_points> best{};
+        std::size_t best_count = 0u;
+        float best_cost = std::numeric_limits<float>::infinity();
 
-            // Each cached point may warm-start only one new constraint.
-            if ((consumed_indices & (1u << i)) != 0u)
-                continue;
+        for (std::size_t code = 0u; code < combinations; ++code) {
+            std::size_t digits = code;
+            std::size_t used = 0u;
+            std::size_t match_count = 0u;
+            float total_cost = 0.0f;
+            std::array<std::size_t, ContactManifold::max_points>
+                candidate{};
+            bool valid = true;
 
-            const auto& contact = pair.points[i];
-            if (!std::isfinite(contact.normal_impulse) ||
-                contact.normal_impulse <= 0.0f)
-                continue;
+            for (std::size_t i = 0u; i < count; ++i) {
+                const std::size_t choice = digits % base;
+                digits /= base;
+                candidate[i] = choice;
+                if (choice == 0u) continue;
 
-            const core::Vec3 delta{
-                contact.point.x - point.x,
-                contact.point.y - point.y,
-                overlap.is_2d ? 0.0f : contact.point.z - point.z
-            };
-            const float squared = dot3(delta, delta);
-            if (squared < best_squared_distance) {
-                best_squared_distance = squared;
-                nearest_index = i;
-                nearest = &contact;
+                const std::size_t old_index = choice - 1u;
+                if ((used & (1u << old_index)) != 0u) {
+                    valid = false;
+                    break;
+                }
+                const auto& old = pair.points[old_index];
+                if (!std::isfinite(old.normal_impulse) ||
+                    old.normal_impulse <= 0.0f) {
+                    valid = false;
+                    break;
+                }
+
+                const core::Vec3 delta{
+                    old.point.x - points[i].x,
+                    old.point.y - points[i].y,
+                    overlap.is_2d ? 0.0f : old.point.z - points[i].z
+                };
+                const float distance_squared = dot3(delta, delta);
+                if (!(distance_squared < 0.01f)) { // 10 cm tolerance.
+                    valid = false;
+                    break;
+                }
+
+                used |= 1u << old_index;
+                ++match_count;
+                total_cost += distance_squared;
+            }
+
+            // Maximize coverage before minimizing aggregate displacement.
+            if (valid &&
+                (match_count > best_count ||
+                 (match_count == best_count && total_cost < best_cost))) {
+                best = candidate;
+                best_count = match_count;
+                best_cost = total_cost;
             }
         }
-        if (nearest)
-            consumed_indices |= 1u << nearest_index;
-        return nearest;
+
+        for (std::size_t i = 0u; i < count; ++i)
+            if (best[i] != 0u)
+                matches[i] = &pair.points[best[i] - 1u];
+        return matches;
     }
-    return nullptr;
+    return matches;
 }
 
 template <typename Constraint>
@@ -4844,42 +4885,34 @@ CollisionResolutionStats resolve_box_contacts_3d(
                 second_body);
 
         const std::size_t contact_count =
-            std::max<std::size_t>(
-                1u,
-                overlap.manifold.count);
+            std::min<std::size_t>(
+                ContactManifold::max_points,
+                std::max<std::size_t>(1u, overlap.manifold.count));
 
-        std::uint32_t consumed_cached_points = 0u;
+        // Gather all contacts before assigning old impulses: a nearest-
+        // neighbor greedy pass can miss a valid one-to-one assignment.
+        std::array<core::Vec3, ContactManifold::max_points>
+            contact_positions{};
+        const core::Vec3 fallback_point{
+            (first_transform->local_position.x +
+             second_transform->local_position.x) * 0.5f,
+            (first_transform->local_position.y +
+             second_transform->local_position.y) * 0.5f,
+            (first_transform->local_position.z +
+             second_transform->local_position.z) * 0.5f
+        };
+        for (std::size_t i = 0u; i < contact_count; ++i)
+            contact_positions[i] = i < overlap.manifold.count
+                ? overlap.manifold.points[i].point
+                : fallback_point;
+        const auto cached_matches = match_cached_impulses(
+            cache, overlap, contact_positions, contact_count);
 
         for (std::size_t index = 0u;
              index < contact_count;
              ++index) {
 
-            core::Vec3 contact_point{
-                (first_transform
-                         ->local_position.x +
-                 second_transform
-                         ->local_position.x) *
-                    0.5f,
-                (first_transform
-                         ->local_position.y +
-                 second_transform
-                         ->local_position.y) *
-                    0.5f,
-                (first_transform
-                         ->local_position.z +
-                 second_transform
-                         ->local_position.z) *
-                    0.5f
-            };
-
-            if (index <
-                overlap.manifold.count) {
-
-                contact_point =
-                    overlap.manifold
-                        .points[index]
-                        .point;
-            }
+            const auto contact_point = contact_positions[index];
 
             VelocityConstraint3D constraint;
             constraint.overlap =
@@ -4951,9 +4984,7 @@ CollisionResolutionStats resolve_box_contacts_3d(
                 !(first_body && first_body->sleeping) &&
                 !(second_body && second_body->sleeping)) {
 
-                const auto* cached = find_cached_impulse(
-                    cache, overlap, contact_point,
-                    consumed_cached_points);
+                const auto* cached = cached_matches[index];
 
                 if (cached && cached->normal_impulse > 0.0f) {
                     constraint.accumulated_normal_impulse =
@@ -5135,38 +5166,33 @@ CollisionResolutionStats resolve_box_contacts_2d(
                 second_body);
 
         const std::size_t contact_count =
-            std::max<std::size_t>(
-                1u,
-                overlap.manifold.count);
+            std::min<std::size_t>(
+                ContactManifold::max_points,
+                std::max<std::size_t>(1u, overlap.manifold.count));
 
-        std::uint32_t consumed_cached_points = 0u;
+        // Gather all contacts before assigning old impulses: a nearest-
+        // neighbor greedy pass can miss a valid one-to-one assignment.
+        std::array<core::Vec3, ContactManifold::max_points>
+            contact_positions{};
+        const core::Vec3 fallback_point{
+            (first_transform->local_position.x +
+             second_transform->local_position.x) * 0.5f,
+            (first_transform->local_position.y +
+             second_transform->local_position.y) * 0.5f,
+            0.0f
+        };
+        for (std::size_t i = 0u; i < contact_count; ++i)
+            contact_positions[i] = i < overlap.manifold.count
+                ? overlap.manifold.points[i].point
+                : fallback_point;
+        const auto cached_matches = match_cached_impulses(
+            cache, overlap, contact_positions, contact_count);
 
         for (std::size_t index = 0u;
              index < contact_count;
              ++index) {
 
-            core::Vec3 contact_point{
-                (first_transform
-                         ->local_position.x +
-                 second_transform
-                         ->local_position.x) *
-                    0.5f,
-                (first_transform
-                         ->local_position.y +
-                 second_transform
-                         ->local_position.y) *
-                    0.5f,
-                0.0f
-            };
-
-            if (index <
-                overlap.manifold.count) {
-
-                contact_point =
-                    overlap.manifold
-                        .points[index]
-                        .point;
-            }
+            const auto contact_point = contact_positions[index];
 
             VelocityConstraint2D constraint;
             constraint.overlap =
@@ -5234,9 +5260,7 @@ CollisionResolutionStats resolve_box_contacts_2d(
                 !(first_body && first_body->sleeping) &&
                 !(second_body && second_body->sleeping)) {
 
-                const auto* cached = find_cached_impulse(
-                    cache, overlap, contact_point,
-                    consumed_cached_points);
+                const auto* cached = cached_matches[index];
 
                 if (cached && cached->normal_impulse > 0.0f) {
                     constraint.accumulated_normal_impulse =
