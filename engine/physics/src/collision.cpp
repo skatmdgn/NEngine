@@ -3328,8 +3328,14 @@ void append_overlaps(
                     bounds[j],
                     is_2d,
                     overlap)) {
-                overlaps.push_back(
-                    overlap);
+                // overlap_pair may reverse the input order. Attach shape
+                // identity in the same entity order as its contact normal.
+                const bool same_order = overlap.first == bounds[i].entity;
+                overlap.first_shape = static_cast<std::uint8_t>(
+                    same_order ? bounds[i].shape : bounds[j].shape);
+                overlap.second_shape = static_cast<std::uint8_t>(
+                    same_order ? bounds[j].shape : bounds[i].shape);
+                overlaps.push_back(overlap);
             }
         }
     }
@@ -4092,6 +4098,8 @@ match_cached_impulses(
         if (pair.first != overlap.first ||
             pair.second != overlap.second ||
             pair.is_2d != overlap.is_2d ||
+            pair.first_shape != overlap.first_shape ||
+            pair.second_shape != overlap.second_shape ||
             dot3(pair.normal, overlap.normal) < 0.95f) {
             continue;
         }
@@ -4229,7 +4237,9 @@ void store_cached_impulses(
         for (auto& existing : cache->current) {
             if (existing.first == overlap.first &&
                 existing.second == overlap.second &&
-                existing.is_2d == is_2d) {
+                existing.is_2d == is_2d &&
+                existing.first_shape == overlap.first_shape &&
+                existing.second_shape == overlap.second_shape) {
                 pair = &existing;
                 break;
             }
@@ -4241,6 +4251,8 @@ void store_cached_impulses(
             pair->second = overlap.second;
             pair->normal = overlap.normal;
             pair->is_2d = is_2d;
+            pair->first_shape = overlap.first_shape;
+            pair->second_shape = overlap.second_shape;
         }
         if (pair->count >= pair->points.size()) continue;
         pair->points[pair->count++] = {

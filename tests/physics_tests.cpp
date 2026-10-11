@@ -3130,6 +3130,63 @@ int main() {
         std::isfinite(match_2d_body->angular_velocity.z),
         "2D nonfinite cached tangent is rejected without poisoning motion");
 
+    // Different collider shapes on the same entity pair must retain
+    // independent contact manifolds and independent persistent impulses.
+    core::World compound_pair_world;
+    const auto compound_first = compound_pair_world.create("Compound First");
+    const auto compound_second = compound_pair_world.create("Compound Second");
+    compound_pair_world.add_component<physics::BoxCollider>(
+        compound_first, physics::box_collider_type());
+    compound_pair_world.add_component<physics::SphereCollider>(
+        compound_first, physics::sphere_collider_type());
+    compound_pair_world.add_component<physics::BoxCollider>(
+        compound_second, physics::box_collider_type());
+    compound_pair_world.transform(compound_second)->local_position =
+        {0.4f, 0.0f, 0.0f};
+    auto* compound_body = compound_pair_world.add_component<physics::Rigidbody>(
+        compound_first, physics::rigidbody_type());
+    compound_body->use_gravity = false;
+    compound_body->linear_velocity = {2.0f, 0.0f, 0.0f};
+
+    const auto compound_detection =
+        physics::detect_box_overlaps(compound_pair_world);
+    bool saw_box_pair = false;
+    bool saw_sphere_pair = false;
+    for (const auto& overlap : compound_detection.overlaps) {
+        const bool radial = overlap.first_shape == 1u ||
+                            overlap.second_shape == 1u;
+        saw_sphere_pair |= radial;
+        saw_box_pair |= !radial;
+    }
+    check(
+        saw_box_pair && saw_sphere_pair,
+        "compound 3D collision reports distinct shape-pair identities");
+
+    physics::ContactImpulseCache compound_cache;
+    const auto compound_solve = physics::resolve_box_contacts_3d(
+        compound_pair_world, compound_detection.overlaps, &compound_cache);
+    check(
+        compound_solve.resolved_3d >= 2u &&
+        compound_cache.current.size() >= 2u,
+        "compound 3D contacts store separate shape-pair impulse caches");
+
+    physics::ContactImpulseCache isolated_shape_cache;
+    physics::CachedContactPair isolated_pair;
+    isolated_pair.first = match_3d_wall;
+    isolated_pair.second = match_3d_mover;
+    isolated_pair.normal = match_3d_overlap.normal;
+    isolated_pair.first_shape = 1u;
+    isolated_pair.points[0] =
+        {{0.25f, 0.0f, 0.0f}, 0.5f, {}};
+    isolated_pair.count = 1u;
+    isolated_shape_cache.previous.push_back(isolated_pair);
+    match_3d_body->linear_velocity = {-2.0f, 0.0f, 0.0f};
+    const auto rejected_shape = physics::resolve_box_contacts_3d(
+        match_3d_world, {match_3d_overlap}, &isolated_shape_cache);
+    check(
+        rejected_shape.warm_started_contacts == 0u,
+        "3D cache will not reuse a spherical impulse for a box contact");
+
     // A static anchor lets an entire connected dynamic island sleep.
     core::World island_world;
     const auto island_wall = island_world.create("Island Wall");

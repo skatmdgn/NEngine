@@ -37,6 +37,10 @@ struct BoxOverlap {
     bool is_trigger{false};
     bool is_2d{false};
     ContactManifold manifold{};
+    // Shape slot: 0 Box, 1 Sphere/Circle, 2 Capsule.
+    // Identity prevents different solid collider pairs sharing impulses.
+    std::uint8_t first_shape{0u};
+    std::uint8_t second_shape{0u};
 };
 
 struct CollisionDetectionResult {
@@ -62,6 +66,8 @@ struct CachedContactPair {
     bool is_2d{false};
     std::array<CachedContactImpulse, 4> points{};
     std::size_t count{0};
+    std::uint8_t first_shape{0u};
+    std::uint8_t second_shape{0u};
 };
 
 struct ContactImpulseCache {
