@@ -2778,6 +2778,83 @@ int main() {
             0.0001f,
         "off-center 2D contact impulse changes only Z angular velocity through planar inertia");
 
+
+    // Frame-to-frame warm starting uses explicit scene-owned state.
+    core::World warm_world;
+    const auto warm_wall = warm_world.create("Warm Wall");
+    const auto warm_mover = warm_world.create("Warm Mover");
+    warm_world.add_component<physics::SphereCollider>(
+        warm_wall, physics::sphere_collider_type());
+    warm_world.add_component<physics::SphereCollider>(
+        warm_mover, physics::sphere_collider_type());
+    auto* warm_body = warm_world.add_component<physics::Rigidbody>(
+        warm_mover, physics::rigidbody_type());
+    warm_body->use_gravity = false;
+    physics::ContactImpulseCache warm_cache;
+
+    const auto warm_frame = [&]() {
+        warm_world.transform(warm_mover)->local_position =
+            {0.75f, 0.0f, 0.0f};
+        auto* body = warm_world.get_component<physics::Rigidbody>(
+            warm_mover, physics::rigidbody_type());
+        body->linear_velocity = {-2.0f, 0.0f, 0.0f};
+        return physics::step_physics(
+            warm_world, 1.0f / 60.0f, {}, &warm_cache);
+    };
+
+    const auto warm_first = warm_frame();
+    const auto warm_second = warm_frame();
+
+    check(
+        warm_first.resolution.resolved_3d == 1u &&
+        warm_first.resolution.warm_started_contacts == 0u &&
+        warm_second.resolution.resolved_3d == 1u &&
+        warm_second.resolution.warm_started_contacts > 0u &&
+        warm_cache.previous.size() == 1u,
+        "3D contact impulses warm-start matching contacts across physics frames");
+
+    warm_world.transform(warm_mover)->local_position =
+        {15.0f, 0.0f, 0.0f};
+    const auto warm_depart =
+        physics::step_physics(warm_world, 1.0f / 60.0f, {}, &warm_cache);
+    check(
+        warm_depart.resolution.warm_started_contacts == 0u &&
+        warm_cache.previous.empty(),
+        "warm-start cache evicts pairs on separation");
+
+    core::World warm_2d_world;
+    const auto warm_2d_wall = warm_2d_world.create("Warm 2D Wall");
+    const auto warm_2d_mover = warm_2d_world.create("Warm 2D Mover");
+    warm_2d_world.add_component<physics::CircleCollider2D>(
+        warm_2d_wall, physics::circle_collider2d_type());
+    warm_2d_world.add_component<physics::CircleCollider2D>(
+        warm_2d_mover, physics::circle_collider2d_type());
+    auto* warm_2d_body = warm_2d_world.add_component<physics::Rigidbody2D>(
+        warm_2d_mover, physics::rigidbody2d_type());
+    warm_2d_body->use_gravity = false;
+    physics::ContactImpulseCache warm_2d_cache;
+    const auto warm_2d_frame = [&]() {
+        warm_2d_world.transform(warm_2d_mover)->local_position =
+            {0.75f, 0.0f, 5.0f};
+        auto* body = warm_2d_world.get_component<physics::Rigidbody2D>(
+            warm_2d_mover, physics::rigidbody2d_type());
+        body->linear_velocity = {-2.0f, 0.0f, 0.0f};
+        return physics::step_physics(
+            warm_2d_world, 1.0f / 60.0f, {}, &warm_2d_cache);
+    };
+    const auto warm_2d_first = warm_2d_frame();
+    const auto warm_2d_second = warm_2d_frame();
+    check(
+        warm_2d_first.resolution.warm_started_contacts == 0u &&
+        warm_2d_second.resolution.warm_started_contacts > 0u &&
+        warm_2d_cache.previous.size() == 1u &&
+        warm_2d_cache.previous.front().is_2d,
+        "2D warm starting is planar and isolated in its own scene cache");
+
+    warm_2d_cache.clear();
+    check(warm_2d_cache.previous.empty(),
+        "warm-start cache can be explicitly cleared on scene reset");
+
     core::World sleeping_world;
 
     const auto sleeping_floor =

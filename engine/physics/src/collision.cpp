@@ -3505,6 +3505,7 @@ struct InverseInertia3D {
 
 struct VelocityConstraint3D {
     const BoxOverlap* overlap{nullptr};
+    core::Vec3 contact_point{};
     Rigidbody* first_body{nullptr};
     Rigidbody* second_body{nullptr};
     float first_inverse_mass{0.0f};
@@ -3522,6 +3523,7 @@ struct VelocityConstraint3D {
 
 struct VelocityConstraint2D {
     const BoxOverlap* overlap{nullptr};
+    core::Vec3 contact_point{};
     Rigidbody2D* first_body{nullptr};
     Rigidbody2D* second_body{nullptr};
     float first_inverse_mass{0.0f};
@@ -4240,6 +4242,78 @@ core::Vec3 relative_velocity_2d(
     };
 }
 
+const CachedContactImpulse* find_cached_impulse(
+    const ContactImpulseCache* cache,
+    const BoxOverlap& overlap,
+    core::Vec3 point) noexcept {
+
+    if (!cache) return nullptr;
+
+    for (const auto& pair : cache->previous) {
+        if (pair.first != overlap.first ||
+            pair.second != overlap.second ||
+            pair.is_2d != overlap.is_2d ||
+            dot3(pair.normal, overlap.normal) < 0.95f) {
+            continue;
+        }
+
+        const CachedContactImpulse* nearest = nullptr;
+        float best_distance = 0.01f; // Match within 10 cm.
+
+        for (std::size_t i = 0; i < pair.count; ++i) {
+            const auto& contact = pair.points[i];
+            const core::Vec3 delta{
+                contact.point.x - point.x,
+                contact.point.y - point.y,
+                overlap.is_2d ? 0.0f : contact.point.z - point.z
+            };
+            const float squared = dot3(delta, delta);
+            if (squared < best_distance) {
+                best_distance = squared;
+                nearest = &contact;
+            }
+        }
+        return nearest;
+    }
+    return nullptr;
+}
+
+template <typename Constraint>
+void store_cached_impulses(
+    ContactImpulseCache* cache,
+    const std::vector<Constraint>& constraints,
+    bool is_2d) {
+
+    if (!cache) return;
+
+    for (const auto& c : constraints) {
+        const auto& overlap = *c.overlap;
+        CachedContactPair* pair = nullptr;
+        for (auto& existing : cache->current) {
+            if (existing.first == overlap.first &&
+                existing.second == overlap.second &&
+                existing.is_2d == is_2d) {
+                pair = &existing;
+                break;
+            }
+        }
+        if (!pair) {
+            cache->current.push_back({});
+            pair = &cache->current.back();
+            pair->first = overlap.first;
+            pair->second = overlap.second;
+            pair->normal = overlap.normal;
+            pair->is_2d = is_2d;
+        }
+        if (pair->count >= pair->points.size()) continue;
+        pair->points[pair->count++] = {
+            c.contact_point,
+            c.accumulated_normal_impulse,
+            c.accumulated_tangent_impulse
+        };
+    }
+}
+
 bool solve_velocity_constraint_3d(
     VelocityConstraint3D& constraint) noexcept {
 
@@ -4614,7 +4688,8 @@ bool solve_velocity_constraint_2d(
 
 CollisionResolutionStats resolve_box_contacts_3d(
     core::World& world,
-    const std::vector<BoxOverlap>& overlaps) {
+    const std::vector<BoxOverlap>& overlaps,
+    ContactImpulseCache* cache) {
 
     CollisionResolutionStats stats;
 
@@ -4791,6 +4866,8 @@ CollisionResolutionStats resolve_box_contacts_3d(
             VelocityConstraint3D constraint;
             constraint.overlap =
                 &overlap;
+            constraint.contact_point =
+                contact_point;
             constraint.first_body =
                 first_body;
             constraint.second_body =
@@ -4851,6 +4928,30 @@ CollisionResolutionStats resolve_box_contacts_3d(
                     normal_speed;
             }
 
+            if (cache &&
+                constraint.restitution_target <= 0.0f &&
+                !(first_body && first_body->sleeping) &&
+                !(second_body && second_body->sleeping)) {
+
+                const auto* cached = find_cached_impulse(
+                    cache, overlap, contact_point);
+
+                if (cached && cached->normal_impulse > 0.0f) {
+                    constraint.accumulated_normal_impulse =
+                        cached->normal_impulse;
+                    constraint.accumulated_tangent_impulse =
+                        cached->tangent_impulse;
+                    apply_impulse_3d(
+                        constraint,
+                        added(
+                            scaled(
+                                overlap.normal,
+                                cached->normal_impulse),
+                            cached->tangent_impulse));
+                    ++stats.warm_started_contacts;
+                }
+            }
+
             constraints.push_back(
                 constraint);
         }
@@ -4879,12 +4980,14 @@ CollisionResolutionStats resolve_box_contacts_3d(
         }
     }
 
+    store_cached_impulses(cache, constraints, false);
     return stats;
 }
 
 CollisionResolutionStats resolve_box_contacts_2d(
     core::World& world,
-    const std::vector<BoxOverlap>& overlaps) {
+    const std::vector<BoxOverlap>& overlaps,
+    ContactImpulseCache* cache) {
 
     CollisionResolutionStats stats;
 
@@ -5047,6 +5150,8 @@ CollisionResolutionStats resolve_box_contacts_2d(
             VelocityConstraint2D constraint;
             constraint.overlap =
                 &overlap;
+            constraint.contact_point =
+                contact_point;
             constraint.first_body =
                 first_body;
             constraint.second_body =
@@ -5101,6 +5206,30 @@ CollisionResolutionStats resolve_box_contacts_2d(
                         first_material.restitution,
                         second_material.restitution) *
                     normal_speed;
+            }
+
+            if (cache &&
+                constraint.restitution_target <= 0.0f &&
+                !(first_body && first_body->sleeping) &&
+                !(second_body && second_body->sleeping)) {
+
+                const auto* cached = find_cached_impulse(
+                    cache, overlap, contact_point);
+
+                if (cached && cached->normal_impulse > 0.0f) {
+                    constraint.accumulated_normal_impulse =
+                        cached->normal_impulse;
+                    constraint.accumulated_tangent_impulse =
+                        cached->tangent_impulse;
+                    apply_impulse_2d(
+                        constraint,
+                        added(
+                            scaled(
+                                overlap.normal,
+                                cached->normal_impulse),
+                            cached->tangent_impulse));
+                    ++stats.warm_started_contacts;
+                }
             }
 
             constraints.push_back(
@@ -5163,6 +5292,7 @@ CollisionResolutionStats resolve_box_contacts_2d(
         }
     }
 
+    store_cached_impulses(cache, constraints, true);
     return stats;
 }
 

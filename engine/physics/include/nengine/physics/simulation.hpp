@@ -30,6 +30,7 @@ PhysicsFrameResult step_physics(
     core::World& world,
     float delta_seconds,
     core::Vec3 gravity =
-        {0.0f, -9.81f, 0.0f});
+        {0.0f, -9.81f, 0.0f},
+    ContactImpulseCache* cache = nullptr);
 
 } // namespace nengine::physics

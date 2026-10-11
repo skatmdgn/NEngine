@@ -21,6 +21,7 @@
 #include "nengine/editor/selection.hpp"
 #include "nengine/input/input_state.hpp"
 #include "nengine/physics/contact_events.hpp"
+#include "nengine/physics/collision.hpp"
 #include "nengine/render/sprite_animation.hpp"
 #include "nengine/scripting/managed_runtime.hpp"
 #include "nengine/scripting/script_system.hpp"
@@ -194,6 +195,8 @@ private:
 
     physics::ContactTracker
         physics_contact_tracker_{};
+    physics::ContactImpulseCache
+        physics_impulse_cache_{};
 
     audio::AudioPlaybackSystem
         audio_playback_system_{};

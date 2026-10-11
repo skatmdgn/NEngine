@@ -411,6 +411,7 @@ bool EditorModel::begin_play_mode() {
 
     managed_script_system_.clear(play_session_.runtime_world());
     physics_contact_tracker_.clear();
+    physics_impulse_cache_.clear();
     audio_playback_system_.reset();
     audio_mix_snapshot_ = {};
 
@@ -461,6 +462,7 @@ bool EditorModel::begin_play_mode() {
 bool EditorModel::stop_play_mode() {
     managed_script_system_.clear(play_session_.runtime_world());
     physics_contact_tracker_.clear();
+    physics_impulse_cache_.clear();
     audio_playback_system_.reset();
     audio_output_device_.close();
     audio_mix_snapshot_ = {};
@@ -476,6 +478,7 @@ bool EditorModel::initialize_managed_runtime(
 
     managed_script_system_.clear(play_session_.runtime_world());
     physics_contact_tracker_.clear();
+    physics_impulse_cache_.clear();
     audio_playback_system_.reset();
     audio_output_device_.close();
     audio_mix_snapshot_ = {};
@@ -530,6 +533,7 @@ bool EditorModel::reload_managed_runtime(
     // Destroy them before requesting unload; Play Mode World state remains.
     managed_script_system_.clear(play_session_.runtime_world());
     physics_contact_tracker_.clear();
+    physics_impulse_cache_.clear();
     audio_playback_system_.reset();
     audio_mix_snapshot_ = {};
 
@@ -567,6 +571,7 @@ void EditorModel::shutdown_managed_runtime()
 
     managed_script_system_.clear(play_session_.runtime_world());
     physics_contact_tracker_.clear();
+    physics_impulse_cache_.clear();
     audio_playback_system_.reset();
     audio_output_device_.close();
     audio_mix_snapshot_ = {};
@@ -583,6 +588,7 @@ void EditorModel::tick_runtime(
         managed_script_system_.clear(
             play_session_.runtime_world());
         physics_contact_tracker_.clear();
+    physics_impulse_cache_.clear();
         audio_playback_system_.reset();
         audio_output_device_.close();
         audio_mix_snapshot_ = {};
@@ -678,7 +684,9 @@ void EditorModel::tick_runtime(
             const auto physics_frame =
                 physics::step_physics(
                     *runtime,
-                    fixed_delta);
+                    fixed_delta,
+                    {0.0f, -9.81f, 0.0f},
+                    &physics_impulse_cache_);
 
             const auto contact_events =
                 physics_contact_tracker_.update(

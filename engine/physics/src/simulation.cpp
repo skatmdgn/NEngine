@@ -459,9 +459,12 @@ PhysicsStepStats step_rigidbodies(
 PhysicsFrameResult step_physics(
     core::World& world,
     float delta_seconds,
-    core::Vec3 gravity) {
+    core::Vec3 gravity,
+    ContactImpulseCache* cache) {
 
     PhysicsFrameResult result;
+
+    if (cache) cache->begin_frame();
 
     result.integration =
         step_rigidbodies(
@@ -476,15 +479,20 @@ PhysicsFrameResult step_physics(
     result.resolution =
         resolve_box_contacts_3d(
             world,
-            result.collisions.overlaps);
+            result.collisions.overlaps,
+            cache);
 
     const auto resolution_2d =
         resolve_box_contacts_2d(
             world,
-            result.collisions.overlaps);
+            result.collisions.overlaps,
+            cache);
 
     result.resolution.resolved_2d +=
         resolution_2d.resolved_2d;
+    result.resolution.warm_started_contacts +=
+        resolution_2d.warm_started_contacts;
+    if (cache) cache->end_frame();
 
     update_sleep_states(
         world,

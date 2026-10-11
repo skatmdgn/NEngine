@@ -296,6 +296,7 @@ Implemented:
 - BoxCollider/SphereCollider/CapsuleCollider and BoxCollider2D/CircleCollider2D/CapsuleCollider2D share the X-axis sweep-and-prune broad phase; rotated boxes and capsules contribute conservative world AABBs while narrow phase handles OBB-OBB, radial-radial, oriented box-radial, capsule-radial, capsule-capsule and oriented box-capsule pairs with layer/collision-mask filtering and trigger separation.
 - Collision detection records a fixed-capacity ContactManifold (up to four ContactPoints) on each solid overlap. Box/Box2D face contacts now choose a SAT-aligned reference face, construct the opposing incident face/edge, and Sutherland-Hodgman clip it against the reference side planes to retain up to four 3D or two 2D contacts even when neither original face contributes contained vertices. SAT edge-edge axes and non-box shape pairs fall back to a representative support-midpoint contact. Each point carries penetration.
 - 3D/2D contact resolution performs inverse-mass-weighted positional correction once with a tiny persistent contact slop, then runs up to twenty-four projected Gauss-Seidel-style sequential velocity passes over individual manifold points. Contact-point velocity includes omega x r, normal/tangent effective mass includes rotational inertia, impulses update both linear and angular velocity, and each point accumulates a non-negative normal impulse plus Coulomb-clamped tangent impulse for the current solve.
+- PhysicsStep accepts an optional scene-owned ContactImpulseCache; persistent solid pairs with matching contact position and normal reuse their 3D/2D accumulated linear/angular impulses on the next frame. The cache evicts separated contacts and is reset with Editor Play Mode and script runtime resets; direct one-shot solvers retain uncached behavior.
 - Contact-supported Rigidbody/Rigidbody2D sleeping enters after 0.5 seconds when combined linear/angular motion remains at or below the configurable threshold, never sleeps unsupported bodies, wakes on externally assigned linear/angular velocity, impact or support loss, and exposes managed allowSleep, sleepThreshold, Sleep(), WakeUp() and IsSleeping().
 - ContactTracker derives Enter/Stay/Exit phases for collision and trigger pairs; solid Enter/Stay events carry the active manifold count plus its centroid as the representative native point, trigger events keep zero contacts, and Exit retains the prior manifold centroid with zero active contacts.
 - Editor Play Mode dispatches tracked contact phases to both active managed Behaviours with side-correct contact normals.
@@ -308,7 +309,7 @@ Implemented:
 
 Not yet implemented:
 - Production broad-phase tuning and remaining polygon-style collider variants remain; additional cast shapes such as SphereCast/CapsuleCast are not yet exposed.
-- Production contact solving beyond the current collider-derived inertia + per-manifold-point rotational constraint foundation: cross-frame warm starting, fuller capsule inertia tensors/compound-collider mass properties and island-aware sleeping/wake propagation; SAT edge-edge contacts still use a single fallback point.
+- Production contact solving beyond the current collider-derived inertia + per-manifold-point rotational constraint foundation: warm-start contact matching refinement, fuller capsule inertia tensors/compound-collider mass properties and island-aware sleeping/wake propagation; SAT edge-edge contacts still use a single fallback point.
 - Additional shape casts and richer hit semantics/query filtering policy.
 - Physics materials and joints.
 - Production 3D/2D backend selection/integration.
@@ -354,7 +355,7 @@ Not yet implemented:
 
 ## Immediate next work
 
-1. Persist per-contact impulses for cross-frame warm starting, then add island-aware sleep/wake propagation and refine capsule/compound-collider mass properties before continuing polygon-style collider work.
+1. Add island-aware sleep/wake propagation, then refine cached-contact matching and refine capsule/compound-collider mass properties before continuing polygon-style collider work.
 2. Extend audio with streaming + OGG/MP3/FLAC runtime decode and a callback-driven device path after real-Windows audible acceptance.
 3. Extend managed physics queries with additional shape casts and richer hit/filtering semantics.
 4. Package/version the managed NEngine API surface and add debugger attach/symbol workflow.

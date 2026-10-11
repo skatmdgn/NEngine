@@ -48,18 +48,45 @@ struct CollisionDetectionResult {
 CollisionDetectionResult detect_box_overlaps(
     const core::World& world);
 
+// Scene-owned cache; reset on scene/play-session changes.
+struct CachedContactImpulse {
+    core::Vec3 point{};
+    float normal_impulse{0.0f};
+    core::Vec3 tangent_impulse{};
+};
+
+struct CachedContactPair {
+    core::Entity first{core::Entity::invalid()};
+    core::Entity second{core::Entity::invalid()};
+    core::Vec3 normal{};
+    bool is_2d{false};
+    std::array<CachedContactImpulse, 4> points{};
+    std::size_t count{0};
+};
+
+struct ContactImpulseCache {
+    std::vector<CachedContactPair> previous{};
+    std::vector<CachedContactPair> current{};
+    void begin_frame() { current.clear(); }
+    void end_frame() { previous.swap(current); current.clear(); }
+    void clear() { previous.clear(); current.clear(); }
+};
+
 struct CollisionResolutionStats {
     std::size_t resolved_3d{0};
     std::size_t resolved_2d{0};
+    std::size_t warm_started_contacts{0};
 };
 
 CollisionResolutionStats resolve_box_contacts_3d(
     core::World& world,
-    const std::vector<BoxOverlap>& overlaps);
+    const std::vector<BoxOverlap>& overlaps,
+    ContactImpulseCache* cache = nullptr);
 
 CollisionResolutionStats resolve_box_contacts_2d(
     core::World& world,
-    const std::vector<BoxOverlap>& overlaps);
+    const std::vector<BoxOverlap>& overlaps,
+    ContactImpulseCache* cache = nullptr);
 
 std::vector<core::Entity> overlap_box(
     const core::World& world,
