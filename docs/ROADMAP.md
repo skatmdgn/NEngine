@@ -180,6 +180,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Maximum-coverage / minimum-distance cached-point assignment for 3D/2D manifolds
 - [x] Safe 3D/2D cached friction impulses: finite validation, tangent projection and Coulomb-limit clamping
 - [x] Shape-pair-aware impulse cache keys for same-entity compound collider contacts
+- [x] Stable entity-ordered broad-phase contacts across sweep reversals + 90-frame compound stability regression
 - [x] Contact-island anchored sleeping and connected-body wake propagation in 3D/2D
 - [x] Sixteen-body 3D/2D island regression coverage for wake propagation and trigger support loss
 - [ ] Remaining collider shapes and production broad-phase/solver tuning

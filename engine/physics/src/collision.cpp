@@ -3335,6 +3335,15 @@ void append_overlaps(
                     same_order ? bounds[i].shape : bounds[j].shape);
                 overlap.second_shape = static_cast<std::uint8_t>(
                     same_order ? bounds[j].shape : bounds[i].shape);
+
+                // Sweep-and-prune ordering changes as objects move.
+                // Canonicalize by stable entity ID so the same physical
+                // pair retains its cache key across left/right crossings.
+                if (overlap.first.value > overlap.second.value) {
+                    std::swap(overlap.first, overlap.second);
+                    std::swap(overlap.first_shape, overlap.second_shape);
+                    overlap.normal = scaled(overlap.normal, -1.0f);
+                }
                 overlaps.push_back(overlap);
             }
         }

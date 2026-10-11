@@ -3187,6 +3187,93 @@ int main() {
         rejected_shape.warm_started_contacts == 0u,
         "3D cache will not reuse a spherical impulse for a box contact");
 
+    // Reversing sweep order must not reverse persistent entity-pair keys.
+    core::World canonical_3d_world;
+    const auto canonical_3d_a = canonical_3d_world.create("Canonical 3D A");
+    const auto canonical_3d_b = canonical_3d_world.create("Canonical 3D B");
+    canonical_3d_world.add_component<physics::SphereCollider>(
+        canonical_3d_a, physics::sphere_collider_type());
+    canonical_3d_world.add_component<physics::SphereCollider>(
+        canonical_3d_b, physics::sphere_collider_type());
+    canonical_3d_world.transform(canonical_3d_b)->local_position =
+        {0.75f, 0.0f, 0.0f};
+    const auto ordered_forward = physics::detect_box_overlaps(
+        canonical_3d_world);
+    canonical_3d_world.transform(canonical_3d_b)->local_position =
+        {-0.75f, 0.0f, 0.0f};
+    const auto ordered_backward = physics::detect_box_overlaps(
+        canonical_3d_world);
+    check(
+        !ordered_forward.overlaps.empty() &&
+        !ordered_backward.overlaps.empty() &&
+        ordered_forward.overlaps.front().first == canonical_3d_a &&
+        ordered_backward.overlaps.front().first == canonical_3d_a &&
+        ordered_forward.overlaps.front().second == canonical_3d_b &&
+        ordered_backward.overlaps.front().second == canonical_3d_b &&
+        ordered_forward.overlaps.front().normal.x > 0.9f &&
+        ordered_backward.overlaps.front().normal.x < -0.9f,
+        "3D entity pair identity survives broad-phase sweep reversal");
+
+    core::World canonical_2d_world;
+    const auto canonical_2d_a = canonical_2d_world.create("Canonical 2D A");
+    const auto canonical_2d_b = canonical_2d_world.create("Canonical 2D B");
+    canonical_2d_world.add_component<physics::CircleCollider2D>(
+        canonical_2d_a, physics::circle_collider2d_type());
+    canonical_2d_world.add_component<physics::CircleCollider2D>(
+        canonical_2d_b, physics::circle_collider2d_type());
+    canonical_2d_world.transform(canonical_2d_b)->local_position =
+        {0.75f, 0.0f, 5.0f};
+    const auto planar_forward = physics::detect_box_overlaps(
+        canonical_2d_world);
+    canonical_2d_world.transform(canonical_2d_b)->local_position =
+        {-0.75f, 0.0f, -5.0f};
+    const auto planar_backward = physics::detect_box_overlaps(
+        canonical_2d_world);
+    check(
+        !planar_forward.overlaps.empty() &&
+        !planar_backward.overlaps.empty() &&
+        planar_forward.overlaps.front().first == canonical_2d_a &&
+        planar_backward.overlaps.front().first == canonical_2d_a &&
+        planar_forward.overlaps.front().second == canonical_2d_b &&
+        planar_backward.overlaps.front().second == canonical_2d_b &&
+        planar_forward.overlaps.front().normal.x > 0.9f &&
+        planar_backward.overlaps.front().normal.x < -0.9f,
+        "2D pair identity and normal survive sweep reversal across Z");
+
+    // Repeated contact solving on compound shapes must remain finite.
+    // Each step maintains nontrivial contacts without exploding the cache.
+    core::World stability_world;
+    const auto stability_base = stability_world.create("Stability Anchor");
+    const auto stability_body_entity =
+        stability_world.create("Compound Stability Body");
+    stability_world.add_component<physics::BoxCollider>(
+        stability_base, physics::box_collider_type());
+    stability_world.add_component<physics::BoxCollider>(
+        stability_body_entity, physics::box_collider_type());
+    stability_world.add_component<physics::SphereCollider>(
+        stability_body_entity, physics::sphere_collider_type());
+    auto* stability_body = stability_world.add_component<physics::Rigidbody>(
+        stability_body_entity, physics::rigidbody_type());
+    stability_body->use_gravity = false;
+    stability_body->allow_sleep = false;
+    physics::ContactImpulseCache stability_cache;
+    std::size_t stable_steps = 0u;
+    for (std::size_t iteration = 0u; iteration < 90u; ++iteration) {
+        auto* tf = stability_world.transform(stability_body_entity);
+        tf->local_position = {0.75f, 0.0f, 0.0f};
+        stability_body->linear_velocity = {-1.0f, 0.0f, 0.0f};
+        const auto step = physics::step_physics(
+            stability_world, 1.0f / 60.0f, {}, &stability_cache);
+        if (step.resolution.resolved_3d > 0u &&
+            stability_cache.previous.size() >= 2u &&
+            std::isfinite(stability_body->linear_velocity.x) &&
+            std::isfinite(stability_body->angular_velocity.z))
+            ++stable_steps;
+    }
+    check(
+        stable_steps == 90u,
+        "90 repeated compound contact frames remain finite and separately cached");
+
     // A static anchor lets an entire connected dynamic island sleep.
     core::World island_world;
     const auto island_wall = island_world.create("Island Wall");
