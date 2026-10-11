@@ -2855,6 +2855,102 @@ int main() {
     check(warm_2d_cache.previous.empty(),
         "warm-start cache can be explicitly cleared on scene reset");
 
+    // Two nearby manifold points must not reuse one cached impulse.
+    core::World match_3d_world;
+    const auto match_3d_wall = match_3d_world.create("Match 3D Wall");
+    const auto match_3d_mover = match_3d_world.create("Match 3D Mover");
+    match_3d_world.add_component<physics::BoxCollider>(
+        match_3d_wall, physics::box_collider_type());
+    match_3d_world.add_component<physics::BoxCollider>(
+        match_3d_mover, physics::box_collider_type());
+    auto* match_3d_body = match_3d_world.add_component<physics::Rigidbody>(
+        match_3d_mover, physics::rigidbody_type());
+    match_3d_body->use_gravity = false;
+    match_3d_body->linear_velocity = {-2.0f, 0.0f, 0.0f};
+
+    physics::BoxOverlap match_3d_overlap;
+    match_3d_overlap.first = match_3d_wall;
+    match_3d_overlap.second = match_3d_mover;
+    match_3d_overlap.normal = {1.0f, 0.0f, 0.0f};
+    match_3d_overlap.penetration = 0.01f;
+    match_3d_overlap.manifold.count = 2u;
+    match_3d_overlap.manifold.points[0].point = {0.25f, 0.0f, 0.0f};
+    match_3d_overlap.manifold.points[1].point = {0.25f, 0.02f, 0.0f};
+
+    physics::ContactImpulseCache match_3d_cache;
+    physics::CachedContactPair match_3d_pair;
+    match_3d_pair.first = match_3d_wall;
+    match_3d_pair.second = match_3d_mover;
+    match_3d_pair.normal = match_3d_overlap.normal;
+    match_3d_pair.count = 1u;
+    match_3d_pair.points[0] = {{0.25f, 0.01f, 0.0f}, 0.5f, {}};
+    match_3d_cache.previous.push_back(match_3d_pair);
+
+    const auto match_3d_single = physics::resolve_box_contacts_3d(
+        match_3d_world, {match_3d_overlap}, &match_3d_cache);
+    check(
+        match_3d_single.resolved_3d == 1u &&
+        match_3d_single.warm_started_contacts == 1u,
+        "one cached 3D impulse cannot warm-start two nearby manifold points");
+
+    match_3d_cache.previous.front().count = 2u;
+    match_3d_cache.previous.front().points[1] =
+        {{0.25f, 0.025f, 0.0f}, 0.5f, {}};
+    match_3d_body->linear_velocity = {-2.0f, 0.0f, 0.0f};
+    const auto match_3d_double = physics::resolve_box_contacts_3d(
+        match_3d_world, {match_3d_overlap}, &match_3d_cache);
+    check(
+        match_3d_double.warm_started_contacts == 2u,
+        "two cached 3D points warm-start distinct manifold constraints");
+
+    core::World match_2d_world;
+    const auto match_2d_wall = match_2d_world.create("Match 2D Wall");
+    const auto match_2d_mover = match_2d_world.create("Match 2D Mover");
+    match_2d_world.add_component<physics::BoxCollider2D>(
+        match_2d_wall, physics::box_collider2d_type());
+    match_2d_world.add_component<physics::BoxCollider2D>(
+        match_2d_mover, physics::box_collider2d_type());
+    auto* match_2d_body = match_2d_world.add_component<physics::Rigidbody2D>(
+        match_2d_mover, physics::rigidbody2d_type());
+    match_2d_body->use_gravity = false;
+    match_2d_body->linear_velocity = {-2.0f, 0.0f, 0.0f};
+
+    physics::BoxOverlap match_2d_overlap;
+    match_2d_overlap.first = match_2d_wall;
+    match_2d_overlap.second = match_2d_mover;
+    match_2d_overlap.normal = {1.0f, 0.0f, 0.0f};
+    match_2d_overlap.penetration = 0.01f;
+    match_2d_overlap.is_2d = true;
+    match_2d_overlap.manifold.count = 2u;
+    match_2d_overlap.manifold.points[0].point = {0.25f, 0.0f, 8.0f};
+    match_2d_overlap.manifold.points[1].point = {0.25f, 0.02f, -8.0f};
+
+    physics::ContactImpulseCache match_2d_cache;
+    physics::CachedContactPair match_2d_pair;
+    match_2d_pair.first = match_2d_wall;
+    match_2d_pair.second = match_2d_mover;
+    match_2d_pair.normal = match_2d_overlap.normal;
+    match_2d_pair.is_2d = true;
+    match_2d_pair.count = 1u;
+    match_2d_pair.points[0] = {{0.25f, 0.01f, 100.0f}, 0.5f, {}};
+    match_2d_cache.previous.push_back(match_2d_pair);
+
+    const auto match_2d_single = physics::resolve_box_contacts_2d(
+        match_2d_world, {match_2d_overlap}, &match_2d_cache);
+    check(
+        match_2d_single.resolved_2d == 1u &&
+        match_2d_single.warm_started_contacts == 1u,
+        "2D cache matching ignores Z without reusing one impulse twice");
+
+    match_2d_cache.previous.front().normal = {0.0f, 1.0f, 0.0f};
+    match_2d_body->linear_velocity = {-2.0f, 0.0f, 0.0f};
+    const auto match_2d_rotated = physics::resolve_box_contacts_2d(
+        match_2d_world, {match_2d_overlap}, &match_2d_cache);
+    check(
+        match_2d_rotated.warm_started_contacts == 0u,
+        "cached 2D impulses reject incompatible contact normals");
+
+
 
     // A static anchor lets an entire connected dynamic island sleep.
     core::World island_world;

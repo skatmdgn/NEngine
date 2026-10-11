@@ -4245,7 +4245,8 @@ core::Vec3 relative_velocity_2d(
 const CachedContactImpulse* find_cached_impulse(
     const ContactImpulseCache* cache,
     const BoxOverlap& overlap,
-    core::Vec3 point) noexcept {
+    core::Vec3 point,
+    std::uint32_t& consumed_indices) noexcept {
 
     if (!cache) return nullptr;
 
@@ -4258,21 +4259,36 @@ const CachedContactImpulse* find_cached_impulse(
         }
 
         const CachedContactImpulse* nearest = nullptr;
-        float best_distance = 0.01f; // Match within 10 cm.
+        std::size_t nearest_index = 0u;
+        float best_squared_distance = 0.01f; // Within 10 cm.
 
-        for (std::size_t i = 0; i < pair.count; ++i) {
+        for (std::size_t i = 0u;
+             i < std::min(pair.count, pair.points.size());
+             ++i) {
+
+            // Each cached point may warm-start only one new constraint.
+            if ((consumed_indices & (1u << i)) != 0u)
+                continue;
+
             const auto& contact = pair.points[i];
+            if (!std::isfinite(contact.normal_impulse) ||
+                contact.normal_impulse <= 0.0f)
+                continue;
+
             const core::Vec3 delta{
                 contact.point.x - point.x,
                 contact.point.y - point.y,
                 overlap.is_2d ? 0.0f : contact.point.z - point.z
             };
             const float squared = dot3(delta, delta);
-            if (squared < best_distance) {
-                best_distance = squared;
+            if (squared < best_squared_distance) {
+                best_squared_distance = squared;
+                nearest_index = i;
                 nearest = &contact;
             }
         }
+        if (nearest)
+            consumed_indices |= 1u << nearest_index;
         return nearest;
     }
     return nullptr;
@@ -4832,6 +4848,8 @@ CollisionResolutionStats resolve_box_contacts_3d(
                 1u,
                 overlap.manifold.count);
 
+        std::uint32_t consumed_cached_points = 0u;
+
         for (std::size_t index = 0u;
              index < contact_count;
              ++index) {
@@ -4934,7 +4952,8 @@ CollisionResolutionStats resolve_box_contacts_3d(
                 !(second_body && second_body->sleeping)) {
 
                 const auto* cached = find_cached_impulse(
-                    cache, overlap, contact_point);
+                    cache, overlap, contact_point,
+                    consumed_cached_points);
 
                 if (cached && cached->normal_impulse > 0.0f) {
                     constraint.accumulated_normal_impulse =
@@ -5120,6 +5139,8 @@ CollisionResolutionStats resolve_box_contacts_2d(
                 1u,
                 overlap.manifold.count);
 
+        std::uint32_t consumed_cached_points = 0u;
+
         for (std::size_t index = 0u;
              index < contact_count;
              ++index) {
@@ -5214,7 +5235,8 @@ CollisionResolutionStats resolve_box_contacts_2d(
                 !(second_body && second_body->sleeping)) {
 
                 const auto* cached = find_cached_impulse(
-                    cache, overlap, contact_point);
+                    cache, overlap, contact_point,
+                    consumed_cached_points);
 
                 if (cached && cached->normal_impulse > 0.0f) {
                     constraint.accumulated_normal_impulse =
