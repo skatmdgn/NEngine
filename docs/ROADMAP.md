@@ -174,6 +174,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Per-scene 3D/2D persistent contact impulse warm starting
 - [x] One-to-one cached manifold point matching for 3D/2D warm starting
 - [x] Maximum-coverage / minimum-distance cached-point assignment for 3D/2D manifolds
+- [x] Safe 3D/2D cached friction impulses: finite validation, tangent projection and Coulomb-limit clamping
 - [x] Contact-island anchored sleeping and connected-body wake propagation in 3D/2D
 - [ ] Remaining collider shapes and production broad-phase/solver tuning
 - [x] Keyboard/mouse InputState transitions + Win32 message capture

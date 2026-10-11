@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <utility>
 
@@ -2982,6 +2983,70 @@ int main() {
     check(
         optimal_2d.warm_started_contacts == 2u,
         "2D manifold cache assignment maximizes planar matches");
+
+    // A stale tangent can point into the normal after contact rotation.
+    // Project it into the tangent plane before applying cached impulses.
+    match_3d_overlap.manifold.count = 1u;
+    match_3d_overlap.manifold.points[0].point = {0.25f, 0.0f, 0.0f};
+    match_3d_cache.previous.front().count = 1u;
+    match_3d_cache.previous.front().points[0] =
+        {{0.25f, 0.0f, 0.0f}, 0.5f, {0.75f, 0.0f, 0.0f}};
+    match_3d_cache.current.clear();
+    match_3d_body->linear_velocity = {-2.0f, 0.0f, 0.0f};
+    const auto projected_3d = physics::resolve_box_contacts_3d(
+        match_3d_world, {match_3d_overlap}, &match_3d_cache);
+    check(
+        projected_3d.warm_started_contacts == 1u &&
+        match_3d_cache.current.size() == 1u &&
+        match_3d_cache.current.front().count == 1u &&
+        std::abs(match_3d_cache.current.front()
+                     .points[0].tangent_impulse.x) < 0.0001f,
+        "3D cached tangent is projected off the current contact normal");
+
+    // Corrupted stale impulses are ignored rather than propagating NaNs.
+    match_3d_cache.previous.front().points[0].tangent_impulse.x =
+        std::numeric_limits<float>::quiet_NaN();
+    match_3d_cache.current.clear();
+    match_3d_body->linear_velocity = {-2.0f, 0.0f, 0.0f};
+    const auto rejected_3d = physics::resolve_box_contacts_3d(
+        match_3d_world, {match_3d_overlap}, &match_3d_cache);
+    check(
+        rejected_3d.warm_started_contacts == 0u &&
+        std::isfinite(match_3d_body->linear_velocity.x) &&
+        std::isfinite(match_3d_body->angular_velocity.z),
+        "3D malformed cached tangent is rejected without poisoning motion");
+
+    // The planar solver must discard cached Z tangents as well.
+    match_2d_overlap.manifold.count = 1u;
+    match_2d_overlap.manifold.points[0].point = {0.25f, 0.0f, 8.0f};
+    match_2d_cache.previous.front().count = 1u;
+    match_2d_cache.previous.front().points[0] =
+        {{0.25f, 0.0f, 80.0f}, 0.5f, {0.75f, 0.0f, 12.0f}};
+    match_2d_cache.current.clear();
+    match_2d_body->linear_velocity = {-2.0f, 0.0f, 0.0f};
+    const auto projected_2d = physics::resolve_box_contacts_2d(
+        match_2d_world, {match_2d_overlap}, &match_2d_cache);
+    check(
+        projected_2d.warm_started_contacts == 1u &&
+        match_2d_cache.current.size() == 1u &&
+        match_2d_cache.current.front().count == 1u &&
+        std::abs(match_2d_cache.current.front()
+                     .points[0].tangent_impulse.x) < 0.0001f &&
+        std::abs(match_2d_cache.current.front()
+                     .points[0].tangent_impulse.z) < 0.0001f,
+        "2D cached tangent discards normal and out-of-plane components");
+
+    match_2d_cache.previous.front().points[0].tangent_impulse.y =
+        std::numeric_limits<float>::infinity();
+    match_2d_cache.current.clear();
+    match_2d_body->linear_velocity = {-2.0f, 0.0f, 0.0f};
+    const auto rejected_2d = physics::resolve_box_contacts_2d(
+        match_2d_world, {match_2d_overlap}, &match_2d_cache);
+    check(
+        rejected_2d.warm_started_contacts == 0u &&
+        std::isfinite(match_2d_body->linear_velocity.x) &&
+        std::isfinite(match_2d_body->angular_velocity.z),
+        "2D nonfinite cached tangent is rejected without poisoning motion");
 
     // A static anchor lets an entire connected dynamic island sleep.
     core::World island_world;

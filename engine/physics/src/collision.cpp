@@ -4335,6 +4335,53 @@ match_cached_impulses(
     return matches;
 }
 
+
+bool sanitized_cached_tangent(
+    const CachedContactImpulse& cached,
+    core::Vec3 normal,
+    float friction,
+    bool is_2d,
+    core::Vec3& result) noexcept {
+
+    // Malformed or stale cached impulses must never poison body velocity.
+    const auto t = cached.tangent_impulse;
+    if (!std::isfinite(cached.normal_impulse) ||
+        cached.normal_impulse <= 0.0f ||
+        !std::isfinite(t.x) ||
+        !std::isfinite(t.y) ||
+        !std::isfinite(t.z) ||
+        !std::isfinite(friction)) {
+        return false;
+    }
+
+    core::Vec3 projected = is_2d
+        ? core::Vec3{t.x, t.y, 0.0f}
+        : t;
+    projected = added(
+        projected, scaled(normal, -dot3(projected, normal)));
+    if (is_2d) projected.z = 0.0f;
+
+    // Friction or the contact plane may have changed since last frame.
+    const float limit = std::max(0.0f, friction) *
+        cached.normal_impulse;
+    const float magnitude_squared = dot3(projected, projected);
+    if (!std::isfinite(limit) ||
+        !std::isfinite(magnitude_squared)) {
+        return false;
+    }
+
+    if (limit == 0.0f) {
+        projected = {};
+    } else {
+        const float magnitude = std::sqrt(magnitude_squared);
+        if (magnitude > limit)
+            projected = scaled(projected, limit / magnitude);
+    }
+
+    result = projected;
+    return true;
+}
+
 template <typename Constraint>
 void store_cached_impulses(
     ContactImpulseCache* cache,
@@ -4986,18 +5033,21 @@ CollisionResolutionStats resolve_box_contacts_3d(
 
                 const auto* cached = cached_matches[index];
 
-                if (cached && cached->normal_impulse > 0.0f) {
+                core::Vec3 safe_tangent{};
+                if (cached && sanitized_cached_tangent(
+                        *cached, overlap.normal, constraint.friction,
+                        overlap.is_2d, safe_tangent)) {
                     constraint.accumulated_normal_impulse =
                         cached->normal_impulse;
                     constraint.accumulated_tangent_impulse =
-                        cached->tangent_impulse;
+                        safe_tangent;
                     apply_impulse_3d(
                         constraint,
                         added(
                             scaled(
                                 overlap.normal,
                                 cached->normal_impulse),
-                            cached->tangent_impulse));
+                            safe_tangent));
                     ++stats.warm_started_contacts;
                 }
             }
@@ -5262,18 +5312,21 @@ CollisionResolutionStats resolve_box_contacts_2d(
 
                 const auto* cached = cached_matches[index];
 
-                if (cached && cached->normal_impulse > 0.0f) {
+                core::Vec3 safe_tangent{};
+                if (cached && sanitized_cached_tangent(
+                        *cached, overlap.normal, constraint.friction,
+                        overlap.is_2d, safe_tangent)) {
                     constraint.accumulated_normal_impulse =
                         cached->normal_impulse;
                     constraint.accumulated_tangent_impulse =
-                        cached->tangent_impulse;
+                        safe_tangent;
                     apply_impulse_2d(
                         constraint,
                         added(
                             scaled(
                                 overlap.normal,
                                 cached->normal_impulse),
-                            cached->tangent_impulse));
+                            safe_tangent));
                     ++stats.warm_started_contacts;
                 }
             }
