@@ -107,4 +107,39 @@ inline core::Vec3 compound_inertia_3d(
     return result;
 }
 
+// Planar solid colliders distribute Rigidbody2D mass by area.
+// The scalar inertia is measured around the Rigidbody Transform pivot.
+struct MassElement2D {
+    float area{0.0f};
+    core::Vec3 center{};
+    float inertia_per_mass{0.0f};
+};
+
+inline float compound_inertia_2d(
+    float mass, const std::array<MassElement2D, 3>& elements) noexcept {
+
+    if (!std::isfinite(mass) || mass <= 0.0f) return 0.0f;
+    float total = 0.0f;
+    for (const auto& part : elements)
+        if (std::isfinite(part.area) && part.area > 0.0f)
+            total += part.area;
+    if (!std::isfinite(total) || total <= 0.0f) return 0.0f;
+
+    float result = 0.0f;
+    for (const auto& part : elements) {
+        if (!(part.area > 0.0f) || !std::isfinite(part.area))
+            continue;
+        if (!std::isfinite(part.center.x) ||
+            !std::isfinite(part.center.y) ||
+            !std::isfinite(part.inertia_per_mass))
+            continue;
+        const float portion = mass * part.area / total;
+        result += portion * (
+            part.inertia_per_mass +
+            part.center.x * part.center.x +
+            part.center.y * part.center.y);
+    }
+    return result;
+}
+
 } // namespace nengine::physics

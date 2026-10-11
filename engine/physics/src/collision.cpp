@@ -3686,123 +3686,71 @@ float inverse_inertia_2d(
     core::Entity entity,
     const Rigidbody2D* body) noexcept {
 
-    if (!body ||
-        !body->enabled ||
-        body->is_kinematic ||
-        body->mass <= 0.0f) {
+    if (!body || !body->enabled || body->is_kinematic ||
+        !std::isfinite(body->mass) || body->mass <= 0.0f)
         return 0.0f;
-    }
 
-    const auto* transform =
-        world.transform(entity);
+    const auto* transform = world.transform(entity);
+    if (!transform) return 0.0f;
 
-    if (!transform) {
-        return 0.0f;
-    }
+    const auto scale = abs_scale(transform->local_scale);
+    std::array<MassElement2D, 3> parts{};
+    bool has_shape = false;
+    constexpr float pi = 3.14159265358979323846f;
 
-    const auto scale =
-        abs_scale(
-            transform->local_scale);
+    if (const auto* box = world.get_component<BoxCollider2D>(
+            entity, box_collider2d_type());
+        box && box->enabled && !box->is_trigger) {
 
-    float inertia = 0.0f;
-    core::Vec3 center{};
-
-    if (const auto* collider =
-            world.get_component<BoxCollider2D>(
-                entity,
-                box_collider2d_type());
-        collider &&
-        collider->enabled) {
-
-        const float width =
-            std::abs(
-                collider->size.x) *
-            scale.x;
-
-        const float height =
-            std::abs(
-                collider->size.y) *
-            scale.y;
-
-        inertia =
-            body->mass *
-            (width * width +
-             height * height) /
-            12.0f;
-
-        center = {
-            collider->center.x * scale.x,
-            collider->center.y * scale.y,
-            0.0f
-        };
-    } else if (
-        const auto* collider =
-            world.get_component<CircleCollider2D>(
-                entity,
-                circle_collider2d_type());
-        collider &&
-        collider->enabled) {
-
-        const float radius =
-            std::abs(
-                collider->radius) *
-            std::max(
-                scale.x,
-                scale.y);
-
-        inertia =
-            0.5f *
-            body->mass *
-            radius *
-            radius;
-
-        center = {
-            collider->center.x * scale.x,
-            collider->center.y * scale.y,
-            0.0f
-        };
-    } else if (
-        const auto* collider =
-            world.get_component<CapsuleCollider2D>(
-                entity,
-                capsule_collider2d_type());
-        collider &&
-        collider->enabled) {
-
-        const float width =
-            std::abs(
-                collider->size.x) *
-            scale.x;
-
-        const float height =
-            std::abs(
-                collider->size.y) *
-            scale.y;
-
-        const bool horizontal = collider->direction == 1u;
-        const float axial_size = horizontal ? width : height;
-        const float cross_size = horizontal ? height : width;
-        const float radius = 0.5f *
-            std::min(axial_size, cross_size);
-        const float straight_length =
-            std::max(0.0f, axial_size - 2.0f * radius);
-        inertia = capsule_inertia_2d(
-            body->mass, radius, straight_length);
-
-        center = {
-            collider->center.x * scale.x,
-            collider->center.y * scale.y,
-            0.0f
+        has_shape = true;
+        const float width = std::abs(box->size.x) * scale.x;
+        const float height = std::abs(box->size.y) * scale.y;
+        parts[0] = {
+            width * height,
+            {box->center.x * scale.x, box->center.y * scale.y, 0.0f},
+            (width * width + height * height) / 12.0f
         };
     }
 
-    inertia +=
-        body->mass *
-        (center.x * center.x +
-         center.y * center.y);
+    if (const auto* circle = world.get_component<CircleCollider2D>(
+            entity, circle_collider2d_type());
+        circle && circle->enabled && !circle->is_trigger) {
 
-    return safe_inverse(
-        inertia);
+        has_shape = true;
+        const float radius = std::abs(circle->radius) *
+            std::max(scale.x, scale.y);
+        parts[1] = {
+            pi * radius * radius,
+            {circle->center.x * scale.x,
+             circle->center.y * scale.y, 0.0f},
+            0.5f * radius * radius
+        };
+    }
+
+    if (const auto* capsule = world.get_component<CapsuleCollider2D>(
+            entity, capsule_collider2d_type());
+        capsule && capsule->enabled && !capsule->is_trigger) {
+
+        has_shape = true;
+        const float width = std::abs(capsule->size.x) * scale.x;
+        const float height = std::abs(capsule->size.y) * scale.y;
+        const bool horizontal = capsule->direction == 1u;
+        const float axial = horizontal ? width : height;
+        const float transverse = horizontal ? height : width;
+        const float radius = 0.5f * std::min(axial, transverse);
+        const float length = std::max(0.0f, axial - 2.0f * radius);
+        parts[2] = {
+            2.0f * radius * length + pi * radius * radius,
+            {capsule->center.x * scale.x,
+             capsule->center.y * scale.y, 0.0f},
+            capsule_inertia_2d(1.0f, radius, length)
+        };
+    }
+
+    if (!has_shape)
+        parts[0] = {1.0f, {}, 1.0f / 6.0f};
+
+    return safe_inverse(compound_inertia_2d(body->mass, parts));
 }
 
 core::Vec3 apply_inverse_inertia(

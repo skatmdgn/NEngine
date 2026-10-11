@@ -2842,6 +2842,26 @@ int main() {
         std::abs(unequal_3d.y - 9.0f) < 0.0001f,
         "3D compound inertia partitions mass by collider volume");
 
+    const float compound_2d = physics::compound_inertia_2d(
+        2.0f, {{
+            {1.0f, {1.0f, 0.0f, 0.0f}, 0.5f},
+            {1.0f, {-1.0f, 0.0f, 0.0f}, 0.5f},
+            {}
+        }});
+    check(
+        std::abs(compound_2d - 3.0f) < 0.0001f,
+        "2D compound inertia distributes area mass and offsets");
+    const float unequal_2d = physics::compound_inertia_2d(
+        3.0f, {{
+            {1.0f, {}, 1.0f}, {2.0f, {}, 4.0f}, {}
+        }});
+    check(
+        std::abs(unequal_2d - 9.0f) < 0.0001f &&
+        physics::compound_inertia_2d(-2.0f, {{
+            {1.0f, {}, 1.0f}, {}, {}
+        }}) == 0.0f,
+        "2D compound inertia partitions area and guards invalid mass");
+
     // Frame-to-frame warm starting uses explicit scene-owned state.
     core::World warm_world;
     const auto warm_wall = warm_world.create("Warm Wall");
