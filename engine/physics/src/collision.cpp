@@ -3431,77 +3431,60 @@ struct ContactMaterial {
     float restitution{0.0f};
 };
 
+ContactMaterial sanitized_material(
+    float friction, float restitution) noexcept {
+
+    return {
+        std::isfinite(friction) ? std::max(0.0f, friction) : 0.0f,
+        std::isfinite(restitution)
+            ? std::clamp(restitution, 0.0f, 1.0f)
+            : 0.0f
+    };
+}
+
 ContactMaterial contact_material_3d(
-    const core::World& world,
-    core::Entity entity) noexcept {
+    const core::World& world, core::Entity entity,
+    std::uint8_t shape) noexcept {
 
-    if (const auto* collider =
-            world.get_component<BoxCollider>(
-                entity,
-                box_collider_type())) {
-        return {
-            collider->friction,
-            collider->restitution
-        };
+    if (shape == 0u) {
+        if (const auto* c = world.get_component<BoxCollider>(
+                entity, box_collider_type());
+            c && c->enabled)
+            return sanitized_material(c->friction, c->restitution);
+    } else if (shape == 1u) {
+        if (const auto* c = world.get_component<SphereCollider>(
+                entity, sphere_collider_type());
+            c && c->enabled)
+            return sanitized_material(c->friction, c->restitution);
+    } else if (shape == 2u) {
+        if (const auto* c = world.get_component<CapsuleCollider>(
+                entity, capsule_collider_type());
+            c && c->enabled)
+            return sanitized_material(c->friction, c->restitution);
     }
-
-    if (const auto* collider =
-            world.get_component<SphereCollider>(
-                entity,
-                sphere_collider_type())) {
-        return {
-            collider->friction,
-            collider->restitution
-        };
-    }
-
-    if (const auto* collider =
-            world.get_component<CapsuleCollider>(
-                entity,
-                capsule_collider_type())) {
-        return {
-            collider->friction,
-            collider->restitution
-        };
-    }
-
     return {};
 }
 
 ContactMaterial contact_material_2d(
-    const core::World& world,
-    core::Entity entity) noexcept {
+    const core::World& world, core::Entity entity,
+    std::uint8_t shape) noexcept {
 
-    if (const auto* collider =
-            world.get_component<BoxCollider2D>(
-                entity,
-                box_collider2d_type())) {
-        return {
-            collider->friction,
-            collider->restitution
-        };
+    if (shape == 0u) {
+        if (const auto* c = world.get_component<BoxCollider2D>(
+                entity, box_collider2d_type());
+            c && c->enabled)
+            return sanitized_material(c->friction, c->restitution);
+    } else if (shape == 1u) {
+        if (const auto* c = world.get_component<CircleCollider2D>(
+                entity, circle_collider2d_type());
+            c && c->enabled)
+            return sanitized_material(c->friction, c->restitution);
+    } else if (shape == 2u) {
+        if (const auto* c = world.get_component<CapsuleCollider2D>(
+                entity, capsule_collider2d_type());
+            c && c->enabled)
+            return sanitized_material(c->friction, c->restitution);
     }
-
-    if (const auto* collider =
-            world.get_component<CircleCollider2D>(
-                entity,
-                circle_collider2d_type())) {
-        return {
-            collider->friction,
-            collider->restitution
-        };
-    }
-
-    if (const auto* collider =
-            world.get_component<CapsuleCollider2D>(
-                entity,
-                capsule_collider2d_type())) {
-        return {
-            collider->friction,
-            collider->restitution
-        };
-    }
-
     return {};
 }
 
@@ -4756,12 +4739,14 @@ CollisionResolutionStats resolve_box_contacts_3d(
         const auto first_material =
             contact_material_3d(
                 world,
-                overlap.first);
+                overlap.first,
+                overlap.first_shape);
 
         const auto second_material =
             contact_material_3d(
                 world,
-                overlap.second);
+                overlap.second,
+                overlap.second_shape);
 
         const auto first_inertia =
             inverse_inertia_3d(
@@ -5040,12 +5025,14 @@ CollisionResolutionStats resolve_box_contacts_2d(
         const auto first_material =
             contact_material_2d(
                 world,
-                overlap.first);
+                overlap.first,
+                overlap.first_shape);
 
         const auto second_material =
             contact_material_2d(
                 world,
-                overlap.second);
+                overlap.second,
+                overlap.second_shape);
 
         const float first_inertia =
             inverse_inertia_2d(

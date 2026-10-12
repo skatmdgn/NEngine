@@ -2922,6 +2922,92 @@ int main() {
         std::abs(coupled_body->angular_velocity.z) > 0.01f,
         "3D off-diagonal inertia couples angular impulse axes");
 
+    // Compound bodies must honor the material of the *contacting*
+    // collider, not just the first component type in the entity.
+    core::World material_shape_world;
+    const auto material_wall = material_shape_world.create("Material Wall");
+    const auto material_actor = material_shape_world.create("Material Actor");
+    auto* material_wall_box = material_shape_world.add_component<
+        physics::BoxCollider>(material_wall, physics::box_collider_type());
+    material_wall_box->friction = 1.0f;
+    auto* material_actor_box = material_shape_world.add_component<
+        physics::BoxCollider>(material_actor, physics::box_collider_type());
+    material_actor_box->friction = 0.0f;
+    auto* material_actor_sphere = material_shape_world.add_component<
+        physics::SphereCollider>(material_actor, physics::sphere_collider_type());
+    material_actor_sphere->friction = 1.0f;
+    auto* material_actor_body = material_shape_world.add_component<
+        physics::Rigidbody>(material_actor, physics::rigidbody_type());
+    material_actor_body->use_gravity = false;
+    physics::BoxOverlap material_overlap;
+    material_overlap.first = material_wall;
+    material_overlap.second = material_actor;
+    material_overlap.normal = {1.0f, 0.0f, 0.0f};
+    material_overlap.penetration = 0.001f;
+    material_overlap.manifold.count = 1u;
+    material_overlap.manifold.points[0].point = {0.0f, 0.5f, 0.0f};
+
+    physics::ContactImpulseCache shape_material_cache;
+    material_actor_body->linear_velocity = {-2.0f, 2.0f, 0.0f};
+    physics::resolve_box_contacts_3d(
+        material_shape_world, {material_overlap}, &shape_material_cache);
+    const auto no_friction =
+        shape_material_cache.current.front().points[0].tangent_impulse;
+    material_overlap.second_shape = 1u;
+    shape_material_cache.current.clear();
+    material_actor_body->linear_velocity = {-2.0f, 2.0f, 0.0f};
+    material_actor_body->angular_velocity = {};
+    physics::resolve_box_contacts_3d(
+        material_shape_world, {material_overlap}, &shape_material_cache);
+    const auto with_friction =
+        shape_material_cache.current.front().points[0].tangent_impulse;
+    check(
+        std::abs(no_friction.x) + std::abs(no_friction.y) < 0.0001f &&
+        std::abs(with_friction.x) + std::abs(with_friction.y) > 0.01f,
+        "3D compound shape-pair selects its own friction coefficient");
+
+    core::World planar_material_world;
+    const auto planar_wall = planar_material_world.create("Material Wall2D");
+    const auto planar_actor = planar_material_world.create("Material Actor2D");
+    auto* planar_wall_box = planar_material_world.add_component<
+        physics::BoxCollider2D>(planar_wall, physics::box_collider2d_type());
+    planar_wall_box->friction = 1.0f;
+    auto* planar_actor_box = planar_material_world.add_component<
+        physics::BoxCollider2D>(planar_actor, physics::box_collider2d_type());
+    planar_actor_box->friction = 0.0f;
+    auto* planar_actor_circle = planar_material_world.add_component<
+        physics::CircleCollider2D>(planar_actor, physics::circle_collider2d_type());
+    planar_actor_circle->friction = 1.0f;
+    auto* planar_actor_body = planar_material_world.add_component<
+        physics::Rigidbody2D>(planar_actor, physics::rigidbody2d_type());
+    planar_actor_body->use_gravity = false;
+    physics::BoxOverlap planar_material_contact;
+    planar_material_contact.first = planar_wall;
+    planar_material_contact.second = planar_actor;
+    planar_material_contact.is_2d = true;
+    planar_material_contact.normal = {1.0f, 0.0f, 0.0f};
+    planar_material_contact.penetration = 0.001f;
+    planar_material_contact.manifold.count = 1u;
+    planar_material_contact.manifold.points[0].point = {0.0f, 0.5f, 0.0f};
+    physics::ContactImpulseCache planar_material_cache;
+    planar_actor_body->linear_velocity = {-2.0f, 2.0f, 0.0f};
+    physics::resolve_box_contacts_2d(
+        planar_material_world, {planar_material_contact}, &planar_material_cache);
+    const float planar_frictionless =
+        planar_material_cache.current.front().points[0].tangent_impulse.y;
+    planar_material_contact.second_shape = 1u;
+    planar_material_cache.current.clear();
+    planar_actor_body->linear_velocity = {-2.0f, 2.0f, 0.0f};
+    planar_actor_body->angular_velocity = {};
+    physics::resolve_box_contacts_2d(
+        planar_material_world, {planar_material_contact}, &planar_material_cache);
+    const float planar_friction =
+        planar_material_cache.current.front().points[0].tangent_impulse.y;
+    check(
+        std::abs(planar_frictionless) < 0.0001f &&
+        std::abs(planar_friction) > 0.01f,
+        "2D compound shape-pair selects its own friction coefficient");
+
     // Frame-to-frame warm starting uses explicit scene-owned state.
     core::World warm_world;
     const auto warm_wall = warm_world.create("Warm Wall");
