@@ -3050,7 +3050,7 @@ int main() {
 
     std::size_t endurance_3d_pass = 0u;
     std::size_t endurance_2d_pass = 0u;
-    for (std::size_t frame = 0u; frame < 240u; ++frame) {
+    for (std::size_t frame = 0u; frame < 480u; ++frame) {
         const float jitter = 0.01f * std::sin(static_cast<float>(frame) * 0.13f);
 
         auto* spatial_transform = endurance_3d_world.transform(endurance_3d_actor);
@@ -3084,8 +3084,8 @@ int main() {
             ++endurance_2d_pass;
     }
     check(
-        endurance_3d_pass == 240u && endurance_2d_pass == 240u,
-        "240 mixed-shape contact frames preserve finite 3D/2D solver state");
+        endurance_3d_pass == 480u && endurance_2d_pass == 480u,
+        "480 mixed-shape contact frames preserve finite 3D/2D solver state");
 
     // Large angular speeds must not overflow float omega^2 or omega*dt.
     core::World fast_rotation_world;
@@ -3205,6 +3205,69 @@ int main() {
         std::isfinite(light_3d_body->linear_velocity.x) &&
         std::isfinite(heavy_3d_body->linear_velocity.x),
         "nonfinite and denormal body masses reject unsafe collision solves");
+
+    // Degenerate or nonfinite contact geometry must not corrupt a
+    // high-angular-velocity body or populate persistent impulse caches.
+    core::World malformed_world;
+    const auto malformed_wall = malformed_world.create("Malformed Wall");
+    const auto malformed_actor = malformed_world.create("Malformed Actor");
+    malformed_world.add_component<physics::BoxCollider>(
+        malformed_wall, physics::box_collider_type());
+    auto* malformed_body = malformed_world.add_component<physics::Rigidbody>(
+        malformed_actor, physics::rigidbody_type());
+    malformed_body->use_gravity = false;
+    malformed_body->linear_velocity = {-2.0f, 0.0f, 0.0f};
+    physics::BoxOverlap malformed_3d;
+    malformed_3d.first = malformed_wall;
+    malformed_3d.second = malformed_actor;
+    malformed_3d.normal = {1.0f, 0.0f, 0.0f};
+    malformed_3d.penetration = 0.001f;
+    malformed_3d.normal.x = std::numeric_limits<float>::quiet_NaN();
+    physics::ContactImpulseCache malformed_cache;
+    const auto invalid_normal_3d = physics::resolve_box_contacts_3d(
+        malformed_world, {malformed_3d}, &malformed_cache);
+    malformed_3d.normal = {0.0f, 0.0f, 0.0f};
+    const auto zero_normal_3d = physics::resolve_box_contacts_3d(
+        malformed_world, {malformed_3d}, &malformed_cache);
+    malformed_3d.normal = {1.0f, 0.0f, 0.0f};
+    malformed_3d.penetration = std::numeric_limits<float>::infinity();
+    const auto invalid_depth_3d = physics::resolve_box_contacts_3d(
+        malformed_world, {malformed_3d}, &malformed_cache);
+    check(
+        invalid_normal_3d.resolved_3d == 0u &&
+        zero_normal_3d.resolved_3d == 0u &&
+        invalid_depth_3d.resolved_3d == 0u &&
+        malformed_cache.current.empty() &&
+        malformed_body->linear_velocity.x == -2.0f,
+        "3D solver discards nonfinite and degenerate contact geometry");
+
+    core::World malformed_2d_world;
+    const auto malformed_2d_wall = malformed_2d_world.create("Malformed 2D Wall");
+    const auto malformed_2d_actor = malformed_2d_world.create("Malformed 2D Actor");
+    malformed_2d_world.add_component<physics::BoxCollider2D>(
+        malformed_2d_wall, physics::box_collider2d_type());
+    auto* malformed_2d_body = malformed_2d_world.add_component<
+        physics::Rigidbody2D>(malformed_2d_actor, physics::rigidbody2d_type());
+    malformed_2d_body->linear_velocity = {-2.0f, 0.0f, 0.0f};
+    physics::BoxOverlap malformed_2d;
+    malformed_2d.first = malformed_2d_wall;
+    malformed_2d.second = malformed_2d_actor;
+    malformed_2d.is_2d = true;
+    malformed_2d.penetration = 0.001f;
+    malformed_2d.normal = {0.0f, 0.0f, 1.0f};
+    physics::ContactImpulseCache malformed_2d_cache;
+    const auto invalid_planar_normal = physics::resolve_box_contacts_2d(
+        malformed_2d_world, {malformed_2d}, &malformed_2d_cache);
+    malformed_2d.normal = {1.0f, 0.0f, 0.0f};
+    malformed_2d.penetration = std::numeric_limits<float>::quiet_NaN();
+    const auto invalid_planar_depth = physics::resolve_box_contacts_2d(
+        malformed_2d_world, {malformed_2d}, &malformed_2d_cache);
+    check(
+        invalid_planar_normal.resolved_2d == 0u &&
+        invalid_planar_depth.resolved_2d == 0u &&
+        malformed_2d_cache.current.empty() &&
+        malformed_2d_body->linear_velocity.x == -2.0f,
+        "2D solver rejects out-of-plane and nonfinite contact geometry");
 
     // Frame-to-frame warm starting uses explicit scene-owned state.
     core::World warm_world;

@@ -3575,6 +3575,25 @@ float safe_inverse(
 // Body masses outside the supported positive finite range are treated
 // as immovable for contact solving; this prevents divide-by-zero and
 // impulse overflow for denormal mass values.
+bool valid_contact_geometry(
+    const BoxOverlap& overlap) noexcept {
+
+    if (!std::isfinite(overlap.penetration) ||
+        overlap.penetration <= 0.0f ||
+        !std::isfinite(overlap.normal.x) ||
+        !std::isfinite(overlap.normal.y) ||
+        !std::isfinite(overlap.normal.z))
+        return false;
+
+    const float normal_squared = overlap.normal.x * overlap.normal.x +
+        overlap.normal.y * overlap.normal.y +
+        (overlap.is_2d ? 0.0f : overlap.normal.z * overlap.normal.z);
+    // Reject degenerate or out-of-range normals instead of injecting
+    // impulses in an undefined direction.
+    return std::isfinite(normal_squared) &&
+        normal_squared > 0.25f && normal_squared < 2.25f;
+}
+
 constexpr float minimum_dynamic_mass = 1.0e-6f;
 
 template <typename Body>
@@ -4652,7 +4671,7 @@ CollisionResolutionStats resolve_box_contacts_3d(
 
         if (overlap.is_2d ||
             overlap.is_trigger ||
-            overlap.penetration <= 0.0f) {
+            !valid_contact_geometry(overlap)) {
             continue;
         }
 
@@ -4935,7 +4954,7 @@ CollisionResolutionStats resolve_box_contacts_2d(
 
         if (!overlap.is_2d ||
             overlap.is_trigger ||
-            overlap.penetration <= 0.0f) {
+            !valid_contact_geometry(overlap)) {
             continue;
         }
 

@@ -353,13 +353,15 @@ Not yet implemented:
 - Persistent project Input Action asset/editor.
 - Analog axes/composites/rebinding.
 
-- Physics regressions now include 240 sequential 3D/2D mixed-shape contact frames with small displacement jitter and cache persistence checks. These are deterministic smoke tests, not large-scale production stability certification.
+- Physics regressions now include 480 sequential 3D/2D mixed-shape contact frames with small displacement jitter and cache persistence checks. These are deterministic smoke tests, not large-scale production stability certification.
 
 - Angular rotation integration now uses double-precision angular magnitude, wrapped phase and normalized quaternions for extreme 3D/2D spin inputs; invalid angular velocities cannot contaminate rotation.
 
 - Contact impulse solving guards invalid/denormal Rigidbody masses and maintains finite 3D/2D responses at mass ratios of 1e8 in regression tests.
 
 - Contact island union-find now joins by component size and compresses roots; anchored sleeping and distal wake regressions cover 64 connected bodies in both 3D and 2D.
+
+- Direct 3D/2D contact solvers discard NaN/infinite penetration and invalid, non-planar or degenerate normals before calculating impulses, protecting velocities and persistent caches.
 
 ## Immediate next work
 

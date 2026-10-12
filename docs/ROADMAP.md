@@ -165,6 +165,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [ ] Additional cast shapes (SphereCast/CapsuleCast) + richer hit semantics/query filtering policy
 - [x] Collider friction/restitution authoring + 3D/2D impulse response foundation
 - [x] 3D/2D finite dynamic inverse-mass validation and eight-order-of-magnitude contact ratio regression
+- [x] Reject nonfinite penetration and degenerate 3D/2D contact normals before impulse solving
 - [x] Contact-supported Rigidbody/Rigidbody2D sleeping + managed Sleep/WakeUp/IsSleeping foundation
 - [x] Fixed-capacity native ContactManifold + representative contact-point tracking foundation
 - [x] Box/Box2D facing-vertex multi-point manifold foundation (up to 4 points / 2 points)
@@ -186,7 +187,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Shape-pair-aware impulse cache keys for same-entity compound collider contacts
 - [x] Per-contact 3D/2D compound shape friction/restitution lookup and nonfinite material validation
 - [x] Stable entity-ordered broad-phase contacts across sweep reversals + 90-frame compound stability regression
-- [x] 240-frame deterministic 3D/2D mixed-shape contact endurance regressions
+- [x] 480-frame deterministic 3D/2D mixed-shape contact endurance regressions
 - [x] Contact-island anchored sleeping and connected-body wake propagation in 3D/2D
 - [x] Sixteen-body 3D/2D island regression coverage for wake propagation and trigger support loss
 - [x] Union-by-size contact-island connectivity with 64-body 3D/2D sleep and wake stress coverage
