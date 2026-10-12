@@ -4099,31 +4099,84 @@ core::Vec3 relative_velocity_2d(
     };
 }
 
+// Stable pair identity includes both collider slots; unlike an entity
+// pair, one compound object pair can produce several independent contacts.
+struct CachedPairKey {
+    std::uint64_t first{0u};
+    std::uint64_t second{0u};
+    std::uint8_t first_shape{0u};
+    std::uint8_t second_shape{0u};
+    bool is_2d{false};
+
+    bool operator==(const CachedPairKey& other) const noexcept {
+        return first == other.first && second == other.second &&
+            first_shape == other.first_shape &&
+            second_shape == other.second_shape &&
+            is_2d == other.is_2d;
+    }
+};
+
+struct CachedPairKeyHash {
+    std::size_t operator()(const CachedPairKey& value) const noexcept {
+        std::size_t hash = std::hash<std::uint64_t>{}(value.first);
+        const auto combine = [&](std::size_t part) {
+            hash ^= part + static_cast<std::size_t>(0x9e3779b9u) +
+                (hash << 6u) + (hash >> 2u);
+        };
+        combine(std::hash<std::uint64_t>{}(value.second));
+        combine(value.first_shape);
+        combine(value.second_shape);
+        combine(value.is_2d ? 1u : 0u);
+        return hash;
+    }
+};
+
+CachedPairKey cached_pair_key(const BoxOverlap& overlap) noexcept {
+    return {overlap.first.value, overlap.second.value,
+            overlap.first_shape, overlap.second_shape, overlap.is_2d};
+}
+
+CachedPairKey cached_pair_key(const CachedContactPair& pair) noexcept {
+    return {pair.first.value, pair.second.value,
+            pair.first_shape, pair.second_shape, pair.is_2d};
+}
+
+using PreviousContactLookup =
+    std::unordered_map<CachedPairKey, const CachedContactPair*, CachedPairKeyHash>;
+
+PreviousContactLookup build_previous_lookup(const ContactImpulseCache* cache) {
+    PreviousContactLookup lookup;
+    if (!cache) return lookup;
+    lookup.reserve(cache->previous.size());
+    for (const auto& pair : cache->previous)
+        lookup.emplace(cached_pair_key(pair), &pair);
+    return lookup;
+}
+
+const CachedContactPair* lookup_previous_pair(
+    const PreviousContactLookup& lookup, const BoxOverlap& overlap) noexcept {
+
+    const auto it = lookup.find(cached_pair_key(overlap));
+    return it == lookup.end() ? nullptr : it->second;
+}
+
 // Each manifold has at most four points. Exhaustive assignment is cheap
 // and avoids greedy matching stealing the only viable cache entry.
 std::array<const CachedContactImpulse*, ContactManifold::max_points>
 match_cached_impulses(
-    const ContactImpulseCache* cache,
+    const CachedContactPair* pair,
     const BoxOverlap& overlap,
     const std::array<core::Vec3, ContactManifold::max_points>& points,
     std::size_t count) noexcept {
 
     std::array<const CachedContactImpulse*, ContactManifold::max_points>
         matches{};
-    if (!cache || count == 0u || count > matches.size()) return matches;
-
-    for (const auto& pair : cache->previous) {
-        if (pair.first != overlap.first ||
-            pair.second != overlap.second ||
-            pair.is_2d != overlap.is_2d ||
-            pair.first_shape != overlap.first_shape ||
-            pair.second_shape != overlap.second_shape ||
-            dot3(pair.normal, overlap.normal) < 0.95f) {
-            continue;
-        }
+    if (!pair || count == 0u || count > matches.size() ||
+        dot3(pair->normal, overlap.normal) < 0.95f)
+        return matches;
 
         const std::size_t cached_count =
-            std::min(pair.count, pair.points.size());
+            std::min(pair->count, pair->points.size());
         const std::size_t base = cached_count + 1u;
         std::size_t combinations = 1u;
         for (std::size_t i = 0u; i < count; ++i)
@@ -4153,7 +4206,7 @@ match_cached_impulses(
                     valid = false;
                     break;
                 }
-                const auto& old = pair.points[old_index];
+                const auto& old = pair->points[old_index];
                 if (!std::isfinite(old.normal_impulse) ||
                     old.normal_impulse <= 0.0f) {
                     valid = false;
@@ -4188,9 +4241,7 @@ match_cached_impulses(
 
         for (std::size_t i = 0u; i < count; ++i)
             if (best[i] != 0u)
-                matches[i] = &pair.points[best[i] - 1u];
-        return matches;
-    }
+                matches[i] = &pair->points[best[i] - 1u];
     return matches;
 }
 
@@ -4239,48 +4290,6 @@ bool sanitized_cached_tangent(
 
     result = projected;
     return true;
-}
-
-// Stable pair identity includes both collider slots; unlike an entity
-// pair, one compound object pair can produce several independent contacts.
-struct CachedPairKey {
-    std::uint64_t first{0u};
-    std::uint64_t second{0u};
-    std::uint8_t first_shape{0u};
-    std::uint8_t second_shape{0u};
-    bool is_2d{false};
-
-    bool operator==(const CachedPairKey& other) const noexcept {
-        return first == other.first && second == other.second &&
-            first_shape == other.first_shape &&
-            second_shape == other.second_shape &&
-            is_2d == other.is_2d;
-    }
-};
-
-struct CachedPairKeyHash {
-    std::size_t operator()(const CachedPairKey& value) const noexcept {
-        std::size_t hash = std::hash<std::uint64_t>{}(value.first);
-        const auto combine = [&](std::size_t part) {
-            hash ^= part + static_cast<std::size_t>(0x9e3779b9u) +
-                (hash << 6u) + (hash >> 2u);
-        };
-        combine(std::hash<std::uint64_t>{}(value.second));
-        combine(value.first_shape);
-        combine(value.second_shape);
-        combine(value.is_2d ? 1u : 0u);
-        return hash;
-    }
-};
-
-CachedPairKey cached_pair_key(const BoxOverlap& overlap) noexcept {
-    return {overlap.first.value, overlap.second.value,
-            overlap.first_shape, overlap.second_shape, overlap.is_2d};
-}
-
-CachedPairKey cached_pair_key(const CachedContactPair& pair) noexcept {
-    return {pair.first.value, pair.second.value,
-            pair.first_shape, pair.second_shape, pair.is_2d};
 }
 
 template <typename Constraint>
@@ -4714,6 +4723,10 @@ CollisionResolutionStats resolve_box_contacts_3d(
         overlaps.size() *
         ContactManifold::max_points);
 
+    // Build once per dimension, rather than scanning every previous pair
+    // for each contact and every manifold point.
+    const auto previous_lookup = build_previous_lookup(cache);
+
     for (const auto& overlap :
          overlaps) {
 
@@ -4852,7 +4865,8 @@ CollisionResolutionStats resolve_box_contacts_3d(
                 ? overlap.manifold.points[i].point
                 : fallback_point;
         const auto cached_matches = match_cached_impulses(
-            cache, overlap, contact_positions, contact_count);
+            lookup_previous_pair(previous_lookup, overlap),
+            overlap, contact_positions, contact_count);
 
         for (std::size_t index = 0u;
              index < contact_count;
@@ -4997,6 +5011,10 @@ CollisionResolutionStats resolve_box_contacts_2d(
         overlaps.size() *
         ContactManifold::max_points);
 
+    // Build once per dimension, rather than scanning every previous pair
+    // for each contact and every manifold point.
+    const auto previous_lookup = build_previous_lookup(cache);
+
     for (const auto& overlap :
          overlaps) {
 
@@ -5124,7 +5142,8 @@ CollisionResolutionStats resolve_box_contacts_2d(
                 ? overlap.manifold.points[i].point
                 : fallback_point;
         const auto cached_matches = match_cached_impulses(
-            cache, overlap, contact_positions, contact_count);
+            lookup_previous_pair(previous_lookup, overlap),
+            overlap, contact_positions, contact_count);
 
         for (std::size_t index = 0u;
              index < contact_count;

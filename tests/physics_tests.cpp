@@ -3320,6 +3320,70 @@ int main() {
     check(unique_indexed_pairs,
         "indexed contact storage preserves 96 distinct 3D shape pairs");
 
+    // Re-indexed previous contacts must match the same 96 actor keys,
+    // without borrowing an impulse from another body.
+    indexed_contact_cache.end_frame();
+    for (const auto& contact : indexed_overlaps) {
+        auto* body = indexed_cache_world.get_component<physics::Rigidbody>(
+            contact.second, physics::rigidbody_type());
+        body->linear_velocity = {-1.0f, 0.0f, 0.0f};
+        body->angular_velocity = {};
+    }
+    const auto indexed_warm_result = physics::resolve_box_contacts_3d(
+        indexed_cache_world, indexed_overlaps, &indexed_contact_cache);
+    check(
+        indexed_warm_result.warm_started_contacts == 96u &&
+        indexed_contact_cache.current.size() == 96u,
+        "indexed previous cache warm-starts all 96 independent 3D pairs");
+
+    // 2D IDs may overlap 3D entity IDs across different Worlds. Cache
+    // keys must include the dimension as well as the collider slot.
+    core::World indexed_2d_world;
+    const auto indexed_2d_wall = indexed_2d_world.create("Indexed Wall2D");
+    indexed_2d_world.add_component<physics::BoxCollider2D>(
+        indexed_2d_wall, physics::box_collider2d_type());
+    std::vector<physics::BoxOverlap> indexed_2d_overlaps;
+    for (std::size_t n = 0u; n < 64u; ++n) {
+        const auto actor = indexed_2d_world.create("Indexed Actor2D");
+        indexed_2d_world.add_component<physics::CircleCollider2D>(
+            actor, physics::circle_collider2d_type());
+        auto* body = indexed_2d_world.add_component<physics::Rigidbody2D>(
+            actor, physics::rigidbody2d_type());
+        body->use_gravity = false;
+        body->linear_velocity = {-1.0f, 0.0f, 0.0f};
+        indexed_2d_world.transform(actor)->local_position =
+            {0.75f, 0.0f, n % 2u == 0u ? 10.0f : -10.0f};
+        physics::BoxOverlap contact;
+        contact.first = indexed_2d_wall;
+        contact.second = actor;
+        contact.normal = {1.0f, 0.0f, 0.0f};
+        contact.penetration = 0.001f;
+        contact.is_2d = true;
+        contact.second_shape = 1u;
+        indexed_2d_overlaps.push_back(contact);
+    }
+    // Keep 3D current data and the same 3D previous data in this cache.
+    const auto indexed_2d_result = physics::resolve_box_contacts_2d(
+        indexed_2d_world, indexed_2d_overlaps, &indexed_contact_cache);
+    check(
+        indexed_2d_result.resolved_2d == 64u &&
+        indexed_2d_result.warm_started_contacts == 0u &&
+        indexed_contact_cache.current.size() == 160u,
+        "2D contacts remain separate from 3D keys with equal entity IDs");
+    indexed_contact_cache.end_frame();
+    for (const auto& contact : indexed_2d_overlaps) {
+        auto* body = indexed_2d_world.get_component<physics::Rigidbody2D>(
+            contact.second, physics::rigidbody2d_type());
+        body->linear_velocity = {-1.0f, 0.0f, 0.0f};
+        body->angular_velocity = {};
+    }
+    const auto indexed_2d_warm = physics::resolve_box_contacts_2d(
+        indexed_2d_world, indexed_2d_overlaps, &indexed_contact_cache);
+    check(
+        indexed_2d_warm.warm_started_contacts == 64u &&
+        indexed_contact_cache.current.size() == 64u,
+        "indexed previous cache warm-starts 64 independent planar pairs");
+
     // Frame-to-frame warm starting uses explicit scene-owned state.
     core::World warm_world;
     const auto warm_wall = warm_world.create("Warm Wall");

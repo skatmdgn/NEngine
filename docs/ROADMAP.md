@@ -186,6 +186,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Safe 3D/2D cached friction impulses: finite validation, tangent projection and Coulomb-limit clamping
 - [x] Shape-pair-aware impulse cache keys for same-entity compound collider contacts
 - [x] Hash-indexed current frame impulse cache storage for many manifold points/compound collider pairs
+- [x] Per-step hash-indexed previous contact warm starting with 96 3D + 64 2D cross-dimension regression contacts
 - [x] Per-contact 3D/2D compound shape friction/restitution lookup and nonfinite material validation
 - [x] Stable entity-ordered broad-phase contacts across sweep reversals + 90-frame compound stability regression
 - [x] 480-frame deterministic 3D/2D mixed-shape contact endurance regressions
