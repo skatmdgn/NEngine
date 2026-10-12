@@ -189,6 +189,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] 240-frame deterministic 3D/2D mixed-shape contact endurance regressions
 - [x] Contact-island anchored sleeping and connected-body wake propagation in 3D/2D
 - [x] Sixteen-body 3D/2D island regression coverage for wake propagation and trigger support loss
+- [x] Union-by-size contact-island connectivity with 64-body 3D/2D sleep and wake stress coverage
 - [ ] Remaining collider shapes and production broad-phase/solver tuning
 - [x] Keyboard/mouse InputState transitions + Win32 message capture
 - [x] Named action-map binding/query foundation

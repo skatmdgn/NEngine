@@ -185,6 +185,9 @@ void update_sleep_islands(
         nodes.push_back({entity, body, index, false, false});
     }
 
+    // Union-by-size keeps even adversarial contact chains shallow.
+    std::vector<std::size_t> island_sizes(nodes.size(), 1u);
+
     const auto root_of = [&](std::size_t index) {
         while (nodes[index].parent != index) {
             nodes[index].parent = nodes[nodes[index].parent].parent;
@@ -206,9 +209,14 @@ void update_sleep_islands(
         if (second != lookup.end()) nodes[second->second].supported = true;
 
         if (first != lookup.end() && second != lookup.end()) {
-            const auto a = root_of(first->second);
-            const auto b = root_of(second->second);
-            if (a != b) nodes[b].parent = a;
+            auto a = root_of(first->second);
+            auto b = root_of(second->second);
+            if (a != b) {
+                if (island_sizes[a] < island_sizes[b])
+                    std::swap(a, b);
+                nodes[b].parent = a;
+                island_sizes[a] += island_sizes[b];
+            }
         } else {
             // A static/kinematic collider anchors its connected island.
             if (first != lookup.end()) nodes[first->second].anchored = true;

@@ -3735,7 +3735,7 @@ int main() {
     // Connected chains test union-find sleeping over more than two bodies.
     // Recreate overlaps before the wake step so the test measures topology,
     // not an incidental gap left by positional correction.
-    constexpr std::size_t chain_count = 16u;
+    constexpr std::size_t chain_count = 64u;
     core::World chain_3d_world;
     const auto chain_3d_anchor = chain_3d_world.create("3D Chain Anchor");
     chain_3d_world.add_component<physics::BoxCollider>(
@@ -3764,7 +3764,7 @@ int main() {
     check(
         chain_3d_sleep.collisions.overlaps.size() >= chain_count &&
         all_chain_3d_asleep,
-        "3D sixteen-body anchored contact chain sleeps as one island");
+        "3D sixty-four-body anchored contact chain sleeps as one island");
 
     for (std::size_t i = 0u; i < chain_count; ++i)
         chain_3d_world.transform(chain_3d_entities[i])->local_position =
@@ -3812,7 +3812,7 @@ int main() {
     check(
         chain_2d_sleep.collisions.overlaps.size() >= chain_count &&
         all_chain_2d_asleep,
-        "2D sixteen-body contact chain sleeps regardless of varying Z");
+        "2D sixty-four-body contact chain sleeps regardless of varying Z");
 
     // A trigger is not physical support: the island must wake when its
     // only static contact becomes a trigger.
