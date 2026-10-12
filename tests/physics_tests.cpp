@@ -3141,6 +3141,12 @@ int main() {
         heavy_3d_light, physics::rigidbody_type());
     auto* heavy_3d_body = heavy_3d_world.add_component<physics::Rigidbody>(
         heavy_3d_heavy, physics::rigidbody_type());
+    // Adding another body can resize ComponentPool's vector and move
+    // previously returned component pointers. Reacquire both handles.
+    light_3d_body = heavy_3d_world.get_component<physics::Rigidbody>(
+        heavy_3d_light, physics::rigidbody_type());
+    heavy_3d_body = heavy_3d_world.get_component<physics::Rigidbody>(
+        heavy_3d_heavy, physics::rigidbody_type());
     light_3d_body->use_gravity = false;
     heavy_3d_body->use_gravity = false;
     light_3d_body->mass = 1.0e-4f;
@@ -3173,6 +3179,12 @@ int main() {
     auto* light_2d_body = heavy_2d_world.add_component<physics::Rigidbody2D>(
         heavy_2d_light, physics::rigidbody2d_type());
     auto* heavy_2d_body = heavy_2d_world.add_component<physics::Rigidbody2D>(
+        heavy_2d_heavy, physics::rigidbody2d_type());
+    // Adding another body can resize ComponentPool's vector and move
+    // previously returned component pointers. Reacquire both handles.
+    light_2d_body = heavy_2d_world.get_component<physics::Rigidbody2D>(
+        heavy_2d_light, physics::rigidbody2d_type());
+    heavy_2d_body = heavy_2d_world.get_component<physics::Rigidbody2D>(
         heavy_2d_heavy, physics::rigidbody2d_type());
     light_2d_body->use_gravity = false;
     heavy_2d_body->use_gravity = false;
