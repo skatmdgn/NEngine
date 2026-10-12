@@ -353,9 +353,11 @@ Not yet implemented:
 - Persistent project Input Action asset/editor.
 - Analog axes/composites/rebinding.
 
+- Physics regressions now include 240 sequential 3D/2D mixed-shape contact frames with small displacement jitter and cache persistence checks. These are deterministic smoke tests, not large-scale production stability certification.
+
 ## Immediate next work
 
-1. Refine cached-contact matching, capsule/compound inertia and physical stability across larger contact islands and refine capsule/compound-collider mass properties before continuing polygon-style collider work.
+1. Validate full 3D compound inertia tensors with more varied mass ratios, high-angular-velocity contacts and larger/longer contact islands; continue polygon-style collider work and production broad-phase/solver tuning.
 2. Extend audio with streaming + OGG/MP3/FLAC runtime decode and a callback-driven device path after real-Windows audible acceptance.
 3. Extend managed physics queries with additional shape casts and richer hit/filtering semantics.
 4. Package/version the managed NEngine API surface and add debugger attach/symbol workflow.

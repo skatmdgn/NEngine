@@ -184,6 +184,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Shape-pair-aware impulse cache keys for same-entity compound collider contacts
 - [x] Per-contact 3D/2D compound shape friction/restitution lookup and nonfinite material validation
 - [x] Stable entity-ordered broad-phase contacts across sweep reversals + 90-frame compound stability regression
+- [x] 240-frame deterministic 3D/2D mixed-shape contact endurance regressions
 - [x] Contact-island anchored sleeping and connected-body wake propagation in 3D/2D
 - [x] Sixteen-body 3D/2D island regression coverage for wake propagation and trigger support loss
 - [ ] Remaining collider shapes and production broad-phase/solver tuning

@@ -3008,6 +3008,85 @@ int main() {
         std::abs(planar_friction) > 0.01f,
         "2D compound shape-pair selects its own friction coefficient");
 
+    // Repeated mixed-shape 3D/2D contacts exercise full inertia,
+    // independent shape cache keys and contact-island transitions.
+    core::World endurance_3d_world;
+    const auto endurance_3d_wall = endurance_3d_world.create("Long 3D Wall");
+    const auto endurance_3d_actor = endurance_3d_world.create("Long 3D Compound");
+    endurance_3d_world.add_component<physics::BoxCollider>(
+        endurance_3d_wall, physics::box_collider_type());
+    auto* endurance_3d_box = endurance_3d_world.add_component<
+        physics::BoxCollider>(endurance_3d_actor, physics::box_collider_type());
+    endurance_3d_box->center = {0.1f, 0.0f, 0.15f};
+    endurance_3d_world.add_component<physics::SphereCollider>(
+        endurance_3d_actor, physics::sphere_collider_type());
+    endurance_3d_world.add_component<physics::CapsuleCollider>(
+        endurance_3d_actor, physics::capsule_collider_type());
+    auto* endurance_3d_body = endurance_3d_world.add_component<
+        physics::Rigidbody>(endurance_3d_actor, physics::rigidbody_type());
+    endurance_3d_body->use_gravity = false;
+    endurance_3d_body->allow_sleep = false;
+    endurance_3d_body->mass = 2.0f;
+    physics::ContactImpulseCache endurance_3d_cache;
+
+    core::World endurance_2d_world;
+    const auto endurance_2d_wall = endurance_2d_world.create("Long 2D Wall");
+    const auto endurance_2d_actor = endurance_2d_world.create("Long 2D Compound");
+    endurance_2d_world.add_component<physics::BoxCollider2D>(
+        endurance_2d_wall, physics::box_collider2d_type());
+    auto* endurance_2d_box = endurance_2d_world.add_component<
+        physics::BoxCollider2D>(endurance_2d_actor, physics::box_collider2d_type());
+    endurance_2d_box->center = {0.1f, 0.0f, 0.0f};
+    endurance_2d_world.add_component<physics::CircleCollider2D>(
+        endurance_2d_actor, physics::circle_collider2d_type());
+    endurance_2d_world.add_component<physics::CapsuleCollider2D>(
+        endurance_2d_actor, physics::capsule_collider2d_type());
+    auto* endurance_2d_body = endurance_2d_world.add_component<
+        physics::Rigidbody2D>(endurance_2d_actor, physics::rigidbody2d_type());
+    endurance_2d_body->use_gravity = false;
+    endurance_2d_body->allow_sleep = false;
+    endurance_2d_body->mass = 2.0f;
+    physics::ContactImpulseCache endurance_2d_cache;
+
+    std::size_t endurance_3d_pass = 0u;
+    std::size_t endurance_2d_pass = 0u;
+    for (std::size_t frame = 0u; frame < 240u; ++frame) {
+        const float jitter = 0.01f * std::sin(static_cast<float>(frame) * 0.13f);
+
+        auto* spatial_transform = endurance_3d_world.transform(endurance_3d_actor);
+        spatial_transform->local_position = {0.75f + jitter, 0.0f, 0.0f};
+        spatial_transform->local_rotation = {0.0f, 0.0f, 0.0f, 1.0f};
+        endurance_3d_body->linear_velocity = {-1.0f, 0.2f, 0.0f};
+        endurance_3d_body->angular_velocity = {};
+        const auto spatial_step = physics::step_physics(
+            endurance_3d_world, 1.0f / 60.0f, {}, &endurance_3d_cache);
+        if (spatial_step.resolution.resolved_3d >= 2u &&
+            endurance_3d_cache.previous.size() >= 2u &&
+            std::isfinite(endurance_3d_body->linear_velocity.x) &&
+            std::isfinite(endurance_3d_body->linear_velocity.y) &&
+            std::isfinite(endurance_3d_body->angular_velocity.x) &&
+            std::isfinite(endurance_3d_body->angular_velocity.z))
+            ++endurance_3d_pass;
+
+        auto* planar_transform = endurance_2d_world.transform(endurance_2d_actor);
+        planar_transform->local_position = {
+            0.75f + jitter, 0.0f, frame % 2u == 0u ? 12.0f : -12.0f};
+        planar_transform->local_rotation = {0.0f, 0.0f, 0.0f, 1.0f};
+        endurance_2d_body->linear_velocity = {-1.0f, 0.2f, 5.0f};
+        endurance_2d_body->angular_velocity = {};
+        const auto planar_step = physics::step_physics(
+            endurance_2d_world, 1.0f / 60.0f, {}, &endurance_2d_cache);
+        if (planar_step.resolution.resolved_2d >= 2u &&
+            endurance_2d_cache.previous.size() >= 2u &&
+            std::isfinite(endurance_2d_body->linear_velocity.x) &&
+            std::isfinite(endurance_2d_body->angular_velocity.z) &&
+            std::abs(endurance_2d_body->linear_velocity.z) < 0.0001f)
+            ++endurance_2d_pass;
+    }
+    check(
+        endurance_3d_pass == 240u && endurance_2d_pass == 240u,
+        "240 mixed-shape contact frames preserve finite 3D/2D solver state");
+
     // Frame-to-frame warm starting uses explicit scene-owned state.
     core::World warm_world;
     const auto warm_wall = warm_world.create("Warm Wall");
