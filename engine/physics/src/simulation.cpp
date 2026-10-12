@@ -61,28 +61,22 @@ float motion_speed_squared(
                is_2d);
 }
 
-core::Quat normalized_quat(
-    core::Quat value) noexcept {
-
-    const float squared =
-        value.x * value.x +
-        value.y * value.y +
-        value.z * value.z +
-        value.w * value.w;
-
-    if (squared <= 0.0000000001f) {
+core::Quat normalized_quat(core::Quat value) noexcept {
+    // Accumulate the norm in double precision so extreme but finite
+    // angular velocities cannot overflow quaternion normalization.
+    const double squared =
+        static_cast<double>(value.x) * value.x +
+        static_cast<double>(value.y) * value.y +
+        static_cast<double>(value.z) * value.z +
+        static_cast<double>(value.w) * value.w;
+    if (!std::isfinite(squared) || squared <= 1.0e-20)
         return {};
-    }
-
-    const float inverse =
-        1.0f /
-        std::sqrt(squared);
-
+    const double inverse = 1.0 / std::sqrt(squared);
     return {
-        value.x * inverse,
-        value.y * inverse,
-        value.z * inverse,
-        value.w * inverse
+        static_cast<float>(value.x * inverse),
+        static_cast<float>(value.y * inverse),
+        static_cast<float>(value.z * inverse),
+        static_cast<float>(value.w * inverse)
     };
 }
 
@@ -120,50 +114,35 @@ void integrate_rotation(
         angular_velocity.x = 0.0f;
         angular_velocity.y = 0.0f;
     }
-
-    const float magnitude_squared =
-        angular_velocity.x *
-            angular_velocity.x +
-        angular_velocity.y *
-            angular_velocity.y +
-        angular_velocity.z *
-            angular_velocity.z;
-
-    if (magnitude_squared <=
-        0.0000000001f) {
+    if (!std::isfinite(angular_velocity.x) ||
+        !std::isfinite(angular_velocity.y) ||
+        !std::isfinite(angular_velocity.z) ||
+        !std::isfinite(delta_seconds) ||
+        delta_seconds <= 0.0f)
         return;
-    }
 
-    const float magnitude =
-        std::sqrt(
-            magnitude_squared);
+    // Keep the angular magnitude and phase in double precision. A float
+    // omega squared, or omega * dt, can overflow long before omega itself.
+    const double wx = angular_velocity.x;
+    const double wy = angular_velocity.y;
+    const double wz = angular_velocity.z;
+    const double magnitude = std::hypot(wx, wy, wz);
+    if (!(magnitude > 1.0e-5) || !std::isfinite(magnitude))
+        return;
 
-    const float angle =
-        magnitude *
-        delta_seconds;
-
-    const float half_angle =
-        angle * 0.5f;
-
-    const float axis_scale =
-        std::sin(half_angle) /
-        magnitude;
-
+    constexpr double tau = 6.283185307179586476925286766559;
+    const double angle = std::remainder(
+        magnitude * static_cast<double>(delta_seconds), tau);
+    if (!std::isfinite(angle)) return;
+    const double sine = std::sin(angle * 0.5);
+    const double cosine = std::cos(angle * 0.5);
     const core::Quat delta{
-        angular_velocity.x *
-            axis_scale,
-        angular_velocity.y *
-            axis_scale,
-        angular_velocity.z *
-            axis_scale,
-        std::cos(half_angle)
+        static_cast<float>((wx / magnitude) * sine),
+        static_cast<float>((wy / magnitude) * sine),
+        static_cast<float>((wz / magnitude) * sine),
+        static_cast<float>(cosine)
     };
-
-    rotation =
-        normalized_quat(
-            multiplied(
-                delta,
-                rotation));
+    rotation = normalized_quat(multiplied(delta, rotation));
 }
 
 

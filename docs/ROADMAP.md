@@ -170,6 +170,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Reference/incident face polygon clipping for Box/Box2D manifolds
 - [x] Accumulated twenty-four-pass sequential velocity solver foundation for 3D/2D contact chains
 - [x] Rigidbody/Rigidbody2D angular velocity Scene/Editor/C# + quaternion integration foundation
+- [x] Extreme angular speed quaternion integration using double magnitude/phase and finite-input guards
 - [x] Collider-derived inertia + per-manifold-point rotational sequential constraints
 - [x] Analytic cylinder + hemispheres inertia for 3D capsules
 - [x] Volume-weighted compound Box/Sphere/Capsule 3D diagonal inertia

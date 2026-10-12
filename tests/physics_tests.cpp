@@ -3087,6 +3087,47 @@ int main() {
         endurance_3d_pass == 240u && endurance_2d_pass == 240u,
         "240 mixed-shape contact frames preserve finite 3D/2D solver state");
 
+    // Large angular speeds must not overflow float omega^2 or omega*dt.
+    core::World fast_rotation_world;
+    const auto fast_3d = fast_rotation_world.create("Fast 3D");
+    auto* fast_3d_body = fast_rotation_world.add_component<physics::Rigidbody>(
+        fast_3d, physics::rigidbody_type());
+    fast_3d_body->use_gravity = false;
+    fast_3d_body->angular_velocity = {1.0e30f, -1.0e30f, 1.0e30f};
+    const auto fast_2d = fast_rotation_world.create("Fast 2D");
+    auto* fast_2d_body = fast_rotation_world.add_component<physics::Rigidbody2D>(
+        fast_2d, physics::rigidbody2d_type());
+    fast_2d_body->use_gravity = false;
+    fast_2d_body->angular_velocity = {1.0e30f, 0.0f, -1.0e30f};
+    physics::step_rigidbodies(fast_rotation_world, 1.0e20f, {});
+    const auto rotated_3d = fast_rotation_world.transform(fast_3d)->local_rotation;
+    const auto rotated_2d = fast_rotation_world.transform(fast_2d)->local_rotation;
+    const auto quat_length2 = [](core::Quat q) {
+        return q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w;
+    };
+    check(
+        std::isfinite(rotated_3d.x) && std::isfinite(rotated_3d.y) &&
+        std::isfinite(rotated_3d.z) && std::isfinite(rotated_3d.w) &&
+        std::abs(quat_length2(rotated_3d) - 1.0f) < 0.0001f,
+        "extreme 3D angular velocity integrates to finite unit quaternion");
+    check(
+        std::isfinite(rotated_2d.z) && std::isfinite(rotated_2d.w) &&
+        std::abs(rotated_2d.x) < 0.0001f &&
+        std::abs(rotated_2d.y) < 0.0001f &&
+        std::abs(quat_length2(rotated_2d) - 1.0f) < 0.0001f,
+        "extreme 2D spin stays on planar unit quaternion");
+    fast_3d_body->angular_velocity = {0.0f, 0.0f,
+        std::numeric_limits<float>::infinity()};
+    const auto before_invalid = fast_rotation_world.transform(fast_3d)->local_rotation;
+    physics::step_rigidbodies(fast_rotation_world, 1.0f / 60.0f, {});
+    const auto after_invalid = fast_rotation_world.transform(fast_3d)->local_rotation;
+    check(
+        before_invalid.x == after_invalid.x &&
+        before_invalid.y == after_invalid.y &&
+        before_invalid.z == after_invalid.z &&
+        before_invalid.w == after_invalid.w,
+        "nonfinite angular velocity does not contaminate rotation");
+
     // Frame-to-frame warm starting uses explicit scene-owned state.
     core::World warm_world;
     const auto warm_wall = warm_world.create("Warm Wall");

@@ -355,6 +355,8 @@ Not yet implemented:
 
 - Physics regressions now include 240 sequential 3D/2D mixed-shape contact frames with small displacement jitter and cache persistence checks. These are deterministic smoke tests, not large-scale production stability certification.
 
+- Angular rotation integration now uses double-precision angular magnitude, wrapped phase and normalized quaternions for extreme 3D/2D spin inputs; invalid angular velocities cannot contaminate rotation.
+
 ## Immediate next work
 
 1. Validate full 3D compound inertia tensors with more varied mass ratios, high-angular-velocity contacts and larger/longer contact islands; continue polygon-style collider work and production broad-phase/solver tuning.
