@@ -164,6 +164,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] BoxCast/BoxCast2D target coverage for box + radial + capsule colliders
 - [ ] Additional cast shapes (SphereCast/CapsuleCast) + richer hit semantics/query filtering policy
 - [x] Collider friction/restitution authoring + 3D/2D impulse response foundation
+- [x] 3D/2D finite dynamic inverse-mass validation and eight-order-of-magnitude contact ratio regression
 - [x] Contact-supported Rigidbody/Rigidbody2D sleeping + managed Sleep/WakeUp/IsSleeping foundation
 - [x] Fixed-capacity native ContactManifold + representative contact-point tracking foundation
 - [x] Box/Box2D facing-vertex multi-point manifold foundation (up to 4 points / 2 points)

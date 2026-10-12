@@ -357,6 +357,8 @@ Not yet implemented:
 
 - Angular rotation integration now uses double-precision angular magnitude, wrapped phase and normalized quaternions for extreme 3D/2D spin inputs; invalid angular velocities cannot contaminate rotation.
 
+- Contact impulse solving guards invalid/denormal Rigidbody masses and maintains finite 3D/2D responses at mass ratios of 1e8 in regression tests.
+
 ## Immediate next work
 
 1. Validate full 3D compound inertia tensors with more varied mass ratios, high-angular-velocity contacts and larger/longer contact islands; continue polygon-style collider work and production broad-phase/solver tuning.

@@ -3572,6 +3572,20 @@ float safe_inverse(
         : 0.0f;
 }
 
+// Body masses outside the supported positive finite range are treated
+// as immovable for contact solving; this prevents divide-by-zero and
+// impulse overflow for denormal mass values.
+constexpr float minimum_dynamic_mass = 1.0e-6f;
+
+template <typename Body>
+float dynamic_inverse_mass(const Body* body) noexcept {
+    return body && body->enabled && !body->is_kinematic &&
+            std::isfinite(body->mass) &&
+            body->mass >= minimum_dynamic_mass
+        ? 1.0f / body->mass
+        : 0.0f;
+}
+
 InverseInertia3D inverse_inertia_3d(
     const core::World& world,
     core::Entity entity,
@@ -3579,7 +3593,8 @@ InverseInertia3D inverse_inertia_3d(
 
     InverseInertia3D result;
     if (!body || !body->enabled || body->is_kinematic ||
-        !std::isfinite(body->mass) || body->mass <= 0.0f) {
+        !std::isfinite(body->mass) ||
+        body->mass < minimum_dynamic_mass) {
         result.tensor = {};
         return result;
     }
@@ -3683,7 +3698,8 @@ float inverse_inertia_2d(
     const Rigidbody2D* body) noexcept {
 
     if (!body || !body->enabled || body->is_kinematic ||
-        !std::isfinite(body->mass) || body->mass <= 0.0f)
+        !std::isfinite(body->mass) ||
+        body->mass < minimum_dynamic_mass)
         return 0.0f;
 
     const auto* transform = world.transform(entity);
@@ -4651,22 +4667,9 @@ CollisionResolutionStats resolve_box_contacts_3d(
                 rigidbody_type());
 
         const float first_inverse_mass =
-            first_body &&
-                    first_body->enabled &&
-                    !first_body->is_kinematic &&
-                    first_body->mass > 0.0f
-                ? 1.0f /
-                    first_body->mass
-                : 0.0f;
-
+            dynamic_inverse_mass(first_body);
         const float second_inverse_mass =
-            second_body &&
-                    second_body->enabled &&
-                    !second_body->is_kinematic &&
-                    second_body->mass > 0.0f
-                ? 1.0f /
-                    second_body->mass
-                : 0.0f;
+            dynamic_inverse_mass(second_body);
 
         const float inverse_mass_sum =
             first_inverse_mass +
@@ -4947,22 +4950,9 @@ CollisionResolutionStats resolve_box_contacts_2d(
                 rigidbody2d_type());
 
         const float first_inverse_mass =
-            first_body &&
-                    first_body->enabled &&
-                    !first_body->is_kinematic &&
-                    first_body->mass > 0.0f
-                ? 1.0f /
-                    first_body->mass
-                : 0.0f;
-
+            dynamic_inverse_mass(first_body);
         const float second_inverse_mass =
-            second_body &&
-                    second_body->enabled &&
-                    !second_body->is_kinematic &&
-                    second_body->mass > 0.0f
-                ? 1.0f /
-                    second_body->mass
-                : 0.0f;
+            dynamic_inverse_mass(second_body);
 
         const float inverse_mass_sum =
             first_inverse_mass +

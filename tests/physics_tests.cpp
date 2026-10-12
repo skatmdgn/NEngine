@@ -3128,6 +3128,84 @@ int main() {
         before_invalid.w == after_invalid.w,
         "nonfinite angular velocity does not contaminate rotation");
 
+    // Eight orders of magnitude of mass separation must not overflow
+    // effective mass or inject NaN impulses into either body.
+    core::World heavy_3d_world;
+    const auto heavy_3d_light = heavy_3d_world.create("Light 3D");
+    const auto heavy_3d_heavy = heavy_3d_world.create("Heavy 3D");
+    heavy_3d_world.add_component<physics::BoxCollider>(
+        heavy_3d_light, physics::box_collider_type());
+    heavy_3d_world.add_component<physics::BoxCollider>(
+        heavy_3d_heavy, physics::box_collider_type());
+    auto* light_3d_body = heavy_3d_world.add_component<physics::Rigidbody>(
+        heavy_3d_light, physics::rigidbody_type());
+    auto* heavy_3d_body = heavy_3d_world.add_component<physics::Rigidbody>(
+        heavy_3d_heavy, physics::rigidbody_type());
+    light_3d_body->use_gravity = false;
+    heavy_3d_body->use_gravity = false;
+    light_3d_body->mass = 1.0e-4f;
+    heavy_3d_body->mass = 1.0e4f;
+    light_3d_body->linear_velocity = {1.0f, 0.0f, 0.0f};
+    heavy_3d_world.transform(heavy_3d_heavy)->local_position =
+        {0.75f, 0.0f, 0.0f};
+    physics::BoxOverlap high_ratio_3d;
+    high_ratio_3d.first = heavy_3d_light;
+    high_ratio_3d.second = heavy_3d_heavy;
+    high_ratio_3d.normal = {1.0f, 0.0f, 0.0f};
+    high_ratio_3d.penetration = 0.001f;
+    const auto high_ratio_3d_result = physics::resolve_box_contacts_3d(
+        heavy_3d_world, {high_ratio_3d});
+    check(
+        high_ratio_3d_result.resolved_3d == 1u &&
+        std::isfinite(light_3d_body->linear_velocity.x) &&
+        std::isfinite(heavy_3d_body->linear_velocity.x) &&
+        light_3d_body->linear_velocity.x < 1.0f &&
+        heavy_3d_body->linear_velocity.x >= 0.0f,
+        "3D contact handles 1e8 mass ratio without invalid impulses");
+
+    core::World heavy_2d_world;
+    const auto heavy_2d_light = heavy_2d_world.create("Light 2D");
+    const auto heavy_2d_heavy = heavy_2d_world.create("Heavy 2D");
+    heavy_2d_world.add_component<physics::BoxCollider2D>(
+        heavy_2d_light, physics::box_collider2d_type());
+    heavy_2d_world.add_component<physics::BoxCollider2D>(
+        heavy_2d_heavy, physics::box_collider2d_type());
+    auto* light_2d_body = heavy_2d_world.add_component<physics::Rigidbody2D>(
+        heavy_2d_light, physics::rigidbody2d_type());
+    auto* heavy_2d_body = heavy_2d_world.add_component<physics::Rigidbody2D>(
+        heavy_2d_heavy, physics::rigidbody2d_type());
+    light_2d_body->use_gravity = false;
+    heavy_2d_body->use_gravity = false;
+    light_2d_body->mass = 1.0e-4f;
+    heavy_2d_body->mass = 1.0e4f;
+    light_2d_body->linear_velocity = {1.0f, 0.0f, 0.0f};
+    heavy_2d_world.transform(heavy_2d_heavy)->local_position =
+        {0.75f, 0.0f, 9.0f};
+    physics::BoxOverlap high_ratio_2d = high_ratio_3d;
+    high_ratio_2d.first = heavy_2d_light;
+    high_ratio_2d.second = heavy_2d_heavy;
+    high_ratio_2d.is_2d = true;
+    const auto high_ratio_2d_result = physics::resolve_box_contacts_2d(
+        heavy_2d_world, {high_ratio_2d});
+    check(
+        high_ratio_2d_result.resolved_2d == 1u &&
+        std::isfinite(light_2d_body->linear_velocity.x) &&
+        std::isfinite(heavy_2d_body->linear_velocity.x) &&
+        light_2d_body->linear_velocity.x < 1.0f,
+        "2D contact handles 1e8 mass ratio without invalid impulses");
+
+    heavy_3d_body->mass = std::numeric_limits<float>::quiet_NaN();
+    light_3d_body->mass = 1.0e-30f;
+    light_3d_body->linear_velocity = {1.0f, 0.0f, 0.0f};
+    heavy_3d_body->linear_velocity = {};
+    const auto bad_mass_result = physics::resolve_box_contacts_3d(
+        heavy_3d_world, {high_ratio_3d});
+    check(
+        bad_mass_result.resolved_3d == 0u &&
+        std::isfinite(light_3d_body->linear_velocity.x) &&
+        std::isfinite(heavy_3d_body->linear_velocity.x),
+        "nonfinite and denormal body masses reject unsafe collision solves");
+
     // Frame-to-frame warm starting uses explicit scene-owned state.
     core::World warm_world;
     const auto warm_wall = warm_world.create("Warm Wall");
