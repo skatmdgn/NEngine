@@ -174,6 +174,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Analytic cylinder + hemispheres inertia for 3D capsules
 - [x] Volume-weighted compound Box/Sphere/Capsule 3D diagonal inertia
 - [x] Full symmetric 3D compound mass tensor with off-diagonal parallel-axis terms and SPD inversion
+- [x] Solver integration of rotated full 3D inverse inertia tensors and coupled angular contact impulses
 - [x] Area-weighted compound Box2D/Circle2D/Capsule2D planar inertia
 - [x] Analytic rectangle + semicircles inertia for 2D capsules
 - [x] Per-scene 3D/2D persistent contact impulse warm starting

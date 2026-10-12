@@ -2889,6 +2889,39 @@ int main() {
             {1.0f, 1.0f, 1.0f, 2.0f, 0.0f, 0.0f}).xx == 0.0f,
         "singular and indefinite inertia tensors reject inversion");
 
+    // A compound offset on both X and Z creates I_xz. A contact
+    // producing Z torque must therefore also induce X angular motion.
+    core::World coupled_inertia_world;
+    const auto coupled_wall = coupled_inertia_world.create("Tensor Wall");
+    const auto coupled_actor = coupled_inertia_world.create("Tensor Body");
+    coupled_inertia_world.add_component<physics::BoxCollider>(
+        coupled_wall, physics::box_collider_type());
+    auto* coupled_box = coupled_inertia_world.add_component<
+        physics::BoxCollider>(coupled_actor, physics::box_collider_type());
+    coupled_box->center = {1.0f, 0.0f, 1.0f};
+    auto* coupled_sphere = coupled_inertia_world.add_component<
+        physics::SphereCollider>(coupled_actor, physics::sphere_collider_type());
+    coupled_sphere->center = {1.0f, 0.0f, 1.0f};
+    auto* coupled_body = coupled_inertia_world.add_component<
+        physics::Rigidbody>(coupled_actor, physics::rigidbody_type());
+    coupled_body->use_gravity = false;
+    coupled_body->linear_velocity = {-2.0f, 0.0f, 0.0f};
+    physics::BoxOverlap coupled_contact;
+    coupled_contact.first = coupled_wall;
+    coupled_contact.second = coupled_actor;
+    coupled_contact.normal = {1.0f, 0.0f, 0.0f};
+    coupled_contact.penetration = 0.001f;
+    coupled_contact.manifold.count = 1u;
+    coupled_contact.manifold.points[0].point = {0.0f, 1.0f, 0.0f};
+    const auto coupled_result = physics::resolve_box_contacts_3d(
+        coupled_inertia_world, {coupled_contact});
+    check(
+        coupled_result.resolved_3d == 1u &&
+        std::isfinite(coupled_body->angular_velocity.x) &&
+        std::abs(coupled_body->angular_velocity.x) > 0.01f &&
+        std::abs(coupled_body->angular_velocity.z) > 0.01f,
+        "3D off-diagonal inertia couples angular impulse axes");
+
     // Frame-to-frame warm starting uses explicit scene-owned state.
     core::World warm_world;
     const auto warm_wall = warm_world.create("Warm Wall");

@@ -3516,7 +3516,7 @@ struct InverseInertia3D {
     core::Vec3 axis_x{1.0f, 0.0f, 0.0f};
     core::Vec3 axis_y{0.0f, 1.0f, 0.0f};
     core::Vec3 axis_z{0.0f, 0.0f, 1.0f};
-    core::Vec3 diagonal{};
+    InertiaTensor3D tensor{};
 };
 
 struct VelocityConstraint3D {
@@ -3597,13 +3597,13 @@ InverseInertia3D inverse_inertia_3d(
     InverseInertia3D result;
     if (!body || !body->enabled || body->is_kinematic ||
         !std::isfinite(body->mass) || body->mass <= 0.0f) {
-        result.diagonal = {};
+        result.tensor = {};
         return result;
     }
 
     const auto* transform = world.transform(entity);
     if (!transform) {
-        result.diagonal = {};
+        result.tensor = {};
         return result;
     }
 
@@ -3687,12 +3687,10 @@ InverseInertia3D inverse_inertia_3d(
         parts[0] = {1.0f, {}, {1.0f / 6.0f,
                               1.0f / 6.0f, 1.0f / 6.0f}};
 
-    const auto inertia = compound_inertia_3d(body->mass, parts);
-    result.diagonal = {
-        safe_inverse(inertia.x),
-        safe_inverse(inertia.y),
-        safe_inverse(inertia.z)
-    };
+    // Inertia is accumulated in the Collider-local coordinate system.
+    // Invert the complete symmetric tensor before rotating into world space.
+    result.tensor = invert_inertia_tensor_3d(
+        compound_inertia_tensor_3d(body->mass, parts));
     return result;
 }
 
@@ -3772,26 +3770,18 @@ core::Vec3 apply_inverse_inertia(
     const InverseInertia3D& inertia,
     core::Vec3 torque) noexcept {
 
+    const core::Vec3 local_torque{
+        dot3(torque, inertia.axis_x),
+        dot3(torque, inertia.axis_y),
+        dot3(torque, inertia.axis_z)
+    };
+    const auto local_response =
+        apply_inertia_tensor_3d(inertia.tensor, local_torque);
     return added(
         added(
-            scaled(
-                inertia.axis_x,
-                dot3(
-                    torque,
-                    inertia.axis_x) *
-                    inertia.diagonal.x),
-            scaled(
-                inertia.axis_y,
-                dot3(
-                    torque,
-                    inertia.axis_y) *
-                    inertia.diagonal.y)),
-        scaled(
-            inertia.axis_z,
-            dot3(
-                torque,
-                inertia.axis_z) *
-                inertia.diagonal.z));
+            scaled(inertia.axis_x, local_response.x),
+            scaled(inertia.axis_y, local_response.y)),
+        scaled(inertia.axis_z, local_response.z));
 }
 
 float effective_mass_3d(
