@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -4240,6 +4241,48 @@ bool sanitized_cached_tangent(
     return true;
 }
 
+// Stable pair identity includes both collider slots; unlike an entity
+// pair, one compound object pair can produce several independent contacts.
+struct CachedPairKey {
+    std::uint64_t first{0u};
+    std::uint64_t second{0u};
+    std::uint8_t first_shape{0u};
+    std::uint8_t second_shape{0u};
+    bool is_2d{false};
+
+    bool operator==(const CachedPairKey& other) const noexcept {
+        return first == other.first && second == other.second &&
+            first_shape == other.first_shape &&
+            second_shape == other.second_shape &&
+            is_2d == other.is_2d;
+    }
+};
+
+struct CachedPairKeyHash {
+    std::size_t operator()(const CachedPairKey& value) const noexcept {
+        std::size_t hash = std::hash<std::uint64_t>{}(value.first);
+        const auto combine = [&](std::size_t part) {
+            hash ^= part + static_cast<std::size_t>(0x9e3779b9u) +
+                (hash << 6u) + (hash >> 2u);
+        };
+        combine(std::hash<std::uint64_t>{}(value.second));
+        combine(value.first_shape);
+        combine(value.second_shape);
+        combine(value.is_2d ? 1u : 0u);
+        return hash;
+    }
+};
+
+CachedPairKey cached_pair_key(const BoxOverlap& overlap) noexcept {
+    return {overlap.first.value, overlap.second.value,
+            overlap.first_shape, overlap.second_shape, overlap.is_2d};
+}
+
+CachedPairKey cached_pair_key(const CachedContactPair& pair) noexcept {
+    return {pair.first.value, pair.second.value,
+            pair.first_shape, pair.second_shape, pair.is_2d};
+}
+
 template <typename Constraint>
 void store_cached_impulses(
     ContactImpulseCache* cache,
@@ -4248,34 +4291,39 @@ void store_cached_impulses(
 
     if (!cache) return;
 
-    for (const auto& c : constraints) {
-        const auto& overlap = *c.overlap;
-        CachedContactPair* pair = nullptr;
-        for (auto& existing : cache->current) {
-            if (existing.first == overlap.first &&
-                existing.second == overlap.second &&
-                existing.is_2d == is_2d &&
-                existing.first_shape == overlap.first_shape &&
-                existing.second_shape == overlap.second_shape) {
-                pair = &existing;
-                break;
-            }
-        }
-        if (!pair) {
+    // Each constraint corresponds to one manifold point. Index pair
+    // records once instead of scanning the growing cache for every point.
+    // Include existing records from the other physics dimension.
+    std::unordered_map<CachedPairKey, std::size_t, CachedPairKeyHash>
+        pair_indices;
+    pair_indices.reserve(cache->current.size() + constraints.size());
+    for (std::size_t index = 0u; index < cache->current.size(); ++index)
+        pair_indices.emplace(cached_pair_key(cache->current[index]), index);
+
+    for (const auto& constraint : constraints) {
+        const auto& overlap = *constraint.overlap;
+        const auto key = cached_pair_key(overlap);
+        auto it = pair_indices.find(key);
+
+        if (it == pair_indices.end()) {
+            const auto index = cache->current.size();
             cache->current.push_back({});
-            pair = &cache->current.back();
-            pair->first = overlap.first;
-            pair->second = overlap.second;
-            pair->normal = overlap.normal;
-            pair->is_2d = is_2d;
-            pair->first_shape = overlap.first_shape;
-            pair->second_shape = overlap.second_shape;
+            auto& new_pair = cache->current.back();
+            new_pair.first = overlap.first;
+            new_pair.second = overlap.second;
+            new_pair.normal = overlap.normal;
+            new_pair.is_2d = is_2d;
+            new_pair.first_shape = overlap.first_shape;
+            new_pair.second_shape = overlap.second_shape;
+            it = pair_indices.emplace(key, index).first;
         }
-        if (pair->count >= pair->points.size()) continue;
-        pair->points[pair->count++] = {
-            c.contact_point,
-            c.accumulated_normal_impulse,
-            c.accumulated_tangent_impulse
+
+        auto& pair = cache->current[it->second];
+        if (pair.count >= pair.points.size()) continue;
+        pair.points[pair.count++] = {
+            constraint.contact_point,
+            constraint.accumulated_normal_impulse,
+            constraint.accumulated_tangent_impulse
         };
     }
 }

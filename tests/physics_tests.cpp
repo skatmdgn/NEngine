@@ -3281,6 +3281,45 @@ int main() {
         malformed_2d_body->linear_velocity.x == -2.0f,
         "2D solver rejects out-of-plane and nonfinite contact geometry");
 
+    // Many distinct contacts should each store a separate impulse pair.
+    // A compound actor can contribute more than one shape-pair key.
+    core::World indexed_cache_world;
+    const auto indexed_wall = indexed_cache_world.create("Indexed Wall");
+    indexed_cache_world.add_component<physics::BoxCollider>(
+        indexed_wall, physics::box_collider_type());
+    std::vector<physics::BoxOverlap> indexed_overlaps;
+    for (std::size_t n = 0u; n < 96u; ++n) {
+        const auto actor = indexed_cache_world.create("Indexed Actor");
+        indexed_cache_world.add_component<physics::SphereCollider>(
+            actor, physics::sphere_collider_type());
+        auto* actor_body = indexed_cache_world.add_component<physics::Rigidbody>(
+            actor, physics::rigidbody_type());
+        actor_body->use_gravity = false;
+        actor_body->linear_velocity = {-1.0f, 0.0f, 0.0f};
+        indexed_cache_world.transform(actor)->local_position =
+            {0.75f, static_cast<float>(n) * 3.0f, 0.0f};
+
+        physics::BoxOverlap contact;
+        contact.first = indexed_wall;
+        contact.second = actor;
+        contact.normal = {1.0f, 0.0f, 0.0f};
+        contact.penetration = 0.001f;
+        contact.second_shape = 1u;
+        indexed_overlaps.push_back(contact);
+    }
+    physics::ContactImpulseCache indexed_contact_cache;
+    const auto indexed_result = physics::resolve_box_contacts_3d(
+        indexed_cache_world, indexed_overlaps, &indexed_contact_cache);
+    bool unique_indexed_pairs =
+        indexed_result.resolved_3d == 96u &&
+        indexed_contact_cache.current.size() == 96u;
+    for (const auto& pair : indexed_contact_cache.current)
+        unique_indexed_pairs &= pair.count == 1u &&
+            pair.second_shape == 1u &&
+            pair.normal.x > 0.9f;
+    check(unique_indexed_pairs,
+        "indexed contact storage preserves 96 distinct 3D shape pairs");
+
     // Frame-to-frame warm starting uses explicit scene-owned state.
     core::World warm_world;
     const auto warm_wall = warm_world.create("Warm Wall");
