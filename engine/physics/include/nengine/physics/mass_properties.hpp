@@ -79,19 +79,83 @@ struct MassElement3D {
     core::Vec3 unit_inertia{};
 };
 
-inline core::Vec3 compound_inertia_3d(
+// Symmetric inertia matrix in collider-local XYZ coordinates.
+struct InertiaTensor3D {
+    float xx{0.0f};
+    float yy{0.0f};
+    float zz{0.0f};
+    float xy{0.0f};
+    float xz{0.0f};
+    float yz{0.0f};
+};
+
+inline core::Vec3 apply_inertia_tensor_3d(
+    const InertiaTensor3D& t, core::Vec3 value) noexcept {
+
+    return {
+        t.xx * value.x + t.xy * value.y + t.xz * value.z,
+        t.xy * value.x + t.yy * value.y + t.yz * value.z,
+        t.xz * value.x + t.yz * value.y + t.zz * value.z
+    };
+}
+
+// Returns a zero matrix if input is singular, indefinite or nonfinite.
+inline InertiaTensor3D invert_inertia_tensor_3d(
+    const InertiaTensor3D& m) noexcept {
+
+    if (!std::isfinite(m.xx) || !std::isfinite(m.yy) ||
+        !std::isfinite(m.zz) || !std::isfinite(m.xy) ||
+        !std::isfinite(m.xz) || !std::isfinite(m.yz))
+        return {};
+
+    const float scale = std::max({
+        std::abs(m.xx), std::abs(m.yy), std::abs(m.zz),
+        std::abs(m.xy), std::abs(m.xz), std::abs(m.yz)});
+    if (!(scale > 0.0f)) return {};
+
+    const float xx = m.xx / scale, yy = m.yy / scale;
+    const float zz = m.zz / scale, xy = m.xy / scale;
+    const float xz = m.xz / scale, yz = m.yz / scale;
+    const float cxx = yy * zz - yz * yz;
+    const float cyy = xx * zz - xz * xz;
+    const float czz = xx * yy - xy * xy;
+    const float cxy = xz * yz - xy * zz;
+    const float cxz = xy * yz - xz * yy;
+    const float cyz = xy * xz - xx * yz;
+    const float det = xx * cxx + xy * cxy + xz * cxz;
+    if (xx <= 0.0f || czz <= 0.0f || det <= 1.0e-10f)
+        return {};
+
+    const float factor = 1.0f / (scale * det);
+    return {
+        cxx * factor, cyy * factor, czz * factor,
+        cxy * factor, cxz * factor, cyz * factor
+    };
+}
+
+// A parallel-axis shift contributes the full outer-product term:
+// I = I_com + m * (|r|^2 identity - outer(r,r)).
+inline InertiaTensor3D compound_inertia_tensor_3d(
     float mass, const std::array<MassElement3D, 3>& elements) noexcept {
 
     if (!std::isfinite(mass) || mass <= 0.0f) return {};
     float total = 0.0f;
-    for (const auto& part : elements)
-        if (std::isfinite(part.measure) && part.measure > 0.0f)
-            total += part.measure;
+    for (const auto& part : elements) {
+        if (!(std::isfinite(part.measure) && part.measure > 0.0f))
+            continue;
+        const auto& p = part.center;
+        const auto& i = part.unit_inertia;
+        if (!std::isfinite(p.x) || !std::isfinite(p.y) ||
+            !std::isfinite(p.z) || !std::isfinite(i.x) ||
+            !std::isfinite(i.y) || !std::isfinite(i.z))
+            continue;
+        total += part.measure;
+    }
     if (!std::isfinite(total) || total <= 0.0f) return {};
 
-    core::Vec3 result{};
+    InertiaTensor3D result{};
     for (const auto& part : elements) {
-        if (!(part.measure > 0.0f) || !std::isfinite(part.measure))
+        if (!(std::isfinite(part.measure) && part.measure > 0.0f))
             continue;
         const auto& p = part.center;
         const auto& i = part.unit_inertia;
@@ -100,11 +164,21 @@ inline core::Vec3 compound_inertia_3d(
             !std::isfinite(i.y) || !std::isfinite(i.z))
             continue;
         const float portion = mass * part.measure / total;
-        result.x += portion * (i.x + p.y * p.y + p.z * p.z);
-        result.y += portion * (i.y + p.x * p.x + p.z * p.z);
-        result.z += portion * (i.z + p.x * p.x + p.y * p.y);
+        result.xx += portion * (i.x + p.y * p.y + p.z * p.z);
+        result.yy += portion * (i.y + p.x * p.x + p.z * p.z);
+        result.zz += portion * (i.z + p.x * p.x + p.y * p.y);
+        result.xy -= portion * p.x * p.y;
+        result.xz -= portion * p.x * p.z;
+        result.yz -= portion * p.y * p.z;
     }
     return result;
+}
+
+inline core::Vec3 compound_inertia_3d(
+    float mass, const std::array<MassElement3D, 3>& elements) noexcept {
+
+    const auto tensor = compound_inertia_tensor_3d(mass, elements);
+    return {tensor.xx, tensor.yy, tensor.zz};
 }
 
 // Planar solid colliders distribute Rigidbody2D mass by area.

@@ -2862,6 +2862,33 @@ int main() {
         }}) == 0.0f,
         "2D compound inertia partitions area and guards invalid mass");
 
+    const auto full_tensor = physics::compound_inertia_tensor_3d(
+        2.0f, {{
+            {1.0f, {1.0f, 2.0f, 0.0f}, {0.5f, 0.5f, 0.5f}},
+            {1.0f, {}, {0.5f, 0.5f, 0.5f}}, {}
+        }});
+    check(
+        std::abs(full_tensor.xx - 5.0f) < 0.0001f &&
+        std::abs(full_tensor.yy - 2.0f) < 0.0001f &&
+        std::abs(full_tensor.zz - 6.0f) < 0.0001f &&
+        std::abs(full_tensor.xy + 2.0f) < 0.0001f,
+        "compound 3D tensor retains off-diagonal parallel-axis products");
+
+    const auto tensor_inv = physics::invert_inertia_tensor_3d(full_tensor);
+    const auto round_trip = physics::apply_inertia_tensor_3d(
+        full_tensor,
+        physics::apply_inertia_tensor_3d(tensor_inv, {2.0f, -3.0f, 1.0f}));
+    check(
+        std::abs(round_trip.x - 2.0f) < 0.0001f &&
+        std::abs(round_trip.y + 3.0f) < 0.0001f &&
+        std::abs(round_trip.z - 1.0f) < 0.0001f,
+        "compound inertia inverse recovers arbitrary local torque");
+    check(
+        physics::invert_inertia_tensor_3d({}).xx == 0.0f &&
+        physics::invert_inertia_tensor_3d(
+            {1.0f, 1.0f, 1.0f, 2.0f, 0.0f, 0.0f}).xx == 0.0f,
+        "singular and indefinite inertia tensors reject inversion");
+
     // Frame-to-frame warm starting uses explicit scene-owned state.
     core::World warm_world;
     const auto warm_wall = warm_world.create("Warm Wall");
