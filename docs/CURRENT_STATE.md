@@ -363,6 +363,8 @@ Not yet implemented:
 
 - Direct 3D/2D contact solvers discard NaN/infinite penetration and invalid, non-planar or degenerate normals before calculating impulses, protecting velocities and persistent caches.
 
+- Milestone 0.7 started: a native SpriteAnimationController graph now validates named states, clip GUIDs, speed and ordered boolean/exit-time transitions. It is a data/runtime foundation; serialized controller assets and visual editor are still pending.
+
 ## Immediate next work
 
 1. Validate full 3D compound inertia tensors with more varied mass ratios, high-angular-velocity contacts and larger/longer contact islands; continue polygon-style collider work and production broad-phase/solver tuning.

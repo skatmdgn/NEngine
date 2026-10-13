@@ -205,6 +205,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [ ] Streaming decode + OGG/MP3/FLAC runtime decode + production realtime device scheduling
 
 ## 0.7 — Animation/UI/navigation
+- [x] Sprite animation controller state graph, named boolean transitions, exit times and deterministic evaluation foundation
 - [ ] animation clips/state machine/blend tree subset
 - [ ] runtime Canvas-style UI
 - [ ] NavMesh agent/obstacle/link subset

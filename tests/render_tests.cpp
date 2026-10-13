@@ -34,6 +34,7 @@
 #include "nengine/render/render_snapshot.hpp"
 #include "nengine/render/rhi.hpp"
 #include "nengine/render/sprite_animation.hpp"
+#include "nengine/render/animation_controller.hpp"
 #include "nengine/render/vulkan_buffer.hpp"
 #include "nengine/render/vulkan_loader.hpp"
 #include "nengine/render/vulkan_material.hpp"
@@ -69,6 +70,41 @@ void check(
 
 int main() {
     using namespace nengine;
+
+    // Controller validation and deterministic, priority-ordered switching.
+    render::AnimationController animation_graph;
+    const auto idle_clip = assets::AssetGuid::generate();
+    const auto run_clip = assets::AssetGuid::generate();
+    animation_graph.default_state = "Idle";
+    animation_graph.states = {
+        {"Idle", idle_clip, true, 1.0f},
+        {"Run", run_clip, true, 1.3f}
+    };
+    animation_graph.transitions = {
+        {"Idle", "Run", "moving", true, 0.1f},
+        {"Run", "Idle", "moving", false, 0.0f}
+    };
+    std::string graph_error;
+    render::AnimationControllerPlayer graph_player;
+    check(animation_graph.validate(&graph_error) &&
+          graph_player.evaluate(animation_graph, 0.0f) &&
+          graph_player.state == "Idle",
+          "sprite animation graph validates and initializes default state");
+    graph_player.set_bool("moving", true);
+    check(!graph_player.evaluate(animation_graph, 0.09f) &&
+          graph_player.state == "Idle" &&
+          graph_player.evaluate(animation_graph, 0.10f) &&
+          graph_player.state == "Run",
+          "sprite graph respects exit time before switching states");
+    graph_player.set_bool("moving", false);
+    check(graph_player.evaluate(animation_graph, 0.0f) &&
+          graph_player.state == "Idle",
+          "sprite graph transitions back with boolean condition");
+    auto duplicate_graph = animation_graph;
+    duplicate_graph.states.push_back(duplicate_graph.states.front());
+    check(!duplicate_graph.validate() &&
+          !graph_player.evaluate(duplicate_graph, 1.0f),
+          "sprite graph rejects duplicate states and invalid evaluation");
 
     render::MeshData decoded_gltf_fixture;
     render::MeshData decoded_multi_material_fixture;
