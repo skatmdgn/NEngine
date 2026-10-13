@@ -381,6 +381,8 @@ Not yet implemented:
 
 - SpriteAnimator now exposes an optional `.nanimctrl` Controller AssetGuid in Scene serialization and Inspector generic property editing, preserving old scenes that lack the field. Play Mode auto-loading is the next integration step.
 
+- Editor Play Mode now auto-loads SpriteAnimator controller GUIDs through project cached artifacts, binds per-Entity controller graphs, evaluates them ahead of sprite sampling each fixed frame, and provides a native boolean-parameter setter; native runtime state resets on Stop and cache invalidation. C# controller parameter APIs and high-level Animator editor remain.
+
 ## Immediate next work
 
 1. Validate full 3D compound inertia tensors with more varied mass ratios, high-angular-velocity contacts and larger/longer contact islands; continue polygon-style collider work and production broad-phase/solver tuning.

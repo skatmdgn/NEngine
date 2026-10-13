@@ -4,6 +4,8 @@
 #include "nengine/editor/physics_integration.hpp"
 #include "nengine/editor/scripting_integration.hpp"
 #include "nengine/physics/simulation.hpp"
+#include "nengine/render/components.hpp"
+#include <utility>
 
 namespace nengine::editor {
 namespace {
@@ -412,6 +414,11 @@ bool EditorModel::begin_play_mode() {
     managed_script_system_.clear(play_session_.runtime_world());
     physics_contact_tracker_.clear();
     physics_impulse_cache_.clear();
+    sprite_controllers_.clear();
+    bound_sprite_controllers_.clear();
+    sprite_controller_asset_cache_.clear();
+    if (auto* runtime = play_session_.runtime_world())
+        sync_sprite_controllers(*runtime);
     audio_playback_system_.reset();
     audio_mix_snapshot_ = {};
 
@@ -460,6 +467,8 @@ bool EditorModel::begin_play_mode() {
 }
 
 bool EditorModel::stop_play_mode() {
+    sprite_controllers_.clear();
+    bound_sprite_controllers_.clear();
     managed_script_system_.clear(play_session_.runtime_world());
     physics_contact_tracker_.clear();
     physics_impulse_cache_.clear();
@@ -578,6 +587,53 @@ void EditorModel::shutdown_managed_runtime()
     managed_runtime_.shutdown();
 }
 
+void EditorModel::sync_sprite_controllers(core::World& runtime) {
+    for (const auto entity : runtime.entities()) {
+        const auto* animator = runtime.get_component<render::SpriteAnimator>(
+            entity, render::sprite_animator_type());
+        if (!animator || !animator->controller.valid()) {
+            if (bound_sprite_controllers_.erase(entity.value))
+                sprite_controllers_.unbind(entity);
+            continue;
+        }
+        const auto existing = bound_sprite_controllers_.find(entity.value);
+        if (existing != bound_sprite_controllers_.end() &&
+            existing->second == animator->controller)
+            continue;
+
+        sprite_controllers_.unbind(entity);
+        bound_sprite_controllers_.erase(entity.value);
+        const auto artifacts = project_.cached_artifacts(animator->controller);
+        if (!artifacts) continue;
+        std::string error;
+        const auto* controller = sprite_controller_asset_cache_.load(
+            animator->controller, *artifacts, &error);
+        if (!controller) continue;
+        if (sprite_controllers_.bind(entity, *controller))
+            bound_sprite_controllers_.emplace(
+                entity.value, animator->controller);
+    }
+    // Destroyed/reused generational entity handles cannot inherit bindings.
+    for (auto it = bound_sprite_controllers_.begin();
+         it != bound_sprite_controllers_.end();) {
+        if (!runtime.is_alive(core::Entity{it->first})) {
+            sprite_controllers_.unbind(core::Entity{it->first});
+            it = bound_sprite_controllers_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+bool EditorModel::set_sprite_controller_bool(
+    core::Entity entity, std::string parameter, bool value) {
+
+    auto* world = play_session_.runtime_world();
+    return world && world->is_alive(entity) &&
+        sprite_controllers_.set_bool(
+            entity, std::move(parameter), value);
+}
+
 void EditorModel::tick_runtime(
     double elapsed_seconds) {
 
@@ -661,6 +717,9 @@ void EditorModel::tick_runtime(
 
     const auto run_fixed_step =
         [&]() {
+            // Controller selects clips before the sprite-frame sampler.
+            sync_sprite_controllers(*runtime);
+            sprite_controllers_.evaluate(*runtime);
             render::update_sprite_animators(
                 *runtime,
                 fixed_delta,

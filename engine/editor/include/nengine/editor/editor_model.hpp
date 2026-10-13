@@ -1,6 +1,8 @@
 #include <filesystem>
 #include <string>
 #include <string_view>
+#include <unordered_map>
+#include <cstdint>
 
 #pragma once
 
@@ -23,6 +25,7 @@
 #include "nengine/physics/contact_events.hpp"
 #include "nengine/physics/collision.hpp"
 #include "nengine/render/sprite_animation.hpp"
+#include "nengine/render/animation_controller_asset.hpp"
 #include "nengine/scripting/managed_runtime.hpp"
 #include "nengine/scripting/script_system.hpp"
 
@@ -150,8 +153,18 @@ public:
     void tick_runtime(
         double elapsed_seconds);
 
+    // Set named controller parameters on a Play Mode SpriteAnimator.
+    bool set_sprite_controller_bool(
+        core::Entity entity, std::string parameter, bool value);
+
+    const render::SpriteControllerRuntime& sprite_controllers()
+        const noexcept { return sprite_controllers_; }
+
     void invalidate_runtime_asset_caches() noexcept {
         sprite_animation_cache_.clear();
+        sprite_controller_asset_cache_.clear();
+        sprite_controllers_.clear();
+        bound_sprite_controllers_.clear();
         audio_clip_cache_.clear();
     }
 
@@ -181,6 +194,13 @@ private:
     PropertyAccessRegistry property_access_{};
     render::SpriteAnimationClipCache
         sprite_animation_cache_{};
+
+    render::AnimationControllerAssetCache sprite_controller_asset_cache_{};
+    render::SpriteControllerRuntime sprite_controllers_{};
+    std::unordered_map<std::uint64_t, assets::AssetGuid>
+        bound_sprite_controllers_{};
+    void sync_sprite_controllers(core::World& runtime);
+
 
     audio::AudioClipCache
         audio_clip_cache_{};

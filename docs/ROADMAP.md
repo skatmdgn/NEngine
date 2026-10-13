@@ -214,6 +214,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Transactional versioned .nanimctrl state graph text serializer and parser with malformed-file validation
 - [x] `.nanimctrl` ProjectSession importer, clip dependency tracking, fingerprint-aware asset cache
 - [x] Scene/Inspector-persistent SpriteAnimator Controller AssetGuid, including older Scene compatibility
+- [x] Play Mode automatically resolves assigned controller assets, drives SpriteAnimator state each fixed step, and accepts native boolean parameters
 - [ ] animation clips/state machine/blend tree subset
 - [ ] runtime Canvas-style UI
 - [ ] NavMesh agent/obstacle/link subset

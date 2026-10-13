@@ -1941,6 +1941,11 @@ int main() {
         restored_health->value == 55,
         "Scene v2 preserves custom component property value");
 
+    // The public parameter bridge is unavailable without a live Play
+    // Mode binding; it must never mutate the editor World.
+    check(!model.set_sprite_controller_bool(
+              child, "moving", true),
+          "sprite controller parameters are scoped to Play Mode");
     check(model.play_session().play(world), "play clones edit world");
     check(!model.can_edit(), "edit operations can be gated during play");
     toolbar = editor::build_toolbar(model);
