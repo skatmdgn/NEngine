@@ -206,6 +206,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 
 ## 0.7 — Animation/UI/navigation
 - [x] Sprite animation controller state graph, named boolean transitions, exit times and deterministic evaluation foundation
+- [x] Runtime sprite controller bindings to World SpriteAnimator with transition/reset behavior and destroyed-entity cleanup
 - [ ] animation clips/state machine/blend tree subset
 - [ ] runtime Canvas-style UI
 - [ ] NavMesh agent/obstacle/link subset

@@ -106,6 +106,45 @@ int main() {
           !graph_player.evaluate(duplicate_graph, 1.0f),
           "sprite graph rejects duplicate states and invalid evaluation");
 
+    // Controller transitions directly select SpriteAnimator clip/speed/
+    // loop without modifying the existing per-frame sprite sampler.
+    core::World graph_world;
+    const auto graph_entity = graph_world.create("Graph Sprite");
+    graph_world.add_component<render::SpriteRenderer>(
+        graph_entity, render::sprite_renderer_type());
+    graph_world.add_component<render::SpriteAnimator>(
+        graph_entity, render::sprite_animator_type());
+    render::SpriteControllerRuntime graph_runtime;
+    check(graph_runtime.bind(graph_entity, animation_graph) &&
+          graph_runtime.evaluate(graph_world).transitions == 1u,
+          "runtime sprite state controller binds and initializes a clip");
+    auto* graph_animator = graph_world.get_component<render::SpriteAnimator>(
+        graph_entity, render::sprite_animator_type());
+    check(graph_animator && graph_animator->clip == idle_clip &&
+          graph_animator->speed == 1.0f && graph_animator->loop,
+          "controller default state writes live SpriteAnimator properties");
+    if (graph_animator) graph_animator->time_seconds = 0.15f;
+    check(graph_runtime.set_bool(graph_entity, "moving", true) &&
+          graph_runtime.evaluate(graph_world).transitions == 1u &&
+          graph_animator->clip == run_clip &&
+          graph_animator->speed == 1.3f &&
+          graph_animator->time_seconds == 0.0f,
+          "controller transition resets playback and applies new speed");
+    check(graph_runtime.evaluate(graph_world).transitions == 0u,
+          "same animation state does not restart every frame");
+    graph_world.set_active(graph_entity, false);
+    check(graph_runtime.evaluate(graph_world).inactive_or_missing == 1u &&
+          graph_runtime.set_bool(graph_entity, "moving", false),
+          "inactive sprites do not advance controller state");
+    graph_world.set_active(graph_entity, true);
+    check(graph_runtime.evaluate(graph_world).transitions == 1u &&
+          graph_animator->clip == idle_clip,
+          "reactivated sprites evaluate pending state transitions");
+    graph_world.destroy(graph_entity);
+    check(graph_runtime.evaluate(graph_world).inactive_or_missing == 1u &&
+          !graph_runtime.set_bool(graph_entity, "moving", true),
+          "destroyed generational entities remove stale animation bindings");
+
     render::MeshData decoded_gltf_fixture;
     render::MeshData decoded_multi_material_fixture;
 

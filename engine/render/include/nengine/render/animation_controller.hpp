@@ -1,6 +1,10 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <string>
+
+#include "nengine/core/world.hpp"
 #include <string_view>
 #include <unordered_map>
 #include <vector>
@@ -46,6 +50,36 @@ struct AnimationControllerPlayer {
     // elapsed_seconds is the playback time of the current state.
     // Returns true when a new state is entered (including initialization).
     bool evaluate(const AnimationController& controller, float elapsed_seconds);
+};
+
+// Synchronizes a transition with the existing SpriteAnimator/SpriteRenderer
+// pipeline. Playback itself is advanced by update_sprite_animators().
+bool apply_sprite_controller(
+    core::World& world, core::Entity entity,
+    const AnimationController& definition,
+    AnimationControllerPlayer& player);
+
+struct SpriteControllerUpdateStats {
+    std::size_t transitions{0};
+    std::size_t inactive_or_missing{0};
+};
+
+// Runtime-only controllers are keyed by full generational Entity handles.
+// An editor asset format and managed public API are separate follow-ups.
+class SpriteControllerRuntime {
+public:
+    bool bind(core::Entity entity, AnimationController definition);
+    bool set_bool(core::Entity entity, std::string parameter, bool value);
+    bool unbind(core::Entity entity) noexcept;
+    void clear() noexcept;
+    SpriteControllerUpdateStats evaluate(core::World& world);
+
+private:
+    struct Binding {
+        AnimationController controller{};
+        AnimationControllerPlayer player{};
+    };
+    std::unordered_map<std::uint64_t, Binding> bindings_{};
 };
 
 } // namespace nengine::render

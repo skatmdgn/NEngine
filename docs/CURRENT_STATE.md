@@ -365,6 +365,8 @@ Not yet implemented:
 
 - Milestone 0.7 started: a native SpriteAnimationController graph now validates named states, clip GUIDs, speed and ordered boolean/exit-time transitions. It is a data/runtime foundation; serialized controller assets and visual editor are still pending.
 
+- Native SpriteControllerRuntime can now bind validated state graphs to live SpriteAnimator components, drive transitions from boolean parameters/exit timing, and discard bindings for destroyed generational Entity IDs. Sprite frame sampling remains owned by the existing runtime update; controller asset serialization/editor UI and automatic Play Mode wiring remain pending.
+
 ## Immediate next work
 
 1. Validate full 3D compound inertia tensors with more varied mass ratios, high-angular-velocity contacts and larger/longer contact islands; continue polygon-style collider work and production broad-phase/solver tuning.
