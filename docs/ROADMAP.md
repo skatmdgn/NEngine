@@ -218,6 +218,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Scene/Inspector-persistent SpriteAnimator Controller AssetGuid, including older Scene compatibility
 - [x] Play Mode automatically resolves assigned controller assets, drives SpriteAnimator state each fixed step, and accepts native boolean parameters
 - [x] Generated C# SpriteAnimator.controller AssetGuid setter/getter via existing property bridge
+- [x] Generated C# SpriteAnimator.SetBool with validated native runtime parameter bridge and fixed-step graph evaluation
 - [ ] animation clips/state machine/blend tree subset
 - [ ] runtime Canvas-style UI
 - [ ] NavMesh agent/obstacle/link subset

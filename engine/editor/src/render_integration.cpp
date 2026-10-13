@@ -920,6 +920,47 @@ bool register_render_integration(
                     });
             }) && ok;
 
+    // C# SetBool uses the existing managed property bridge. Commands
+    // update runtime-only parameter state, not persistent Scene data.
+    ok = properties.register_property(
+        animator_type, "Bool Parameter", core::PropertyKind::String,
+        [animator_type](const core::World& world, core::Entity entity) {
+            return read_component_property<render::SpriteAnimator>(
+                world, entity, animator_type,
+                [](const render::SpriteAnimator& animator) {
+                    return core::PropertyValue{animator.last_bool_parameter};
+                });
+        },
+        [animator_type](core::World& world, core::Entity entity,
+                        const core::PropertyValue& value) {
+            return write_component_property<render::SpriteAnimator>(
+                world, entity, animator_type, value,
+                [](render::SpriteAnimator& animator,
+                   const core::PropertyValue& raw) {
+                    const auto* text = std::get_if<std::string>(&raw);
+                    if (!text || text->size() > 130u) return false;
+                    const auto sep = text->find('=');
+                    if (sep == std::string::npos || sep == 0u ||
+                        sep > 128u || sep + 2u != text->size() ||
+                        ((*text)[sep + 1u] != '0' &&
+                         (*text)[sep + 1u] != '1'))
+                        return false;
+                    const auto name = text->substr(0u, sep);
+                    for (const char ch : name)
+                        if (!((ch >= 'a' && ch <= 'z') ||
+                              (ch >= 'A' && ch <= 'Z') ||
+                              (ch >= '0' && ch <= '9') ||
+                              ch == '_' || ch == '.' || ch == '-'))
+                            return false;
+                    if (!animator.bool_parameters.contains(name) &&
+                        animator.bool_parameters.size() >= 64u)
+                        return false;
+                    animator.bool_parameters[name] = (*text)[sep + 1u] == '1';
+                    animator.last_bool_parameter = *text;
+                    return true;
+                });
+        }) && ok;
+
     ok =
         properties.register_property(
             animator_type,

@@ -389,6 +389,8 @@ Not yet implemented:
 
 - C# generated NEngine `SpriteAnimator.controller` now exposes the scene-assigned `.nanimctrl` AssetGuid for managed game scripts (without changing the native ABI).
 
+- SpriteAnimator.SetBool(parameter, value) is now exposed to C# via the existing string property callback, backed by runtime-only bounded boolean parameters. Play Mode copies parameters into each controller before clip evaluation, and fixed-step scripts can modify the same frame's state.
+
 ## Immediate next work
 
 1. Validate full 3D compound inertia tensors with more varied mass ratios, high-angular-velocity contacts and larger/longer contact islands; continue polygon-style collider work and production broad-phase/solver tuning.

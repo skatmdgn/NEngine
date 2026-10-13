@@ -646,8 +646,11 @@ void EditorModel::sync_sprite_controllers(core::World& runtime) {
         }
         const auto existing = bound_sprite_controllers_.find(entity.value);
         if (existing != bound_sprite_controllers_.end() &&
-            existing->second == animator->controller)
+            existing->second == animator->controller) {
+            for (const auto& [name, value] : animator->bool_parameters)
+                sprite_controllers_.set_bool(entity, name, value);
             continue;
+        }
 
         sprite_controllers_.unbind(entity);
         bound_sprite_controllers_.erase(entity.value);
@@ -657,9 +660,12 @@ void EditorModel::sync_sprite_controllers(core::World& runtime) {
         const auto* controller = sprite_controller_asset_cache_.load(
             animator->controller, *artifacts, &error);
         if (!controller) continue;
-        if (sprite_controllers_.bind(entity, *controller))
+        if (sprite_controllers_.bind(entity, *controller)) {
             bound_sprite_controllers_.emplace(
                 entity.value, animator->controller);
+            for (const auto& [name, value] : animator->bool_parameters)
+                sprite_controllers_.set_bool(entity, name, value);
+        }
     }
     // Destroyed/reused generational entity handles cannot inherit bindings.
     for (auto it = bound_sprite_controllers_.begin();
@@ -677,9 +683,15 @@ bool EditorModel::set_sprite_controller_bool(
     core::Entity entity, std::string parameter, bool value) {
 
     auto* world = play_session_.runtime_world();
-    return world && world->is_alive(entity) &&
-        sprite_controllers_.set_bool(
-            entity, std::move(parameter), value);
+    if (!world || !world->is_alive(entity)) return false;
+    auto* animator = world->get_component<render::SpriteAnimator>(
+        entity, render::sprite_animator_type());
+    if (!animator || parameter.empty() || parameter.size() > 128u)
+        return false;
+    if (!sprite_controllers_.set_bool(entity, parameter, value))
+        return false;
+    animator->bool_parameters[std::move(parameter)] = value;
+    return true;
 }
 
 void EditorModel::tick_runtime(
@@ -765,21 +777,6 @@ void EditorModel::tick_runtime(
 
     const auto run_fixed_step =
         [&]() {
-            // Controller selects clips before the sprite-frame sampler.
-            sync_sprite_controllers(*runtime);
-            sprite_controllers_.evaluate(*runtime);
-            render::update_sprite_animators(
-                *runtime,
-                fixed_delta,
-                sprite_animation_cache_,
-                [this](
-                    assets::AssetGuid guid) {
-                    return project_
-                        .cached_artifacts(
-                            guid);
-                },
-                &animation_error);
-
             if (managed_runtime_.valid()) {
                 managed_script_system_
                     .fixed_update(
@@ -787,6 +784,18 @@ void EditorModel::tick_runtime(
                         fixed_delta,
                         &script_error);
             }
+            // FixedUpdate may have written Animator.SetBool; evaluate it in
+            // this same simulation frame, before sampling sprite textures.
+            sync_sprite_controllers(*runtime);
+            sprite_controllers_.evaluate(*runtime);
+            render::update_sprite_animators(
+                *runtime,
+                fixed_delta,
+                sprite_animation_cache_,
+                [this](assets::AssetGuid guid) {
+                    return project_.cached_artifacts(guid);
+                },
+                &animation_error);
 
             const auto physics_frame =
                 physics::step_physics(

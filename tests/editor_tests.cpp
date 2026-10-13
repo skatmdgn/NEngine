@@ -1452,6 +1452,20 @@ int main() {
             "Controller", core::PropertyValue{std::string{"not-a-guid"}}),
         "invalid SpriteAnimator Controller AssetGuid is rejected");
 
+    check(model.property_access().write(
+              world, sprite_entity, render::sprite_animator_type(),
+              "Bool Parameter", core::PropertyValue{std::string{"moving=1"}}) &&
+          sprite_animator->bool_parameters["moving"],
+          "C# animation boolean property bridge writes native parameter");
+    check(!model.property_access().write(
+              world, sprite_entity, render::sprite_animator_type(),
+              "Bool Parameter", core::PropertyValue{std::string{"bad!=1"}}),
+          "animator parameter bridge rejects invalid characters");
+    check(!model.property_access().write(
+              world, sprite_entity, render::sprite_animator_type(),
+              "Bool Parameter", core::PropertyValue{std::string{"moving=2"}}),
+          "animator parameter bridge rejects malformed boolean values");
+
     check(
         world.destroy(sprite_entity),
         "sprite render integration test entity cleanup succeeds");

@@ -3333,6 +3333,15 @@ std::string api_stub(
             set => SetNativeAssetGuid("Controller", value);
         }
 
+        // Native state graph transitions consume this value on the next
+        // fixed tick. Script FixedUpdate can affect the current frame.
+        public void SetBool(string parameter, bool value)
+        {
+            if (string.IsNullOrEmpty(parameter) || parameter.Length > 128)
+                throw new ArgumentException("Invalid animator parameter", nameof(parameter));
+            SetNativeString("Bool Parameter", parameter + "=" + (value ? "1" : "0"));
+        }
+
         public bool enabled
         {
             get => NativeBool("Enabled", true);

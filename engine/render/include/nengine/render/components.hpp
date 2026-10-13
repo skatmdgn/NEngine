@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
+#include <unordered_map>
 
 #include "nengine/assets/asset_guid.hpp"
 #include "nengine/core/component_registry.hpp"
@@ -52,6 +54,9 @@ struct SpriteAnimator {
     assets::AssetGuid clip{};
     // Optional .nanimctrl graph asset used by Play Mode.
     assets::AssetGuid controller{};
+    // Runtime-only C# animation parameters; intentionally not serialized.
+    std::unordered_map<std::string, bool> bool_parameters{};
+    std::string last_bool_parameter{};
     bool playing{true};
     bool loop{true};
     float speed{1.0f};
