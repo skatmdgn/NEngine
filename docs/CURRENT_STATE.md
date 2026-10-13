@@ -401,6 +401,8 @@ Not yet implemented:
 
 - EditorModel and Windows Scene View now forward keyboard Tab/Shift+Tab/Enter events to Canvas focus navigation and record resulting click events, with keyboard state reset on focus loss and Play stop.
 
+- Canvas hot-reload invalidation now preserves its assigned AssetGuid and reloads the refreshed asset on the next Play Mode tick, with a single bounded attempt per invalidation and a regression test. The remaining Vulkan Game View and C# UI event system are not yet completed.
+
 ## Immediate next work
 
 1. Validate full 3D compound inertia tensors with more varied mass ratios, high-angular-velocity contacts and larger/longer contact islands; continue polygon-style collider work and production broad-phase/solver tuning.

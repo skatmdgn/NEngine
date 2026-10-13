@@ -600,6 +600,7 @@ void EditorModel::shutdown_managed_runtime()
 
 bool EditorModel::set_ui_canvas_asset(assets::AssetGuid asset) {
     ui_canvas_asset_ = asset;
+    ui_canvas_reload_pending_ = false;
     ui_canvas_.reset();
     ui_pointer_router_.reset();
     ui_events_.clear();
@@ -717,6 +718,16 @@ void EditorModel::tick_runtime(
 
     auto* runtime =
         play_session_.runtime_world();
+
+    // File-watcher invalidation should refresh the selected Canvas asset,
+    // not silently remove the entire UI for the rest of Play Mode.
+    // Only one reload is attempted per invalidation to avoid log spam
+    // when the replacement file is malformed or not yet imported.
+    if (runtime && ui_canvas_reload_pending_) {
+        const auto requested = ui_canvas_asset_;
+        ui_canvas_reload_pending_ = false;
+        set_ui_canvas_asset(requested);
+    }
 
     if (!runtime) {
         managed_script_system_.clear(

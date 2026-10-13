@@ -189,6 +189,7 @@ public:
     void invalidate_runtime_asset_caches() noexcept {
         canvas_cache_.clear();
         ui_canvas_.reset();
+        ui_canvas_reload_pending_ = ui_canvas_asset_.valid();
         ui_pointer_router_.reset();
         ui_keyboard_router_.reset();
         sprite_animation_cache_.clear();
@@ -225,6 +226,7 @@ private:
     ui::CanvasAssetCache canvas_cache_{};
     std::optional<ui::UiCanvas> ui_canvas_{};
     assets::AssetGuid ui_canvas_asset_{};
+    bool ui_canvas_reload_pending_{false};
     ui::UiPointerRouter ui_pointer_router_{};
     ui::UiKeyboardRouter ui_keyboard_router_{};
     std::vector<ui::UiPointerEvent> ui_events_{};
