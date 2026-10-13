@@ -4,6 +4,7 @@
 
 #include "nengine/ui/canvas.hpp"
 #include "nengine/ui/pointer_router.hpp"
+#include "nengine/ui/keyboard_router.hpp"
 #include "nengine/ui/rasterizer.hpp"
 #include "nengine/ui/canvas_serialization.hpp"
 #include "nengine/ui/canvas_asset.hpp"
@@ -229,6 +230,41 @@ int main() {
           "invalidated Canvas cache does not return stale UI");
     std::error_code ec;
     std::filesystem::remove_all(root, ec);
+
+    UiCanvas keyboard_canvas;
+    const auto keyboard_a = keyboard_canvas.add(WidgetKind::Button);
+    const auto keyboard_b = keyboard_canvas.add(WidgetKind::Button);
+    keyboard_canvas.find(keyboard_b)->anchors.offset_min = {150, 0};
+    keyboard_canvas.find(keyboard_b)->anchors.offset_max = {250, 30};
+    UiKeyboardRouter keyboard;
+    const auto keys = keyboard_canvas.layout(400, 100);
+    auto key_events = keyboard.update(keys, true, false);
+    check(key_events.size() == 1u &&
+          key_events[0].target == keyboard_a &&
+          keyboard.focused() == keyboard_a,
+          "Tab selects first interactable UI button");
+    check(keyboard.update(keys, true, false).empty(),
+          "held Tab does not repeat focus navigation");
+    keyboard.update(keys, false, false);
+    keyboard.update(keys, true, false);
+    check(keyboard.focused() == keyboard_b,
+          "second Tab moves focus to next button");
+    keyboard.update(keys, false, false);
+    keyboard.update(keys, true, false, true);
+    check(keyboard.focused() == keyboard_a,
+          "Shift+Tab traverses UI focus backwards");
+    keyboard.update(keys, false, true);
+    check(keyboard.update(keys, false, true).empty(),
+          "held Enter cannot auto-repeat a click");
+    const auto activate = keyboard.update(keys, false, false);
+    check(activate.size() == 1u &&
+          activate[0].target == keyboard_a &&
+          activate[0].type == UiPointerEventType::Click,
+          "Enter release clicks the focused button");
+    keyboard_canvas.find(keyboard_a)->visible = false;
+    keyboard.update(keyboard_canvas.layout(400, 100), false, false);
+    check(keyboard.focused() == invalid_widget,
+          "hidden focused button loses keyboard focus");
 
     if (failures) return EXIT_FAILURE;
     std::cout << "All UI checks passed\n";

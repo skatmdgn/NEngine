@@ -3,6 +3,7 @@ add_library(NEngineUI STATIC
   src/canvas_asset.cpp
   src/canvas_serialization.cpp
   src/pointer_router.cpp
+  src/keyboard_router.cpp
   src/rasterizer.cpp
 )
 target_include_directories(NEngineUI PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
