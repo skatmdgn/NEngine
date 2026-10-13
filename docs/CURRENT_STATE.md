@@ -373,6 +373,8 @@ Not yet implemented:
 
 - Sprite AnimationController now supports a versioned human-readable `.nanimctrl` parser/writer with transactional validation and exact state/transition round-trip; importer registration and editor data binding follow.
 
+- `.nanimctrl` assets now register with ProjectSession, are parsed/validated on import, track referenced clip AssetGuids, and can be resolved through a fingerprint-aware native controller cache. Scene-level controller assignment and automatic Play Mode evaluation still need wiring.
+
 ## Immediate next work
 
 1. Validate full 3D compound inertia tensors with more varied mass ratios, high-angular-velocity contacts and larger/longer contact islands; continue polygon-style collider work and production broad-phase/solver tuning.

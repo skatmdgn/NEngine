@@ -35,6 +35,7 @@
 #include "nengine/render/rhi.hpp"
 #include "nengine/render/sprite_animation.hpp"
 #include "nengine/render/animation_controller.hpp"
+#include "nengine/render/animation_controller_asset.hpp"
 #include "nengine/render/vulkan_buffer.hpp"
 #include "nengine/render/vulkan_loader.hpp"
 #include "nengine/render/vulkan_material.hpp"
@@ -126,6 +127,53 @@ int main() {
               bad_controller, loaded_graph, &graph_error) &&
           loaded_graph.states.size() == original_count,
           "malformed controller file does not replace the old graph");
+
+    // The project importer validates .nanimctrl files and declares clip
+    // dependencies. Cache updates are fingerprint-aware.
+    const auto graph_root = std::filesystem::temp_directory_path() /
+        ("nengine_graph_" + std::to_string(
+            std::chrono::high_resolution_clock::now()
+                .time_since_epoch().count()));
+    std::filesystem::create_directories(graph_root / "cache");
+    const auto graph_source = graph_root / "movement.nanimctrl";
+    {
+        std::ofstream stream(graph_source, std::ios::binary);
+        render::write_animation_controller(stream, animation_graph);
+    }
+    assets::AssetRecord graph_record;
+    graph_record.guid = assets::AssetGuid::generate();
+    graph_record.source_path = graph_source;
+    graph_record.relative_path = "movement.nanimctrl";
+    graph_record.importer_id = "NEngine.AnimationController";
+    graph_record.file_size = std::filesystem::file_size(graph_source);
+    assets::ImporterDescriptor graph_importer{
+        "NEngine.AnimationController", 1u, {".nanimctrl"}, false};
+    const assets::ImportContext graph_context{
+        &graph_record, &graph_importer, graph_root / "cache"};
+    const auto graph_import =
+        render::animation_controller_source_importer(graph_context);
+    check(graph_import.success && graph_import.dependencies.size() == 2u &&
+          std::find(graph_import.dependencies.begin(),
+                    graph_import.dependencies.end(), idle_clip) !=
+              graph_import.dependencies.end(),
+          "animation controller importer validates and tracks clip dependencies");
+    assets::CachedArtifactSet graph_artifacts;
+    graph_artifacts.fingerprint = "graph-v1";
+    graph_artifacts.artifacts = graph_import.artifacts;
+    render::AnimationControllerAssetCache controller_cache;
+    const auto* cached_graph = controller_cache.load(
+        graph_record.guid, graph_artifacts, &graph_error);
+    check(cached_graph && cached_graph->states.size() == 2u &&
+          controller_cache.find(graph_record.guid) == cached_graph,
+          "animation controller cache resolves a validated staged asset");
+    graph_artifacts.fingerprint = "graph-v2";
+    graph_artifacts.artifacts.clear();
+    check(!controller_cache.load(graph_record.guid, graph_artifacts,
+                                 &graph_error) &&
+          !controller_cache.find(graph_record.guid),
+          "invalidated graph fingerprint cannot retain stale controller");
+    std::error_code graph_cleanup;
+    std::filesystem::remove_all(graph_root, graph_cleanup);
 
     // Controller transitions directly select SpriteAnimator clip/speed/
     // loop without modifying the existing per-frame sprite sampler.

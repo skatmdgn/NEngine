@@ -1,5 +1,6 @@
 add_library(NEngineRender STATIC
   src/animation_controller.cpp
+  src/animation_controller_asset.cpp
   src/asset_resources.cpp
   src/builtin_assets.cpp
   src/decoded_mesh.cpp
