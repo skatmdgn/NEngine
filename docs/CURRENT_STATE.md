@@ -395,6 +395,8 @@ Not yet implemented:
 
 - UI button capture now handles Windows WM_CAPTURECHANGED, cancelling stale pressed state and suppressing ghost Click events after focus/capture loss.
 
+- Windows diagnostic GDI Canvas preview now alpha-blends premultiplied rectangle draws and clips widget text; this is still not Vulkan Game View or production text rendering.
+
 ## Immediate next work
 
 1. Validate full 3D compound inertia tensors with more varied mass ratios, high-angular-velocity contacts and larger/longer contact islands; continue polygon-style collider work and production broad-phase/solver tuning.

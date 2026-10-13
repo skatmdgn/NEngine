@@ -4269,32 +4269,84 @@ struct Win32EditorShell::Impl {
                 static_cast<float>(rect.right),
                 static_cast<float>(rect.bottom));
             const auto draws = nengine::ui::build_ui_draw_list(layout);
+            // A premultiplied 1x1 BGRA DIB alpha-blends each clipped
+            // rectangle against the existing GDI Scene View.
+            HDC source = CreateCompatibleDC(dc);
+            BITMAPINFO info{};
+            info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+            info.bmiHeader.biWidth = 1;
+            info.bmiHeader.biHeight = -1;
+            info.bmiHeader.biPlanes = 1;
+            info.bmiHeader.biBitCount = 32;
+            info.bmiHeader.biCompression = BI_RGB;
+            void* bits = nullptr;
+            HBITMAP pixel = source
+                ? CreateDIBSection(dc, &info, DIB_RGB_COLORS, &bits,
+                                   nullptr, 0)
+                : nullptr;
+            HGDIOBJ old_bitmap = pixel
+                ? SelectObject(source, pixel) : nullptr;
+            const auto clamped = [](float value) {
+                return std::isfinite(value)
+                    ? std::clamp(value, 0.0f, 1.0f) : 0.0f;
+            };
             for (const auto& draw : draws) {
-                const auto to_byte = [](float channel) {
-                    return static_cast<int>(
-                        std::clamp(channel, 0.0f, 1.0f) * 255.0f);
-                };
+                const float alpha = clamped(draw.color.a);
+                if (alpha <= 0.0f) continue;
                 RECT box{
                     static_cast<LONG>(draw.rect.x),
                     static_cast<LONG>(draw.rect.y),
                     static_cast<LONG>(draw.rect.x + draw.rect.width),
                     static_cast<LONG>(draw.rect.y + draw.rect.height)};
-                HBRUSH fill = CreateSolidBrush(RGB(
-                    to_byte(draw.color.r),
-                    to_byte(draw.color.g),
-                    to_byte(draw.color.b)));
-                FillRect(dc, &box, fill);
-                DeleteObject(fill);
+                if (box.right <= box.left || box.bottom <= box.top) continue;
+                if (source && bits && pixel) {
+                    const auto channel = [alpha, &clamped](float c) {
+                        return static_cast<std::uint32_t>(
+                            std::lround(clamped(c) * alpha * 255.0f));
+                    };
+                    const auto a = static_cast<std::uint32_t>(
+                        std::lround(alpha * 255.0f));
+                    *static_cast<std::uint32_t*>(bits) =
+                        (a << 24u) | (channel(draw.color.r) << 16u) |
+                        (channel(draw.color.g) << 8u) |
+                        channel(draw.color.b);
+                    BLENDFUNCTION blend{AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
+                    AlphaBlend(dc, box.left, box.top,
+                               box.right - box.left, box.bottom - box.top,
+                               source, 0, 0, 1, 1, blend);
+                } else {
+                    // An allocation failure still keeps the UI visible.
+                    const auto to_byte = [&clamped](float c) {
+                        return static_cast<int>(clamped(c) * 255.0f);
+                    };
+                    HBRUSH fill = CreateSolidBrush(RGB(
+                        to_byte(draw.color.r), to_byte(draw.color.g),
+                        to_byte(draw.color.b)));
+                    FillRect(dc, &box, fill);
+                    DeleteObject(fill);
+                }
+            }
+            if (source) {
+                if (old_bitmap) SelectObject(source, old_bitmap);
+                if (pixel) DeleteObject(pixel);
+                DeleteDC(source);
             }
             for (const auto& item : layout.items) {
                 if (item.text.empty() || item.clipped_rect.width <= 0 ||
                     item.clipped_rect.height <= 0) continue;
                 SetTextColor(dc, RGB(245, 245, 245));
                 const auto label = utf8_to_wide(item.text);
-                TextOutW(dc,
-                    static_cast<int>(item.clipped_rect.x) + 4,
-                    static_cast<int>(item.clipped_rect.y) + 4,
-                    label.c_str(), static_cast<int>(label.size()));
+                RECT clip{
+                    static_cast<LONG>(item.clipped_rect.x),
+                    static_cast<LONG>(item.clipped_rect.y),
+                    static_cast<LONG>(item.clipped_rect.x +
+                                      item.clipped_rect.width),
+                    static_cast<LONG>(item.clipped_rect.y +
+                                      item.clipped_rect.height)};
+                ExtTextOutW(dc,
+                    clip.left + 4, clip.top + 4,
+                    ETO_CLIPPED, &clip, label.c_str(),
+                    static_cast<UINT>(label.size()), nullptr);
             }
         }
 
