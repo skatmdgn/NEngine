@@ -143,6 +143,42 @@ int main() {
     check(
         std::filesystem::exists(project_root / "Assets" / "Animations"),
         "project creates Assets/Animations");
+
+    // The optional project UI convention resolves an imported Canvas
+    // asset and can route clicks without a Windows display.
+    std::filesystem::create_directories(project_root / "Assets" / "UI");
+    {
+        std::ofstream source(
+            project_root / "Assets" / "UI" / "Main.ncanvas",
+            std::ios::binary);
+        source << "NENGINE_CANVAS 1\nWIDGETS 1\n"
+                  "WIDGET 1 0 3 1 1 0 \"Start\" 0 0 0 0 "
+                  "10 10 110 45 0.3 0.4 0.5 1\nEND_CANVAS\n";
+    }
+    model.project().refresh_assets();
+    const auto ui_imports = model.project().import_supported_assets();
+    const auto* ui_record = model.project().assets().find_relative(
+        "UI/Main.ncanvas");
+    check(ui_record && ui_imports.failed == 0u &&
+          model.set_ui_canvas_asset(ui_record->guid) &&
+          !model.ui_layout(640, 480).items.size(),
+          "EditorModel loads imported project Canvas but hides it in Edit Mode");
+    check(model.begin_play_mode() &&
+          model.ui_layout(640, 480).items.size() == 1u &&
+          model.ui_layout(640, 480).items[0].text == "Start",
+          "Canvas is available in Editor Play Mode");
+    const auto ui_down = model.route_ui_pointer(
+        640, 480, {20.0f, 20.0f}, true);
+    const auto ui_up = model.route_ui_pointer(
+        640, 480, {20.0f, 20.0f}, false);
+    check(ui_down.size() >= 1u && ui_up.size() == 2u &&
+          ui_up.back().type == ui::UiPointerEventType::Click &&
+          ui_up.back().target == 1u,
+          "Editor Play Mode UI routes button press and click");
+    check(model.stop_play_mode() &&
+          model.ui_layout(640, 480).items.empty(),
+          "stopping Play Mode hides runtime Canvas");
+
     check(
         std::filesystem::exists(project_root / "Library" / "Cache"),
         "project creates Library/Cache");

@@ -344,6 +344,7 @@ struct Win32EditorShell::Impl {
     int vulkan_scene_height{-1};
     bool vulkan_preview_enabled{false};
 
+    bool ui_pointer_captured{false};
     bool scene_dragging{false};
     nengine::editor::SceneGizmoAxis scene_drag_axis{
         nengine::editor::SceneGizmoAxis::None};
@@ -438,6 +439,25 @@ struct Win32EditorShell::Impl {
         switch (message) {
         case WM_LBUTTONDOWN:
             SetFocus(hwnd);
+            if (!self->vulkan_preview_enabled &&
+                self->editor.play_session().is_playing() &&
+                self->editor.has_ui_canvas()) {
+                RECT bounds{};
+                GetClientRect(hwnd, &bounds);
+                const auto events = self->editor.route_ui_pointer(
+                    static_cast<float>(bounds.right),
+                    static_cast<float>(bounds.bottom),
+                    {static_cast<float>(static_cast<short>(LOWORD(lparam))),
+                     static_cast<float>(static_cast<short>(HIWORD(lparam)))},
+                    true);
+                for (const auto& event : events) {
+                    if (event.type == nengine::ui::UiPointerEventType::Down) {
+                        self->ui_pointer_captured = true;
+                        SetCapture(hwnd);
+                        return 0;
+                    }
+                }
+            }
             self->begin_scene_pointer(
                 hwnd,
                 static_cast<int>(
@@ -447,6 +467,19 @@ struct Win32EditorShell::Impl {
             return 0;
 
         case WM_MOUSEMOVE:
+            if (!self->vulkan_preview_enabled &&
+                self->editor.play_session().is_playing() &&
+                self->editor.has_ui_canvas() &&
+                !self->scene_dragging) {
+                RECT bounds{};
+                GetClientRect(hwnd, &bounds);
+                self->editor.route_ui_pointer(
+                    static_cast<float>(bounds.right),
+                    static_cast<float>(bounds.bottom),
+                    {static_cast<float>(static_cast<short>(LOWORD(lparam))),
+                     static_cast<float>(static_cast<short>(HIWORD(lparam)))},
+                    (wparam & MK_LBUTTON) != 0);
+            }
             if (self->scene_dragging) {
                 self->update_scene_drag(
                     static_cast<int>(
@@ -458,6 +491,24 @@ struct Win32EditorShell::Impl {
             break;
 
         case WM_LBUTTONUP:
+            if (self->ui_pointer_captured) {
+                RECT bounds{};
+                GetClientRect(hwnd, &bounds);
+                const auto events = self->editor.route_ui_pointer(
+                    static_cast<float>(bounds.right),
+                    static_cast<float>(bounds.bottom),
+                    {static_cast<float>(static_cast<short>(LOWORD(lparam))),
+                     static_cast<float>(static_cast<short>(HIWORD(lparam)))},
+                    false);
+                for (const auto& event : events)
+                    if (event.type == nengine::ui::UiPointerEventType::Click)
+                        self->editor.console().info(
+                            "UI", "Canvas button clicked: " +
+                                std::to_string(event.target));
+                self->ui_pointer_captured = false;
+                if (GetCapture() == hwnd) ReleaseCapture();
+                return 0;
+            }
             if (self->scene_dragging) {
                 self->end_scene_drag();
                 return 0;
@@ -4183,6 +4234,43 @@ struct Win32EditorShell::Impl {
         SetTextColor(
             dc,
             RGB(160, 165, 175));
+
+        // Diagnostic GDI UI overlay: the final Vulkan Game View will use
+        // backend-independent UiDrawQuad geometry from NEngineUI.
+        if (editor.play_session().is_playing() &&
+            editor.has_ui_canvas()) {
+            const auto layout = editor.ui_layout(
+                static_cast<float>(rect.right),
+                static_cast<float>(rect.bottom));
+            const auto draws = nengine::ui::build_ui_draw_list(layout);
+            for (const auto& draw : draws) {
+                const auto to_byte = [](float channel) {
+                    return static_cast<int>(
+                        std::clamp(channel, 0.0f, 1.0f) * 255.0f);
+                };
+                RECT box{
+                    static_cast<LONG>(draw.rect.x),
+                    static_cast<LONG>(draw.rect.y),
+                    static_cast<LONG>(draw.rect.x + draw.rect.width),
+                    static_cast<LONG>(draw.rect.y + draw.rect.height)};
+                HBRUSH fill = CreateSolidBrush(RGB(
+                    to_byte(draw.color.r),
+                    to_byte(draw.color.g),
+                    to_byte(draw.color.b)));
+                FillRect(dc, &box, fill);
+                DeleteObject(fill);
+            }
+            for (const auto& item : layout.items) {
+                if (item.text.empty() || item.clipped_rect.width <= 0 ||
+                    item.clipped_rect.height <= 0) continue;
+                SetTextColor(dc, RGB(245, 245, 245));
+                const auto label = utf8_to_wide(item.text);
+                TextOutW(dc,
+                    static_cast<int>(item.clipped_rect.x) + 4,
+                    static_cast<int>(item.clipped_rect.y) + 4,
+                    label.c_str(), static_cast<int>(label.size()));
+            }
+        }
 
         constexpr wchar_t caption[] =
             L"Scene View (diagnostic top-down preview; Vulkan viewport comes later)";

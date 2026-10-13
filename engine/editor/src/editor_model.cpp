@@ -406,6 +406,13 @@ EditorModel::EditorModel() {
 
 
 bool EditorModel::begin_play_mode() {
+    // Prefer an optional project Canvas convention without requiring
+    // a new scene/component format for this diagnostic preview.
+    if (!ui_canvas_asset_.valid()) {
+        if (const auto* record =
+                project_.assets().find_relative("UI/Main.ncanvas"))
+            set_ui_canvas_asset(record->guid);
+    }
     if (!play_session_.play(
             world_)) {
         return false;
@@ -467,6 +474,8 @@ bool EditorModel::begin_play_mode() {
 }
 
 bool EditorModel::stop_play_mode() {
+    ui_pointer_router_.reset();
+    ui_events_.clear();
     sprite_controllers_.clear();
     bound_sprite_controllers_.clear();
     managed_script_system_.clear(play_session_.runtime_world());
@@ -585,6 +594,45 @@ void EditorModel::shutdown_managed_runtime()
     audio_output_device_.close();
     audio_mix_snapshot_ = {};
     managed_runtime_.shutdown();
+}
+
+bool EditorModel::set_ui_canvas_asset(assets::AssetGuid asset) {
+    ui_canvas_asset_ = asset;
+    ui_canvas_.reset();
+    ui_pointer_router_.reset();
+    ui_events_.clear();
+    if (!asset.valid()) return true;
+    const auto artifacts = project_.cached_artifacts(asset);
+    if (!artifacts) return false;
+    std::string error;
+    const auto* canvas = canvas_cache_.load(asset, *artifacts, &error);
+    if (!canvas) {
+        console_.warning("UI", error.empty()
+            ? "Could not load Canvas asset." : error);
+        return false;
+    }
+    ui_canvas_ = *canvas;
+    return true;
+}
+
+ui::UiLayout EditorModel::ui_layout(float width, float height) const {
+    return play_session_.is_playing() && ui_canvas_
+        ? ui_canvas_->layout(width, height) : ui::UiLayout{};
+}
+
+std::vector<ui::UiPointerEvent> EditorModel::route_ui_pointer(
+    float width, float height, core::Vec2 pointer, bool pressed) {
+
+    if (!play_session_.is_playing() || !ui_canvas_) return {};
+    auto events = ui_pointer_router_.update(
+        ui_canvas_->layout(width, height), pointer, pressed);
+    ui_events_.insert(ui_events_.end(), events.begin(), events.end());
+    // Bound event history to avoid retaining unbounded hover/click traffic.
+    if (ui_events_.size() > 128u)
+        ui_events_.erase(ui_events_.begin(),
+            ui_events_.begin() +
+                static_cast<std::ptrdiff_t>(ui_events_.size() - 128u));
+    return events;
 }
 
 void EditorModel::sync_sprite_controllers(core::World& runtime) {

@@ -2,6 +2,8 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <optional>
+#include <vector>
 #include <cstdint>
 
 #pragma once
@@ -26,6 +28,9 @@
 #include "nengine/physics/collision.hpp"
 #include "nengine/render/sprite_animation.hpp"
 #include "nengine/render/animation_controller_asset.hpp"
+#include "nengine/ui/canvas_asset.hpp"
+#include "nengine/ui/pointer_router.hpp"
+#include "nengine/ui/rasterizer.hpp"
 #include "nengine/scripting/managed_runtime.hpp"
 #include "nengine/scripting/script_system.hpp"
 
@@ -153,6 +158,18 @@ public:
     void tick_runtime(
         double elapsed_seconds);
 
+    // The optional Canvas asset is displayed in Play Mode's diagnostic
+    // Scene View. The caller supplies Scene View pixel coordinates.
+    bool set_ui_canvas_asset(assets::AssetGuid asset);
+    bool has_ui_canvas() const noexcept { return ui_canvas_.has_value(); }
+    ui::UiLayout ui_layout(float width, float height) const;
+    std::vector<ui::UiPointerEvent> route_ui_pointer(
+        float width, float height, core::Vec2 pointer, bool pressed);
+    const std::vector<ui::UiPointerEvent>& ui_events() const noexcept {
+        return ui_events_;
+    }
+
+
     // Set named controller parameters on a Play Mode SpriteAnimator.
     bool set_sprite_controller_bool(
         core::Entity entity, std::string parameter, bool value);
@@ -161,6 +178,9 @@ public:
         const noexcept { return sprite_controllers_; }
 
     void invalidate_runtime_asset_caches() noexcept {
+        canvas_cache_.clear();
+        ui_canvas_.reset();
+        ui_pointer_router_.reset();
         sprite_animation_cache_.clear();
         sprite_controller_asset_cache_.clear();
         sprite_controllers_.clear();
@@ -192,6 +212,12 @@ private:
     EditorLayoutState layout_{};
     ProjectSession project_{};
     PropertyAccessRegistry property_access_{};
+    ui::CanvasAssetCache canvas_cache_{};
+    std::optional<ui::UiCanvas> ui_canvas_{};
+    assets::AssetGuid ui_canvas_asset_{};
+    ui::UiPointerRouter ui_pointer_router_{};
+    std::vector<ui::UiPointerEvent> ui_events_{};
+
     render::SpriteAnimationClipCache
         sprite_animation_cache_{};
 

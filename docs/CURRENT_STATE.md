@@ -385,6 +385,8 @@ Not yet implemented:
 
 - `.ncanvas` sources are now first-class ProjectSession assets, validated on import and resolved through a fingerprint-aware Canvas cache. The Editor/Game viewport consumption and managed UI bridge are still future milestones.
 
+- The editor can resolve a `.ncanvas` AssetGuid, automatically use `Assets/UI/Main.ncanvas` as a Play Mode diagnostic UI, route pointer hover/press/click through NEngineUI and display a basic opaque GDI overlay in non-Vulkan Scene View. This is NOT production Vulkan Game View, alpha-correct presentation, or managed UI callbacks; these remain pending.
+
 ## Immediate next work
 
 1. Validate full 3D compound inertia tensors with more varied mass ratios, high-angular-velocity contacts and larger/longer contact islands; continue polygon-style collider work and production broad-phase/solver tuning.
