@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "nengine/ui/canvas.hpp"
+#include "nengine/ui/pointer_router.hpp"
 
 namespace {
 int failures = 0;
@@ -56,6 +57,67 @@ int main() {
     const auto next = canvas.add(WidgetKind::Text);
     check(next > overflow && canvas.layout(0.0f, 600.0f).items.empty(),
           "widget IDs advance and invalid viewport is safely rejected");
+    // Topmost button wins; clipped regions cannot receive hover/click.
+    UiCanvas interactive;
+    const auto bottom = interactive.add(WidgetKind::Button);
+    auto* bottom_data = interactive.find(bottom);
+    bottom_data->anchors.offset_max = {200.0f, 100.0f};
+    const auto top = interactive.add(WidgetKind::Button);
+    auto* top_data = interactive.find(top);
+    top_data->anchors.offset_min = {50.0f, 0.0f};
+    top_data->anchors.offset_max = {150.0f, 100.0f};
+    UiPointerRouter router;
+    auto interactive_layout = interactive.layout(400.0f, 200.0f);
+    const auto enter = router.update(interactive_layout, {80.0f, 40.0f}, false);
+    const auto down = router.update(interactive_layout, {80.0f, 40.0f}, true);
+    const auto up = router.update(interactive_layout, {80.0f, 40.0f}, false);
+    check(enter.size() == 1u && enter[0].target == top &&
+          enter[0].type == UiPointerEventType::Enter &&
+          down.size() == 1u && down[0].type == UiPointerEventType::Down &&
+          up.size() == 2u && up[0].type == UiPointerEventType::Up &&
+          up[1].type == UiPointerEventType::Click &&
+          up[1].target == top,
+          "topmost button receives hover down up and click");
+
+    router.update(interactive_layout, {80.0f, 40.0f}, true);
+    const auto moved = router.update(interactive_layout, {300.0f, 120.0f}, true);
+    const auto released_outside =
+        router.update(interactive_layout, {300.0f, 120.0f}, false);
+    check(moved.size() == 1u &&
+          moved[0].type == UiPointerEventType::Exit &&
+          released_outside.size() == 1u &&
+          released_outside[0].type == UiPointerEventType::Up,
+          "captured release outside button never emits Click");
+
+    interactive.find(top)->interactable = false;
+    interactive_layout = interactive.layout(400.0f, 200.0f);
+    const auto through_overlay =
+        router.update(interactive_layout, {80.0f, 40.0f}, false);
+    check(through_overlay.size() == 1u &&
+          through_overlay[0].target == bottom &&
+          through_overlay[0].type == UiPointerEventType::Enter,
+          "noninteractable top widget allows lower button interaction");
+    router.update(interactive_layout, {80.0f, 40.0f}, true);
+    interactive.remove(bottom);
+    interactive_layout = interactive.layout(400.0f, 200.0f);
+    const auto destroyed_capture =
+        router.update(interactive_layout, {80.0f, 40.0f}, false);
+    bool clicked_destroyed = false;
+    for (const auto& event : destroyed_capture)
+        clicked_destroyed |= event.type == UiPointerEventType::Click;
+    check(!clicked_destroyed && router.captured() == invalid_widget,
+          "removed captured button never receives a ghost click");
+
+    // Native keyboard/mouse InputState is consumable by the UI router.
+    nengine::input::InputState native_input;
+    native_input.set_pointer_position(80.0f, 40.0f);
+    native_input.set_key(nengine::input::Key::MouseLeft, true);
+    router.reset();
+    const auto input_down = router.update(
+        interactive.layout(400.0f, 200.0f), native_input);
+    check(input_down.empty(),
+          "native input does not emit clicks when no button is available");
+
     if (failures) return EXIT_FAILURE;
     std::cout << "All UI checks passed\n";
     return EXIT_SUCCESS;

@@ -369,6 +369,8 @@ Not yet implemented:
 
 - An independent NEngineUI native module now has Canvas/Panel/Text/Image/Button widget descriptors, anchored screen-space layout, hierarchical visibility, optional clipping, stable IDs and cross-platform layout regressions. Pixel rendering and editor/scene serialization are not yet connected.
 
+- UI native pointer routing can use InputState mouse coordinates and left-button state, hit-test topmost interactable Button, and dispatch Enter/Exit/Down/Up/Click with release-inside capture semantics. This is logic-side UI groundwork; no font/glyph drawing, Canvas serialization, or Editor/Player viewport integration yet.
+
 ## Immediate next work
 
 1. Validate full 3D compound inertia tensors with more varied mass ratios, high-angular-velocity contacts and larger/longer contact islands; continue polygon-style collider work and production broad-phase/solver tuning.
