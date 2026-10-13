@@ -391,6 +391,8 @@ Not yet implemented:
 
 - SpriteAnimator.SetBool(parameter, value) is now exposed to C# via the existing string property callback, backed by runtime-only bounded boolean parameters. Play Mode copies parameters into each controller before clip evaluation, and fixed-step scripts can modify the same frame's state.
 
+- Double-clicking a `.ncanvas` in the Windows Assets panel now selects it for the Play Mode diagnostic Canvas preview. The `Assets/UI/Main.ncanvas` convention is a fallback rather than the only path.
+
 ## Immediate next work
 
 1. Validate full 3D compound inertia tensors with more varied mass ratios, high-angular-velocity contacts and larger/longer contact islands; continue polygon-style collider work and production broad-phase/solver tuning.

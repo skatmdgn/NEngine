@@ -3643,6 +3643,26 @@ struct Win32EditorShell::Impl {
                             static_cast<std::size_t>(
                                 index)];
 
+                    if (asset.importer_id == "NEngine.Canvas") {
+                        // Allow explicit Canvas selection; the project
+                        // UI/Main convention remains only a fallback.
+                        editor.project().import_supported_assets();
+                        if (editor.set_ui_canvas_asset(asset.guid)) {
+                            editor.console().info(
+                                "UI", "Selected Canvas preview: " +
+                                    asset.relative_path.generic_string());
+                            if (scene)
+                                InvalidateRect(scene, nullptr, FALSE);
+                        } else {
+                            editor.console().warning(
+                                "UI", "Canvas could not be loaded: " +
+                                    asset.relative_path.generic_string());
+                        }
+                        refresh_console();
+                        handled = true;
+                        break;
+                    }
+
                     const auto activation =
                         editor.project()
                             .activation_for(

@@ -162,6 +162,7 @@ public:
     // Scene View. The caller supplies Scene View pixel coordinates.
     bool set_ui_canvas_asset(assets::AssetGuid asset);
     bool has_ui_canvas() const noexcept { return ui_canvas_.has_value(); }
+    assets::AssetGuid ui_canvas_asset() const noexcept { return ui_canvas_asset_; }
     ui::UiLayout ui_layout(float width, float height) const;
     std::vector<ui::UiPointerEvent> route_ui_pointer(
         float width, float height, core::Vec2 pointer, bool pressed);
