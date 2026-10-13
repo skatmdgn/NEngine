@@ -896,6 +896,33 @@ bool register_render_integration(
     ok =
         properties.register_property(
             animator_type,
+            "Controller",
+            core::PropertyKind::AssetReference,
+            [animator_type](const core::World& world, core::Entity entity) {
+                return read_component_property<render::SpriteAnimator>(
+                    world, entity, animator_type,
+                    [](const render::SpriteAnimator& animator) {
+                        return core::PropertyValue{
+                            asset_reference_text(animator.controller)};
+                    });
+            },
+            [animator_type](core::World& world, core::Entity entity,
+                            const core::PropertyValue& value) {
+                return write_component_property<render::SpriteAnimator>(
+                    world, entity, animator_type, value,
+                    [](render::SpriteAnimator& animator,
+                       const core::PropertyValue& raw) {
+                        assets::AssetGuid parsed;
+                        if (!parse_asset_reference(raw, parsed)) return false;
+                        animator.controller = parsed;
+                        animator.time_seconds = 0.0f;
+                        return true;
+                    });
+            }) && ok;
+
+    ok =
+        properties.register_property(
+            animator_type,
             "Speed",
             core::PropertyKind::Float,
             [animator_type](

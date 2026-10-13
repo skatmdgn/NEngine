@@ -379,6 +379,8 @@ Not yet implemented:
 
 - The UI Canvas widget tree can now round-trip through versioned `.ncanvas` text files, preserving stable widget IDs, parent-child relationships, anchors, text and colors with malformed-source atomic rejection. UI asset import, interactive Editor Game View and font/texture rendering remain separate work.
 
+- SpriteAnimator now exposes an optional `.nanimctrl` Controller AssetGuid in Scene serialization and Inspector generic property editing, preserving old scenes that lack the field. Play Mode auto-loading is the next integration step.
+
 ## Immediate next work
 
 1. Validate full 3D compound inertia tensors with more varied mass ratios, high-angular-velocity contacts and larger/longer contact islands; continue polygon-style collider work and production broad-phase/solver tuning.

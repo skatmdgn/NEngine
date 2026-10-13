@@ -50,6 +50,8 @@ struct SpriteRenderer {
 struct SpriteAnimator {
     bool enabled{true};
     assets::AssetGuid clip{};
+    // Optional .nanimctrl graph asset used by Play Mode.
+    assets::AssetGuid controller{};
     bool playing{true};
     bool loop{true};
     float speed{1.0f};

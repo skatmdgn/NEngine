@@ -451,6 +451,16 @@ bool register_component_metadata(
         registry.register_property(
             sprite_animator_type(),
             {
+                "Controller",
+                core::PropertyKind::AssetReference,
+                core::PropertyFlags::Serializable |
+                    core::PropertyFlags::Editable
+            }) && ok;
+
+    ok =
+        registry.register_property(
+            sprite_animator_type(),
+            {
                 "Playing",
                 core::PropertyKind::Boolean,
                 core::PropertyFlags::Serializable |
@@ -914,6 +924,9 @@ bool register_component_serializers(
                     asset_property(
                         "Clip",
                         animator->clip),
+                    asset_property(
+                        "Controller",
+                        animator->controller),
                     boolean_property(
                         "Playing",
                         animator->playing),
@@ -942,6 +955,9 @@ bool register_component_serializers(
                         data,
                         "Clip",
                         value.clip) ||
+                    // Older Scene files need not contain this optional field.
+                    (find_property(data, "Controller") &&
+                     !read_asset(data, "Controller", value.controller)) ||
                     !read_bool(
                         data,
                         "Playing",

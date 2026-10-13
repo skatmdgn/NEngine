@@ -361,9 +361,12 @@ int main() {
         sprite_animator != nullptr,
         "sprite animator component attaches");
 
+    const auto sprite_controller_guid = assets::AssetGuid::generate();
+
     if (sprite_animator) {
         sprite_animator->clip =
             sprite_clip_guid;
+        sprite_animator->controller = sprite_controller_guid;
         sprite_animator->playing = true;
         sprite_animator->loop = false;
         sprite_animator->speed = 1.5f;
@@ -558,6 +561,8 @@ int main() {
         restored_animator_component &&
         restored_animator_component->clip ==
             sprite_clip_guid &&
+        restored_animator_component->controller ==
+            sprite_controller_guid &&
         restored_animator_component->playing &&
         !restored_animator_component->loop &&
         restored_animator_component->speed ==

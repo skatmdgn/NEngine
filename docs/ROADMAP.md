@@ -213,6 +213,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Runtime sprite controller bindings to World SpriteAnimator with transition/reset behavior and destroyed-entity cleanup
 - [x] Transactional versioned .nanimctrl state graph text serializer and parser with malformed-file validation
 - [x] `.nanimctrl` ProjectSession importer, clip dependency tracking, fingerprint-aware asset cache
+- [x] Scene/Inspector-persistent SpriteAnimator Controller AssetGuid, including older Scene compatibility
 - [ ] animation clips/state machine/blend tree subset
 - [ ] runtime Canvas-style UI
 - [ ] NavMesh agent/obstacle/link subset

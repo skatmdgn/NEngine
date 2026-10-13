@@ -1401,6 +1401,21 @@ int main() {
             0.0001f,
         "SpriteAnimator Clip property resets runtime playback time");
 
+    const auto animation_controller_guid = assets::AssetGuid::generate();
+    check(
+        model.property_access().write(
+            world, sprite_entity, render::sprite_animator_type(),
+            "Controller",
+            core::PropertyValue{animation_controller_guid.to_string()}) &&
+        sprite_animator &&
+        sprite_animator->controller == animation_controller_guid,
+        "SpriteAnimator Controller AssetGuid is Inspector-editable");
+    check(
+        !model.property_access().write(
+            world, sprite_entity, render::sprite_animator_type(),
+            "Controller", core::PropertyValue{std::string{"not-a-guid"}}),
+        "invalid SpriteAnimator Controller AssetGuid is rejected");
+
     check(
         world.destroy(sprite_entity),
         "sprite render integration test entity cleanup succeeds");
