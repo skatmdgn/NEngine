@@ -6,6 +6,10 @@
 #include "nengine/ui/pointer_router.hpp"
 #include "nengine/ui/rasterizer.hpp"
 #include "nengine/ui/canvas_serialization.hpp"
+#include "nengine/ui/canvas_asset.hpp"
+#include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <sstream>
 
 namespace {
@@ -171,6 +175,46 @@ int main() {
     check(!read_canvas(invalid_canvas, restored_canvas) &&
           restored_canvas.widgets().size() == old_widgets,
           "orphan Canvas widget is rejected without damaging existing UI");
+
+    const auto root = std::filesystem::temp_directory_path() /
+        ("nengine_canvas_import_" + std::to_string(
+            std::chrono::high_resolution_clock::now()
+                .time_since_epoch().count()));
+    std::filesystem::create_directories(root / "cache");
+    const auto source = root / "menu.ncanvas";
+    {
+        std::ofstream output(source, std::ios::binary);
+        check(write_canvas(output, paint),
+              "Canvas source writer generates importable file");
+    }
+    nengine::assets::AssetRecord record;
+    record.guid = nengine::assets::AssetGuid::generate();
+    record.source_path = source;
+    record.relative_path = "menu.ncanvas";
+    record.importer_id = "NEngine.Canvas";
+    record.file_size = std::filesystem::file_size(source);
+    nengine::assets::ImporterDescriptor descriptor{
+        "NEngine.Canvas", 1u, {".ncanvas"}, false};
+    const nengine::assets::ImportContext context{
+        &record, &descriptor, root / "cache"};
+    const auto result = canvas_source_importer(context);
+    check(result.success && result.artifacts.size() == 1u,
+          "Canvas importer stages validated source");
+    nengine::assets::CachedArtifactSet artifacts;
+    artifacts.fingerprint = "canvas-v1";
+    artifacts.artifacts = result.artifacts;
+    CanvasAssetCache canvas_cache;
+    const auto* cached = canvas_cache.load(record.guid, artifacts);
+    check(cached && cached->widgets().size() == paint.widgets().size() &&
+          canvas_cache.find(record.guid) == cached,
+          "fingerprint-aware Canvas cache resolves staged UI");
+    artifacts.fingerprint = "canvas-v2";
+    artifacts.artifacts.clear();
+    check(!canvas_cache.load(record.guid, artifacts) &&
+          !canvas_cache.find(record.guid),
+          "invalidated Canvas cache does not return stale UI");
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
 
     if (failures) return EXIT_FAILURE;
     std::cout << "All UI checks passed\n";

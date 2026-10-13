@@ -383,6 +383,8 @@ Not yet implemented:
 
 - Editor Play Mode now auto-loads SpriteAnimator controller GUIDs through project cached artifacts, binds per-Entity controller graphs, evaluates them ahead of sprite sampling each fixed frame, and provides a native boolean-parameter setter; native runtime state resets on Stop and cache invalidation. C# controller parameter APIs and high-level Animator editor remain.
 
+- `.ncanvas` sources are now first-class ProjectSession assets, validated on import and resolved through a fingerprint-aware Canvas cache. The Editor/Game viewport consumption and managed UI bridge are still future milestones.
+
 ## Immediate next work
 
 1. Validate full 3D compound inertia tensors with more varied mass ratios, high-angular-velocity contacts and larger/longer contact islands; continue polygon-style collider work and production broad-phase/solver tuning.
