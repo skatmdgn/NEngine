@@ -387,6 +387,8 @@ Not yet implemented:
 
 - The editor can resolve a `.ncanvas` AssetGuid, automatically use `Assets/UI/Main.ncanvas` as a Play Mode diagnostic UI, route pointer hover/press/click through NEngineUI and display a basic opaque GDI overlay in non-Vulkan Scene View. This is NOT production Vulkan Game View, alpha-correct presentation, or managed UI callbacks; these remain pending.
 
+- C# generated NEngine `SpriteAnimator.controller` now exposes the scene-assigned `.nanimctrl` AssetGuid for managed game scripts (without changing the native ABI).
+
 ## Immediate next work
 
 1. Validate full 3D compound inertia tensors with more varied mass ratios, high-angular-velocity contacts and larger/longer contact islands; continue polygon-style collider work and production broad-phase/solver tuning.

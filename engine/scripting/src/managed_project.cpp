@@ -3325,6 +3325,14 @@ std::string api_stub(
 
     public sealed class SpriteAnimator : Component
     {
+        // Asset assigned in the NEngine Inspector; state transitions run
+        // automatically in Play Mode when the .nanimctrl asset resolves.
+        public AssetGuid controller
+        {
+            get => NativeAssetGuid("Controller");
+            set => SetNativeAssetGuid("Controller", value);
+        }
+
         public bool enabled
         {
             get => NativeBool("Enabled", true);
