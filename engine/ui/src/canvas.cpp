@@ -72,6 +72,16 @@ WidgetId UiCanvas::add(WidgetKind kind, WidgetId parent) {
     return id;
 }
 
+bool UiCanvas::restore(Widget widget) {
+    if (widget.id == invalid_widget ||
+        widget.id == UINT64_MAX || find(widget.id) ||
+        (widget.parent != invalid_widget && !find(widget.parent)))
+        return false;
+    next_id_ = std::max(next_id_, widget.id + 1u);
+    widgets_.push_back(std::move(widget));
+    return true;
+}
+
 Widget* UiCanvas::find(WidgetId id) noexcept {
     for (auto& widget : widgets_)
         if (widget.id == id && id != invalid_widget) return &widget;

@@ -1,5 +1,6 @@
 add_library(NEngineUI STATIC
   src/canvas.cpp
+  src/canvas_serialization.cpp
   src/pointer_router.cpp
   src/rasterizer.cpp
 )

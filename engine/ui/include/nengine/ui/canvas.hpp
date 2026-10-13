@@ -70,6 +70,9 @@ struct UiLayout {
 class UiCanvas {
 public:
     WidgetId add(WidgetKind kind, WidgetId parent = invalid_widget);
+    // For persistence, restore an exact stable WidgetId (parent must exist).
+    bool restore(Widget widget);
+    const std::vector<Widget>& widgets() const noexcept { return widgets_; }
     Widget* find(WidgetId id) noexcept;
     const Widget* find(WidgetId id) const noexcept;
     bool remove(WidgetId id);

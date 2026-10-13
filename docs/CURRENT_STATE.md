@@ -377,6 +377,8 @@ Not yet implemented:
 
 - The UI module now emits backend-independent clipped color rectangle draws (Panel/Button/Image placeholder), with a deterministic RGBA8 CPU reference rasterizer and alpha-blend tests. Text glyph rendering, sampled images and Vulkan/Game View consumption remain unfinished.
 
+- The UI Canvas widget tree can now round-trip through versioned `.ncanvas` text files, preserving stable widget IDs, parent-child relationships, anchors, text and colors with malformed-source atomic rejection. UI asset import, interactive Editor Game View and font/texture rendering remain separate work.
+
 ## Immediate next work
 
 1. Validate full 3D compound inertia tensors with more varied mass ratios, high-angular-velocity contacts and larger/longer contact islands; continue polygon-style collider work and production broad-phase/solver tuning.

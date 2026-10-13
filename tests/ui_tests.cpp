@@ -5,6 +5,8 @@
 #include "nengine/ui/canvas.hpp"
 #include "nengine/ui/pointer_router.hpp"
 #include "nengine/ui/rasterizer.hpp"
+#include "nengine/ui/canvas_serialization.hpp"
+#include <sstream>
 
 namespace {
 int failures = 0;
@@ -146,6 +148,29 @@ int main() {
           "CPU UI renderer blends ordered quads and respects child clipping");
     check(rasterize_ui({}, 5000u, 1u).pixels.empty(),
           "rasterizer guards oversized render targets");
+
+    std::stringstream canvas_file;
+    check(write_canvas(canvas_file, paint),
+          "Canvas tree writes versioned .ncanvas source");
+    UiCanvas restored_canvas;
+    check(read_canvas(canvas_file, restored_canvas) &&
+          restored_canvas.find(layer) &&
+          restored_canvas.find(translucent) &&
+          restored_canvas.find(translucent)->parent == layer &&
+          restored_canvas.find(translucent)->color.a == 0.5f &&
+          restored_canvas.widgets().size() == paint.widgets().size(),
+          "Canvas source roundtrip retains stable IDs hierarchy and color");
+    const auto new_widget = restored_canvas.add(WidgetKind::Button);
+    check(new_widget > text_widget,
+          "restored Canvas allocates new IDs above previously serialized IDs");
+    std::stringstream invalid_canvas(
+        "NENGINE_CANVAS 1\nWIDGETS 1\n"
+        "WIDGET 100 999 3 1 1 0 \"Lost\" 0 0 0 0 0 0 10 10 1 1 1 1\n"
+        "END_CANVAS\n");
+    const auto old_widgets = restored_canvas.widgets().size();
+    check(!read_canvas(invalid_canvas, restored_canvas) &&
+          restored_canvas.widgets().size() == old_widgets,
+          "orphan Canvas widget is rejected without damaging existing UI");
 
     if (failures) return EXIT_FAILURE;
     std::cout << "All UI checks passed\n";
