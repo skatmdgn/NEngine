@@ -23,6 +23,13 @@ struct UiRect {
 
 UiRect intersect_rect(UiRect a, UiRect b) noexcept;
 
+struct UiColor {
+    float r{1.0f};
+    float g{1.0f};
+    float b{1.0f};
+    float a{1.0f};
+};
+
 struct RectAnchors {
     core::Vec2 anchor_min{};
     core::Vec2 anchor_max{};
@@ -43,6 +50,7 @@ struct Widget {
     bool visible{true};
     bool interactable{true};
     bool clip_children{false};
+    UiColor color{};
 };
 
 struct UiLayoutItem {
@@ -52,6 +60,7 @@ struct UiLayoutItem {
     UiRect clipped_rect{};
     std::string text{};
     bool interactable{false};
+    UiColor color{};
 };
 
 struct UiLayout {

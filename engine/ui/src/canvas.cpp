@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
+#include <utility>
 #include <unordered_set>
 
 namespace nengine::ui {
@@ -62,7 +63,12 @@ WidgetId UiCanvas::add(WidgetKind kind, WidgetId parent) {
     if (parent != invalid_widget && !find(parent)) return invalid_widget;
     if (next_id_ == invalid_widget) return invalid_widget;
     const auto id = next_id_++;
-    widgets_.push_back(Widget{id, parent, kind});
+    Widget widget{id, parent, kind};
+    // Text has no backing geometry until glyph rendering is implemented.
+    if (kind == WidgetKind::Text) widget.color = {1, 1, 1, 0};
+    if (kind == WidgetKind::Panel) widget.color = {0.18f, 0.20f, 0.24f, 1};
+    if (kind == WidgetKind::Button) widget.color = {0.30f, 0.38f, 0.48f, 1};
+    widgets_.push_back(std::move(widget));
     return id;
 }
 
@@ -136,7 +142,8 @@ UiLayout UiCanvas::layout(float width, float height) const {
         const auto clipped = intersect_rect(rect, parent.clipping);
         result.items.push_back({
             node.id, node.kind, rect, clipped, node.text,
-            node.kind == WidgetKind::Button && node.interactable
+            node.kind == WidgetKind::Button && node.interactable,
+            node.color
         });
         // When clip_children=false, descendants inherit the parent's
         // effective clipping from ancestors, not the parent's own bounds.

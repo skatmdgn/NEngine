@@ -207,6 +207,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 ## 0.7 — Animation/UI/navigation
 - [x] Independent Canvas layout foundation: parent-relative anchors, rectangles, clipping and UI widget hierarchy
 - [x] Native pointer routing with topmost Button hit testing, hover/down/up/click, capture and InputState bridge
+- [x] Backend-independent Canvas rectangle draw list and clipped RGBA8 CPU alpha-compositing reference renderer
 - [x] Sprite animation controller state graph, named boolean transitions, exit times and deterministic evaluation foundation
 - [x] Runtime sprite controller bindings to World SpriteAnimator with transition/reset behavior and destroyed-entity cleanup
 - [x] Transactional versioned .nanimctrl state graph text serializer and parser with malformed-file validation

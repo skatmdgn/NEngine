@@ -4,6 +4,7 @@
 
 #include "nengine/ui/canvas.hpp"
 #include "nengine/ui/pointer_router.hpp"
+#include "nengine/ui/rasterizer.hpp"
 
 namespace {
 int failures = 0;
@@ -117,6 +118,34 @@ int main() {
         interactive.layout(400.0f, 200.0f), native_input);
     check(input_down.empty(),
           "native input does not emit clicks when no button is available");
+
+    UiCanvas paint;
+    const auto layer = paint.add(WidgetKind::Panel);
+    auto* layer_node = paint.find(layer);
+    layer_node->color = {1.0f, 0.0f, 0.0f, 1.0f};
+    layer_node->anchors.offset_max = {5.0f, 5.0f};
+    layer_node->clip_children = true;
+    const auto translucent = paint.add(WidgetKind::Image, layer);
+    auto* translucent_node = paint.find(translucent);
+    translucent_node->color = {0.0f, 0.0f, 1.0f, 0.5f};
+    translucent_node->anchors.offset_min = {3.0f, 3.0f};
+    translucent_node->anchors.offset_max = {8.0f, 8.0f};
+    const auto text_widget = paint.add(WidgetKind::Text);
+    (void)text_widget;
+    const auto paint_commands = build_ui_draw_list(paint.layout(8, 8));
+    const auto image = rasterize_ui(paint_commands, 8u, 8u);
+    const auto rgba = [&](std::uint32_t x, std::uint32_t y, int channel) {
+        return image.pixels[(y * image.width + x) * 4u +
+                            static_cast<std::size_t>(channel)];
+    };
+    check(paint_commands.size() == 2u &&
+          image.pixels.size() == 8u * 8u * 4u &&
+          rgba(0, 0, 0) == 255u && rgba(0, 0, 3) == 255u &&
+          rgba(4, 4, 0) >= 126u && rgba(4, 4, 2) >= 126u &&
+          rgba(6, 6, 3) == 0u,
+          "CPU UI renderer blends ordered quads and respects child clipping");
+    check(rasterize_ui({}, 5000u, 1u).pixels.empty(),
+          "rasterizer guards oversized render targets");
 
     if (failures) return EXIT_FAILURE;
     std::cout << "All UI checks passed\n";
