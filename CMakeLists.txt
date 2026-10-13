@@ -24,6 +24,7 @@ add_subdirectory(engine/assets)
 add_subdirectory(engine/audio)
 add_subdirectory(engine/physics)
 add_subdirectory(engine/render)
+add_subdirectory(engine/ui)
 add_subdirectory(engine/scripting)
 add_subdirectory(engine/editor)
 

@@ -205,6 +205,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [ ] Streaming decode + OGG/MP3/FLAC runtime decode + production realtime device scheduling
 
 ## 0.7 — Animation/UI/navigation
+- [x] Independent Canvas layout foundation: parent-relative anchors, rectangles, clipping and UI widget hierarchy
 - [x] Sprite animation controller state graph, named boolean transitions, exit times and deterministic evaluation foundation
 - [x] Runtime sprite controller bindings to World SpriteAnimator with transition/reset behavior and destroyed-entity cleanup
 - [ ] animation clips/state machine/blend tree subset

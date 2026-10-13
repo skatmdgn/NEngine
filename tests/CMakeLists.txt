@@ -37,3 +37,8 @@ add_executable(NEngineAudioTests audio_tests.cpp)
 target_link_libraries(NEngineAudioTests PRIVATE NEngineAudio)
 target_compile_features(NEngineAudioTests PRIVATE cxx_std_20)
 add_test(NAME NEngineAudioTests COMMAND NEngineAudioTests)
+
+add_executable(NEngineUITests ui_tests.cpp)
+target_link_libraries(NEngineUITests PRIVATE NEngineUI)
+target_compile_features(NEngineUITests PRIVATE cxx_std_20)
+add_test(NAME NEngineUITests COMMAND NEngineUITests)
