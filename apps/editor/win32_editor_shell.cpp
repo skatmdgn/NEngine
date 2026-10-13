@@ -516,6 +516,12 @@ struct Win32EditorShell::Impl {
             break;
 
         case WM_CAPTURECHANGED:
+            if (self->ui_pointer_captured &&
+                reinterpret_cast<HWND>(lparam) != hwnd) {
+                self->ui_pointer_captured = false;
+                self->editor.cancel_ui_pointer_capture();
+                return 0;
+            }
             if (self->scene_dragging &&
                 reinterpret_cast<HWND>(lparam) != hwnd) {
                 self->cancel_scene_drag();

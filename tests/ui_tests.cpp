@@ -115,6 +115,20 @@ int main() {
     check(!clicked_destroyed && router.captured() == invalid_widget,
           "removed captured button never receives a ghost click");
 
+    router.reset();
+    router.update(interactive.layout(400, 200), {120.0f, 30.0f}, true);
+    router.cancel_capture();
+    const auto interrupted = router.update(
+        interactive.layout(400, 200), {120.0f, 30.0f}, true);
+    const auto interrupted_release = router.update(
+        interactive.layout(400, 200), {120.0f, 30.0f}, false);
+    bool any_false_click = false;
+    for (const auto& event : interrupted_release)
+        any_false_click |= event.type == UiPointerEventType::Click;
+    check(router.captured() == invalid_widget &&
+          !any_false_click && interrupted.size() <= 1u,
+          "lost native capture cannot produce a ghost click");
+
     // Native keyboard/mouse InputState is consumable by the UI router.
     nengine::input::InputState native_input;
     native_input.set_pointer_position(80.0f, 40.0f);

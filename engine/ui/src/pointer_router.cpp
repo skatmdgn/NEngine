@@ -57,6 +57,13 @@ std::vector<UiPointerEvent> UiPointerRouter::update(
         input.held(input::Key::MouseLeft));
 }
 
+void UiPointerRouter::cancel_capture() noexcept {
+    captured_ = invalid_widget;
+    hovered_ = invalid_widget;
+    // Suppress re-capture until a released-button frame is observed.
+    was_held_ = true;
+}
+
 void UiPointerRouter::reset() noexcept {
     hovered_ = invalid_widget;
     captured_ = invalid_widget;

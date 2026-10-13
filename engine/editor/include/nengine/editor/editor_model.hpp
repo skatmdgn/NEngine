@@ -166,6 +166,9 @@ public:
     ui::UiLayout ui_layout(float width, float height) const;
     std::vector<ui::UiPointerEvent> route_ui_pointer(
         float width, float height, core::Vec2 pointer, bool pressed);
+    void cancel_ui_pointer_capture() noexcept {
+        ui_pointer_router_.cancel_capture();
+    }
     const std::vector<ui::UiPointerEvent>& ui_events() const noexcept {
         return ui_events_;
     }

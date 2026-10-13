@@ -26,6 +26,8 @@ public:
     std::vector<UiPointerEvent> update(
         const UiLayout& layout, const input::InputState& input);
     void reset() noexcept;
+    // Capture loss must not generate clicks or a fresh Down while held.
+    void cancel_capture() noexcept;
     WidgetId hovered() const noexcept { return hovered_; }
     WidgetId captured() const noexcept { return captured_; }
 
