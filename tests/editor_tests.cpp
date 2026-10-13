@@ -175,6 +175,17 @@ int main() {
           ui_up.back().type == ui::UiPointerEventType::Click &&
           ui_up.back().target == 1u,
           "Editor Play Mode UI routes button press and click");
+    const auto ui_tab = model.route_ui_keyboard(640, 480, true, false);
+    model.route_ui_keyboard(640, 480, false, true);
+    const auto ui_enter_click =
+        model.route_ui_keyboard(640, 480, false, false);
+    check(ui_tab.size() == 1u &&
+          ui_tab[0].target == 1u &&
+          ui_enter_click.size() == 1u &&
+          ui_enter_click[0].target == 1u &&
+          ui_enter_click[0].type == ui::UiPointerEventType::Click,
+          "Play Mode keyboard Tab and Enter activate Canvas button");
+
     check(model.stop_play_mode() &&
           model.ui_layout(640, 480).items.empty(),
           "stopping Play Mode hides runtime Canvas");

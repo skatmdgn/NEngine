@@ -215,6 +215,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Canvas pointer capture loss cancellation prevents stale/ghost button clicks
 - [x] Alpha-aware premultiplied GDI Canvas overlay with clipped Text rendering in diagnostic Scene View
 - [x] Independent Canvas keyboard focus router: Tab/Shift+Tab and Enter release-click with auto-repeat suppression
+- [x] Windows Play Mode Canvas keyboard Tab/Enter route and native UI event history
 - [x] Sprite animation controller state graph, named boolean transitions, exit times and deterministic evaluation foundation
 - [x] Runtime sprite controller bindings to World SpriteAnimator with transition/reset behavior and destroyed-entity cleanup
 - [x] Transactional versioned .nanimctrl state graph text serializer and parser with malformed-file validation

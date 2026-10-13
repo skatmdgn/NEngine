@@ -345,6 +345,8 @@ struct Win32EditorShell::Impl {
     bool vulkan_preview_enabled{false};
 
     bool ui_pointer_captured{false};
+    bool ui_tab_down{false};
+    bool ui_enter_down{false};
     bool scene_dragging{false};
     nengine::editor::SceneGizmoAxis scene_drag_axis{
         nengine::editor::SceneGizmoAxis::None};
@@ -437,6 +439,38 @@ struct Win32EditorShell::Impl {
         }
 
         switch (message) {
+        case WM_KEYDOWN:
+        case WM_KEYUP:
+            if (!self->vulkan_preview_enabled &&
+                self->editor.play_session().is_playing() &&
+                self->editor.has_ui_canvas() &&
+                (wparam == VK_TAB || wparam == VK_RETURN)) {
+                const bool down = message == WM_KEYDOWN;
+                if (wparam == VK_TAB) self->ui_tab_down = down;
+                if (wparam == VK_RETURN) self->ui_enter_down = down;
+                RECT bounds{};
+                GetClientRect(hwnd, &bounds);
+                const auto events = self->editor.route_ui_keyboard(
+                    static_cast<float>(bounds.right),
+                    static_cast<float>(bounds.bottom),
+                    self->ui_tab_down, self->ui_enter_down,
+                    (GetKeyState(VK_SHIFT) & 0x8000) != 0);
+                for (const auto& event : events)
+                    if (event.type == nengine::ui::UiPointerEventType::Click)
+                        self->editor.console().info(
+                            "UI", "Keyboard Canvas click: " +
+                                std::to_string(event.target));
+                InvalidateRect(hwnd, nullptr, FALSE);
+                return 0;
+            }
+            break;
+
+        case WM_KILLFOCUS:
+            self->ui_tab_down = false;
+            self->ui_enter_down = false;
+            self->editor.reset_ui_keyboard();
+            break;
+
         case WM_LBUTTONDOWN:
             SetFocus(hwnd);
             if (!self->vulkan_preview_enabled &&

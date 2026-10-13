@@ -399,6 +399,8 @@ Not yet implemented:
 
 - NEngineUI now has a platform-neutral keyboard focus router with Tab/Shift+Tab navigation and Enter-release click semantics. Connecting it to the Win32 Scene View and C# UI events remains.
 
+- EditorModel and Windows Scene View now forward keyboard Tab/Shift+Tab/Enter events to Canvas focus navigation and record resulting click events, with keyboard state reset on focus loss and Play stop.
+
 ## Immediate next work
 
 1. Validate full 3D compound inertia tensors with more varied mass ratios, high-angular-velocity contacts and larger/longer contact islands; continue polygon-style collider work and production broad-phase/solver tuning.

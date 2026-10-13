@@ -30,6 +30,7 @@
 #include "nengine/render/animation_controller_asset.hpp"
 #include "nengine/ui/canvas_asset.hpp"
 #include "nengine/ui/pointer_router.hpp"
+#include "nengine/ui/keyboard_router.hpp"
 #include "nengine/ui/rasterizer.hpp"
 #include "nengine/scripting/managed_runtime.hpp"
 #include "nengine/scripting/script_system.hpp"
@@ -169,6 +170,10 @@ public:
     void cancel_ui_pointer_capture() noexcept {
         ui_pointer_router_.cancel_capture();
     }
+    std::vector<ui::UiPointerEvent> route_ui_keyboard(
+        float width, float height,
+        bool tab_held, bool enter_held, bool reverse_tab = false);
+    void reset_ui_keyboard() noexcept { ui_keyboard_router_.reset(); }
     const std::vector<ui::UiPointerEvent>& ui_events() const noexcept {
         return ui_events_;
     }
@@ -185,6 +190,7 @@ public:
         canvas_cache_.clear();
         ui_canvas_.reset();
         ui_pointer_router_.reset();
+        ui_keyboard_router_.reset();
         sprite_animation_cache_.clear();
         sprite_controller_asset_cache_.clear();
         sprite_controllers_.clear();
@@ -220,6 +226,7 @@ private:
     std::optional<ui::UiCanvas> ui_canvas_{};
     assets::AssetGuid ui_canvas_asset_{};
     ui::UiPointerRouter ui_pointer_router_{};
+    ui::UiKeyboardRouter ui_keyboard_router_{};
     std::vector<ui::UiPointerEvent> ui_events_{};
 
     render::SpriteAnimationClipCache
