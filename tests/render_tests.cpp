@@ -106,6 +106,27 @@ int main() {
           !graph_player.evaluate(duplicate_graph, 1.0f),
           "sprite graph rejects duplicate states and invalid evaluation");
 
+    std::stringstream controller_file;
+    check(render::write_animation_controller(
+              controller_file, animation_graph, &graph_error),
+          "controller file writer accepts validated state graph");
+    render::AnimationController loaded_graph;
+    check(render::read_animation_controller(
+              controller_file, loaded_graph, &graph_error) &&
+          loaded_graph.default_state == "Idle" &&
+          loaded_graph.states.size() == 2u &&
+          loaded_graph.states[1].clip == run_clip &&
+          loaded_graph.transitions.size() == 2u &&
+          loaded_graph.transitions[0].minimum_exit_seconds == 0.1f,
+          "controller text file roundtrips clips and conditions");
+    std::stringstream bad_controller(
+        "NENGINE_ANIMATION_CONTROLLER 1\nDEFAULT \"Idle\"\nSTATES 50000\n");
+    const auto original_count = loaded_graph.states.size();
+    check(!render::read_animation_controller(
+              bad_controller, loaded_graph, &graph_error) &&
+          loaded_graph.states.size() == original_count,
+          "malformed controller file does not replace the old graph");
+
     // Controller transitions directly select SpriteAnimator clip/speed/
     // loop without modifying the existing per-frame sprite sampler.
     core::World graph_world;

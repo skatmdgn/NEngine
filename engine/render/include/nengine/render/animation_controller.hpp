@@ -6,6 +6,8 @@
 
 #include "nengine/core/world.hpp"
 #include <string_view>
+#include <istream>
+#include <ostream>
 #include <unordered_map>
 #include <vector>
 
@@ -38,6 +40,14 @@ struct AnimationController {
     const AnimationState* find(std::string_view name) const noexcept;
     bool validate(std::string* error = nullptr) const;
 };
+
+// Human-editable, versioned .nanimctrl format. Loading is transactional.
+bool read_animation_controller(
+    std::istream& input, AnimationController& result,
+    std::string* error = nullptr);
+bool write_animation_controller(
+    std::ostream& output, const AnimationController& controller,
+    std::string* error = nullptr);
 
 struct AnimationControllerPlayer {
     std::string state{};

@@ -371,6 +371,8 @@ Not yet implemented:
 
 - UI native pointer routing can use InputState mouse coordinates and left-button state, hit-test topmost interactable Button, and dispatch Enter/Exit/Down/Up/Click with release-inside capture semantics. This is logic-side UI groundwork; no font/glyph drawing, Canvas serialization, or Editor/Player viewport integration yet.
 
+- Sprite AnimationController now supports a versioned human-readable `.nanimctrl` parser/writer with transactional validation and exact state/transition round-trip; importer registration and editor data binding follow.
+
 ## Immediate next work
 
 1. Validate full 3D compound inertia tensors with more varied mass ratios, high-angular-velocity contacts and larger/longer contact islands; continue polygon-style collider work and production broad-phase/solver tuning.

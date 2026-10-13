@@ -2,6 +2,9 @@
 #include "nengine/render/components.hpp"
 
 #include <cmath>
+#include <iomanip>
+#include <sstream>
+#include <limits>
 #include <unordered_set>
 #include <utility>
 
@@ -37,6 +40,106 @@ bool AnimationController::validate(std::string* error) const {
             edge.minimum_exit_seconds < 0.0f)
             return fail("animation controller transition is invalid");
     }
+    if (error) error->clear();
+    return true;
+}
+
+bool write_animation_controller(
+    std::ostream& output, const AnimationController& controller,
+    std::string* error) {
+
+    if (!controller.validate(error)) return false;
+    std::ostringstream staged;
+    staged << std::setprecision(std::numeric_limits<float>::max_digits10);
+    staged << "NENGINE_ANIMATION_CONTROLLER 1\n"
+           << "DEFAULT " << std::quoted(controller.default_state) << "\n"
+           << "STATES " << controller.states.size() << "\n";
+    for (const auto& state : controller.states) {
+        staged << "STATE " << std::quoted(state.name) << ' '
+               << std::quoted(state.clip.to_string()) << ' '
+               << (state.loop ? 1 : 0) << ' ' << state.speed << "\n";
+    }
+    staged << "TRANSITIONS " << controller.transitions.size() << "\n";
+    for (const auto& edge : controller.transitions) {
+        staged << "TRANSITION " << std::quoted(edge.from) << ' '
+               << std::quoted(edge.to) << ' '
+               << std::quoted(edge.bool_parameter) << ' '
+               << (edge.expected ? 1 : 0) << ' '
+               << edge.minimum_exit_seconds << "\n";
+    }
+    staged << "END_ANIMATION_CONTROLLER\n";
+    output << staged.str();
+    if (!output.good()) {
+        if (error) *error = "could not write animation controller";
+        return false;
+    }
+    if (error) error->clear();
+    return true;
+}
+
+bool read_animation_controller(
+    std::istream& input, AnimationController& result,
+    std::string* error) {
+
+    const auto fail = [&](const char* message) {
+        if (error) *error = message;
+        return false;
+    };
+    std::string tag;
+    unsigned version = 0;
+    AnimationController candidate;
+    if (!(input >> tag >> version) ||
+        tag != "NENGINE_ANIMATION_CONTROLLER" || version != 1u ||
+        !(input >> tag) || tag != "DEFAULT" ||
+        !(input >> std::quoted(candidate.default_state)))
+        return fail("invalid animation controller header/default");
+
+    std::size_t state_count = 0;
+    if (!(input >> tag >> state_count) || tag != "STATES" ||
+        state_count == 0u || state_count > 4096u)
+        return fail("invalid animation controller state count");
+
+    for (std::size_t i = 0; i < state_count; ++i) {
+        AnimationState state;
+        std::string guid_text;
+        int loop = -1;
+        if (!(input >> tag) || tag != "STATE" ||
+            !(input >> std::quoted(state.name) >>
+                    std::quoted(guid_text) >> loop >> state.speed) ||
+            (loop != 0 && loop != 1))
+            return fail("malformed animation controller state");
+        const auto guid = assets::AssetGuid::parse(guid_text);
+        if (!guid || !guid->valid())
+            return fail("invalid animation controller clip GUID");
+        state.clip = *guid;
+        state.loop = loop == 1;
+        candidate.states.push_back(std::move(state));
+    }
+
+    std::size_t edge_count = 0;
+    if (!(input >> tag >> edge_count) || tag != "TRANSITIONS" ||
+        edge_count > 16384u)
+        return fail("invalid animation controller transition count");
+
+    for (std::size_t i = 0; i < edge_count; ++i) {
+        AnimationTransition edge;
+        int expected = -1;
+        if (!(input >> tag) || tag != "TRANSITION" ||
+            !(input >> std::quoted(edge.from) >> std::quoted(edge.to) >>
+                    std::quoted(edge.bool_parameter) >> expected >>
+                    edge.minimum_exit_seconds) ||
+            (expected != 0 && expected != 1))
+            return fail("malformed animation controller transition");
+        edge.expected = expected == 1;
+        candidate.transitions.push_back(std::move(edge));
+    }
+
+    if (!(input >> tag) || tag != "END_ANIMATION_CONTROLLER")
+        return fail("animation controller terminator missing");
+    if (input >> tag)
+        return fail("trailing animation controller data");
+    if (!candidate.validate(error)) return false;
+    result = std::move(candidate);
     if (error) error->clear();
     return true;
 }
