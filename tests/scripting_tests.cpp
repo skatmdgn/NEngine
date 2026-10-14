@@ -1711,7 +1711,7 @@ int main() {
             "GetAbiVersion") !=
                 std::string::npos &&
         bridge.find(
-            "AbiVersion = 15") !=
+            "AbiVersion = 16") !=
                 std::string::npos &&
         bridge.find(
             "GameplayLoadContext") !=
@@ -1749,6 +1749,13 @@ int main() {
         bridge.find(
             "ConfigureNativeInputCallbacks") !=
                 std::string::npos &&
+        bridge.find(
+            "ConfigureNativeUiCallbacks") !=
+                std::string::npos &&
+        api.find("public static class UI") != std::string::npos &&
+        api.find("WasClicked") != std::string::npos &&
+        api.find("SetInteractable") != std::string::npos &&
+        api.find("SetText") != std::string::npos &&
         bridge.find(
             "AdvanceFrameClock") !=
                 std::string::npos &&
@@ -2080,6 +2087,17 @@ int main() {
                 << "        frame++;\n"
                 << "    }\n"
                 << "}\n"
+                << "public class UIProbe : Behaviour {\n"
+                << "    private void Update() {\n"
+                << "        ulong button = UI.Find(\"Launch\");\n"
+                << "        if (button != 17 || !UI.WasClicked(button) || !UI.IsVisible(button) || !UI.IsInteractable(button)) throw new System.Exception(\"UI query mismatch\");\n"
+                << "        if (UI.GetText(button) != \"Launch\" || !UI.SetText(button, \"시작\") || UI.GetText(button) != \"시작\") throw new System.Exception(\"UI UTF8 text mismatch\");\n"
+                << "        if (UI.Find(\"Launch\") != 0 || UI.Find(\"시작\") != button) throw new System.Exception(\"UI label lookup mismatch\");\n"
+                << "        if (!UI.SetVisible(button, false) || UI.IsVisible(button) || !UI.SetInteractable(button, false) || UI.IsInteractable(button)) throw new System.Exception(\"UI mutation mismatch\");\n"
+                << "        if (UI.SetText(9999, \"No\") || UI.GetText(9999) != null || UI.WasClicked(9999)) throw new System.Exception(\"invalid UI widget accepted\");\n"
+                << "        gameObject.name = \"UI Passed\";\n"
+                << "    }\n"
+                << "}\n"
                 << "public class RenderPropertyProbe : Behaviour {\n"
                 << "    private void Update() {\n"
                 << "        Camera? camera = GetComponent<Camera>();\n"
@@ -2299,6 +2317,67 @@ int main() {
                             &read_managed_physics_query,
                             &read_managed_overlap_query,
                             &read_managed_box_cast_query);
+
+                        struct UiTestState {
+                            std::string text{"Launch"};
+                            bool visible{true};
+                            bool interactable{true};
+                            bool clicked{true};
+                        } ui_test;
+
+                        managed_runtime.bind_ui(
+                            &ui_test,
+                            [](void* context, std::string_view label) -> std::uint64_t {
+                                const auto& ui = *static_cast<UiTestState*>(context);
+                                return ui.text == label ? 17u : 0u;
+                            },
+                            [](void* context, std::uint64_t id, int op) -> int {
+                                const auto& ui = *static_cast<UiTestState*>(context);
+                                if (id != 17u) return -1;
+                                if (op == 0) return ui.visible ? 1 : 0;
+                                if (op == 1) return ui.interactable ? 1 : 0;
+                                if (op == 2) return ui.clicked ? 1 : 0;
+                                return -1;
+                            },
+                            [](void* context, std::uint64_t id, int op, int v) -> int {
+                                auto& ui = *static_cast<UiTestState*>(context);
+                                if (id != 17u || (v != 0 && v != 1)) return 0;
+                                if (op == 0) ui.visible = v != 0;
+                                else if (op == 1) ui.interactable = v != 0;
+                                else return 0;
+                                return 1;
+                            },
+                            [](void* context, std::uint64_t id) -> std::optional<std::string> {
+                                const auto& ui = *static_cast<UiTestState*>(context);
+                                if (id != 17u) return std::nullopt;
+                                return ui.text;
+                            },
+                            [](void* context, std::uint64_t id, std::string_view value) -> bool {
+                                auto& ui = *static_cast<UiTestState*>(context);
+                                if (id != 17u || value.size() > 4096u) return false;
+                                ui.text = value;
+                                return true;
+                            });
+
+                        const auto ui_probe = managed_runtime.create_behaviour("UIProbe");
+                        nengine::core::Entity probe_entity{};
+                        std::string probe_name;
+                        bool probe_active = false;
+                        const bool ui_passed =
+                            ui_probe.valid() &&
+                            managed_runtime.set_game_object(
+                                ui_probe, nengine::core::Entity::make(100, 1),
+                                "UI Probe", true) &&
+                            managed_runtime.update(ui_probe, 1.0f / 60.0f) &&
+                            managed_runtime.get_game_object(
+                                ui_probe, probe_entity, probe_name, probe_active) &&
+                            probe_name == "UI Passed" &&
+                            ui_test.text == "시작" &&
+                            !ui_test.visible && !ui_test.interactable;
+                        check(ui_passed,
+                            "real .NET C# UI API queries clicks, mutates Canvas properties and roundtrips UTF-8");
+                        if (ui_probe.valid())
+                            managed_runtime.destroy(ui_probe);
 
                         check(
                             managed_runtime.instance_count() == 0,
