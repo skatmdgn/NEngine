@@ -652,6 +652,57 @@ void EditorModel::bind_managed_ui() {
         });
 }
 
+bool EditorModel::begin_ui_canvas_edit(
+    assets::AssetGuid asset, std::string* error) {
+    if (!can_edit() || !asset.valid() || !project_.is_open()) {
+        if (error) *error = "Canvas editing requires an open project in Edit Mode";
+        return false;
+    }
+    const auto* record = project_.assets().find(asset);
+    if (!record || record->importer_id != "NEngine.Canvas") {
+        if (error) *error = "Canvas asset must be an imported .ncanvas file";
+        return false;
+    }
+    const auto artifacts = project_.cached_artifacts(asset);
+    if (!artifacts) {
+        if (error) *error = "Canvas asset has no imported artifacts";
+        return false;
+    }
+    std::string load_error;
+    const auto* canvas = canvas_cache_.load(asset, *artifacts, &load_error);
+    if (!canvas || !ui_edit_history_.reset(*canvas)) {
+        if (error) *error = load_error.empty()
+            ? "Canvas authoring draft could not be initialized" : load_error;
+        return false;
+    }
+    ui_edit_asset_ = asset;
+    ui_edit_open_ = true;
+    ui_edit_selected_ = ui::invalid_widget;
+    if (error) error->clear();
+    return true;
+}
+
+ui::UiLayout EditorModel::ui_edit_layout(float width, float height) const {
+    return has_ui_canvas_draft()
+        ? ui_edit_history_.canvas().layout(width, height) : ui::UiLayout{};
+}
+
+bool EditorModel::select_ui_widget(ui::WidgetId id) noexcept {
+    if (!has_ui_canvas_draft() ||
+        (id != ui::invalid_widget && !ui_edit_history_.canvas().find(id)))
+        return false;
+    ui_edit_selected_ = id;
+    return true;
+}
+
+ui::WidgetId EditorModel::select_ui_widget_at(
+    float width, float height, core::Vec2 pointer) {
+    if (!has_ui_canvas_draft()) return ui::invalid_widget;
+    const auto id = ui::hit_test_ui(ui_edit_layout(width, height), pointer);
+    select_ui_widget(id);
+    return id;
+}
+
 bool EditorModel::set_ui_canvas_asset(assets::AssetGuid asset) {
     ui_canvas_asset_ = asset;
     ui_canvas_reload_pending_ = false;

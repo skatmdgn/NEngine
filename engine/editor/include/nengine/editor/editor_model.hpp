@@ -33,6 +33,7 @@
 #include "nengine/ui/pointer_router.hpp"
 #include "nengine/ui/keyboard_router.hpp"
 #include "nengine/ui/rasterizer.hpp"
+#include "nengine/ui/canvas_edit_history.hpp"
 #include "nengine/scripting/managed_runtime.hpp"
 #include "nengine/scripting/script_system.hpp"
 
@@ -162,6 +163,25 @@ public:
 
     // The optional Canvas asset is displayed in Play Mode's diagnostic
     // Scene View. The caller supplies Scene View pixel coordinates.
+    // Authoring draft is separate from Play Mode's mutable Canvas.
+    bool begin_ui_canvas_edit(assets::AssetGuid asset,
+                              std::string* error = nullptr);
+    bool has_ui_canvas_draft() const noexcept {
+        return ui_edit_open_ && can_edit();
+    }
+    assets::AssetGuid ui_edit_asset() const noexcept { return ui_edit_asset_; }
+    ui::WidgetId selected_ui_widget() const noexcept {
+        return ui_edit_selected_;
+    }
+    const ui::Widget* ui_edit_widget() const noexcept {
+        return has_ui_canvas_draft()
+            ? ui_edit_history_.canvas().find(ui_edit_selected_) : nullptr;
+    }
+    ui::UiLayout ui_edit_layout(float width, float height) const;
+    ui::WidgetId select_ui_widget_at(float width, float height,
+                                    core::Vec2 pointer);
+    bool select_ui_widget(ui::WidgetId id) noexcept;
+
     bool set_ui_canvas_asset(assets::AssetGuid asset);
     bool has_ui_canvas() const noexcept { return ui_canvas_.has_value(); }
     assets::AssetGuid ui_canvas_asset() const noexcept { return ui_canvas_asset_; }
@@ -234,6 +254,10 @@ private:
     ProjectSession project_{};
     PropertyAccessRegistry property_access_{};
     ui::CanvasAssetCache canvas_cache_{};
+    ui::CanvasEditHistory ui_edit_history_{};
+    assets::AssetGuid ui_edit_asset_{};
+    bool ui_edit_open_{false};
+    ui::WidgetId ui_edit_selected_{ui::invalid_widget};
     std::optional<ui::UiCanvas> ui_canvas_{};
     assets::AssetGuid ui_canvas_asset_{};
     bool ui_canvas_reload_pending_{false};

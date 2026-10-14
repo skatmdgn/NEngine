@@ -163,7 +163,17 @@ int main() {
           model.set_ui_canvas_asset(ui_record->guid) &&
           !model.ui_layout(640, 480).items.size(),
           "EditorModel loads imported project Canvas but hides it in Edit Mode");
+    check(model.begin_ui_canvas_edit(ui_record->guid) &&
+          model.has_ui_canvas_draft() &&
+          model.ui_edit_layout(640, 480).items.size() == 1u &&
+          model.select_ui_widget_at(640, 480, {20, 20}) == 1u &&
+          model.ui_edit_widget() &&
+          model.ui_edit_widget()->text == "Start" &&
+          !model.select_ui_widget(9999),
+          "Canvas authoring draft loads imported UI in Edit Mode with clipped widget selection");
     check(model.begin_play_mode() &&
+          !model.has_ui_canvas_draft() &&
+          model.ui_edit_layout(640, 480).items.empty() &&
           model.ui_layout(640, 480).items.size() == 1u &&
           model.ui_layout(640, 480).items[0].text == "Start",
           "Canvas is available in Editor Play Mode");
