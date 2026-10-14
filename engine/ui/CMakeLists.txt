@@ -2,6 +2,7 @@ add_library(NEngineUI STATIC
   src/canvas.cpp
   src/canvas_asset.cpp
   src/canvas_serialization.cpp
+  src/canvas_edit_history.cpp
   src/pointer_router.cpp
   src/keyboard_router.cpp
   src/rasterizer.cpp

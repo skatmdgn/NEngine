@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "nengine/ui/canvas.hpp"
+#include "nengine/ui/canvas_edit_history.hpp"
 #include "nengine/ui/pointer_router.hpp"
 #include "nengine/ui/keyboard_router.hpp"
 #include "nengine/ui/rasterizer.hpp"
@@ -188,6 +189,31 @@ int main() {
     check(clone_named != invalid_widget &&
           named.find(clone_named)->name.empty(),
           "duplicated Canvas subtree does not duplicate script names");
+    CanvasEditHistory edits(2);
+    check(edits.reset(named) && edits.undo_count() == 0,
+          "Canvas edit history accepts a validated source asset");
+    UiCanvas edited = edits.canvas();
+    check(edited.set_text(named_button, "Ready") && edits.commit(edited) &&
+          edits.canvas().find(named_button)->text == "Ready" &&
+          edits.undo_count() == 1,
+          "Canvas edit history commits an isolated widget change");
+    check(edits.undo() &&
+          edits.canvas().find(named_button)->text == "Start" &&
+          edits.redo() &&
+          edits.canvas().find(named_button)->text == "Ready",
+          "Canvas edit history restores committed snapshots with Undo and Redo");
+    UiCanvas invalid_edit = edits.canvas();
+    invalid_edit.find(named_other)->name = "Main.Start";
+    check(!edits.commit(invalid_edit) &&
+          edits.canvas().find(named_other)->name == "Main.Subtitle",
+          "invalid duplicate-name Canvas transaction cannot corrupt history");
+    UiCanvas changed = edits.canvas();
+    check(changed.set_text(named_button, "Launch") && edits.commit(changed) &&
+          changed.set_text(named_button, "Begin") && edits.commit(changed) &&
+          edits.undo_count() == 2 && !edits.redo() &&
+          edits.undo() && edits.undo() && !edits.undo(),
+          "Canvas Undo storage is bounded and a new commit clears Redo");
+
     const auto next = canvas.add(WidgetKind::Text);
     check(next > overflow && canvas.layout(0.0f, 600.0f).items.empty(),
           "widget IDs advance and invalid viewport is safely rejected");
