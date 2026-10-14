@@ -201,6 +201,21 @@ int main() {
           model.ui_edit_widget()->anchors.offset_min.x == 24,
           "Canvas editor rejects nonfinite anchor offsets without new undo state");
     const auto original_edit_id = model.selected_ui_widget();
+    const auto edits_before_drag = model.ui_edit_undo_count();
+    check(model.ui_edit_begin_drag() &&
+          model.ui_edit_update_drag({11, -5}, false) &&
+          model.ui_edit_widget()->anchors.offset_min.x == 35 &&
+          model.ui_edit_undo_count() == edits_before_drag &&
+          model.ui_edit_end_drag(false) == false &&
+          model.ui_edit_widget()->anchors.offset_min.x == 24,
+          "Canvas drag preview changes geometry without committing and cancellation rolls back");
+    check(model.ui_edit_begin_drag() &&
+          model.ui_edit_update_drag({20, 10}, true) &&
+          model.ui_edit_end_drag(true) &&
+          model.ui_edit_undo_count() == edits_before_drag + 1 &&
+          model.ui_edit_undo() &&
+          model.ui_edit_redo(),
+          "Canvas resize drag commits exactly one undo step on mouse release");
     const auto new_widget = model.ui_edit_add_widget(ui::WidgetKind::Text);
     check(new_widget != ui::invalid_widget &&
           model.ui_edit_set_name("Main.Label") &&

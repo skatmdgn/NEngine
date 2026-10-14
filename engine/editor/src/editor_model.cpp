@@ -685,19 +685,25 @@ bool EditorModel::begin_ui_canvas_edit(
     ui_edit_asset_ = asset;
     ui_edit_open_ = true;
     ui_edit_selected_ = ui::invalid_widget;
+    ui_edit_drag_active_ = false;
+    ui_edit_preview_.reset();
     if (error) error->clear();
     return true;
 }
 
 ui::UiLayout EditorModel::ui_edit_layout(float width, float height) const {
-    return has_ui_canvas_draft()
-        ? ui_edit_history_.canvas().layout(width, height) : ui::UiLayout{};
+    if (!has_ui_canvas_draft()) return {};
+    return ui_edit_preview_
+        ? ui_edit_preview_->layout(width, height)
+        : ui_edit_history_.canvas().layout(width, height);
 }
 
 bool EditorModel::select_ui_widget(ui::WidgetId id) noexcept {
     if (!has_ui_canvas_draft() ||
         (id != ui::invalid_widget && !ui_edit_history_.canvas().find(id)))
         return false;
+    if (ui_edit_drag_active_ && id != ui_edit_selected_)
+        ui_edit_end_drag(false);
     ui_edit_selected_ = id;
     return true;
 }
@@ -708,6 +714,36 @@ ui::WidgetId EditorModel::select_ui_widget_at(
     const auto id = ui::hit_test_ui(ui_edit_layout(width, height), pointer);
     select_ui_widget(id);
     return id;
+}
+
+bool EditorModel::ui_edit_begin_drag() {
+    const auto* widget = ui_edit_widget();
+    if (!widget || ui_edit_drag_active_) return false;
+    ui_edit_drag_anchors_ = widget->anchors;
+    ui_edit_drag_widget_ = ui_edit_selected_;
+    ui_edit_drag_active_ = true;
+    ui_edit_preview_.reset();
+    return true;
+}
+
+bool EditorModel::ui_edit_update_drag(core::Vec2 delta, bool resize) {
+    if (!ui_edit_drag_active_ || !has_ui_canvas_draft()) return false;
+    const auto next = ui::drag_canvas_anchors(
+        ui_edit_drag_anchors_, delta, resize);
+    if (!next) return false;
+    auto candidate = ui_edit_history_.canvas();
+    if (!candidate.set_anchors(ui_edit_drag_widget_, *next)) return false;
+    ui_edit_preview_ = std::move(candidate);
+    return true;
+}
+
+bool EditorModel::ui_edit_end_drag(bool commit) {
+    if (!ui_edit_drag_active_) return false;
+    ui_edit_drag_active_ = false;
+    ui_edit_drag_widget_ = ui::invalid_widget;
+    auto staged = std::move(ui_edit_preview_);
+    ui_edit_preview_.reset();
+    return commit && staged && ui_edit_history_.commit(std::move(*staged));
 }
 
 bool EditorModel::ui_edit_set_name(std::string name) {
@@ -804,8 +840,8 @@ bool EditorModel::save_ui_canvas_edit(std::string* error) {
         if (error) *error = std::move(message);
         return false;
     };
-    if (!has_ui_canvas_draft() || !ui_edit_asset_.valid() ||
-        !project_.is_open())
+    if (!has_ui_canvas_draft() || ui_edit_drag_active_ ||
+        !ui_edit_asset_.valid() || !project_.is_open())
         return fail("Canvas editing and saving require Edit Mode");
 
     const auto* record = project_.assets().find(ui_edit_asset_);
@@ -881,6 +917,7 @@ bool EditorModel::save_ui_canvas_edit(std::string* error) {
 }
 
 bool EditorModel::ui_edit_undo() {
+    if (ui_edit_drag_active_) ui_edit_end_drag(false);
     if (!has_ui_canvas_draft() || !ui_edit_history_.undo()) return false;
     if (!ui_edit_history_.canvas().find(ui_edit_selected_))
         ui_edit_selected_ = ui::invalid_widget;
@@ -888,6 +925,7 @@ bool EditorModel::ui_edit_undo() {
 }
 
 bool EditorModel::ui_edit_redo() {
+    if (ui_edit_drag_active_) ui_edit_end_drag(false);
     if (!has_ui_canvas_draft() || !ui_edit_history_.redo()) return false;
     if (!ui_edit_history_.canvas().find(ui_edit_selected_))
         ui_edit_selected_ = ui::invalid_widget;

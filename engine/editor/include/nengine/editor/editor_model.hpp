@@ -175,8 +175,10 @@ public:
         return ui_edit_selected_;
     }
     const ui::Widget* ui_edit_widget() const noexcept {
-        return has_ui_canvas_draft()
-            ? ui_edit_history_.canvas().find(ui_edit_selected_) : nullptr;
+        if (!has_ui_canvas_draft()) return nullptr;
+        return ui_edit_preview_
+            ? ui_edit_preview_->find(ui_edit_selected_)
+            : ui_edit_history_.canvas().find(ui_edit_selected_);
     }
     ui::UiLayout ui_edit_layout(float width, float height) const;
     ui::WidgetId select_ui_widget_at(float width, float height,
@@ -188,6 +190,10 @@ public:
     bool ui_edit_set_interactable(bool interactable);
     bool ui_edit_set_anchors(ui::RectAnchors anchors);
     bool ui_edit_set_color(ui::UiColor color);
+    bool ui_edit_begin_drag();
+    bool ui_edit_update_drag(core::Vec2 delta, bool resize);
+    bool ui_edit_end_drag(bool commit);
+    bool ui_edit_dragging() const noexcept { return ui_edit_drag_active_; }
     ui::WidgetId ui_edit_add_widget(ui::WidgetKind kind,
                                     ui::WidgetId parent = ui::invalid_widget);
     ui::WidgetId ui_edit_duplicate_selected();
@@ -280,6 +286,10 @@ private:
     assets::AssetGuid ui_edit_asset_{};
     bool ui_edit_open_{false};
     ui::WidgetId ui_edit_selected_{ui::invalid_widget};
+    bool ui_edit_drag_active_{false};
+    ui::WidgetId ui_edit_drag_widget_{ui::invalid_widget};
+    ui::RectAnchors ui_edit_drag_anchors_{};
+    std::optional<ui::UiCanvas> ui_edit_preview_{};
     std::optional<ui::UiCanvas> ui_canvas_{};
     assets::AssetGuid ui_canvas_asset_{};
     bool ui_canvas_reload_pending_{false};
