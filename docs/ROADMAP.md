@@ -235,6 +235,13 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] C# managed integration coverage for UI click listener dispatch, unsubscribe, and stable IDs
 - [x] Backend-neutral topmost Canvas authoring hit tests (clipped/visible, Play Mode interactive filtering)
 - [x] Transactional bounded CanvasEditHistory Undo/Redo core (visual editor/save UI not connected)
+- [x] Separate Canvas authoring draft and clipped widget selection in EditorModel
+- [x] Undoable Canvas name/text/visibility/interactable, anchors and hierarchy operations
+- [x] Dirty baseline and unsaved draft replacement safeguards
+- [x] Project-root-validated Canvas source save with same-directory backup and reimport
+- [x] Windows Canvas inspector controls for text/name edit, add/remove, Undo/Redo and Save
+- [x] Canvas authoring Scene View GDI overlay and widget selection outline, Ctrl+Z/Y/S
+- [x] Integration regression for save, Play Mode guard, reopened Canvas and saved-state Undo/Redo
 - [x] Bounded Canvas source parser rejects oversized records, trailing data and duplicates without partial import
 - [x] Sprite animation controller state graph, named boolean transitions, exit times and deterministic evaluation foundation
 - [x] Runtime sprite controller bindings to World SpriteAnimator with transition/reset behavior and destroyed-entity cleanup

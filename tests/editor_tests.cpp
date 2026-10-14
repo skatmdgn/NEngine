@@ -267,6 +267,8 @@ int main() {
           model.ui_canvas_asset() == canvas_before_reload,
           "Play Mode restores Canvas after file-watcher cache invalidation");
 
+    check(!model.save_ui_canvas_edit() && model.ui_edit_dirty(),
+          "Canvas source cannot be saved while gameplay Play Mode is active");
     check(model.stop_play_mode() &&
           !model.ui_was_clicked(1u) &&
           model.ui_layout(640, 480).items.empty(),
@@ -278,6 +280,14 @@ int main() {
           canvas_save_error.empty() && !model.ui_edit_dirty() &&
           model.ui_edit_undo_count() > 0u,
           "Canvas authoring save writes validated source and preserves Undo history");
+    check(model.ui_edit_undo() && model.ui_edit_dirty() &&
+          model.ui_edit_redo() && !model.ui_edit_dirty(),
+          "saved Canvas snapshot remains the Undo/Redo dirty-state baseline");
+    check(model.begin_ui_canvas_edit(ui_record->guid) &&
+          model.select_ui_widget(1u) &&
+          model.ui_edit_widget()->name == "Main.Start" &&
+          model.ui_edit_widget()->text == "새 게임",
+          "reopening a saved Canvas draft reads refreshed importer artifacts");
     {
         std::ifstream saved_canvas(project_root / "Assets" / "UI" / "Main.ncanvas");
         ui::UiCanvas on_disk;
