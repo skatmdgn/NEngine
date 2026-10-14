@@ -41,8 +41,8 @@ bool write_canvas(
             static_cast<unsigned>(node.kind) >
                 static_cast<unsigned>(WidgetKind::Button) ||
             !finite_widget(node) ||
-            node.name.size() > 128u || node.text.size() > 4096u ||
-            node.name.find(char(0)) != std::string::npos ||
+            !valid_widget_name(node.name) ||
+            node.text.size() > 4096u ||
             (!node.name.empty() && !names.insert(node.name).second))
             return fail(error, "cannot serialize invalid Canvas hierarchy");
 

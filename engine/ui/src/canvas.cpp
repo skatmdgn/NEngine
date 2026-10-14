@@ -39,6 +39,20 @@ UiRect resolve_rect(const UiRect& parent, const RectAnchors& a) noexcept {
 
 } // namespace
 
+bool valid_widget_name(std::string_view name) noexcept {
+    if (name.size() > 128u) return false;
+    if (name.empty()) return true;
+    const auto alpha = [](char ch) {
+        return (ch >= 'A' && ch <= 'Z') ||
+               (ch >= 'a' && ch <= 'z') || ch == '_';
+    };
+    if (!alpha(name.front())) return false;
+    for (const char ch : name)
+        if (!alpha(ch) && !(ch >= '0' && ch <= '9') &&
+            ch != '.' && ch != '-') return false;
+    return true;
+}
+
 bool UiRect::contains(core::Vec2 point) const noexcept {
     return finite_rect(*this) && width > 0.0f && height > 0.0f &&
         std::isfinite(point.x) && std::isfinite(point.y) &&
@@ -77,9 +91,8 @@ bool UiCanvas::restore(Widget widget) {
     if (widget.id == invalid_widget ||
         widget.id == UINT64_MAX || find(widget.id) ||
         (widget.parent != invalid_widget && !find(widget.parent)) ||
-        widget.name.size() > 128u ||
-        widget.text.size() > 4096u ||
-        widget.name.find(char(0)) != std::string::npos)
+        !valid_widget_name(widget.name) ||
+        widget.text.size() > 4096u)
         return false;
     if (!widget.name.empty())
         for (const auto& existing : widgets_)
@@ -241,6 +254,24 @@ WidgetId UiCanvas::duplicate_subtree(WidgetId id) {
     widgets_ = std::move(staged);
     next_id_ = candidate_next;
     return new_root;
+}
+
+bool UiCanvas::set_name(WidgetId id, std::string name) {
+    auto* node = find(id);
+    if (!node || !valid_widget_name(name)) return false;
+    if (!name.empty())
+        for (const auto& existing : widgets_)
+            if (existing.id != id && existing.name == name)
+                return false;
+    node->name = std::move(name);
+    return true;
+}
+
+WidgetId UiCanvas::find_by_name(std::string_view name) const noexcept {
+    if (name.empty()) return invalid_widget;
+    for (const auto& widget : widgets_)
+        if (widget.name == name) return widget.id;
+    return invalid_widget;
 }
 
 bool UiCanvas::set_text(WidgetId id, std::string text) {

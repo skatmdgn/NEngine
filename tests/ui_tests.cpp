@@ -157,8 +157,17 @@ int main() {
 
     UiCanvas named;
     const auto named_button = named.add(WidgetKind::Button);
-    named.find(named_button)->name = "Main.Start";
+    check(named.set_name(named_button, "Main.Start") &&
+          named.find_by_name("Main.Start") == named_button,
+          "named widgets can be located by script identity");
     named.find(named_button)->text = "Start";
+    check(!named.set_name(named_button, "123 invalid") &&
+          named.find_by_name("Main.Start") == named_button,
+          "invalid stable script names cannot replace existing names");
+    const auto named_other = named.add(WidgetKind::Text);
+    check(!named.set_name(named_other, "Main.Start") &&
+          named.set_name(named_other, "Main.Subtitle"),
+          "Canvas script names are unique regardless of widget kind");
     std::stringstream named_stream;
     UiCanvas named_restore;
     check(write_canvas(named_stream, named) &&

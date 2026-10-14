@@ -24,6 +24,8 @@ struct UiRect {
 };
 
 UiRect intersect_rect(UiRect a, UiRect b) noexcept;
+// Empty is allowed for legacy widgets; nonempty names are bounded ASCII IDs.
+bool valid_widget_name(std::string_view name) noexcept;
 
 struct UiColor {
     float r{1.0f};
@@ -81,6 +83,8 @@ public:
     const Widget* find(WidgetId id) const noexcept;
     // Runtime authoring changes never alter persisted Canvas assets.
     bool set_text(WidgetId id, std::string text);
+    bool set_name(WidgetId id, std::string name);
+    WidgetId find_by_name(std::string_view name) const noexcept;
     bool set_visible(WidgetId id, bool visible) noexcept;
     bool set_interactable(WidgetId id, bool interactable) noexcept;
     WidgetId find_by_text(std::string_view text) const noexcept;

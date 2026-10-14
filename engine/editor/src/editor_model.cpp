@@ -607,6 +607,9 @@ void EditorModel::bind_managed_ui() {
             auto& editor = *static_cast<EditorModel*>(context);
             if (!editor.play_session_.is_playing() || !editor.ui_canvas_)
                 return ui::invalid_widget;
+            const auto named = editor.ui_canvas_->find_by_name(label);
+            if (named != ui::invalid_widget) return named;
+            // Legacy .ncanvas v1 widgets remain discoverable by text.
             return editor.ui_canvas_->find_by_text(label);
         },
         [](void* context, std::uint64_t id, int operation) -> int {
