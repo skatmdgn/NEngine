@@ -181,6 +181,18 @@ public:
     ui::WidgetId select_ui_widget_at(float width, float height,
                                     core::Vec2 pointer);
     bool select_ui_widget(ui::WidgetId id) noexcept;
+    bool ui_edit_set_name(std::string name);
+    bool ui_edit_set_text(std::string text);
+    bool ui_edit_set_visible(bool visible);
+    bool ui_edit_set_interactable(bool interactable);
+    bool ui_edit_undo();
+    bool ui_edit_redo();
+    std::size_t ui_edit_undo_count() const noexcept {
+        return ui_edit_history_.undo_count();
+    }
+    std::size_t ui_edit_redo_count() const noexcept {
+        return ui_edit_history_.redo_count();
+    }
 
     bool set_ui_canvas_asset(assets::AssetGuid asset);
     bool has_ui_canvas() const noexcept { return ui_canvas_.has_value(); }

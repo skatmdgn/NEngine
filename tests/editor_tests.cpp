@@ -171,6 +171,20 @@ int main() {
           model.ui_edit_widget()->text == "Start" &&
           !model.select_ui_widget(9999),
           "Canvas authoring draft loads imported UI in Edit Mode with clipped widget selection");
+    check(model.ui_edit_set_name("Main.Start") &&
+          model.ui_edit_set_text("새 게임") &&
+          model.ui_edit_set_interactable(false) &&
+          model.ui_edit_widget()->name == "Main.Start" &&
+          model.ui_edit_widget()->text == "새 게임" &&
+          !model.ui_edit_widget()->interactable &&
+          model.ui_edit_undo_count() == 3u,
+          "Canvas edit applies bounded validated name text and interactivity transactions");
+    check(model.ui_edit_undo() &&
+          model.ui_edit_widget()->interactable &&
+          model.ui_edit_redo() &&
+          !model.ui_edit_widget()->interactable &&
+          !model.ui_edit_set_name("invalid name"),
+          "Canvas Edit Mode Undo/Redo restores widget fields and rejects invalid identifiers");
     check(model.begin_play_mode() &&
           !model.has_ui_canvas_draft() &&
           model.ui_edit_layout(640, 480).items.empty() &&

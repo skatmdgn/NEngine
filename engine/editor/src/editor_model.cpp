@@ -703,6 +703,49 @@ ui::WidgetId EditorModel::select_ui_widget_at(
     return id;
 }
 
+bool EditorModel::ui_edit_set_name(std::string name) {
+    if (!ui_edit_widget()) return false;
+    auto candidate = ui_edit_history_.canvas();
+    if (!candidate.set_name(ui_edit_selected_, std::move(name))) return false;
+    return ui_edit_history_.commit(std::move(candidate));
+}
+
+bool EditorModel::ui_edit_set_text(std::string text) {
+    if (!ui_edit_widget()) return false;
+    auto candidate = ui_edit_history_.canvas();
+    if (!candidate.set_text(ui_edit_selected_, std::move(text))) return false;
+    return ui_edit_history_.commit(std::move(candidate));
+}
+
+bool EditorModel::ui_edit_set_visible(bool visible) {
+    if (!ui_edit_widget()) return false;
+    auto candidate = ui_edit_history_.canvas();
+    if (!candidate.set_visible(ui_edit_selected_, visible)) return false;
+    return ui_edit_history_.commit(std::move(candidate));
+}
+
+bool EditorModel::ui_edit_set_interactable(bool interactable) {
+    if (!ui_edit_widget()) return false;
+    auto candidate = ui_edit_history_.canvas();
+    if (!candidate.set_interactable(ui_edit_selected_, interactable))
+        return false;
+    return ui_edit_history_.commit(std::move(candidate));
+}
+
+bool EditorModel::ui_edit_undo() {
+    if (!has_ui_canvas_draft() || !ui_edit_history_.undo()) return false;
+    if (!ui_edit_history_.canvas().find(ui_edit_selected_))
+        ui_edit_selected_ = ui::invalid_widget;
+    return true;
+}
+
+bool EditorModel::ui_edit_redo() {
+    if (!has_ui_canvas_draft() || !ui_edit_history_.redo()) return false;
+    if (!ui_edit_history_.canvas().find(ui_edit_selected_))
+        ui_edit_selected_ = ui::invalid_widget;
+    return true;
+}
+
 bool EditorModel::set_ui_canvas_asset(assets::AssetGuid asset) {
     ui_canvas_asset_ = asset;
     ui_canvas_reload_pending_ = false;
