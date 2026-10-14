@@ -514,7 +514,15 @@ namespace NEngine.Internal
                 return -1;
 
             NEngine.Time.SetDeltaTime(deltaTime);
-            return 1;
+            try
+            {
+                NEngine.UI.DispatchClickEvents();
+                return 1;
+            }
+            catch
+            {
+                return -2;
+            }
         }
 
         [UnmanagedCallersOnly]
@@ -1824,8 +1832,52 @@ std::string api_stub(
 
     public static class UI
     {
-        // Returns the first matching widget ID. For duplicate labels,
-        // prefer stable IDs serialized in the .ncanvas asset.
+        // Subscribers live in the stable API assembly, so they must be
+        // removed before unloading a collectible gameplay assembly.
+        private static readonly Dictionary<ulong, List<Action>> ClickListeners = new();
+
+        public static void AddClickListener(ulong id, Action callback)
+        {
+            ArgumentNullException.ThrowIfNull(callback);
+            if (id == 0UL)
+                throw new ArgumentOutOfRangeException(nameof(id));
+            if (!ClickListeners.TryGetValue(id, out var callbacks))
+                ClickListeners[id] = callbacks = new List<Action>();
+            if (!callbacks.Contains(callback))
+                callbacks.Add(callback);
+        }
+
+        public static bool RemoveClickListener(ulong id, Action callback)
+        {
+            if (!ClickListeners.TryGetValue(id, out var callbacks))
+                return false;
+            bool removed = callbacks.Remove(callback);
+            if (callbacks.Count == 0) ClickListeners.Remove(id);
+            return removed;
+        }
+
+        public static void ClearClickListeners() => ClickListeners.Clear();
+
+        internal static void DispatchClickEvents()
+        {
+            if (ClickListeners.Count == 0) return;
+            // Copy the active listeners so callback removal/rebinding is safe.
+            var pending = new List<KeyValuePair<ulong, Action>>();
+            foreach (var entry in ClickListeners)
+            {
+                if (NativeUi.Query(entry.Key, 2) <= 0) continue;
+                foreach (Action callback in entry.Value)
+                    pending.Add(new KeyValuePair<ulong, Action>(entry.Key, callback));
+            }
+            foreach (var entry in pending)
+            {
+                if (ClickListeners.TryGetValue(entry.Key, out var current) &&
+                    current.Contains(entry.Value))
+                    entry.Value();
+            }
+        }
+
+        // Prefer unique Canvas v2 script names; legacy v1 falls back to text.
         public static ulong Find(string label) => NativeUi.Find(label);
         public static bool WasClicked(ulong id) =>
             NativeUi.Query(id, 2) > 0;
