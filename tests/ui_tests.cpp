@@ -137,6 +137,18 @@ int main() {
           duplication_readback.find(duplicate_child)->parent == duplicate_a,
           "duplicated Canvas hierarchy serializes with stable fresh IDs");
 
+    RectAnchors gesture;
+    const auto translated = drag_canvas_anchors(gesture, {12, -7}, false);
+    const auto resized = drag_canvas_anchors(gesture, {12, -7}, true);
+    check(translated && translated->offset_min.x == 12 &&
+          translated->offset_max.x == 112 &&
+          translated->offset_min.y == -7 && translated->offset_max.y == 23 &&
+          resized && resized->offset_min.x == 0 &&
+          resized->offset_max.x == 112 && resized->offset_max.y == 23 &&
+          !drag_canvas_anchors(gesture,
+              {std::numeric_limits<float>::infinity(), 0}, false),
+          "Canvas authoring gesture translates and resizes from immutable start bounds");
+
     UiCanvas editable;
     const auto edit_button = editable.add(WidgetKind::Button);
     check(editable.set_text(edit_button, "Play") &&

@@ -53,6 +53,21 @@ bool valid_widget_name(std::string_view name) noexcept {
     return true;
 }
 
+std::optional<RectAnchors> drag_canvas_anchors(
+    RectAnchors start, core::Vec2 delta, bool resize) noexcept {
+    if (!finite_anchors(start) ||
+        !std::isfinite(delta.x) || !std::isfinite(delta.y))
+        return std::nullopt;
+    if (!resize) {
+        start.offset_min.x += delta.x;
+        start.offset_min.y += delta.y;
+    }
+    start.offset_max.x += delta.x;
+    start.offset_max.y += delta.y;
+    if (!finite_anchors(start)) return std::nullopt;
+    return start;
+}
+
 bool UiRect::contains(core::Vec2 point) const noexcept {
     return finite_rect(*this) && width > 0.0f && height > 0.0f &&
         std::isfinite(point.x) && std::isfinite(point.y) &&

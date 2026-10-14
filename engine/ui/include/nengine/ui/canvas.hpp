@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -40,6 +41,11 @@ struct RectAnchors {
     core::Vec2 offset_min{};
     core::Vec2 offset_max{100.0f, 30.0f};
 };
+
+// Editor drag math operates on a gesture's immutable starting anchors.
+// resize=false translates both offsets; resize=true changes only far edge.
+std::optional<RectAnchors> drag_canvas_anchors(
+    RectAnchors start, core::Vec2 delta, bool resize) noexcept;
 
 enum class WidgetKind : std::uint8_t {
     Panel, Text, Image, Button
