@@ -62,6 +62,28 @@ int main() {
     check(canvas.remove(panel) && !canvas.find(button) &&
           !canvas.find(overflow) && canvas.layout(800.0f, 600.0f).items.empty(),
           "destroying parent removes descendants without ID reuse");
+    UiCanvas hierarchy;
+    const auto root_a = hierarchy.add(WidgetKind::Panel);
+    const auto root_b = hierarchy.add(WidgetKind::Panel);
+    const auto child_a = hierarchy.add(WidgetKind::Button, root_a);
+    const auto grandchild_a = hierarchy.add(WidgetKind::Text, child_a);
+    check(!hierarchy.reparent(root_a, grandchild_a) &&
+          !hierarchy.reparent(root_a, root_a) &&
+          !hierarchy.reparent(child_a, 999999u),
+          "Canvas reparent rejects cycles self-parenting and stale parents");
+    check(hierarchy.reparent(child_a, root_b) &&
+          hierarchy.find(child_a)->parent == root_b &&
+          hierarchy.find(grandchild_a)->parent == child_a &&
+          hierarchy.widgets()[2].id == child_a &&
+          hierarchy.widgets()[3].id == grandchild_a,
+          "Canvas reparent moves the entire subtree after the new parent");
+    std::stringstream moved_source;
+    UiCanvas moved_readback;
+    check(write_canvas(moved_source, hierarchy) &&
+          read_canvas(moved_source, moved_readback) &&
+          moved_readback.find(grandchild_a)->parent == child_a,
+          "reparented hierarchy remains valid and serializable");
+
     const auto next = canvas.add(WidgetKind::Text);
     check(next > overflow && canvas.layout(0.0f, 600.0f).items.empty(),
           "widget IDs advance and invalid viewport is safely rejected");

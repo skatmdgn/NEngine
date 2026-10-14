@@ -76,6 +76,9 @@ public:
     Widget* find(WidgetId id) noexcept;
     const Widget* find(WidgetId id) const noexcept;
     bool remove(WidgetId id);
+    // Move a complete widget subtree while preserving stable IDs.
+    // Rejects cycles, stale IDs, and self-parenting.
+    bool reparent(WidgetId id, WidgetId new_parent);
     void clear() noexcept;
     UiLayout layout(float width, float height) const;
 

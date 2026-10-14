@@ -94,6 +94,52 @@ const Widget* UiCanvas::find(WidgetId id) const noexcept {
     return nullptr;
 }
 
+bool UiCanvas::reparent(WidgetId id, WidgetId new_parent) {
+    const auto* source = find(id);
+    if (!source || id == new_parent ||
+        (new_parent != invalid_widget && !find(new_parent)))
+        return false;
+
+    // Collect descendants even when the current paint order interleaves
+    // separate subtrees. Serialization requires every parent before child.
+    std::unordered_set<WidgetId> moving{id};
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        for (const auto& node : widgets_)
+            if (moving.contains(node.parent) &&
+                moving.insert(node.id).second)
+                changed = true;
+    }
+    if (new_parent != invalid_widget && moving.contains(new_parent))
+        return false;
+    if (source->parent == new_parent) return true;
+
+    std::vector<Widget> subtree, remaining;
+    subtree.reserve(moving.size());
+    remaining.reserve(widgets_.size() - moving.size());
+    for (const auto& node : widgets_)
+        (moving.contains(node.id) ? subtree : remaining).push_back(node);
+    // The root always precedes its descendants.
+    subtree.front().parent = new_parent;
+
+    std::size_t at = remaining.size();
+    if (new_parent != invalid_widget) {
+        std::unordered_set<WidgetId> descendants{new_parent};
+        for (std::size_t i = 0; i < remaining.size(); ++i)
+            if (descendants.contains(remaining[i].id) ||
+                descendants.contains(remaining[i].parent)) {
+                descendants.insert(remaining[i].id);
+                at = i + 1u;
+            }
+    }
+    remaining.insert(
+        remaining.begin() + static_cast<std::ptrdiff_t>(at),
+        subtree.begin(), subtree.end());
+    widgets_ = std::move(remaining);
+    return true;
+}
+
 bool UiCanvas::remove(WidgetId id) {
     if (!find(id)) return false;
     std::unordered_set<WidgetId> removed{id};
