@@ -14,6 +14,7 @@
 #include "nengine/editor/presentation.hpp"
 #include "nengine/editor/property_command.hpp"
 #include "nengine/editor/property_text.hpp"
+#include "nengine/ui/canvas_serialization.hpp"
 #include "nengine/editor/scene_interaction.hpp"
 #include "nengine/render/builtin_assets.hpp"
 #include "nengine/render/components.hpp"
@@ -270,6 +271,23 @@ int main() {
           !model.ui_was_clicked(1u) &&
           model.ui_layout(640, 480).items.empty(),
           "stopping Play Mode hides runtime Canvas");
+
+    std::string canvas_save_error;
+    check(model.has_ui_canvas_draft() && model.ui_edit_dirty() &&
+          model.save_ui_canvas_edit(&canvas_save_error) &&
+          canvas_save_error.empty() && !model.ui_edit_dirty() &&
+          model.ui_edit_undo_count() > 0u,
+          "Canvas authoring save writes validated source and preserves Undo history");
+    {
+        std::ifstream saved_canvas(project_root / "Assets" / "UI" / "Main.ncanvas");
+        ui::UiCanvas on_disk;
+        check(ui::read_canvas(saved_canvas, on_disk) &&
+              on_disk.find(1u) &&
+              on_disk.find(1u)->name == "Main.Start" &&
+              on_disk.find(1u)->text == "새 게임" &&
+              !on_disk.find(1u)->interactable,
+              "Canvas authoring save roundtrips v2 stable names and editable widget data");
+    }
 
     check(
         std::filesystem::exists(project_root / "Library" / "Cache"),

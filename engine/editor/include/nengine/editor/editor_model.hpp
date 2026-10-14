@@ -193,6 +193,7 @@ public:
     bool ui_edit_remove_selected();
     bool ui_edit_reparent_selected(ui::WidgetId parent);
     bool ui_edit_set_sibling_index(std::size_t index);
+    bool save_ui_canvas_edit(std::string* error = nullptr);
     bool ui_edit_undo();
     bool ui_edit_redo();
     std::size_t ui_edit_undo_count() const noexcept {

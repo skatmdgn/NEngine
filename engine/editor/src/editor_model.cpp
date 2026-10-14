@@ -4,6 +4,9 @@
 #include "nengine/editor/physics_integration.hpp"
 #include "nengine/editor/scripting_integration.hpp"
 #include "nengine/physics/simulation.hpp"
+#include "nengine/ui/canvas_serialization.hpp"
+#include <chrono>
+#include <fstream>
 #include "nengine/render/components.hpp"
 #include <utility>
 
@@ -787,6 +790,87 @@ bool EditorModel::ui_edit_set_sibling_index(std::size_t index) {
     auto candidate = ui_edit_history_.canvas();
     if (!candidate.set_sibling_index(ui_edit_selected_, index)) return false;
     return ui_edit_history_.commit(std::move(candidate));
+}
+
+bool EditorModel::save_ui_canvas_edit(std::string* error) {
+    const auto fail = [error](std::string message) {
+        if (error) *error = std::move(message);
+        return false;
+    };
+    if (!has_ui_canvas_draft() || !ui_edit_asset_.valid() ||
+        !project_.is_open())
+        return fail("Canvas editing and saving require Edit Mode");
+
+    const auto* record = project_.assets().find(ui_edit_asset_);
+    if (!record || record->importer_id != "NEngine.Canvas")
+        return fail("Selected Canvas asset is missing or not a Canvas");
+
+    const auto& source = record->source_path;
+    std::error_code ec;
+    const auto root = std::filesystem::canonical(project_.assets_path(), ec);
+    if (ec) return fail("Cannot resolve project Assets directory");
+    const auto resolved = std::filesystem::canonical(source, ec);
+    if (ec || std::filesystem::is_symlink(source) ||
+        !std::filesystem::is_regular_file(source))
+        return fail("Canvas source must be a regular project file");
+    const auto relative = resolved.lexically_relative(root);
+    if (relative.empty() || relative == "." ||
+        *relative.begin() == ".." || relative.is_absolute())
+        return fail("Canvas source is outside project Assets");
+
+    const auto stamp = std::to_string(
+        std::chrono::steady_clock::now().time_since_epoch().count());
+    auto temporary = source;
+    temporary += ".nengine-tmp-" + stamp;
+    auto backup = source;
+    backup += ".nengine-backup-" + stamp;
+    if (std::filesystem::exists(temporary) ||
+        std::filesystem::exists(backup))
+        return fail("Canvas save temporary path already exists");
+
+    std::string write_error;
+    {
+        std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+        if (!output ||
+            !ui::write_canvas(output, ui_edit_history_.canvas(),
+                              &write_error)) {
+            output.close();
+            std::filesystem::remove(temporary, ec);
+            return fail(write_error.empty()
+                ? "Canvas save could not serialize draft" : write_error);
+        }
+        output.flush();
+        if (!output.good()) {
+            output.close();
+            std::filesystem::remove(temporary, ec);
+            return fail("Canvas save could not flush temporary file");
+        }
+    }
+
+    std::filesystem::rename(source, backup, ec);
+    if (ec) {
+        std::filesystem::remove(temporary, ec);
+        return fail("Canvas save could not back up original source");
+    }
+    std::filesystem::rename(temporary, source, ec);
+    if (ec) {
+        std::error_code restore_error;
+        std::filesystem::rename(backup, source, restore_error);
+        std::filesystem::remove(temporary, restore_error);
+        return fail("Canvas save failed replacing original file; backup retained if restoration failed");
+    }
+    std::filesystem::remove(backup, ec);
+
+    ui_edit_history_.mark_saved();
+    project_.refresh_assets();
+    const auto imported = project_.import_asset(ui_edit_asset_);
+    canvas_cache_.clear();
+    if (ui_canvas_asset_ == ui_edit_asset_)
+        set_ui_canvas_asset(ui_edit_asset_);
+    if (!imported.success)
+        return fail("Canvas saved, but asset reimport failed: " + imported.message);
+    if (error) error->clear();
+    return true;
 }
 
 bool EditorModel::ui_edit_undo() {
