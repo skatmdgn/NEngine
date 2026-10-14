@@ -311,6 +311,7 @@ namespace NEngine.Internal
             {
                 if (callbacksPtr == 0)
                 {
+                    NEngine.UI.ClearClickListeners();
                     NEngine.NativeUi.Clear();
                     return 1;
                 }
@@ -390,6 +391,9 @@ namespace NEngine.Internal
 
             try
             {
+                // Delegates in the API assembly must not retain references
+                // to types in the collectible gameplay AssemblyLoadContext.
+                NEngine.UI.ClearClickListeners();
                 GameplayLoadContext? context = _gameplayContext;
 
                 _gameplayAssembly = null;
@@ -528,6 +532,7 @@ namespace NEngine.Internal
         [UnmanagedCallersOnly]
         public static int ResetFrameClock()
         {
+            NEngine.UI.ClearClickListeners();
             NEngine.Time.Reset();
             return 1;
         }
@@ -1775,6 +1780,7 @@ std::string api_stub(
 
         internal static void Clear()
         {
+            UI.ClearClickListeners();
             _context = 0;
             _find = null;
             _query = null;
