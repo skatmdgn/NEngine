@@ -369,7 +369,7 @@ int main() {
     keyboard.set_focus(keys, 1234567u);
     check(keyboard.focused() == keyboard_b,
           "invalid mouse target cannot steal keyboard focus");
-    keyboard_canvas.find(keyboard_a)->visible = false;
+    keyboard_canvas.find(keyboard_b)->visible = false;
     keyboard.update(keyboard_canvas.layout(400, 100), false, false);
     check(keyboard.focused() == invalid_widget,
           "hidden focused button loses keyboard focus");
