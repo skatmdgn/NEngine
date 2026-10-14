@@ -283,7 +283,9 @@ int main() {
     check(model.ui_edit_undo() && model.ui_edit_dirty() &&
           model.ui_edit_redo() && !model.ui_edit_dirty(),
           "saved Canvas snapshot remains the Undo/Redo dirty-state baseline");
-    check(model.begin_ui_canvas_edit(ui_record->guid) &&
+    // AssetDatabase::scan rebuilds its record map after save; never
+    // dereference the old ui_record pointer after that refresh.
+    check(model.begin_ui_canvas_edit(model.ui_edit_asset()) &&
           model.select_ui_widget(1u) &&
           model.ui_edit_widget()->name == "Main.Start" &&
           model.ui_edit_widget()->text == "새 게임",
