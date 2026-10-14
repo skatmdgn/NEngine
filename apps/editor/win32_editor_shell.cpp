@@ -97,6 +97,10 @@ enum ControlId : int {
     IdCanvasAnchorBase = 11000,
     IdCanvasColorBase = 11020,
     IdCanvasApplyGeometry = 11040,
+    IdCanvasWidgetList = 11041,
+    IdCanvasDuplicate = 11042,
+    IdCanvasBack = 11043,
+    IdCanvasFront = 11044,
 };
 
 struct GenericPropertyBinding {
@@ -317,6 +321,11 @@ struct Win32EditorShell::Impl {
     HWND canvas_offset_label{nullptr};
     HWND canvas_color_label{nullptr};
     HWND canvas_apply_geometry{nullptr};
+    HWND canvas_widget_list{nullptr};
+    HWND canvas_duplicate{nullptr};
+    HWND canvas_to_back{nullptr};
+    HWND canvas_to_front{nullptr};
+    std::vector<nengine::ui::WidgetId> canvas_widget_rows{};
     bool canvas_mode{false};
 
     HWND hierarchy{nullptr};
@@ -1113,6 +1122,15 @@ struct Win32EditorShell::Impl {
         canvas_redo = create_control(
             host, L"BUTTON", L"UI Redo", BS_PUSHBUTTON, IdCanvasRedo);
 
+        canvas_widget_list = create_control(
+            host, L"COMBOBOX", L"", CBS_DROPDOWNLIST | WS_VSCROLL,
+            IdCanvasWidgetList);
+        canvas_duplicate = create_control(
+            host, L"BUTTON", L"Duplicate", BS_PUSHBUTTON, IdCanvasDuplicate);
+        canvas_to_back = create_control(
+            host, L"BUTTON", L"To Back", BS_PUSHBUTTON, IdCanvasBack);
+        canvas_to_front = create_control(
+            host, L"BUTTON", L"To Front", BS_PUSHBUTTON, IdCanvasFront);
         canvas_anchor_label = create_control(
             host, L"STATIC", L"Anchor min XY / max XY", 0);
         canvas_offset_label = create_control(
@@ -1131,7 +1149,9 @@ struct Win32EditorShell::Impl {
             host, L"BUTTON", L"Apply Anchors + RGBA",
             BS_PUSHBUTTON, IdCanvasApplyGeometry);
 
-        if (!canvas_anchor_label || !canvas_offset_label ||
+        if (!canvas_widget_list || !canvas_duplicate ||
+            !canvas_to_back || !canvas_to_front ||
+            !canvas_anchor_label || !canvas_offset_label ||
             !canvas_color_label || !canvas_apply_geometry ||
             std::any_of(canvas_anchor_inputs.begin(),
                         canvas_anchor_inputs.end(),
@@ -1910,6 +1930,10 @@ struct Win32EditorShell::Impl {
             canvas_undo, canvas_redo};
         for (HWND control : ui_controls)
             ShowWindow(control, ui_authoring ? SW_SHOW : SW_HIDE);
+        for (HWND control : std::array<HWND, 4>{
+                canvas_widget_list, canvas_duplicate,
+                canvas_to_back, canvas_to_front})
+            ShowWindow(control, ui_authoring ? SW_SHOW : SW_HIDE);
         for (HWND control : canvas_anchor_inputs)
             ShowWindow(control, ui_authoring ? SW_SHOW : SW_HIDE);
         for (HWND control : canvas_color_inputs)
@@ -1919,6 +1943,8 @@ struct Win32EditorShell::Impl {
                 canvas_color_label, canvas_apply_geometry})
             ShowWindow(control, ui_authoring ? SW_SHOW : SW_HIDE);
         if (ui_authoring) {
+            MoveWindow(canvas_widget_list, ix, iy, iw, 220, TRUE);
+            iy += 32;
             MoveWindow(canvas_name, ix, iy, iw, 24, TRUE); iy += 29;
             MoveWindow(canvas_text, ix, iy, iw, 24, TRUE); iy += 29;
             MoveWindow(canvas_apply, ix, iy, iw, 24, TRUE); iy += 28;
@@ -1926,6 +1952,13 @@ struct Win32EditorShell::Impl {
             const int half = (iw - 4) / 2;
             MoveWindow(canvas_add_button, ix, iy, half, 24, TRUE);
             MoveWindow(canvas_add_text, ix + half + 4, iy, half, 24, TRUE);
+            iy += 28;
+            const int third_width = (iw - 8) / 3;
+            MoveWindow(canvas_duplicate, ix, iy, third_width, 24, TRUE);
+            MoveWindow(canvas_to_back, ix + third_width + 4, iy,
+                       third_width, 24, TRUE);
+            MoveWindow(canvas_to_front, ix + (third_width + 4) * 2,
+                       iy, third_width, 24, TRUE);
             iy += 28;
             MoveWindow(canvas_delete, ix, iy, iw, 24, TRUE); iy += 28;
             MoveWindow(canvas_undo, ix, iy, half, 24, TRUE);
@@ -2539,6 +2572,35 @@ struct Win32EditorShell::Impl {
         SetWindowTextW(canvas_edit_toggle,
             active ? L"Close Canvas Edit" : L"Canvas Edit");
         if (!active) return;
+        canvas_widget_rows.clear();
+        SendMessageW(canvas_widget_list, CB_RESETCONTENT, 0, 0);
+        int selected_index = -1;
+        for (const auto& entry : editor.ui_edit_widgets()) {
+            std::size_t depth = 0;
+            auto parent = entry.parent;
+            while (parent != nengine::ui::invalid_widget && depth < 12) {
+                ++depth;
+                const auto& nodes = editor.ui_edit_widgets();
+                const auto found = std::find_if(
+                    nodes.begin(), nodes.end(),
+                    [parent](const nengine::ui::Widget& node) {
+                        return node.id == parent;
+                    });
+                if (found == nodes.end()) break;
+                parent = found->parent;
+            }
+            std::string label(depth * 2, ' ');
+            label += "#" + std::to_string(entry.id) + " ";
+            label += entry.name.empty() ? entry.text : entry.name;
+            if (label.size() <= depth * 2 + 4) label += "(unnamed)";
+            const auto wide = utf8_to_wide(label);
+            SendMessageW(canvas_widget_list, CB_ADDSTRING, 0,
+                         reinterpret_cast<LPARAM>(wide.c_str()));
+            if (entry.id == editor.selected_ui_widget())
+                selected_index = static_cast<int>(canvas_widget_rows.size());
+            canvas_widget_rows.push_back(entry.id);
+        }
+        SendMessageW(canvas_widget_list, CB_SETCURSEL, selected_index, 0);
         const auto* widget = editor.ui_edit_widget();
         set_text(canvas_name, widget ? widget->name : "");
         set_text(canvas_text, widget ? widget->text : "");
@@ -2551,6 +2613,9 @@ struct Win32EditorShell::Impl {
         EnableWindow(canvas_redo, editor.ui_edit_redo_count() != 0);
         EnableWindow(canvas_add_button, true);
         EnableWindow(canvas_add_text, true);
+        EnableWindow(canvas_duplicate, widget != nullptr);
+        EnableWindow(canvas_to_back, widget != nullptr);
+        EnableWindow(canvas_to_front, widget != nullptr);
         const auto values = widget
             ? std::array<float, 8>{
                 widget->anchors.anchor_min.x, widget->anchors.anchor_min.y,
@@ -3675,6 +3740,33 @@ struct Win32EditorShell::Impl {
             handled = true;
             break;
         }
+        case IdCanvasWidgetList:
+            if (notification != CBN_SELCHANGE) return false;
+            if (canvas_mode && editor.has_ui_canvas_draft()) {
+                const auto index = static_cast<int>(
+                    SendMessageW(canvas_widget_list, CB_GETCURSEL, 0, 0));
+                if (index >= 0 &&
+                    static_cast<std::size_t>(index) < canvas_widget_rows.size())
+                    editor.select_ui_widget(
+                        canvas_widget_rows[static_cast<std::size_t>(index)]);
+            }
+            handled = true;
+            break;
+        case IdCanvasDuplicate:
+            if (notification != BN_CLICKED) return false;
+            if (canvas_mode) editor.ui_edit_duplicate_selected();
+            handled = true;
+            break;
+        case IdCanvasBack:
+            if (notification != BN_CLICKED) return false;
+            if (canvas_mode) editor.ui_edit_set_sibling_index(0);
+            handled = true;
+            break;
+        case IdCanvasFront:
+            if (notification != BN_CLICKED) return false;
+            if (canvas_mode) editor.ui_edit_set_sibling_index(99999u);
+            handled = true;
+            break;
         case IdCanvasApplyGeometry: {
             if (notification != BN_CLICKED) return false;
             const auto* selected = editor.ui_edit_widget();
