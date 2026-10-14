@@ -94,6 +94,9 @@ enum ControlId : int {
     IdSplitHierarchy,
     IdSplitInspector,
     IdSplitBottom,
+    IdCanvasAnchorBase = 11000,
+    IdCanvasColorBase = 11020,
+    IdCanvasApplyGeometry = 11040,
 };
 
 struct GenericPropertyBinding {
@@ -308,6 +311,12 @@ struct Win32EditorShell::Impl {
     HWND canvas_delete{nullptr};
     HWND canvas_undo{nullptr};
     HWND canvas_redo{nullptr};
+    std::array<HWND, 8> canvas_anchor_inputs{};
+    std::array<HWND, 4> canvas_color_inputs{};
+    HWND canvas_anchor_label{nullptr};
+    HWND canvas_offset_label{nullptr};
+    HWND canvas_color_label{nullptr};
+    HWND canvas_apply_geometry{nullptr};
     bool canvas_mode{false};
 
     HWND hierarchy{nullptr};
@@ -1104,7 +1113,33 @@ struct Win32EditorShell::Impl {
         canvas_redo = create_control(
             host, L"BUTTON", L"UI Redo", BS_PUSHBUTTON, IdCanvasRedo);
 
-        if (!canvas_edit_toggle || !canvas_name || !canvas_text ||
+        canvas_anchor_label = create_control(
+            host, L"STATIC", L"Anchor min XY / max XY", 0);
+        canvas_offset_label = create_control(
+            host, L"STATIC", L"Offsets left top right bottom", 0);
+        canvas_color_label = create_control(
+            host, L"STATIC", L"Color R G B A (0..1)", 0);
+        for (std::size_t i = 0; i < canvas_anchor_inputs.size(); ++i)
+            canvas_anchor_inputs[i] = create_control(
+                host, L"EDIT", L"", WS_BORDER | ES_AUTOHSCROLL,
+                IdCanvasAnchorBase + static_cast<int>(i));
+        for (std::size_t i = 0; i < canvas_color_inputs.size(); ++i)
+            canvas_color_inputs[i] = create_control(
+                host, L"EDIT", L"", WS_BORDER | ES_AUTOHSCROLL,
+                IdCanvasColorBase + static_cast<int>(i));
+        canvas_apply_geometry = create_control(
+            host, L"BUTTON", L"Apply Anchors + RGBA",
+            BS_PUSHBUTTON, IdCanvasApplyGeometry);
+
+        if (!canvas_anchor_label || !canvas_offset_label ||
+            !canvas_color_label || !canvas_apply_geometry ||
+            std::any_of(canvas_anchor_inputs.begin(),
+                        canvas_anchor_inputs.end(),
+                        [](HWND control) { return !control; }) ||
+            std::any_of(canvas_color_inputs.begin(),
+                        canvas_color_inputs.end(),
+                        [](HWND control) { return !control; }) ||
+            !canvas_edit_toggle || !canvas_name || !canvas_text ||
             !canvas_apply || !canvas_save || !canvas_add_button ||
             !canvas_add_text || !canvas_delete || !canvas_undo ||
             !canvas_redo) {
@@ -1875,6 +1910,14 @@ struct Win32EditorShell::Impl {
             canvas_undo, canvas_redo};
         for (HWND control : ui_controls)
             ShowWindow(control, ui_authoring ? SW_SHOW : SW_HIDE);
+        for (HWND control : canvas_anchor_inputs)
+            ShowWindow(control, ui_authoring ? SW_SHOW : SW_HIDE);
+        for (HWND control : canvas_color_inputs)
+            ShowWindow(control, ui_authoring ? SW_SHOW : SW_HIDE);
+        for (HWND control : std::array<HWND, 4>{
+                canvas_anchor_label, canvas_offset_label,
+                canvas_color_label, canvas_apply_geometry})
+            ShowWindow(control, ui_authoring ? SW_SHOW : SW_HIDE);
         if (ui_authoring) {
             MoveWindow(canvas_name, ix, iy, iw, 24, TRUE); iy += 29;
             MoveWindow(canvas_text, ix, iy, iw, 24, TRUE); iy += 29;
@@ -1887,9 +1930,38 @@ struct Win32EditorShell::Impl {
             MoveWindow(canvas_delete, ix, iy, iw, 24, TRUE); iy += 28;
             MoveWindow(canvas_undo, ix, iy, half, 24, TRUE);
             MoveWindow(canvas_redo, ix + half + 4, iy, half, 24, TRUE);
-            iy += 36;
+            iy += 30;
+            const int quarter_width = (iw - 12) / 4;
+            const auto place_quad = [&](const auto& fields, int first) {
+                for (int i = 0; i < 4; ++i)
+                    MoveWindow(fields[static_cast<std::size_t>(first + i)],
+                        ix + i * (quarter_width + 4), iy,
+                        quarter_width, 24, TRUE);
+                iy += 30;
+            };
+            MoveWindow(canvas_anchor_label, ix, iy, iw, 20, TRUE); iy += 20;
+            place_quad(canvas_anchor_inputs, 0);
+            MoveWindow(canvas_offset_label, ix, iy, iw, 20, TRUE); iy += 20;
+            place_quad(canvas_anchor_inputs, 4);
+            MoveWindow(canvas_color_label, ix, iy, iw, 20, TRUE); iy += 20;
+            place_quad(canvas_color_inputs, 0);
+            MoveWindow(canvas_apply_geometry, ix, iy, iw, 26, TRUE); iy += 32;
         }
 
+        const std::array<HWND, 17> native_inspector{
+            inspector_title, label_name, name, active, label_position,
+            label_rotation, label_scale, apply_transform, generic_title,
+            generic_properties, generic_value, assign_asset, apply_property,
+            add_component_list, add_component, position[0], position[1]};
+        for (HWND control : native_inspector)
+            ShowWindow(control, ui_authoring ? SW_HIDE : SW_SHOW);
+        for (HWND control : position)
+            ShowWindow(control, ui_authoring ? SW_HIDE : SW_SHOW);
+        for (HWND control : rotation)
+            ShowWindow(control, ui_authoring ? SW_HIDE : SW_SHOW);
+        for (HWND control : scale)
+            ShowWindow(control, ui_authoring ? SW_HIDE : SW_SHOW);
+        if (!ui_authoring) {
         MoveWindow(
             inspector_title,
             ix,
@@ -2101,6 +2173,7 @@ struct Win32EditorShell::Impl {
             24,
             TRUE);
 
+        }
         const int bottom_y =
             bottom_split_y +
             kSplitterSize +
@@ -2478,6 +2551,26 @@ struct Win32EditorShell::Impl {
         EnableWindow(canvas_redo, editor.ui_edit_redo_count() != 0);
         EnableWindow(canvas_add_button, true);
         EnableWindow(canvas_add_text, true);
+        const auto values = widget
+            ? std::array<float, 8>{
+                widget->anchors.anchor_min.x, widget->anchors.anchor_min.y,
+                widget->anchors.anchor_max.x, widget->anchors.anchor_max.y,
+                widget->anchors.offset_min.x, widget->anchors.offset_min.y,
+                widget->anchors.offset_max.x, widget->anchors.offset_max.y}
+            : std::array<float, 8>{};
+        for (std::size_t i = 0; i < canvas_anchor_inputs.size(); ++i) {
+            set_float(canvas_anchor_inputs[i], values[i]);
+            EnableWindow(canvas_anchor_inputs[i], widget != nullptr);
+        }
+        const auto colors = widget
+            ? std::array<float, 4>{widget->color.r, widget->color.g,
+                                    widget->color.b, widget->color.a}
+            : std::array<float, 4>{};
+        for (std::size_t i = 0; i < canvas_color_inputs.size(); ++i) {
+            set_float(canvas_color_inputs[i], colors[i]);
+            EnableWindow(canvas_color_inputs[i], widget != nullptr);
+        }
+        EnableWindow(canvas_apply_geometry, widget != nullptr);
     }
 
     void refresh_toolbar() {
@@ -3579,6 +3672,37 @@ struct Win32EditorShell::Impl {
             RECT bounds{};
             GetClientRect(host, &bounds);
             layout(bounds.right - bounds.left, bounds.bottom - bounds.top);
+            handled = true;
+            break;
+        }
+        case IdCanvasApplyGeometry: {
+            if (notification != BN_CLICKED) return false;
+            const auto* selected = editor.ui_edit_widget();
+            if (canvas_mode && selected) {
+                std::array<float, 8> values{};
+                std::array<float, 4> rgba{};
+                bool valid = true;
+                for (std::size_t i = 0; i < values.size(); ++i)
+                    valid = read_float(canvas_anchor_inputs[i], values[i]) && valid;
+                for (std::size_t i = 0; i < rgba.size(); ++i)
+                    valid = read_float(canvas_color_inputs[i], rgba[i]) && valid;
+                if (valid) {
+                    auto anchors = selected->anchors;
+                    anchors.anchor_min = {values[0], values[1]};
+                    anchors.anchor_max = {values[2], values[3]};
+                    anchors.offset_min = {values[4], values[5]};
+                    anchors.offset_max = {values[6], values[7]};
+                    const bool anchors_changed =
+                        editor.ui_edit_set_anchors(anchors);
+                    const bool color_changed =
+                        editor.ui_edit_set_color(
+                            {rgba[0], rgba[1], rgba[2], rgba[3]});
+                    if (!anchors_changed && !color_changed)
+                        editor.console().warning(
+                            "UI", "Canvas geometry/color unchanged or invalid");
+                } else editor.console().warning(
+                    "UI", "Canvas geometry must contain finite numbers");
+            }
             handled = true;
             break;
         }
