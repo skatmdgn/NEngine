@@ -201,6 +201,10 @@ int main() {
     check(!model.ui_edit_reparent_selected(original_edit_id) &&
           !model.ui_edit_add_widget(ui::WidgetKind::Button, 99999),
           "Canvas editor rejects invalid parent and self-parenting");
+    check(model.ui_edit_dirty() &&
+          !model.begin_ui_canvas_edit(ui_record->guid) &&
+          model.ui_edit_widget() != nullptr,
+          "Canvas editor guards unsaved changes from draft replacement");
     check(model.begin_play_mode() &&
           !model.has_ui_canvas_draft() &&
           model.ui_edit_layout(640, 480).items.empty() &&

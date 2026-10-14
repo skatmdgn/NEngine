@@ -658,6 +658,10 @@ bool EditorModel::begin_ui_canvas_edit(
         if (error) *error = "Canvas editing requires an open project in Edit Mode";
         return false;
     }
+    if (ui_edit_open_ && ui_edit_history_.dirty()) {
+        if (error) *error = "Canvas has unsaved authoring edits";
+        return false;
+    }
     const auto* record = project_.assets().find(asset);
     if (!record || record->importer_id != "NEngine.Canvas") {
         if (error) *error = "Canvas asset must be an imported .ncanvas file";

@@ -1,6 +1,7 @@
 #pragma once
 #include <cstddef>
 #include <vector>
+#include <string>
 #include "nengine/ui/canvas.hpp"
 
 namespace nengine::ui {
@@ -15,11 +16,14 @@ public:
     bool commit(UiCanvas canvas);
     bool undo();
     bool redo();
+    bool dirty() const;
+    bool mark_saved();
     std::size_t undo_count() const noexcept { return undo_.size(); }
     std::size_t redo_count() const noexcept { return redo_.size(); }
 private:
     std::size_t max_undo_{32u};
     UiCanvas current_{};
+    std::string saved_serialization_{};
     std::vector<UiCanvas> undo_{};
     std::vector<UiCanvas> redo_{};
 };

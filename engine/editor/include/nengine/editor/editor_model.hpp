@@ -170,6 +170,7 @@ public:
         return ui_edit_open_ && can_edit();
     }
     assets::AssetGuid ui_edit_asset() const noexcept { return ui_edit_asset_; }
+    bool ui_edit_dirty() const { return ui_edit_open_ && ui_edit_history_.dirty(); }
     ui::WidgetId selected_ui_widget() const noexcept {
         return ui_edit_selected_;
     }

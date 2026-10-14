@@ -197,11 +197,14 @@ int main() {
           edits.canvas().find(named_button)->text == "Ready" &&
           edits.undo_count() == 1,
           "Canvas edit history commits an isolated widget change");
+    check(edits.dirty() && edits.mark_saved() && !edits.dirty(),
+          "Canvas edit history tracks the last persisted draft without losing undo");
     check(edits.undo() &&
           edits.canvas().find(named_button)->text == "Start" &&
           edits.redo() &&
           edits.canvas().find(named_button)->text == "Ready",
           "Canvas edit history restores committed snapshots with Undo and Redo");
+    check(!edits.dirty(), "redo returns to the last saved Canvas baseline");
     UiCanvas invalid_edit = edits.canvas();
     invalid_edit.find(named_other)->name = "Main.Start";
     check(!edits.commit(invalid_edit) &&

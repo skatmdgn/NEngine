@@ -21,6 +21,7 @@ bool CanvasEditHistory::reset(UiCanvas canvas) {
     std::string serialized;
     if (!serialize(canvas, serialized)) return false;
     current_ = std::move(canvas);
+    saved_serialization_ = std::move(serialized);
     undo_.clear();
     redo_.clear();
     return true;
@@ -36,6 +37,18 @@ bool CanvasEditHistory::commit(UiCanvas canvas) {
     }
     current_ = std::move(canvas);
     redo_.clear();
+    return true;
+}
+
+bool CanvasEditHistory::dirty() const {
+    std::string snapshot;
+    return !serialize(current_, snapshot) || snapshot != saved_serialization_;
+}
+
+bool CanvasEditHistory::mark_saved() {
+    std::string snapshot;
+    if (!serialize(current_, snapshot)) return false;
+    saved_serialization_ = std::move(snapshot);
     return true;
 }
 
