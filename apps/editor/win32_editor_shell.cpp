@@ -4391,6 +4391,30 @@ struct Win32EditorShell::Impl {
                     ETO_CLIPPED, &clip, label.c_str(),
                     static_cast<UINT>(label.size()), nullptr);
             }
+
+            // Keyboard-selected (or mouse-selected) button is identifiable
+            // even when no pointer is hovering over it. Use the already
+            // clipped rectangle to avoid drawing outside the Canvas bounds.
+            const auto focused_widget = editor.focused_ui_widget();
+            for (const auto& item : layout.items) {
+                if (item.id != focused_widget ||
+                    item.kind != nengine::ui::WidgetKind::Button ||
+                    !item.interactable ||
+                    item.clipped_rect.width <= 2.0f ||
+                    item.clipped_rect.height <= 2.0f)
+                    continue;
+                RECT focus_rect{
+                    static_cast<LONG>(item.clipped_rect.x) + 1,
+                    static_cast<LONG>(item.clipped_rect.y) + 1,
+                    static_cast<LONG>(item.clipped_rect.x +
+                                      item.clipped_rect.width) - 1,
+                    static_cast<LONG>(item.clipped_rect.y +
+                                      item.clipped_rect.height) - 1};
+                if (focus_rect.right > focus_rect.left &&
+                    focus_rect.bottom > focus_rect.top)
+                    DrawFocusRect(dc, &focus_rect);
+                break;
+            }
         }
 
         constexpr wchar_t caption[] =
