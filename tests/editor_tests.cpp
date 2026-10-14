@@ -185,6 +185,22 @@ int main() {
           !model.ui_edit_widget()->interactable &&
           !model.ui_edit_set_name("invalid name"),
           "Canvas Edit Mode Undo/Redo restores widget fields and rejects invalid identifiers");
+    const auto original_edit_id = model.selected_ui_widget();
+    const auto new_widget = model.ui_edit_add_widget(ui::WidgetKind::Text);
+    check(new_widget != ui::invalid_widget &&
+          model.ui_edit_set_name("Main.Label") &&
+          model.ui_edit_set_text("Subtitle") &&
+          model.ui_edit_widget()->name == "Main.Label" &&
+          model.ui_edit_duplicate_selected() != ui::invalid_widget &&
+          model.ui_edit_widget()->name.empty() &&
+          model.ui_edit_remove_selected() &&
+          model.ui_edit_undo() &&
+          model.ui_edit_redo() &&
+          model.select_ui_widget(original_edit_id),
+          "Canvas editor supports create duplicate remove and undoable subtree operations");
+    check(!model.ui_edit_reparent_selected(original_edit_id) &&
+          !model.ui_edit_add_widget(ui::WidgetKind::Button, 99999),
+          "Canvas editor rejects invalid parent and self-parenting");
     check(model.begin_play_mode() &&
           !model.has_ui_canvas_draft() &&
           model.ui_edit_layout(640, 480).items.empty() &&

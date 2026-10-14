@@ -732,6 +732,59 @@ bool EditorModel::ui_edit_set_interactable(bool interactable) {
     return ui_edit_history_.commit(std::move(candidate));
 }
 
+bool EditorModel::ui_edit_set_anchors(ui::RectAnchors anchors) {
+    if (!ui_edit_widget()) return false;
+    auto candidate = ui_edit_history_.canvas();
+    candidate.find(ui_edit_selected_)->anchors = anchors;
+    return ui_edit_history_.commit(std::move(candidate));
+}
+
+ui::WidgetId EditorModel::ui_edit_add_widget(
+    ui::WidgetKind kind, ui::WidgetId parent) {
+    if (!has_ui_canvas_draft()) return ui::invalid_widget;
+    auto candidate = ui_edit_history_.canvas();
+    const auto id = candidate.add(kind, parent);
+    if (id == ui::invalid_widget ||
+        !ui_edit_history_.commit(std::move(candidate)))
+        return ui::invalid_widget;
+    ui_edit_selected_ = id;
+    return id;
+}
+
+ui::WidgetId EditorModel::ui_edit_duplicate_selected() {
+    if (!ui_edit_widget()) return ui::invalid_widget;
+    auto candidate = ui_edit_history_.canvas();
+    const auto duplicate = candidate.duplicate_subtree(ui_edit_selected_);
+    if (duplicate == ui::invalid_widget ||
+        !ui_edit_history_.commit(std::move(candidate)))
+        return ui::invalid_widget;
+    ui_edit_selected_ = duplicate;
+    return duplicate;
+}
+
+bool EditorModel::ui_edit_remove_selected() {
+    if (!ui_edit_widget()) return false;
+    auto candidate = ui_edit_history_.canvas();
+    if (!candidate.remove(ui_edit_selected_) ||
+        !ui_edit_history_.commit(std::move(candidate))) return false;
+    ui_edit_selected_ = ui::invalid_widget;
+    return true;
+}
+
+bool EditorModel::ui_edit_reparent_selected(ui::WidgetId parent) {
+    if (!ui_edit_widget()) return false;
+    auto candidate = ui_edit_history_.canvas();
+    if (!candidate.reparent(ui_edit_selected_, parent)) return false;
+    return ui_edit_history_.commit(std::move(candidate));
+}
+
+bool EditorModel::ui_edit_set_sibling_index(std::size_t index) {
+    if (!ui_edit_widget()) return false;
+    auto candidate = ui_edit_history_.canvas();
+    if (!candidate.set_sibling_index(ui_edit_selected_, index)) return false;
+    return ui_edit_history_.commit(std::move(candidate));
+}
+
 bool EditorModel::ui_edit_undo() {
     if (!has_ui_canvas_draft() || !ui_edit_history_.undo()) return false;
     if (!ui_edit_history_.canvas().find(ui_edit_selected_))

@@ -185,6 +185,13 @@ public:
     bool ui_edit_set_text(std::string text);
     bool ui_edit_set_visible(bool visible);
     bool ui_edit_set_interactable(bool interactable);
+    bool ui_edit_set_anchors(ui::RectAnchors anchors);
+    ui::WidgetId ui_edit_add_widget(ui::WidgetKind kind,
+                                    ui::WidgetId parent = ui::invalid_widget);
+    ui::WidgetId ui_edit_duplicate_selected();
+    bool ui_edit_remove_selected();
+    bool ui_edit_reparent_selected(ui::WidgetId parent);
+    bool ui_edit_set_sibling_index(std::size_t index);
     bool ui_edit_undo();
     bool ui_edit_redo();
     std::size_t ui_edit_undo_count() const noexcept {
