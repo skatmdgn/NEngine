@@ -879,6 +879,61 @@ void ManagedRuntime::bind_input(
         input_state;
 }
 
+void ManagedRuntime::bind_ui(
+    void* context, UiFindFn find, UiQueryFn query,
+    UiWriteFn write, UiTextFn text,
+    UiSetTextFn set_text) noexcept {
+    if (!world_context_)
+        world_context_ = std::make_unique<NativeWorldContext>();
+    world_context_->ui_context = context;
+    world_context_->ui_find = find;
+    world_context_->ui_query = query;
+    world_context_->ui_write = write;
+    world_context_->ui_text = text;
+    world_context_->ui_set_text = set_text;
+}
+
+std::uint64_t ManagedRuntime::callback_ui_find(
+    void* context, const char* label) {
+    auto* state = static_cast<NativeWorldContext*>(context);
+    if (!state || !state->ui_find || !label) return 0u;
+    return state->ui_find(state->ui_context, label);
+}
+
+int ManagedRuntime::callback_ui_query(
+    void* context, std::uint64_t id, int operation) {
+    auto* state = static_cast<NativeWorldContext*>(context);
+    if (!state || !state->ui_query) return -1;
+    return state->ui_query(state->ui_context, id, operation);
+}
+
+int ManagedRuntime::callback_ui_write(
+    void* context, std::uint64_t id, int operation, int value) {
+    auto* state = static_cast<NativeWorldContext*>(context);
+    if (!state || !state->ui_write) return -1;
+    return state->ui_write(state->ui_context, id, operation, value);
+}
+
+int ManagedRuntime::callback_ui_copy_text(
+    void* context, std::uint64_t id, char* buffer, int capacity) {
+    auto* state = static_cast<NativeWorldContext*>(context);
+    if (!state || !state->ui_text) return 0;
+    const auto text = state->ui_text(state->ui_context, id);
+    if (!text || text->size() > 4096u) return 0;
+    const int required = static_cast<int>(text->size() + 1u);
+    if (!buffer || capacity < required) return -required;
+    if (!text->empty()) std::memcpy(buffer, text->data(), text->size());
+    buffer[text->size()] = char(0);
+    return required;
+}
+
+int ManagedRuntime::callback_ui_set_text(
+    void* context, std::uint64_t id, const char* text) {
+    auto* state = static_cast<NativeWorldContext*>(context);
+    if (!state || !state->ui_set_text || !text) return -1;
+    return state->ui_set_text(state->ui_context, id, text) ? 1 : 0;
+}
+
 int ManagedRuntime::callback_physics_raycast(
     void* context,
     int is_2d,
@@ -1267,6 +1322,10 @@ ManagedRuntime::ManagedRuntime(
           std::exchange(
               other.configure_input_callbacks_,
               nullptr)),
+      configure_ui_callbacks_(
+          std::exchange(
+              other.configure_ui_callbacks_,
+              nullptr)),
       world_context_(
           std::move(
               other.world_context_)),
@@ -1412,6 +1471,10 @@ ManagedRuntime::operator=(
         std::exchange(
             other.configure_input_callbacks_,
             nullptr);
+    configure_ui_callbacks_ =
+        std::exchange(
+            other.configure_ui_callbacks_,
+            nullptr);
 
     world_context_ =
         std::move(
@@ -1521,9 +1584,9 @@ bool ManagedRuntime::initialize(
     const int abi_version =
         abi();
 
-    if (abi_version != 15) {
+    if (abi_version != 16) {
         diagnostic_ =
-            "managed bridge ABI mismatch: expected 15, got " +
+            "managed bridge ABI mismatch: expected 16, got " +
             std::to_string(
                 abi_version);
         shutdown();
@@ -1677,6 +1740,11 @@ bool ManagedRuntime::initialize(
             bridge_type,
             "ConfigureNativeInputCallbacks");
 
+    configure_ui_callbacks_ =
+        load_entry<ConfigureUiCallbacksFn>(
+            host_, bridge_assembly_path, bridge_type,
+            "ConfigureNativeUiCallbacks");
+
     load_gameplay_ =
         load_entry<LoadGameplayFn>(
             host_,
@@ -1733,6 +1801,7 @@ bool ManagedRuntime::initialize(
         !copy_game_object_name_ ||
         !configure_world_callbacks_ ||
         !configure_input_callbacks_ ||
+        !configure_ui_callbacks_ ||
         !load_gameplay_ ||
         !unload_gameplay_ ||
         !is_gameplay_loaded_ ||
@@ -1825,6 +1894,19 @@ bool ManagedRuntime::initialize(
         diagnostic_ =
             "managed Bridge rejected native Input callback table";
 
+        shutdown();
+        return false;
+    }
+
+    NativeUiCallbacks ui_callbacks;
+    ui_callbacks.context = world_context_.get();
+    ui_callbacks.find = &ManagedRuntime::callback_ui_find;
+    ui_callbacks.query = &ManagedRuntime::callback_ui_query;
+    ui_callbacks.write = &ManagedRuntime::callback_ui_write;
+    ui_callbacks.copy_text = &ManagedRuntime::callback_ui_copy_text;
+    ui_callbacks.set_text = &ManagedRuntime::callback_ui_set_text;
+    if (configure_ui_callbacks_(&ui_callbacks) <= 0) {
+        diagnostic_ = "managed Bridge rejected native UI callback table";
         shutdown();
         return false;
     }
@@ -2465,6 +2547,7 @@ int ManagedRuntime::instance_count()
 }
 
 void ManagedRuntime::shutdown() noexcept {
+    if (configure_ui_callbacks_) configure_ui_callbacks_(nullptr);
     if (configure_input_callbacks_) {
         configure_input_callbacks_(
             nullptr);
@@ -2488,6 +2571,12 @@ void ManagedRuntime::shutdown() noexcept {
             nullptr;
         world_context_->physics_box_cast =
             nullptr;
+        world_context_->ui_context = nullptr;
+        world_context_->ui_find = nullptr;
+        world_context_->ui_query = nullptr;
+        world_context_->ui_write = nullptr;
+        world_context_->ui_text = nullptr;
+        world_context_->ui_set_text = nullptr;
     }
 
     create_ = nullptr;
@@ -2520,6 +2609,7 @@ void ManagedRuntime::shutdown() noexcept {
     copy_game_object_name_ = nullptr;
     configure_world_callbacks_ = nullptr;
     configure_input_callbacks_ = nullptr;
+    configure_ui_callbacks_ = nullptr;
     world_context_.reset();
     load_gameplay_ = nullptr;
     unload_gameplay_ = nullptr;

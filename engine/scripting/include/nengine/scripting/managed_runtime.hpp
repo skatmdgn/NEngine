@@ -216,6 +216,17 @@ public:
     void bind_input(
         const input::InputState* input_state) noexcept;
 
+    // Domain-neutral callback boundary: Scripting never depends on NEngineUI.
+    // Query op: 0=visible, 1=interactable, 2=clicked in current runtime frame.
+    using UiFindFn = std::uint64_t (*)(void*, std::string_view);
+    using UiQueryFn = int (*)(void*, std::uint64_t, int);
+    using UiWriteFn = int (*)(void*, std::uint64_t, int, int);
+    using UiTextFn = std::optional<std::string> (*)(void*, std::uint64_t);
+    using UiSetTextFn = bool (*)(void*, std::uint64_t, std::string_view);
+    void bind_ui(void* context, UiFindFn find, UiQueryFn query,
+                 UiWriteFn write, UiTextFn text,
+                 UiSetTextFn set_text) noexcept;
+
     bool unload_gameplay();
 
     bool gameplay_loaded() const noexcept {
@@ -253,6 +264,7 @@ public:
             copy_game_object_name_ != nullptr &&
             configure_world_callbacks_ != nullptr &&
             configure_input_callbacks_ != nullptr &&
+            configure_ui_callbacks_ != nullptr &&
             world_context_ != nullptr &&
             load_gameplay_ != nullptr &&
             unload_gameplay_ != nullptr &&
@@ -356,6 +368,12 @@ private:
         PhysicsRaycastQueryFn physics_raycast{nullptr};
         PhysicsOverlapQueryFn physics_overlap{nullptr};
         PhysicsBoxCastQueryFn physics_box_cast{nullptr};
+        void* ui_context{nullptr};
+        UiFindFn ui_find{nullptr};
+        UiQueryFn ui_query{nullptr};
+        UiWriteFn ui_write{nullptr};
+        UiTextFn ui_text{nullptr};
+        UiSetTextFn ui_set_text{nullptr};
         std::vector<core::Entity> pending_destroy{};
     };
 
@@ -715,6 +733,26 @@ private:
         void* context,
         NativePointerState* state);
 
+    using UiFindCallbackFn = std::uint64_t (*)(void*, const char*);
+    using UiQueryCallbackFn = int (*)(void*, std::uint64_t, int);
+    using UiWriteCallbackFn = int (*)(void*, std::uint64_t, int, int);
+    using UiCopyTextCallbackFn = int (*)(void*, std::uint64_t, char*, int);
+    using UiSetTextCallbackFn = int (*)(void*, std::uint64_t, const char*);
+    struct NativeUiCallbacks {
+        void* context{nullptr};
+        UiFindCallbackFn find{nullptr};
+        UiQueryCallbackFn query{nullptr};
+        UiWriteCallbackFn write{nullptr};
+        UiCopyTextCallbackFn copy_text{nullptr};
+        UiSetTextCallbackFn set_text{nullptr};
+    };
+    using ConfigureUiCallbacksFn = int (*)(const NativeUiCallbacks*);
+    static std::uint64_t callback_ui_find(void*, const char*);
+    static int callback_ui_query(void*, std::uint64_t, int);
+    static int callback_ui_write(void*, std::uint64_t, int, int);
+    static int callback_ui_copy_text(void*, std::uint64_t, char*, int);
+    static int callback_ui_set_text(void*, std::uint64_t, const char*);
+
     using LoadGameplayFn =
         int (*)(
             const char*,
@@ -748,6 +786,7 @@ private:
     CopyGameObjectNameFn copy_game_object_name_{nullptr};
     ConfigureWorldCallbacksFn configure_world_callbacks_{nullptr};
     ConfigureInputCallbacksFn configure_input_callbacks_{nullptr};
+    ConfigureUiCallbacksFn configure_ui_callbacks_{nullptr};
     std::unique_ptr<NativeWorldContext> world_context_{};
     LoadGameplayFn load_gameplay_{nullptr};
     SimpleFn unload_gameplay_{nullptr};
