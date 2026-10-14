@@ -476,7 +476,6 @@ bool EditorModel::begin_play_mode() {
 bool EditorModel::stop_play_mode() {
     ui_keyboard_router_.reset();
     ui_pointer_router_.reset();
-    ui_keyboard_router_.reset();
     ui_events_.clear();
     sprite_controllers_.clear();
     bound_sprite_controllers_.clear();
@@ -603,6 +602,7 @@ bool EditorModel::set_ui_canvas_asset(assets::AssetGuid asset) {
     ui_canvas_reload_pending_ = false;
     ui_canvas_.reset();
     ui_pointer_router_.reset();
+    ui_keyboard_router_.reset();
     ui_events_.clear();
     if (!asset.valid()) return true;
     const auto artifacts = project_.cached_artifacts(asset);

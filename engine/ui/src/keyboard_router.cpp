@@ -44,12 +44,16 @@ std::vector<UiPointerEvent> UiKeyboardRouter::update(
         enter_target_ = invalid_widget;
     }
     if (enter_held && !was_enter_held_ &&
-        focused_ != invalid_widget)
+        focused_ != invalid_widget) {
         enter_target_ = focused_;
+        events.push_back({focused_, UiPointerEventType::Down});
+    }
     if (!enter_held && was_enter_held_ &&
         enter_target_ == focused_ &&
-        enter_target_ != invalid_widget)
+        enter_target_ != invalid_widget) {
+        events.push_back({focused_, UiPointerEventType::Up});
         events.push_back({focused_, UiPointerEventType::Click});
+    }
     if (!enter_held) enter_target_ = invalid_widget;
     was_tab_held_ = tab_held;
     was_enter_held_ = enter_held;

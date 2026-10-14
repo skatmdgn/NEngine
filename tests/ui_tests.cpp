@@ -253,14 +253,20 @@ int main() {
     keyboard.update(keys, true, false, true);
     check(keyboard.focused() == keyboard_a,
           "Shift+Tab traverses UI focus backwards");
-    keyboard.update(keys, false, true);
+    const auto key_down = keyboard.update(keys, false, true);
+    check(key_down.size() == 1u &&
+          key_down[0].target == keyboard_a &&
+          key_down[0].type == UiPointerEventType::Down,
+          "Enter press raises a button Down event");
     check(keyboard.update(keys, false, true).empty(),
           "held Enter cannot auto-repeat a click");
     const auto activate = keyboard.update(keys, false, false);
-    check(activate.size() == 1u &&
+    check(activate.size() == 2u &&
           activate[0].target == keyboard_a &&
-          activate[0].type == UiPointerEventType::Click,
-          "Enter release clicks the focused button");
+          activate[0].type == UiPointerEventType::Up &&
+          activate[1].target == keyboard_a &&
+          activate[1].type == UiPointerEventType::Click,
+          "Enter release raises button Up then Click");
     keyboard_canvas.find(keyboard_a)->visible = false;
     keyboard.update(keyboard_canvas.layout(400, 100), false, false);
     check(keyboard.focused() == invalid_widget,

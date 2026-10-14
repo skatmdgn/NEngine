@@ -181,9 +181,11 @@ int main() {
         model.route_ui_keyboard(640, 480, false, false);
     check(ui_tab.size() == 1u &&
           ui_tab[0].target == 1u &&
-          ui_enter_click.size() == 1u &&
+          ui_enter_click.size() == 2u &&
           ui_enter_click[0].target == 1u &&
-          ui_enter_click[0].type == ui::UiPointerEventType::Click,
+          ui_enter_click[0].type == ui::UiPointerEventType::Up &&
+          ui_enter_click[1].target == 1u &&
+          ui_enter_click[1].type == ui::UiPointerEventType::Click,
           "Play Mode keyboard Tab and Enter activate Canvas button");
 
     const auto canvas_before_reload = model.ui_canvas_asset();
