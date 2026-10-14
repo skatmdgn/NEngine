@@ -59,6 +59,16 @@ enum ControlId : int {
     IdStep,
     IdStop,
     IdVulkanPreview,
+    IdCanvasEdit,
+    IdCanvasName,
+    IdCanvasText,
+    IdCanvasApply,
+    IdCanvasSave,
+    IdCanvasAddButton,
+    IdCanvasAddText,
+    IdCanvasDelete,
+    IdCanvasUndo,
+    IdCanvasRedo,
     IdHierarchy,
     IdName,
     IdActive,
@@ -288,6 +298,17 @@ struct Win32EditorShell::Impl {
     HWND step{nullptr};
     HWND stop{nullptr};
     HWND vulkan_preview{nullptr};
+    HWND canvas_edit_toggle{nullptr};
+    HWND canvas_name{nullptr};
+    HWND canvas_text{nullptr};
+    HWND canvas_apply{nullptr};
+    HWND canvas_save{nullptr};
+    HWND canvas_add_button{nullptr};
+    HWND canvas_add_text{nullptr};
+    HWND canvas_delete{nullptr};
+    HWND canvas_undo{nullptr};
+    HWND canvas_redo{nullptr};
+    bool canvas_mode{false};
 
     HWND hierarchy{nullptr};
     HWND scene{nullptr};
@@ -1012,6 +1033,35 @@ struct Win32EditorShell::Impl {
             !add_component_list ||
             !add_component) {
             shell_log("attach failed: inspector control creation");
+            return false;
+        }
+
+        canvas_edit_toggle = create_control(
+            host, L"BUTTON", L"Canvas Edit", BS_PUSHBUTTON, IdCanvasEdit);
+        canvas_name = create_control(
+            host, L"EDIT", L"", WS_BORDER | ES_AUTOHSCROLL, IdCanvasName);
+        canvas_text = create_control(
+            host, L"EDIT", L"", WS_BORDER | ES_AUTOHSCROLL, IdCanvasText);
+        canvas_apply = create_control(
+            host, L"BUTTON", L"Apply Name + Text", BS_PUSHBUTTON, IdCanvasApply);
+        canvas_save = create_control(
+            host, L"BUTTON", L"Save Canvas", BS_PUSHBUTTON, IdCanvasSave);
+        canvas_add_button = create_control(
+            host, L"BUTTON", L"+ Button", BS_PUSHBUTTON, IdCanvasAddButton);
+        canvas_add_text = create_control(
+            host, L"BUTTON", L"+ Text", BS_PUSHBUTTON, IdCanvasAddText);
+        canvas_delete = create_control(
+            host, L"BUTTON", L"Delete UI", BS_PUSHBUTTON, IdCanvasDelete);
+        canvas_undo = create_control(
+            host, L"BUTTON", L"UI Undo", BS_PUSHBUTTON, IdCanvasUndo);
+        canvas_redo = create_control(
+            host, L"BUTTON", L"UI Redo", BS_PUSHBUTTON, IdCanvasRedo);
+
+        if (!canvas_edit_toggle || !canvas_name || !canvas_text ||
+            !canvas_apply || !canvas_save || !canvas_add_button ||
+            !canvas_add_text || !canvas_delete || !canvas_undo ||
+            !canvas_redo) {
+            shell_log("attach failed: Canvas authoring controls");
             return false;
         }
 
@@ -1769,6 +1819,30 @@ struct Win32EditorShell::Impl {
         const int iw =
             inspector_width - 20;
 
+        MoveWindow(canvas_edit_toggle, ix, iy, iw, 26, TRUE);
+        iy += 32;
+        const bool ui_authoring = canvas_mode && editor.has_ui_canvas_draft();
+        const std::array<HWND, 9> ui_controls{
+            canvas_name, canvas_text, canvas_apply, canvas_save,
+            canvas_add_button, canvas_add_text, canvas_delete,
+            canvas_undo, canvas_redo};
+        for (HWND control : ui_controls)
+            ShowWindow(control, ui_authoring ? SW_SHOW : SW_HIDE);
+        if (ui_authoring) {
+            MoveWindow(canvas_name, ix, iy, iw, 24, TRUE); iy += 29;
+            MoveWindow(canvas_text, ix, iy, iw, 24, TRUE); iy += 29;
+            MoveWindow(canvas_apply, ix, iy, iw, 24, TRUE); iy += 28;
+            MoveWindow(canvas_save, ix, iy, iw, 24, TRUE); iy += 29;
+            const int half = (iw - 4) / 2;
+            MoveWindow(canvas_add_button, ix, iy, half, 24, TRUE);
+            MoveWindow(canvas_add_text, ix + half + 4, iy, half, 24, TRUE);
+            iy += 28;
+            MoveWindow(canvas_delete, ix, iy, iw, 24, TRUE); iy += 28;
+            MoveWindow(canvas_undo, ix, iy, half, 24, TRUE);
+            MoveWindow(canvas_redo, ix + half + 4, iy, half, 24, TRUE);
+            iy += 36;
+        }
+
         MoveWindow(
             inspector_title,
             ix,
@@ -2322,6 +2396,7 @@ struct Win32EditorShell::Impl {
 
         shell_log("refresh inspector");
         refresh_inspector();
+        refresh_canvas_controls();
 
         refresh_assets_panel();
         refresh_console();
@@ -2334,6 +2409,28 @@ struct Win32EditorShell::Impl {
 
         shell_log("refresh complete");
         refreshing = false;
+    }
+
+    void refresh_canvas_controls() {
+        if (!canvas_edit_toggle) return;
+        const bool active = canvas_mode && editor.has_ui_canvas_draft();
+        EnableWindow(canvas_edit_toggle, editor.can_edit() &&
+                     editor.ui_canvas_asset().valid());
+        SetWindowTextW(canvas_edit_toggle,
+            active ? L"Close Canvas Edit" : L"Canvas Edit");
+        if (!active) return;
+        const auto* widget = editor.ui_edit_widget();
+        set_text(canvas_name, widget ? widget->name : "");
+        set_text(canvas_text, widget ? widget->text : "");
+        EnableWindow(canvas_name, widget != nullptr);
+        EnableWindow(canvas_text, widget != nullptr);
+        EnableWindow(canvas_apply, widget != nullptr);
+        EnableWindow(canvas_delete, widget != nullptr);
+        EnableWindow(canvas_save, editor.ui_edit_dirty());
+        EnableWindow(canvas_undo, editor.ui_edit_undo_count() != 0);
+        EnableWindow(canvas_redo, editor.ui_edit_redo_count() != 0);
+        EnableWindow(canvas_add_button, true);
+        EnableWindow(canvas_add_text, true);
     }
 
     void refresh_toolbar() {
@@ -3414,6 +3511,79 @@ struct Win32EditorShell::Impl {
         bool handled = false;
 
         switch (id) {
+        case IdCanvasEdit: {
+            if (notification != BN_CLICKED) return false;
+            if (canvas_mode && editor.has_ui_canvas_draft()) {
+                if (editor.ui_edit_dirty())
+                    editor.console().warning(
+                        "UI", "Save Canvas edits before closing Canvas Edit Mode.");
+                else canvas_mode = false;
+            } else {
+                std::string error;
+                if (editor.begin_ui_canvas_edit(editor.ui_canvas_asset(), &error))
+                    canvas_mode = true;
+                else editor.console().warning("UI", error);
+            }
+            RECT bounds{};
+            GetClientRect(host, &bounds);
+            layout(bounds.right - bounds.left, bounds.bottom - bounds.top);
+            handled = true;
+            break;
+        }
+        case IdCanvasApply: {
+            if (notification != BN_CLICKED) return false;
+            if (canvas_mode && editor.has_ui_canvas_draft() &&
+                editor.ui_edit_widget()) {
+                const auto next_name = read_text(canvas_name);
+                const auto next_text = read_text(canvas_text);
+                bool changed = false;
+                if (editor.ui_edit_widget()->name != next_name)
+                    changed = editor.ui_edit_set_name(next_name) || changed;
+                if (editor.ui_edit_widget()->text != next_text)
+                    changed = editor.ui_edit_set_text(next_text) || changed;
+                if (!changed)
+                    editor.console().warning(
+                        "UI", "Canvas properties unchanged or rejected; check widget name.");
+            }
+            handled = true;
+            break;
+        }
+        case IdCanvasSave: {
+            if (notification != BN_CLICKED) return false;
+            std::string error;
+            if (editor.save_ui_canvas_edit(&error))
+                editor.console().info("UI", "Canvas saved and reimported.");
+            else editor.console().warning("UI", error);
+            handled = true;
+            break;
+        }
+        case IdCanvasAddButton:
+        case IdCanvasAddText: {
+            if (notification != BN_CLICKED) return false;
+            if (canvas_mode && editor.has_ui_canvas_draft()) {
+                const auto kind = id == IdCanvasAddButton
+                    ? nengine::ui::WidgetKind::Button
+                    : nengine::ui::WidgetKind::Text;
+                editor.ui_edit_add_widget(kind);
+            }
+            handled = true;
+            break;
+        }
+        case IdCanvasDelete:
+            if (notification != BN_CLICKED) return false;
+            if (canvas_mode) editor.ui_edit_remove_selected();
+            handled = true;
+            break;
+        case IdCanvasUndo:
+            if (notification != BN_CLICKED) return false;
+            if (canvas_mode) editor.ui_edit_undo();
+            handled = true;
+            break;
+        case IdCanvasRedo:
+            if (notification != BN_CLICKED) return false;
+            if (canvas_mode) editor.ui_edit_redo();
+            handled = true;
+            break;
         case IdOpen:
             if (notification != BN_CLICKED) return false;
             open_scene_file();
