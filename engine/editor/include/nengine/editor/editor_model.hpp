@@ -187,6 +187,7 @@ public:
     bool ui_edit_set_visible(bool visible);
     bool ui_edit_set_interactable(bool interactable);
     bool ui_edit_set_anchors(ui::RectAnchors anchors);
+    bool ui_edit_set_color(ui::UiColor color);
     ui::WidgetId ui_edit_add_widget(ui::WidgetKind kind,
                                     ui::WidgetId parent = ui::invalid_widget);
     ui::WidgetId ui_edit_duplicate_selected();

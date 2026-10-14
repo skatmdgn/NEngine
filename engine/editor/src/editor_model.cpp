@@ -742,7 +742,14 @@ bool EditorModel::ui_edit_set_interactable(bool interactable) {
 bool EditorModel::ui_edit_set_anchors(ui::RectAnchors anchors) {
     if (!ui_edit_widget()) return false;
     auto candidate = ui_edit_history_.canvas();
-    candidate.find(ui_edit_selected_)->anchors = anchors;
+    if (!candidate.set_anchors(ui_edit_selected_, anchors)) return false;
+    return ui_edit_history_.commit(std::move(candidate));
+}
+
+bool EditorModel::ui_edit_set_color(ui::UiColor color) {
+    if (!ui_edit_widget()) return false;
+    auto candidate = ui_edit_history_.canvas();
+    if (!candidate.set_color(ui_edit_selected_, color)) return false;
     return ui_edit_history_.commit(std::move(candidate));
 }
 

@@ -311,6 +311,25 @@ bool UiCanvas::set_interactable(
     return true;
 }
 
+bool UiCanvas::set_anchors(WidgetId id, RectAnchors anchors) noexcept {
+    auto* widget = find(id);
+    if (!widget || !finite_anchors(anchors)) return false;
+    const auto reasonable = [](float x, float limit) {
+        return std::abs(x) <= limit;
+    };
+    if (!reasonable(anchors.anchor_min.x, 8) ||
+        !reasonable(anchors.anchor_min.y, 8) ||
+        !reasonable(anchors.anchor_max.x, 8) ||
+        !reasonable(anchors.anchor_max.y, 8) ||
+        !reasonable(anchors.offset_min.x, 1000000) ||
+        !reasonable(anchors.offset_min.y, 1000000) ||
+        !reasonable(anchors.offset_max.x, 1000000) ||
+        !reasonable(anchors.offset_max.y, 1000000))
+        return false;
+    widget->anchors = anchors;
+    return true;
+}
+
 bool UiCanvas::set_color(WidgetId id, UiColor color) noexcept {
     auto* widget = find(id);
     const auto valid_channel = [](float value) {

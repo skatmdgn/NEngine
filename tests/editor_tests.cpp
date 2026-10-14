@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -186,6 +187,19 @@ int main() {
           !model.ui_edit_widget()->interactable &&
           !model.ui_edit_set_name("invalid name"),
           "Canvas Edit Mode Undo/Redo restores widget fields and rejects invalid identifiers");
+    auto bounded_anchors = model.ui_edit_widget()->anchors;
+    bounded_anchors.offset_min = {24, 36};
+    check(model.ui_edit_set_anchors(bounded_anchors) &&
+          model.ui_edit_widget()->anchors.offset_min.x == 24 &&
+          model.ui_edit_set_color({0.2f, 0.4f, 0.6f, 1}) &&
+          model.ui_edit_widget()->color.b == 0.6f &&
+          !model.ui_edit_set_color({2, 0, 0, 1}),
+          "Canvas authoring commits checked RGBA and anchor bounds");
+    auto rejected_anchors = bounded_anchors;
+    rejected_anchors.offset_min.x = std::numeric_limits<float>::infinity();
+    check(!model.ui_edit_set_anchors(rejected_anchors) &&
+          model.ui_edit_widget()->anchors.offset_min.x == 24,
+          "Canvas editor rejects nonfinite anchor offsets without new undo state");
     const auto original_edit_id = model.selected_ui_widget();
     const auto new_widget = model.ui_edit_add_widget(ui::WidgetKind::Text);
     check(new_widget != ui::invalid_widget &&
