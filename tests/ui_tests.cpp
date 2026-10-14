@@ -84,6 +84,32 @@ int main() {
           moved_readback.find(grandchild_a)->parent == child_a,
           "reparented hierarchy remains valid and serializable");
 
+    UiCanvas sorting;
+    const auto sorting_parent = sorting.add(WidgetKind::Panel);
+    const auto sibling_a = sorting.add(WidgetKind::Button, sorting_parent);
+    const auto sibling_b = sorting.add(WidgetKind::Button, sorting_parent);
+    const auto nested_a = sorting.add(WidgetKind::Text, sibling_a);
+    const auto sibling_c = sorting.add(WidgetKind::Button, sorting_parent);
+    check(!sorting.set_sibling_index(0, 0) &&
+          !sorting.set_sibling_index(345678, 0),
+          "sibling reorder rejects invalid IDs");
+    check(sorting.set_sibling_index(sibling_a, 999) &&
+          sorting.widgets()[1].id == sibling_b &&
+          sorting.widgets()[2].id == sibling_c &&
+          sorting.widgets()[3].id == sibling_a &&
+          sorting.widgets()[4].id == nested_a,
+          "sibling reorder moves the full subtree to the front of paint order");
+    check(sorting.set_sibling_index(sibling_a, 0) &&
+          sorting.widgets()[1].id == sibling_a &&
+          sorting.widgets()[2].id == nested_a,
+          "sibling reorder moves full subtree behind older siblings");
+    std::stringstream sorting_source;
+    UiCanvas sorting_readback;
+    check(write_canvas(sorting_source, sorting) &&
+          read_canvas(sorting_source, sorting_readback) &&
+          sorting_readback.find(nested_a)->parent == sibling_a,
+          "sibling reorder maintains a serializable parent-first Canvas");
+
     const auto next = canvas.add(WidgetKind::Text);
     check(next > overflow && canvas.layout(0.0f, 600.0f).items.empty(),
           "widget IDs advance and invalid viewport is safely rejected");

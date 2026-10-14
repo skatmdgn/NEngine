@@ -79,6 +79,9 @@ public:
     // Move a complete widget subtree while preserving stable IDs.
     // Rejects cycles, stale IDs, and self-parenting.
     bool reparent(WidgetId id, WidgetId new_parent);
+    // Reorder a widget (including descendants) among immediate siblings.
+    // Larger sibling indices render on top. Indices are clamped.
+    bool set_sibling_index(WidgetId id, std::size_t index);
     void clear() noexcept;
     UiLayout layout(float width, float height) const;
 

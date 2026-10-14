@@ -140,6 +140,56 @@ bool UiCanvas::reparent(WidgetId id, WidgetId new_parent) {
     return true;
 }
 
+bool UiCanvas::set_sibling_index(WidgetId id, std::size_t index) {
+    const auto* source = find(id);
+    if (!source) return false;
+    const WidgetId parent = source->parent;
+    std::vector<WidgetId> siblings;
+    for (const auto& node : widgets_)
+        if (node.parent == parent && node.id != id)
+            siblings.push_back(node.id);
+
+    // Keep all descendants together, even for older Canvases whose
+    // source order interleaves descendant blocks.
+    std::unordered_set<WidgetId> moving{id};
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        for (const auto& node : widgets_)
+            if (moving.contains(node.parent) &&
+                moving.insert(node.id).second)
+                changed = true;
+    }
+    std::vector<Widget> subtree, remaining;
+    subtree.reserve(moving.size());
+    remaining.reserve(widgets_.size() - moving.size());
+    for (const auto& node : widgets_)
+        (moving.contains(node.id) ? subtree : remaining).push_back(node);
+
+    std::size_t at = remaining.size();
+    if (index < siblings.size()) {
+        const auto target = siblings[index];
+        const auto it = std::find_if(
+            remaining.begin(), remaining.end(),
+            [target](const Widget& node) { return node.id == target; });
+        if (it == remaining.end()) return false;
+        at = static_cast<std::size_t>(it - remaining.begin());
+    } else if (parent != invalid_widget) {
+        std::unordered_set<WidgetId> descendants{parent};
+        for (std::size_t i = 0; i < remaining.size(); ++i)
+            if (descendants.contains(remaining[i].id) ||
+                descendants.contains(remaining[i].parent)) {
+                descendants.insert(remaining[i].id);
+                at = i + 1u;
+            }
+    }
+    remaining.insert(
+        remaining.begin() + static_cast<std::ptrdiff_t>(at),
+        subtree.begin(), subtree.end());
+    widgets_ = std::move(remaining);
+    return true;
+}
+
 bool UiCanvas::remove(WidgetId id) {
     if (!find(id)) return false;
     std::unordered_set<WidgetId> removed{id};
