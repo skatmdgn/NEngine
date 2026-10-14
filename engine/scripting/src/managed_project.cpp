@@ -168,7 +168,7 @@ namespace NEngine.Internal
 
     public static class NativeBridge
     {
-        public const int AbiVersion = 15;
+        public const int AbiVersion = 16;
 
         private static readonly Dictionary<long, NEngine.Behaviour> Instances = new();
         private static long _nextHandle = 1;
@@ -292,6 +292,46 @@ namespace NEngine.Internal
             }
         }
 
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativeUiCallbacks
+        {
+            public nint context;
+            public nint find;
+            public nint query;
+            public nint write;
+            public nint copyText;
+            public nint setText;
+        }
+
+        [UnmanagedCallersOnly]
+        public static int ConfigureNativeUiCallbacks(nint callbacksPtr)
+        {
+            try
+            {
+                if (callbacksPtr == 0)
+                {
+                    NEngine.NativeUi.Clear();
+                    return 1;
+                }
+
+                NativeUiCallbacks callbacks =
+                    Marshal.PtrToStructure<NativeUiCallbacks>(callbacksPtr);
+                NEngine.NativeUi.Configure(
+                    callbacks.context,
+                    callbacks.find,
+                    callbacks.query,
+                    callbacks.write,
+                    callbacks.copyText,
+                    callbacks.setText);
+                return 1;
+            }
+            catch
+            {
+                NEngine.NativeUi.Clear();
+                return -1;
+            }
+        }
 
         [UnmanagedCallersOnly]
         public static int LoadGameplayAssembly(nint assemblyPathUtf8, nint assemblyNameUtf8)
