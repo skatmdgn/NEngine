@@ -464,6 +464,20 @@ struct Win32EditorShell::Impl {
         switch (message) {
         case WM_KEYDOWN:
         case WM_KEYUP:
+            if (message == WM_KEYDOWN &&
+                self->canvas_mode && self->editor.has_ui_canvas_draft() &&
+                (GetKeyState(VK_CONTROL) & 0x8000) != 0) {
+                bool processed = true;
+                if (wparam == 'Z') self->editor.ui_edit_undo();
+                else if (wparam == 'Y') self->editor.ui_edit_redo();
+                else if (wparam == 'S') {
+                    std::string error;
+                    if (!self->editor.save_ui_canvas_edit(&error))
+                        self->editor.console().warning("UI", error);
+                    else self->editor.console().info("UI", "Canvas saved.");
+                } else processed = false;
+                if (processed) { self->refresh(); return 0; }
+            }
             if (!self->vulkan_preview_enabled &&
                 self->editor.play_session().is_playing() &&
                 self->editor.has_ui_canvas() &&
@@ -3520,8 +3534,13 @@ struct Win32EditorShell::Impl {
                 else canvas_mode = false;
             } else {
                 std::string error;
-                if (editor.begin_ui_canvas_edit(editor.ui_canvas_asset(), &error))
+                if (editor.begin_ui_canvas_edit(editor.ui_canvas_asset(), &error)) {
                     canvas_mode = true;
+                    if (vulkan_preview_enabled) {
+                        vulkan_preview_enabled = false;
+                        SendMessageW(vulkan_preview, BM_SETCHECK, BST_UNCHECKED, 0);
+                    }
+                }
                 else editor.console().warning("UI", error);
             }
             RECT bounds{};
@@ -3870,6 +3889,23 @@ struct Win32EditorShell::Impl {
                             editor.console().info(
                                 "UI", "Selected Canvas preview: " +
                                     asset.relative_path.generic_string());
+                            if (editor.can_edit()) {
+                                std::string edit_error;
+                                if (editor.begin_ui_canvas_edit(asset.guid, &edit_error)) {
+                                    canvas_mode = true;
+                                    if (vulkan_preview_enabled) {
+                                        vulkan_preview_enabled = false;
+                                        SendMessageW(vulkan_preview,
+                                            BM_SETCHECK, BST_UNCHECKED, 0);
+                                    }
+                                    RECT client{};
+                                    GetClientRect(host, &client);
+                                    layout(client.right - client.left,
+                                           client.bottom - client.top);
+                                } else {
+                                    editor.console().warning("UI", edit_error);
+                                }
+                            }
                             if (scene)
                                 InvalidateRect(scene, nullptr, FALSE);
                         } else {
@@ -4105,6 +4141,13 @@ struct Win32EditorShell::Impl {
         const float height =
             static_cast<float>(
                 rect.bottom - rect.top);
+
+        if (canvas_mode && editor.has_ui_canvas_draft()) {
+            editor.select_ui_widget_at(width, height,
+                {static_cast<float>(x), static_cast<float>(y)});
+            refresh();
+            return;
+        }
 
         const auto selected =
             editor.selection().active();
@@ -4476,11 +4519,17 @@ struct Win32EditorShell::Impl {
 
         // Diagnostic GDI UI overlay: the final Vulkan Game View will use
         // backend-independent UiDrawQuad geometry from NEngineUI.
-        if (editor.play_session().is_playing() &&
-            editor.has_ui_canvas()) {
-            const auto layout = editor.ui_layout(
-                static_cast<float>(rect.right),
-                static_cast<float>(rect.bottom));
+        const bool painting_ui_draft =
+            canvas_mode && editor.has_ui_canvas_draft();
+        if ((editor.play_session().is_playing() && editor.has_ui_canvas()) ||
+            painting_ui_draft) {
+            const auto layout = painting_ui_draft
+                ? editor.ui_edit_layout(
+                    static_cast<float>(rect.right),
+                    static_cast<float>(rect.bottom))
+                : editor.ui_layout(
+                    static_cast<float>(rect.right),
+                    static_cast<float>(rect.bottom));
             const auto draws = nengine::ui::build_ui_draw_list(layout);
             // A premultiplied 1x1 BGRA DIB alpha-blends each clipped
             // rectangle against the existing GDI Scene View.
@@ -4565,11 +4614,13 @@ struct Win32EditorShell::Impl {
             // Keyboard-selected (or mouse-selected) button is identifiable
             // even when no pointer is hovering over it. Use the already
             // clipped rectangle to avoid drawing outside the Canvas bounds.
-            const auto focused_widget = editor.focused_ui_widget();
+            const auto focused_widget = painting_ui_draft
+                ? editor.selected_ui_widget() : editor.focused_ui_widget();
             for (const auto& item : layout.items) {
                 if (item.id != focused_widget ||
-                    item.kind != nengine::ui::WidgetKind::Button ||
-                    !item.interactable ||
+                    (!painting_ui_draft &&
+                     (item.kind != nengine::ui::WidgetKind::Button ||
+                      !item.interactable)) ||
                     item.clipped_rect.width <= 2.0f ||
                     item.clipped_rect.height <= 2.0f)
                     continue;
