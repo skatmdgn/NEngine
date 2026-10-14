@@ -311,6 +311,18 @@ bool UiCanvas::set_interactable(
     return true;
 }
 
+bool UiCanvas::set_color(WidgetId id, UiColor color) noexcept {
+    auto* widget = find(id);
+    const auto valid_channel = [](float value) {
+        return std::isfinite(value) && value >= 0.0f && value <= 1.0f;
+    };
+    if (!widget || !valid_channel(color.r) || !valid_channel(color.g) ||
+        !valid_channel(color.b) || !valid_channel(color.a))
+        return false;
+    widget->color = color;
+    return true;
+}
+
 WidgetId UiCanvas::find_by_text(std::string_view text) const noexcept {
     // Text is a convenience label, not a unique widget identity.
     for (const auto& node : widgets_)

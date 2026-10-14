@@ -1,6 +1,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 
 #include "nengine/ui/canvas.hpp"
 #include "nengine/ui/canvas_edit_history.hpp"
@@ -155,6 +156,16 @@ int main() {
           !editable.set_visible(9876, true) &&
           !editable.set_interactable(9876, false),
           "runtime Canvas visibility and interactivity can change safely");
+
+    check(editable.set_color(edit_button, {0.1f, 0.2f, 0.3f, 0.5f}) &&
+          editable.find(edit_button)->color.a == 0.5f &&
+          !editable.set_color(edit_button, {-0.1f, 0, 0, 1}) &&
+          !editable.set_color(edit_button, {0, 0, 0, 2.0f}) &&
+          !editable.set_color(edit_button,
+              {std::numeric_limits<float>::quiet_NaN(), 0, 0, 1}) &&
+          !editable.set_color(9999, {1, 1, 1, 1}) &&
+          editable.find(edit_button)->color.a == 0.5f,
+          "Canvas RGBA edits validate range and preserve prior state on errors");
 
     UiCanvas named;
     const auto named_button = named.add(WidgetKind::Button);

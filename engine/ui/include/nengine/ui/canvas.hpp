@@ -92,6 +92,8 @@ public:
     WidgetId find_by_name(std::string_view name) const noexcept;
     bool set_visible(WidgetId id, bool visible) noexcept;
     bool set_interactable(WidgetId id, bool interactable) noexcept;
+    // Reject non-finite, out-of-gamut RGBA values atomically.
+    bool set_color(WidgetId id, UiColor color) noexcept;
     WidgetId find_by_text(std::string_view text) const noexcept;
     bool remove(WidgetId id);
     // Move a complete widget subtree while preserving stable IDs.
