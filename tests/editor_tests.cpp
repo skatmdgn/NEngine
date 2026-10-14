@@ -173,8 +173,10 @@ int main() {
         640, 480, {20.0f, 20.0f}, false);
     check(ui_down.size() >= 1u && ui_up.size() == 2u &&
           ui_up.back().type == ui::UiPointerEventType::Click &&
-          ui_up.back().target == 1u,
-          "Editor Play Mode UI routes button press and click");
+          ui_up.back().target == 1u &&
+          model.focused_ui_widget() == 1u,
+          "mouse click synchronizes Play Mode keyboard button focus");
+    model.reset_ui_keyboard();
     const auto ui_tab = model.route_ui_keyboard(640, 480, true, false);
     model.route_ui_keyboard(640, 480, false, true);
     const auto ui_enter_click =

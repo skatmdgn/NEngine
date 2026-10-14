@@ -13,6 +13,9 @@ public:
         const UiLayout& layout, bool tab_held, bool enter_held,
         bool reverse_tab = false, bool space_held = false,
         bool escape_held = false);
+    // Synchronize keyboard navigation with a mouse-selected button without
+    // duplicating pointer hover Enter/Exit events.
+    void set_focus(const UiLayout& layout, WidgetId target) noexcept;
     void reset() noexcept;
     WidgetId focused() const noexcept { return focused_; }
 

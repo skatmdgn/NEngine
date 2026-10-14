@@ -290,6 +290,12 @@ int main() {
           keyboard.focused() == invalid_widget &&
           cancelled_release.empty(),
           "Escape clears keyboard focus and cancels an in-flight activation");
+    keyboard.set_focus(keys, keyboard_b);
+    check(keyboard.focused() == keyboard_b,
+          "mouse-selected visible button becomes keyboard focused");
+    keyboard.set_focus(keys, 1234567u);
+    check(keyboard.focused() == keyboard_b,
+          "invalid mouse target cannot steal keyboard focus");
     keyboard_canvas.find(keyboard_a)->visible = false;
     keyboard.update(keyboard_canvas.layout(400, 100), false, false);
     check(keyboard.focused() == invalid_widget,

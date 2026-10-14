@@ -69,6 +69,23 @@ std::vector<UiPointerEvent> UiKeyboardRouter::update(
     return events;
 }
 
+void UiKeyboardRouter::set_focus(
+    const UiLayout& layout, WidgetId target) noexcept {
+
+    if (target != invalid_widget) {
+        const auto it = std::find_if(
+            layout.items.begin(), layout.items.end(),
+            [target](const UiLayoutItem& item) {
+                return item.id == target && focusable(item);
+            });
+        if (it == layout.items.end()) return;
+    }
+    if (target != focused_) {
+        focused_ = target;
+        enter_target_ = invalid_widget;
+    }
+}
+
 void UiKeyboardRouter::reset() noexcept {
     focused_ = invalid_widget;
     enter_target_ = invalid_widget;

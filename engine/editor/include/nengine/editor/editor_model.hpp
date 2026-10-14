@@ -175,6 +175,9 @@ public:
         bool tab_held, bool enter_held, bool reverse_tab = false,
         bool space_held = false, bool escape_held = false);
     void reset_ui_keyboard() noexcept { ui_keyboard_router_.reset(); }
+    ui::WidgetId focused_ui_widget() const noexcept {
+        return ui_keyboard_router_.focused();
+    }
     const std::vector<ui::UiPointerEvent>& ui_events() const noexcept {
         return ui_events_;
     }

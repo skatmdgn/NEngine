@@ -645,8 +645,11 @@ std::vector<ui::UiPointerEvent> EditorModel::route_ui_pointer(
     float width, float height, core::Vec2 pointer, bool pressed) {
 
     if (!play_session_.is_playing() || !ui_canvas_) return {};
-    auto events = ui_pointer_router_.update(
-        ui_canvas_->layout(width, height), pointer, pressed);
+    const auto layout = ui_canvas_->layout(width, height);
+    auto events = ui_pointer_router_.update(layout, pointer, pressed);
+    for (const auto& event : events)
+        if (event.type == ui::UiPointerEventType::Down)
+            ui_keyboard_router_.set_focus(layout, event.target);
     ui_events_.insert(ui_events_.end(), events.begin(), events.end());
     // Bound event history to avoid retaining unbounded hover/click traffic.
     if (ui_events_.size() > 128u)
