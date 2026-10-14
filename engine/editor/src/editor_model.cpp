@@ -521,6 +521,7 @@ bool EditorModel::initialize_managed_runtime(
 
     managed_runtime_.bind_input(
         &input_state_);
+    bind_managed_ui();
 
     bind_managed_property_access(
         managed_runtime_,
@@ -572,6 +573,7 @@ bool EditorModel::reload_managed_runtime(
 
     managed_runtime_.bind_input(
         &input_state_);
+    bind_managed_ui();
 
     bind_managed_property_access(
         managed_runtime_,
@@ -596,6 +598,55 @@ void EditorModel::shutdown_managed_runtime()
     audio_output_device_.close();
     audio_mix_snapshot_ = {};
     managed_runtime_.shutdown();
+}
+
+void EditorModel::bind_managed_ui() {
+    managed_runtime_.bind_ui(
+        this,
+        [](void* context, std::string_view label) -> std::uint64_t {
+            auto& editor = *static_cast<EditorModel*>(context);
+            if (!editor.play_session_.is_playing() || !editor.ui_canvas_)
+                return ui::invalid_widget;
+            return editor.ui_canvas_->find_by_text(label);
+        },
+        [](void* context, std::uint64_t id, int operation) -> int {
+            auto& editor = *static_cast<EditorModel*>(context);
+            if (!editor.play_session_.is_playing() || !editor.ui_canvas_)
+                return -1;
+            const auto* widget = editor.ui_canvas_->find(id);
+            if (!widget) return -1;
+            switch (operation) {
+                case 0: return widget->visible ? 1 : 0;
+                case 1: return widget->interactable ? 1 : 0;
+                case 2: return editor.ui_clicked_widgets_.contains(id) ? 1 : 0;
+                default: return -1;
+            }
+        },
+        [](void* context, std::uint64_t id, int operation, int value) -> int {
+            auto& editor = *static_cast<EditorModel*>(context);
+            if (!editor.play_session_.is_playing() || !editor.ui_canvas_)
+                return -1;
+            if (value != 0 && value != 1) return -1;
+            if (operation == 0)
+                return editor.ui_canvas_->set_visible(id, value != 0) ? 1 : 0;
+            if (operation == 1)
+                return editor.ui_canvas_->set_interactable(id, value != 0) ? 1 : 0;
+            return -1;
+        },
+        [](void* context, std::uint64_t id) -> std::optional<std::string> {
+            auto& editor = *static_cast<EditorModel*>(context);
+            if (!editor.play_session_.is_playing() || !editor.ui_canvas_)
+                return std::nullopt;
+            const auto* widget = editor.ui_canvas_->find(id);
+            if (!widget) return std::nullopt;
+            return widget->text;
+        },
+        [](void* context, std::uint64_t id, std::string_view value) -> bool {
+            auto& editor = *static_cast<EditorModel*>(context);
+            if (!editor.play_session_.is_playing() || !editor.ui_canvas_)
+                return false;
+            return editor.ui_canvas_->set_text(id, std::string(value));
+        });
 }
 
 bool EditorModel::set_ui_canvas_asset(assets::AssetGuid asset) {

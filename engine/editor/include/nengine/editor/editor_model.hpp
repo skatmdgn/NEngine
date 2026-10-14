@@ -250,6 +250,7 @@ private:
     std::unordered_map<std::uint64_t, assets::AssetGuid>
         bound_sprite_controllers_{};
     void sync_sprite_controllers(core::World& runtime);
+    void bind_managed_ui();
 
 
     audio::AudioClipCache
