@@ -214,6 +214,26 @@ int main() {
           edits.undo() && edits.undo() && !edits.undo(),
           "Canvas Undo storage is bounded and a new commit clears Redo");
 
+    std::string malformed_record = named_stream.str();
+    const auto line_end = malformed_record.find(
+        '\n', malformed_record.find("WIDGET "));
+    if (line_end != std::string::npos)
+        malformed_record.insert(line_end, " FORBIDDEN");
+    std::stringstream invalid_record(malformed_record);
+    const auto retained_widgets = named_restore.widgets().size();
+    check(!read_canvas(invalid_record, named_restore) &&
+          named_restore.widgets().size() == retained_widgets,
+          "Canvas v2 rejects trailing widget fields without overwriting an existing tree");
+    std::string oversized_record = named_stream.str();
+    const auto oversized_end = oversized_record.find(
+        '\n', oversized_record.find("WIDGET "));
+    if (oversized_end != std::string::npos)
+        oversized_record.insert(oversized_end, std::string(17000, 'x'));
+    std::stringstream oversized_source(oversized_record);
+    check(!read_canvas(oversized_source, named_restore) &&
+          named_restore.widgets().size() == retained_widgets,
+          "Canvas importer bounds oversized source records transactionally");
+
     const auto next = canvas.add(WidgetKind::Text);
     check(next > overflow && canvas.layout(0.0f, 600.0f).items.empty(),
           "widget IDs advance and invalid viewport is safely rejected");

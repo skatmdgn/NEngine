@@ -1,5 +1,6 @@
 #include "nengine/ui/canvas_serialization.hpp"
 
+#include <array>
 #include <cmath>
 #include <iomanip>
 #include <limits>
@@ -80,21 +81,35 @@ bool read_canvas(
         tag != "WIDGETS" || count > 8192u)
         return fail(error, "invalid Canvas header or widget count");
 
+    // A widget record must fit on a single reasonably sized line;
+    // bounded reads prevent hostile .ncanvas sources from allocating an
+    // unbounded quoted string before validation.
+    std::string header_tail;
+    std::getline(input, header_tail);
+    if (header_tail.find_first_not_of(" \t\r") != std::string::npos)
+        return fail(error, "invalid Canvas header trailing data");
+
     UiCanvas candidate;
     for (std::size_t n = 0u; n < count; ++n) {
+        std::array<char, 16384> record{};
+        if (!input.getline(
+                record.data(), static_cast<std::streamsize>(record.size())))
+            return fail(error, "Canvas widget record too large or truncated");
+
+        std::istringstream fields(record.data());
         Widget node;
         unsigned kind = 0u;
         int visible = -1, interactable = -1, clip = -1;
         auto& a = node.anchors;
         auto& c = node.color;
-        if (!(input >> tag) || tag != "WIDGET" ||
-            !(input >> node.id >> node.parent >> kind >>
+        if (!(fields >> tag) || tag != "WIDGET" ||
+            !(fields >> node.id >> node.parent >> kind >>
                 visible >> interactable >> clip >>
                 std::quoted(node.text)))
             return fail(error, "malformed Canvas WIDGET record");
-        if (version >= 2u && !(input >> std::quoted(node.name)))
+        if (version >= 2u && !(fields >> std::quoted(node.name)))
             return fail(error, "malformed Canvas widget name");
-        if (!(input >> a.anchor_min.x >> a.anchor_min.y >>
+        if (!(fields >> a.anchor_min.x >> a.anchor_min.y >>
                 a.anchor_max.x >> a.anchor_max.y >>
                 a.offset_min.x >> a.offset_min.y >>
                 a.offset_max.x >> a.offset_max.y >>
@@ -104,6 +119,10 @@ bool read_canvas(
             (interactable != 0 && interactable != 1) ||
             (clip != 0 && clip != 1))
             return fail(error, "malformed Canvas WIDGET record");
+
+        std::string trailing;
+        if (fields >> trailing)
+            return fail(error, "Canvas widget contains trailing data");
 
         node.kind = static_cast<WidgetKind>(kind);
         node.visible = visible != 0;

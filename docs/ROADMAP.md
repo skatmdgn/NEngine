@@ -229,6 +229,13 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Generated NEngine.UI Find/GetText/SetText/IsVisible/SetVisible/IsInteractable/SetInteractable/WasClicked APIs
 - [x] Editor Play Mode managed Canvas binding (no Scripting -> NEngineUI dependency)
 - [x] Real .NET integration regression for C# UI query/click/UTF-8 text mutation
+- [x] Canvas v2 stable optional script names with v1 source compatibility and unique-name checks
+- [x] Managed C# UI.Find prefers stable names with legacy visible-text fallback
+- [x] Managed UI.AddClickListener / RemoveClickListener with frame dispatch and collectible-assembly cleanup
+- [x] C# managed integration coverage for UI click listener dispatch, unsubscribe, and stable IDs
+- [x] Backend-neutral topmost Canvas authoring hit tests (clipped/visible, Play Mode interactive filtering)
+- [x] Transactional bounded CanvasEditHistory Undo/Redo core (visual editor/save UI not connected)
+- [x] Bounded Canvas source parser rejects oversized records, trailing data and duplicates without partial import
 - [x] Sprite animation controller state graph, named boolean transitions, exit times and deterministic evaluation foundation
 - [x] Runtime sprite controller bindings to World SpriteAnimator with transition/reset behavior and destroyed-entity cleanup
 - [x] Transactional versioned .nanimctrl state graph text serializer and parser with malformed-file validation
