@@ -242,6 +242,12 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Windows Canvas inspector controls for text/name edit, add/remove, Undo/Redo and Save
 - [x] Canvas authoring Scene View GDI overlay and widget selection outline, Ctrl+Z/Y/S
 - [x] Integration regression for save, Play Mode guard, reopened Canvas and saved-state Undo/Redo
+- [x] Canvas RGBA color validation and bounded finite anchor transactions
+- [x] Move/resize from immutable gesture anchors; transient preview with one Undo step on release
+- [x] Windows GDI Canvas move drag and Shift+drag resize with pointer-capture rollback
+- [x] Windows Canvas authoring Inspector exposes anchor Min/Max XY, offsets and RGBA numeric editing
+- [x] Hierarchical authoring widget dropdown, duplication, and sibling front/back controls
+- [x] Guard unsaved Canvas asset switching and malformed/nonfinite drag inputs
 - [x] Bounded Canvas source parser rejects oversized records, trailing data and duplicates without partial import
 - [x] Sprite animation controller state graph, named boolean transitions, exit times and deterministic evaluation foundation
 - [x] Runtime sprite controller bindings to World SpriteAnimator with transition/reset behavior and destroyed-entity cleanup

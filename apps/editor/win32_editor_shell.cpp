@@ -4131,6 +4131,15 @@ struct Win32EditorShell::Impl {
                                 index)];
 
                     if (asset.importer_id == "NEngine.Canvas") {
+                        // Never switch the runtime Canvas asset out from under
+                        // an unsaved authoring draft, even when clicked again.
+                        if (canvas_mode && editor.has_ui_canvas_draft() &&
+                            editor.ui_edit_dirty()) {
+                            editor.console().warning(
+                                "UI", "Save Canvas edits before switching UI assets.");
+                            handled = true;
+                            break;
+                        }
                         // Allow explicit Canvas selection; the project
                         // UI/Main convention remains only a fallback.
                         editor.project().import_supported_assets();

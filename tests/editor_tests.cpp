@@ -235,6 +235,15 @@ int main() {
           !model.begin_ui_canvas_edit(ui_record->guid) &&
           model.ui_edit_widget() != nullptr,
           "Canvas editor guards unsaved changes from draft replacement");
+    check(model.ui_edit_widgets().size() >= 2u &&
+          !model.ui_edit_update_drag({1, 1}, false) &&
+          model.ui_edit_begin_drag() &&
+          !model.ui_edit_begin_drag() &&
+          !model.ui_edit_update_drag(
+              {std::numeric_limits<float>::infinity(), 0}, false) &&
+          model.ui_edit_end_drag(false) == false &&
+          !model.ui_edit_dragging(),
+          "Canvas editing rejects duplicate active drags and nonfinite pointer deltas");
     check(model.begin_play_mode() &&
           !model.has_ui_canvas_draft() &&
           model.ui_edit_layout(640, 480).items.empty() &&
