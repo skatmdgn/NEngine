@@ -267,6 +267,16 @@ int main() {
           activate[1].target == keyboard_a &&
           activate[1].type == UiPointerEventType::Click,
           "Enter release raises button Up then Click");
+    keyboard.update(keys, false, false);
+    const auto space_down = keyboard.update(keys, false, false, false, true);
+    const auto space_up = keyboard.update(keys, false, false, false, false);
+    check(space_down.size() == 1u &&
+          space_down[0].type == UiPointerEventType::Down &&
+          space_down[0].target == keyboard_a &&
+          space_up.size() == 2u &&
+          space_up[0].type == UiPointerEventType::Up &&
+          space_up[1].type == UiPointerEventType::Click,
+          "Space activates focused button like Enter");
     keyboard_canvas.find(keyboard_a)->visible = false;
     keyboard.update(keyboard_canvas.layout(400, 100), false, false);
     check(keyboard.focused() == invalid_widget,

@@ -188,6 +188,15 @@ int main() {
           ui_enter_click[1].type == ui::UiPointerEventType::Click,
           "Play Mode keyboard Tab and Enter activate Canvas button");
 
+    const auto ui_space_down = model.route_ui_keyboard(
+        640, 480, false, false, false, true);
+    const auto ui_space_up = model.route_ui_keyboard(
+        640, 480, false, false, false, false);
+    check(ui_space_down.size() == 1u &&
+          ui_space_down[0].type == ui::UiPointerEventType::Down &&
+          ui_space_up.size() == 2u &&
+          ui_space_up.back().type == ui::UiPointerEventType::Click,
+          "Editor Play Mode routes Space button activation");
     const auto canvas_before_reload = model.ui_canvas_asset();
     model.invalidate_runtime_asset_caches();
     check(model.ui_canvas_asset() == canvas_before_reload &&

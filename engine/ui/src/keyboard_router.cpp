@@ -11,7 +11,7 @@ bool focusable(const UiLayoutItem& item) noexcept {
 } // namespace
 
 std::vector<UiPointerEvent> UiKeyboardRouter::update(
-    const UiLayout& layout, bool tab_held, bool enter_held, bool reverse_tab) {
+    const UiLayout& layout, bool tab_held, bool enter_held, bool reverse_tab, bool space_held) {
 
     std::vector<UiPointerEvent> events;
     std::vector<WidgetId> buttons;
@@ -43,20 +43,21 @@ std::vector<UiPointerEvent> UiKeyboardRouter::update(
         }
         enter_target_ = invalid_widget;
     }
-    if (enter_held && !was_enter_held_ &&
+    const bool activate_held = enter_held || space_held;
+    if (activate_held && !was_activation_held_ &&
         focused_ != invalid_widget) {
         enter_target_ = focused_;
         events.push_back({focused_, UiPointerEventType::Down});
     }
-    if (!enter_held && was_enter_held_ &&
+    if (!activate_held && was_activation_held_ &&
         enter_target_ == focused_ &&
         enter_target_ != invalid_widget) {
         events.push_back({focused_, UiPointerEventType::Up});
         events.push_back({focused_, UiPointerEventType::Click});
     }
-    if (!enter_held) enter_target_ = invalid_widget;
+    if (!activate_held) enter_target_ = invalid_widget;
     was_tab_held_ = tab_held;
-    was_enter_held_ = enter_held;
+    was_activation_held_ = activate_held;
     return events;
 }
 
@@ -64,7 +65,7 @@ void UiKeyboardRouter::reset() noexcept {
     focused_ = invalid_widget;
     enter_target_ = invalid_widget;
     was_tab_held_ = false;
-    was_enter_held_ = false;
+    was_activation_held_ = false;
 }
 
 } // namespace nengine::ui

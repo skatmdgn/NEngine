@@ -172,7 +172,8 @@ public:
     }
     std::vector<ui::UiPointerEvent> route_ui_keyboard(
         float width, float height,
-        bool tab_held, bool enter_held, bool reverse_tab = false);
+        bool tab_held, bool enter_held, bool reverse_tab = false,
+        bool space_held = false);
     void reset_ui_keyboard() noexcept { ui_keyboard_router_.reset(); }
     const std::vector<ui::UiPointerEvent>& ui_events() const noexcept {
         return ui_events_;

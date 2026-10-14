@@ -11,7 +11,7 @@ class UiKeyboardRouter {
 public:
     std::vector<UiPointerEvent> update(
         const UiLayout& layout, bool tab_held, bool enter_held,
-        bool reverse_tab = false);
+        bool reverse_tab = false, bool space_held = false);
     void reset() noexcept;
     WidgetId focused() const noexcept { return focused_; }
 
@@ -19,7 +19,7 @@ private:
     WidgetId focused_{invalid_widget};
     WidgetId enter_target_{invalid_widget};
     bool was_tab_held_{false};
-    bool was_enter_held_{false};
+    bool was_activation_held_{false};
 };
 
 } // namespace nengine::ui
