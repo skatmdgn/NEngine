@@ -2088,11 +2088,22 @@ int main() {
                 << "    }\n"
                 << "}\n"
                 << "public class UIProbe : Behaviour {\n"
+                << "    private int clicks;\n"
+                << "    private void OnClicked() {\n"
+                << "        clicks++;\n"
+                << "        if (!UI.RemoveClickListener(17, OnClicked)) throw new System.Exception(\"click listener removal failed\");\n"
+                << "    }\n"
+                << "    private void Start() {\n"
+                << "        ulong id = UI.Find(\"Main.Start\");\n"
+                << "        if (id != 17) throw new System.Exception(\"stable Canvas name not found\");\n"
+                << "        UI.AddClickListener(id, OnClicked);\n"
+                << "        UI.AddClickListener(id, OnClicked);\n"
+                << "    }\n"
                 << "    private void Update() {\n"
-                << "        ulong button = UI.Find(\"Launch\");\n"
-                << "        if (button != 17 || !UI.WasClicked(button) || !UI.IsVisible(button) || !UI.IsInteractable(button)) throw new System.Exception(\"UI query mismatch\");\n"
+                << "        ulong button = UI.Find(\"Main.Start\");\n"
+                << "        if (button != 17 || clicks != 1 || !UI.WasClicked(button) || !UI.IsVisible(button) || !UI.IsInteractable(button)) throw new System.Exception(\"UI click subscription mismatch\");\n"
                 << "        if (UI.GetText(button) != \"Launch\" || !UI.SetText(button, \"시작\") || UI.GetText(button) != \"시작\") throw new System.Exception(\"UI UTF8 text mismatch\");\n"
-                << "        if (UI.Find(\"Launch\") != 0 || UI.Find(\"시작\") != button) throw new System.Exception(\"UI label lookup mismatch\");\n"
+                << "        if (UI.Find(\"Main.Start\") != button || UI.Find(\"Launch\") != 0 || UI.Find(\"시작\") != button) throw new System.Exception(\"UI stable name/legacy text lookup mismatch\");\n"
                 << "        if (!UI.SetVisible(button, false) || UI.IsVisible(button) || !UI.SetInteractable(button, false) || UI.IsInteractable(button)) throw new System.Exception(\"UI mutation mismatch\");\n"
                 << "        if (UI.SetText(9999, \"No\") || UI.GetText(9999) != null || UI.WasClicked(9999)) throw new System.Exception(\"invalid UI widget accepted\");\n"
                 << "        gameObject.name = \"UI Passed\";\n"
@@ -2319,6 +2330,7 @@ int main() {
                             &read_managed_box_cast_query);
 
                         struct UiTestState {
+                            std::string name{"Main.Start"};
                             std::string text{"Launch"};
                             bool visible{true};
                             bool interactable{true};
@@ -2329,7 +2341,7 @@ int main() {
                             &ui_test,
                             [](void* context, std::string_view label) -> std::uint64_t {
                                 const auto& ui = *static_cast<UiTestState*>(context);
-                                return ui.text == label ? 17u : 0u;
+                                return (ui.name == label || ui.text == label) ? 17u : 0u;
                             },
                             [](void* context, std::uint64_t id, int op) -> int {
                                 const auto& ui = *static_cast<UiTestState*>(context);
@@ -2368,6 +2380,8 @@ int main() {
                             managed_runtime.set_game_object(
                                 ui_probe, nengine::core::Entity::make(100, 1),
                                 "UI Probe", true) &&
+                            managed_runtime.start(ui_probe) &&
+                            managed_runtime.advance_frame(1.0f / 60.0f) &&
                             managed_runtime.update(ui_probe, 1.0f / 60.0f) &&
                             managed_runtime.get_game_object(
                                 ui_probe, probe_entity, probe_name, probe_active) &&
@@ -2375,7 +2389,7 @@ int main() {
                             ui_test.text == "시작" &&
                             !ui_test.visible && !ui_test.interactable;
                         check(ui_passed,
-                            "real .NET C# UI API queries clicks, mutates Canvas properties and roundtrips UTF-8");
+                            "real .NET UI click subscriptions dispatch once, safely unsubscribe, preserve script IDs and roundtrip UTF-8");
                         if (ui_probe.valid())
                             managed_runtime.destroy(ui_probe);
 
