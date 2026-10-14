@@ -143,7 +143,7 @@ int main() {
           !editable.set_text(9999, "Orphan"),
           "Canvas exposes deterministic runtime text lookup and editing");
     check(!editable.set_text(edit_button, std::string(4097, 'a')) &&
-          !editable.set_text(edit_button, std::string("a\\0b", 3)) &&
+          !editable.set_text(edit_button, std::string("a", 1) + std::string(1, char(0)) + "b") &&
           editable.find(edit_button)->text == "Play",
           "oversized or embedded-NUL Canvas text is rejected atomically");
     check(editable.set_visible(edit_button, false) &&

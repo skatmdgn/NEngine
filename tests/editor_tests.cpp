@@ -177,6 +177,8 @@ int main() {
           model.focused_ui_widget() == 1u,
           "mouse click synchronizes Play Mode keyboard button focus");
     model.reset_ui_keyboard();
+    check(model.ui_was_clicked(1u),
+          "Canvas mouse Click remains available until the script tick");
     const auto ui_tab = model.route_ui_keyboard(640, 480, true, false);
     model.route_ui_keyboard(640, 480, false, true);
     const auto ui_enter_click =
@@ -204,6 +206,11 @@ int main() {
     check(ui_escape.size() == 1u &&
           ui_escape[0].type == ui::UiPointerEventType::Exit,
           "Escape releases UI keyboard focus in Play Mode");
+    check(model.ui_was_clicked(1u),
+          "keyboard Canvas clicks share the managed click signal");
+    model.tick_runtime(1.0 / 60.0);
+    check(!model.ui_was_clicked(1u),
+          "Canvas click signals expire after one runtime frame");
     const auto canvas_before_reload = model.ui_canvas_asset();
     model.invalidate_runtime_asset_caches();
     check(model.ui_canvas_asset() == canvas_before_reload &&

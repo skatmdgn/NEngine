@@ -474,6 +474,7 @@ bool EditorModel::begin_play_mode() {
 }
 
 bool EditorModel::stop_play_mode() {
+    ui_clicked_widgets_.clear();
     ui_keyboard_router_.reset();
     ui_pointer_router_.reset();
     ui_events_.clear();
@@ -604,6 +605,7 @@ bool EditorModel::set_ui_canvas_asset(assets::AssetGuid asset) {
     ui_pointer_router_.reset();
     ui_keyboard_router_.reset();
     ui_events_.clear();
+    ui_clicked_widgets_.clear();
     if (!asset.valid()) return true;
     const auto artifacts = project_.cached_artifacts(asset);
     if (!artifacts) return false;
@@ -628,6 +630,12 @@ std::vector<ui::UiPointerEvent> EditorModel::route_ui_keyboard(
         ui_canvas_->layout(width, height),
         tab_held, enter_held, reverse_tab, space_held,
         escape_held);
+    for (const auto& event : events)
+        if (event.type == ui::UiPointerEventType::Click)
+            ui_clicked_widgets_.insert(event.target);
+    for (const auto& event : events)
+        if (event.type == ui::UiPointerEventType::Click)
+            ui_clicked_widgets_.insert(event.target);
     ui_events_.insert(ui_events_.end(), events.begin(), events.end());
     if (ui_events_.size() > 128u)
         ui_events_.erase(ui_events_.begin(),
@@ -968,6 +976,10 @@ void EditorModel::tick_runtime(
             }
         }
     }
+
+    // UI activation is a one-frame signal; do not replay stale clicks in
+    // later managed Update calls (including after a paused Step).
+    ui_clicked_widgets_.clear();
 
     if (!script_error.empty()) {
         console_.warning(

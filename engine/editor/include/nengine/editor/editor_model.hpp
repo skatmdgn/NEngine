@@ -2,6 +2,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <optional>
 #include <vector>
 #include <cstdint>
@@ -178,6 +179,10 @@ public:
     ui::WidgetId focused_ui_widget() const noexcept {
         return ui_keyboard_router_.focused();
     }
+    // Clicks remain observable by the next managed Update, then expire.
+    bool ui_was_clicked(ui::WidgetId id) const noexcept {
+        return ui_clicked_widgets_.contains(id);
+    }
     const std::vector<ui::UiPointerEvent>& ui_events() const noexcept {
         return ui_events_;
     }
@@ -196,6 +201,7 @@ public:
         ui_canvas_reload_pending_ = ui_canvas_asset_.valid();
         ui_pointer_router_.reset();
         ui_keyboard_router_.reset();
+        ui_clicked_widgets_.clear();
         sprite_animation_cache_.clear();
         sprite_controller_asset_cache_.clear();
         sprite_controllers_.clear();
@@ -234,6 +240,7 @@ private:
     ui::UiPointerRouter ui_pointer_router_{};
     ui::UiKeyboardRouter ui_keyboard_router_{};
     std::vector<ui::UiPointerEvent> ui_events_{};
+    std::unordered_set<ui::WidgetId> ui_clicked_widgets_{};
 
     render::SpriteAnimationClipCache
         sprite_animation_cache_{};
