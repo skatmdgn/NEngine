@@ -110,6 +110,31 @@ int main() {
           sorting_readback.find(nested_a)->parent == sibling_a,
           "sibling reorder maintains a serializable parent-first Canvas");
 
+    sorting.find(sibling_a)->text = "Original";
+    sorting.find(nested_a)->text = "Nested";
+    const auto duplicate_a = sorting.duplicate_subtree(sibling_a);
+    WidgetId duplicate_child = invalid_widget;
+    for (const auto& node : sorting.widgets())
+        if (node.parent == duplicate_a)
+            duplicate_child = node.id;
+    check(duplicate_a != invalid_widget && duplicate_a != sibling_a &&
+          sorting.find(duplicate_a)->parent == sorting_parent &&
+          sorting.find(duplicate_a)->text == "Original" &&
+          duplicate_child != invalid_widget &&
+          duplicate_child != nested_a &&
+          sorting.find(duplicate_child)->text == "Nested",
+          "Canvas duplication creates fresh IDs and preserves subtree data");
+    sorting.find(duplicate_a)->text = "Copy";
+    check(sorting.find(sibling_a)->text == "Original" &&
+          sorting.find(duplicate_a)->text == "Copy",
+          "editing duplicated Canvas widgets never mutates source data");
+    std::stringstream duplication_source;
+    UiCanvas duplication_readback;
+    check(write_canvas(duplication_source, sorting) &&
+          read_canvas(duplication_source, duplication_readback) &&
+          duplication_readback.find(duplicate_child)->parent == duplicate_a,
+          "duplicated Canvas hierarchy serializes with stable fresh IDs");
+
     const auto next = canvas.add(WidgetKind::Text);
     check(next > overflow && canvas.layout(0.0f, 600.0f).items.empty(),
           "widget IDs advance and invalid viewport is safely rejected");

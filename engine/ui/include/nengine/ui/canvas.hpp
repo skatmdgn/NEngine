@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -82,6 +83,9 @@ public:
     // Reorder a widget (including descendants) among immediate siblings.
     // Larger sibling indices render on top. Indices are clamped.
     bool set_sibling_index(WidgetId id, std::size_t index);
+    // Duplicate a complete subtree with fresh IDs and copied widget
+    // properties; the duplicate root becomes a sibling of the source.
+    WidgetId duplicate_subtree(WidgetId id);
     void clear() noexcept;
     UiLayout layout(float width, float height) const;
 

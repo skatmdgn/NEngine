@@ -61,7 +61,8 @@ UiRect intersect_rect(UiRect a, UiRect b) noexcept {
 
 WidgetId UiCanvas::add(WidgetKind kind, WidgetId parent) {
     if (parent != invalid_widget && !find(parent)) return invalid_widget;
-    if (next_id_ == invalid_widget) return invalid_widget;
+    if (next_id_ == invalid_widget || next_id_ == UINT64_MAX)
+        return invalid_widget;
     const auto id = next_id_++;
     Widget widget{id, parent, kind};
     // Text has no backing geometry until glyph rendering is implemented.
@@ -188,6 +189,50 @@ bool UiCanvas::set_sibling_index(WidgetId id, std::size_t index) {
         subtree.begin(), subtree.end());
     widgets_ = std::move(remaining);
     return true;
+}
+
+WidgetId UiCanvas::duplicate_subtree(WidgetId id) {
+    if (!find(id)) return invalid_widget;
+    std::unordered_set<WidgetId> moving{id};
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        for (const auto& node : widgets_)
+            if (moving.contains(node.parent) &&
+                moving.insert(node.id).second)
+                changed = true;
+    }
+    // Reserved UINT64_MAX cannot become a valid persistent WidgetId.
+    if (next_id_ == invalid_widget ||
+        next_id_ == UINT64_MAX ||
+        moving.size() > UINT64_MAX - next_id_)
+        return invalid_widget;
+
+    std::unordered_map<WidgetId, WidgetId> copies;
+    copies.reserve(moving.size());
+    std::vector<Widget> duplicates;
+    duplicates.reserve(moving.size());
+    std::size_t after = 0;
+    auto candidate_next = next_id_;
+    for (std::size_t i = 0; i < widgets_.size(); ++i) {
+        const auto& original = widgets_[i];
+        if (!moving.contains(original.id)) continue;
+        Widget duplicate = original;
+        duplicate.id = candidate_next++;
+        copies.emplace(original.id, duplicate.id);
+        if (original.id != id)
+            duplicate.parent = copies.at(original.parent);
+        duplicates.push_back(std::move(duplicate));
+        after = i + 1u;
+    }
+    const auto new_root = copies.at(id);
+    auto staged = widgets_;
+    staged.insert(
+        staged.begin() + static_cast<std::ptrdiff_t>(after),
+        duplicates.begin(), duplicates.end());
+    widgets_ = std::move(staged);
+    next_id_ = candidate_next;
+    return new_root;
 }
 
 bool UiCanvas::remove(WidgetId id) {
