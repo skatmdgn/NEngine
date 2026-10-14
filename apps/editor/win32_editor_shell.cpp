@@ -370,6 +370,10 @@ struct Win32EditorShell::Impl {
     bool ui_enter_down{false};
     bool ui_space_down{false};
     bool ui_escape_down{false};
+    bool canvas_dragging{false};
+    bool canvas_drag_resize{false};
+    int canvas_drag_start_x{0};
+    int canvas_drag_start_y{0};
     bool scene_dragging{false};
     nengine::editor::SceneGizmoAxis scene_drag_axis{
         nengine::editor::SceneGizmoAxis::None};
@@ -508,6 +512,11 @@ struct Win32EditorShell::Impl {
             break;
 
         case WM_KILLFOCUS:
+            if (self->canvas_dragging) {
+                self->canvas_dragging = false;
+                self->editor.ui_edit_end_drag(false);
+                if (GetCapture() == hwnd) ReleaseCapture();
+            }
             self->ui_tab_down = false;
             self->ui_enter_down = false;
             self->ui_space_down = false;
@@ -545,6 +554,16 @@ struct Win32EditorShell::Impl {
             return 0;
 
         case WM_MOUSEMOVE:
+            if (self->canvas_dragging) {
+                const int x = static_cast<short>(LOWORD(lparam));
+                const int y = static_cast<short>(HIWORD(lparam));
+                self->editor.ui_edit_update_drag(
+                    {static_cast<float>(x - self->canvas_drag_start_x),
+                     static_cast<float>(y - self->canvas_drag_start_y)},
+                    self->canvas_drag_resize);
+                InvalidateRect(hwnd, nullptr, FALSE);
+                return 0;
+            }
             if (!self->vulkan_preview_enabled &&
                 self->editor.play_session().is_playing() &&
                 self->editor.has_ui_canvas() &&
@@ -569,6 +588,13 @@ struct Win32EditorShell::Impl {
             break;
 
         case WM_LBUTTONUP:
+            if (self->canvas_dragging) {
+                self->canvas_dragging = false;
+                self->editor.ui_edit_end_drag(true);
+                if (GetCapture() == hwnd) ReleaseCapture();
+                self->refresh();
+                return 0;
+            }
             if (self->ui_pointer_captured) {
                 RECT bounds{};
                 GetClientRect(hwnd, &bounds);
@@ -594,6 +620,13 @@ struct Win32EditorShell::Impl {
             break;
 
         case WM_CAPTURECHANGED:
+            if (self->canvas_dragging &&
+                reinterpret_cast<HWND>(lparam) != hwnd) {
+                self->canvas_dragging = false;
+                self->editor.ui_edit_end_drag(false);
+                InvalidateRect(hwnd, nullptr, FALSE);
+                return 0;
+            }
             if (self->ui_pointer_captured &&
                 reinterpret_cast<HWND>(lparam) != hwnd) {
                 self->ui_pointer_captured = false;
@@ -4143,8 +4176,16 @@ struct Win32EditorShell::Impl {
                 rect.bottom - rect.top);
 
         if (canvas_mode && editor.has_ui_canvas_draft()) {
-            editor.select_ui_widget_at(width, height,
-                {static_cast<float>(x), static_cast<float>(y)});
+            const auto id = editor.select_ui_widget_at(
+                width, height, {static_cast<float>(x), static_cast<float>(y)});
+            if (id != nengine::ui::invalid_widget &&
+                editor.ui_edit_begin_drag()) {
+                canvas_dragging = true;
+                canvas_drag_resize = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+                canvas_drag_start_x = x;
+                canvas_drag_start_y = y;
+                SetCapture(hwnd);
+            }
             refresh();
             return;
         }
