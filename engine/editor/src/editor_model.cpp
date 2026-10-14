@@ -684,9 +684,6 @@ std::vector<ui::UiPointerEvent> EditorModel::route_ui_keyboard(
     for (const auto& event : events)
         if (event.type == ui::UiPointerEventType::Click)
             ui_clicked_widgets_.insert(event.target);
-    for (const auto& event : events)
-        if (event.type == ui::UiPointerEventType::Click)
-            ui_clicked_widgets_.insert(event.target);
     ui_events_.insert(ui_events_.end(), events.begin(), events.end());
     if (ui_events_.size() > 128u)
         ui_events_.erase(ui_events_.begin(),
@@ -706,9 +703,12 @@ std::vector<ui::UiPointerEvent> EditorModel::route_ui_pointer(
     if (!play_session_.is_playing() || !ui_canvas_) return {};
     const auto layout = ui_canvas_->layout(width, height);
     auto events = ui_pointer_router_.update(layout, pointer, pressed);
-    for (const auto& event : events)
+    for (const auto& event : events) {
         if (event.type == ui::UiPointerEventType::Down)
             ui_keyboard_router_.set_focus(layout, event.target);
+        if (event.type == ui::UiPointerEventType::Click)
+            ui_clicked_widgets_.insert(event.target);
+    }
     ui_events_.insert(ui_events_.end(), events.begin(), events.end());
     // Bound event history to avoid retaining unbounded hover/click traffic.
     if (ui_events_.size() > 128u)
