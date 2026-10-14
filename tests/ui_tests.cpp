@@ -135,6 +135,26 @@ int main() {
           duplication_readback.find(duplicate_child)->parent == duplicate_a,
           "duplicated Canvas hierarchy serializes with stable fresh IDs");
 
+    UiCanvas editable;
+    const auto edit_button = editable.add(WidgetKind::Button);
+    check(editable.set_text(edit_button, "Play") &&
+          editable.find_by_text("Play") == edit_button &&
+          editable.find_by_text("Missing") == invalid_widget &&
+          !editable.set_text(9999, "Orphan"),
+          "Canvas exposes deterministic runtime text lookup and editing");
+    check(!editable.set_text(edit_button, std::string(4097, 'a')) &&
+          !editable.set_text(edit_button, std::string("a\\0b", 3)) &&
+          editable.find(edit_button)->text == "Play",
+          "oversized or embedded-NUL Canvas text is rejected atomically");
+    check(editable.set_visible(edit_button, false) &&
+          editable.layout(200, 100).items.empty() &&
+          editable.set_visible(edit_button, true) &&
+          editable.set_interactable(edit_button, false) &&
+          !editable.layout(200, 100).items[0].interactable &&
+          !editable.set_visible(9876, true) &&
+          !editable.set_interactable(9876, false),
+          "runtime Canvas visibility and interactivity can change safely");
+
     const auto next = canvas.add(WidgetKind::Text);
     check(next > overflow && canvas.layout(0.0f, 600.0f).items.empty(),
           "widget IDs advance and invalid viewport is safely rejected");

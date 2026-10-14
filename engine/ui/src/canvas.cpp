@@ -235,6 +235,39 @@ WidgetId UiCanvas::duplicate_subtree(WidgetId id) {
     return new_root;
 }
 
+bool UiCanvas::set_text(WidgetId id, std::string text) {
+    auto* node = find(id);
+    // Cap mutable UI strings to prevent unbounded script allocations;
+    // embedded NUL is incompatible with managed UTF-8 transport.
+    if (!node || text.size() > 4096u ||
+        text.find('\0') != std::string::npos)
+        return false;
+    node->text = std::move(text);
+    return true;
+}
+
+bool UiCanvas::set_visible(WidgetId id, bool visible) noexcept {
+    auto* node = find(id);
+    if (!node) return false;
+    node->visible = visible;
+    return true;
+}
+
+bool UiCanvas::set_interactable(
+    WidgetId id, bool interactable) noexcept {
+    auto* node = find(id);
+    if (!node) return false;
+    node->interactable = interactable;
+    return true;
+}
+
+WidgetId UiCanvas::find_by_text(std::string_view text) const noexcept {
+    // Text is a convenience label, not a unique widget identity.
+    for (const auto& node : widgets_)
+        if (node.text == text) return node.id;
+    return invalid_widget;
+}
+
 bool UiCanvas::remove(WidgetId id) {
     if (!find(id)) return false;
     std::unordered_set<WidgetId> removed{id};

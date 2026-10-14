@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "nengine/core/math.hpp"
@@ -76,6 +77,11 @@ public:
     const std::vector<Widget>& widgets() const noexcept { return widgets_; }
     Widget* find(WidgetId id) noexcept;
     const Widget* find(WidgetId id) const noexcept;
+    // Runtime authoring changes never alter persisted Canvas assets.
+    bool set_text(WidgetId id, std::string text);
+    bool set_visible(WidgetId id, bool visible) noexcept;
+    bool set_interactable(WidgetId id, bool interactable) noexcept;
+    WidgetId find_by_text(std::string_view text) const noexcept;
     bool remove(WidgetId id);
     // Move a complete widget subtree while preserving stable IDs.
     // Rejects cycles, stale IDs, and self-parenting.
