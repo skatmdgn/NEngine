@@ -155,6 +155,30 @@ int main() {
           !editable.set_interactable(9876, false),
           "runtime Canvas visibility and interactivity can change safely");
 
+    UiCanvas named;
+    const auto named_button = named.add(WidgetKind::Button);
+    named.find(named_button)->name = "Main.Start";
+    named.find(named_button)->text = "Start";
+    std::stringstream named_stream;
+    UiCanvas named_restore;
+    check(write_canvas(named_stream, named) &&
+          named_stream.str().find("NENGINE_CANVAS 2") == 0 &&
+          read_canvas(named_stream, named_restore) &&
+          named_restore.find(named_button)->name == "Main.Start",
+          "Canvas v2 serializes stable script names separately from visible text");
+    std::stringstream legacy_source(
+        "NENGINE_CANVAS 1\nWIDGETS 1\n"
+        "WIDGET 7 0 3 1 1 0 \"Legacy\" 0 0 0 0 0 0 100 30 1 1 1 1\n"
+        "END_CANVAS\n");
+    UiCanvas legacy_restore;
+    check(read_canvas(legacy_source, legacy_restore) &&
+          legacy_restore.find(7u)->name.empty() &&
+          legacy_restore.find(7u)->text == "Legacy",
+          "Canvas v1 sources remain readable without names");
+    auto clone_named = named.duplicate_subtree(named_button);
+    check(clone_named != invalid_widget &&
+          named.find(clone_named)->name.empty(),
+          "duplicated Canvas subtree does not duplicate script names");
     const auto next = canvas.add(WidgetKind::Text);
     check(next > overflow && canvas.layout(0.0f, 600.0f).items.empty(),
           "widget IDs advance and invalid viewport is safely rejected");

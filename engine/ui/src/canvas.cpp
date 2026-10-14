@@ -76,8 +76,14 @@ WidgetId UiCanvas::add(WidgetKind kind, WidgetId parent) {
 bool UiCanvas::restore(Widget widget) {
     if (widget.id == invalid_widget ||
         widget.id == UINT64_MAX || find(widget.id) ||
-        (widget.parent != invalid_widget && !find(widget.parent)))
+        (widget.parent != invalid_widget && !find(widget.parent)) ||
+        widget.name.size() > 128u ||
+        widget.text.size() > 4096u ||
+        widget.name.find(char(0)) != std::string::npos)
         return false;
+    if (!widget.name.empty())
+        for (const auto& existing : widgets_)
+            if (existing.name == widget.name) return false;
     next_id_ = std::max(next_id_, widget.id + 1u);
     widgets_.push_back(std::move(widget));
     return true;
@@ -219,6 +225,8 @@ WidgetId UiCanvas::duplicate_subtree(WidgetId id) {
         if (!moving.contains(original.id)) continue;
         Widget duplicate = original;
         duplicate.id = candidate_next++;
+        // A clone must not steal its source widget's script identity.
+        duplicate.name.clear();
         copies.emplace(original.id, duplicate.id);
         if (original.id != id)
             duplicate.parent = copies.at(original.parent);

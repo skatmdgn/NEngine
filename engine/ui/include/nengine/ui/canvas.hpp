@@ -53,6 +53,8 @@ struct Widget {
     bool interactable{true};
     bool clip_children{false};
     UiColor color{};
+    // Stable optional script name, independent of visible widget text.
+    std::string name{};
 };
 
 struct UiLayoutItem {

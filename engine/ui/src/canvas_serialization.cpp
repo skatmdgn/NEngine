@@ -31,15 +31,19 @@ bool write_canvas(
 
     std::ostringstream staged;
     staged << std::setprecision(std::numeric_limits<float>::max_digits10);
-    staged << "NENGINE_CANVAS 1\nWIDGETS " << canvas.widgets().size() << '\n';
+    staged << "NENGINE_CANVAS 2\nWIDGETS " << canvas.widgets().size() << '\n';
     std::unordered_set<WidgetId> written;
+    std::unordered_set<std::string> names;
     for (const auto& node : canvas.widgets()) {
         if (node.id == invalid_widget || node.id == UINT64_MAX ||
             !written.insert(node.id).second ||
             (node.parent != invalid_widget && !written.contains(node.parent)) ||
             static_cast<unsigned>(node.kind) >
                 static_cast<unsigned>(WidgetKind::Button) ||
-            !finite_widget(node))
+            !finite_widget(node) ||
+            node.name.size() > 128u || node.text.size() > 4096u ||
+            node.name.find(char(0)) != std::string::npos ||
+            (!node.name.empty() && !names.insert(node.name).second))
             return fail(error, "cannot serialize invalid Canvas hierarchy");
 
         const auto& a = node.anchors;
@@ -50,6 +54,7 @@ bool write_canvas(
                << (node.interactable ? 1 : 0) << ' '
                << (node.clip_children ? 1 : 0) << ' '
                << std::quoted(node.text) << ' '
+               << std::quoted(node.name) << ' '
                << a.anchor_min.x << ' ' << a.anchor_min.y << ' '
                << a.anchor_max.x << ' ' << a.anchor_max.y << ' '
                << a.offset_min.x << ' ' << a.offset_min.y << ' '
@@ -70,7 +75,8 @@ bool read_canvas(
     unsigned version = 0u;
     std::size_t count = 0u;
     if (!(input >> tag >> version) || tag != "NENGINE_CANVAS" ||
-        version != 1u || !(input >> tag >> count) ||
+        (version != 1u && version != 2u) ||
+        !(input >> tag >> count) ||
         tag != "WIDGETS" || count > 8192u)
         return fail(error, "invalid Canvas header or widget count");
 
@@ -84,8 +90,11 @@ bool read_canvas(
         if (!(input >> tag) || tag != "WIDGET" ||
             !(input >> node.id >> node.parent >> kind >>
                 visible >> interactable >> clip >>
-                std::quoted(node.text) >>
-                a.anchor_min.x >> a.anchor_min.y >>
+                std::quoted(node.text)))
+            return fail(error, "malformed Canvas WIDGET record");
+        if (version >= 2u && !(input >> std::quoted(node.name)))
+            return fail(error, "malformed Canvas widget name");
+        if (!(input >> a.anchor_min.x >> a.anchor_min.y >>
                 a.anchor_max.x >> a.anchor_max.y >>
                 a.offset_min.x >> a.offset_min.y >>
                 a.offset_max.x >> a.offset_max.y >>
