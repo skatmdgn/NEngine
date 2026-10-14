@@ -277,6 +277,19 @@ int main() {
           space_up[0].type == UiPointerEventType::Up &&
           space_up[1].type == UiPointerEventType::Click,
           "Space activates focused button like Enter");
+    const auto cancel_down = keyboard.update(
+        keys, false, true);
+    const auto escaped = keyboard.update(
+        keys, false, true, false, false, true);
+    const auto cancelled_release = keyboard.update(
+        keys, false, false);
+    check(cancel_down.size() == 1u &&
+          cancel_down[0].type == UiPointerEventType::Down &&
+          escaped.size() == 1u &&
+          escaped[0].type == UiPointerEventType::Exit &&
+          keyboard.focused() == invalid_widget &&
+          cancelled_release.empty(),
+          "Escape clears keyboard focus and cancels an in-flight activation");
     keyboard_canvas.find(keyboard_a)->visible = false;
     keyboard.update(keyboard_canvas.layout(400, 100), false, false);
     check(keyboard.focused() == invalid_widget,

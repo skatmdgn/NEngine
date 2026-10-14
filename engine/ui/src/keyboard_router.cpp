@@ -11,7 +11,7 @@ bool focusable(const UiLayoutItem& item) noexcept {
 } // namespace
 
 std::vector<UiPointerEvent> UiKeyboardRouter::update(
-    const UiLayout& layout, bool tab_held, bool enter_held, bool reverse_tab, bool space_held) {
+    const UiLayout& layout, bool tab_held, bool enter_held, bool reverse_tab, bool space_held, bool escape_held) {
 
     std::vector<UiPointerEvent> events;
     std::vector<WidgetId> buttons;
@@ -25,7 +25,14 @@ std::vector<UiPointerEvent> UiKeyboardRouter::update(
         focused_ = invalid_widget;
         enter_target_ = invalid_widget;
     }
-    if (tab_held && !was_tab_held_ && !buttons.empty()) {
+    if (escape_held && !was_escape_held_) {
+        if (focused_ != invalid_widget)
+            events.push_back({focused_, UiPointerEventType::Exit});
+        focused_ = invalid_widget;
+        enter_target_ = invalid_widget;
+    }
+    if (!escape_held && tab_held && !was_tab_held_ &&
+        !buttons.empty()) {
         const auto it = std::find(buttons.begin(), buttons.end(), focused_);
         const auto old_index = it == buttons.end()
             ? buttons.size()
@@ -44,7 +51,7 @@ std::vector<UiPointerEvent> UiKeyboardRouter::update(
         enter_target_ = invalid_widget;
     }
     const bool activate_held = enter_held || space_held;
-    if (activate_held && !was_activation_held_ &&
+    if (!escape_held && activate_held && !was_activation_held_ &&
         focused_ != invalid_widget) {
         enter_target_ = focused_;
         events.push_back({focused_, UiPointerEventType::Down});
@@ -58,6 +65,7 @@ std::vector<UiPointerEvent> UiKeyboardRouter::update(
     if (!activate_held) enter_target_ = invalid_widget;
     was_tab_held_ = tab_held;
     was_activation_held_ = activate_held;
+    was_escape_held_ = escape_held;
     return events;
 }
 
@@ -66,6 +74,7 @@ void UiKeyboardRouter::reset() noexcept {
     enter_target_ = invalid_widget;
     was_tab_held_ = false;
     was_activation_held_ = false;
+    was_escape_held_ = false;
 }
 
 } // namespace nengine::ui

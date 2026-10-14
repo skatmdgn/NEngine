@@ -197,6 +197,11 @@ int main() {
           ui_space_up.size() == 2u &&
           ui_space_up.back().type == ui::UiPointerEventType::Click,
           "Editor Play Mode routes Space button activation");
+    const auto ui_escape = model.route_ui_keyboard(
+        640, 480, false, false, false, false, true);
+    check(ui_escape.size() == 1u &&
+          ui_escape[0].type == ui::UiPointerEventType::Exit,
+          "Escape releases UI keyboard focus in Play Mode");
     const auto canvas_before_reload = model.ui_canvas_asset();
     model.invalidate_runtime_asset_caches();
     check(model.ui_canvas_asset() == canvas_before_reload &&

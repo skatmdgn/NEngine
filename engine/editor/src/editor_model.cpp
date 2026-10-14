@@ -621,12 +621,13 @@ bool EditorModel::set_ui_canvas_asset(assets::AssetGuid asset) {
 std::vector<ui::UiPointerEvent> EditorModel::route_ui_keyboard(
     float width, float height,
     bool tab_held, bool enter_held, bool reverse_tab,
-    bool space_held) {
+    bool space_held, bool escape_held) {
 
     if (!play_session_.is_playing() || !ui_canvas_) return {};
     auto events = ui_keyboard_router_.update(
         ui_canvas_->layout(width, height),
-        tab_held, enter_held, reverse_tab, space_held);
+        tab_held, enter_held, reverse_tab, space_held,
+        escape_held);
     ui_events_.insert(ui_events_.end(), events.begin(), events.end());
     if (ui_events_.size() > 128u)
         ui_events_.erase(ui_events_.begin(),
