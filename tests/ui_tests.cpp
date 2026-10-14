@@ -192,6 +192,21 @@ int main() {
     check(next > overflow && canvas.layout(0.0f, 600.0f).items.empty(),
           "widget IDs advance and invalid viewport is safely rejected");
     // Topmost button wins; clipped regions cannot receive hover/click.
+    UiCanvas selectable;
+    const auto select_panel = selectable.add(WidgetKind::Panel);
+    selectable.find(select_panel)->anchors.offset_max = {80.0f, 80.0f};
+    selectable.find(select_panel)->clip_children = true;
+    const auto select_button = selectable.add(WidgetKind::Button, select_panel);
+    selectable.find(select_button)->anchors.offset_max = {130.0f, 30.0f};
+    const auto select_label = selectable.add(WidgetKind::Text, select_panel);
+    selectable.find(select_label)->anchors.offset_max = {80.0f, 25.0f};
+    const auto select_layout = selectable.layout(200, 200);
+    check(hit_test_ui(select_layout, {20, 10}) == select_label &&
+          hit_test_ui(select_layout, {20, 10}, true) == select_button &&
+          hit_test_ui(select_layout, {95, 15}) == invalid_widget &&
+          hit_test_ui(select_layout, {-1, 15}) == invalid_widget,
+          "authoring hit testing selects topmost clipped visible widget while Play only targets buttons");
+
     UiCanvas interactive;
     const auto bottom = interactive.add(WidgetKind::Button);
     auto* bottom_data = interactive.find(bottom);

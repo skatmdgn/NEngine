@@ -6,14 +6,7 @@ std::vector<UiPointerEvent> UiPointerRouter::update(
     const UiLayout& layout, core::Vec2 pointer, bool left_held) {
 
     std::vector<UiPointerEvent> events;
-    WidgetId next_hover = invalid_widget;
-    for (auto it = layout.items.rbegin(); it != layout.items.rend(); ++it) {
-        if (it->interactable && it->kind == WidgetKind::Button &&
-            it->clipped_rect.contains(pointer)) {
-            next_hover = it->id;
-            break;
-        }
-    }
+    WidgetId next_hover = hit_test_ui(layout, pointer, true);
 
     if (next_hover != hovered_) {
         if (hovered_ != invalid_widget)

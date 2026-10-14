@@ -73,6 +73,11 @@ struct UiLayout {
     std::vector<UiLayoutItem> items{};
 };
 
+// Topmost clipped widget in painter order. All-visible mode is suitable
+// for authoring selection; button-only mode matches Play Mode routing.
+WidgetId hit_test_ui(const UiLayout& layout, core::Vec2 pointer,
+                     bool interactive_buttons_only = false) noexcept;
+
 class UiCanvas {
 public:
     WidgetId add(WidgetKind kind, WidgetId parent = invalid_widget);

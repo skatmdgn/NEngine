@@ -256,6 +256,17 @@ WidgetId UiCanvas::duplicate_subtree(WidgetId id) {
     return new_root;
 }
 
+WidgetId hit_test_ui(const UiLayout& layout, core::Vec2 pointer,
+                     bool interactive_buttons_only) noexcept {
+    for (auto it = layout.items.rbegin(); it != layout.items.rend(); ++it) {
+        if (interactive_buttons_only &&
+            (it->kind != WidgetKind::Button || !it->interactable))
+            continue;
+        if (it->clipped_rect.contains(pointer)) return it->id;
+    }
+    return invalid_widget;
+}
+
 bool UiCanvas::set_name(WidgetId id, std::string name) {
     auto* node = find(id);
     if (!node || !valid_widget_name(name)) return false;
