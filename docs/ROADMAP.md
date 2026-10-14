@@ -223,6 +223,12 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Canvas whole-subtree reparenting with cycle rejection and stable WidgetIds
 - [x] Canvas sibling painter-order reordering with descendant preservation
 - [x] Canvas deep subtree duplication with new stable IDs and serialization regression coverage
+- [x] Runtime Canvas text/visible/interactable setters with bounds and invalid-ID safeguards
+- [x] Frame-scoped native mouse/keyboard Canvas click snapshots for scripting
+- [x] Standalone managed UI callback ABI v16 with lifecycle-safe teardown
+- [x] Generated NEngine.UI Find/GetText/SetText/IsVisible/SetVisible/IsInteractable/SetInteractable/WasClicked APIs
+- [x] Editor Play Mode managed Canvas binding (no Scripting -> NEngineUI dependency)
+- [x] Real .NET integration regression for C# UI query/click/UTF-8 text mutation
 - [x] Sprite animation controller state graph, named boolean transitions, exit times and deterministic evaluation foundation
 - [x] Runtime sprite controller bindings to World SpriteAnimator with transition/reset behavior and destroyed-entity cleanup
 - [x] Transactional versioned .nanimctrl state graph text serializer and parser with malformed-file validation

@@ -28,3 +28,7 @@ Legend: `A` familiar/direct, `B` equivalent, `C` reduced/alternative, `D` intent
 | HDRP/VFX Graph/DOTS/Burst | C/D | not parity targets |
 | XR/consoles/iOS/macOS/Web | D for 1.0 | outside agreed platform scope |
 | Unity project/binary/plugin drop-in compatibility | D | explicitly not a target |
+
+## Managed Canvas foundation (ABI v16)
+
+The generated `NEngine.UI` class provides `Find(string label)`, `WasClicked(ulong id)`, `GetText/SetText`, `IsVisible/SetVisible`, and `IsInteractable/SetInteractable`. `Find` returns the first widget with that label and zero if none matches; for stable production scripts, prefer the persistent widget ID stored in a `.ncanvas` asset. All write APIs act on the Play Mode Canvas copy, not the imported source asset. Missing/non-Play Canvas data is read as unavailable and writes return false. `WasClicked` reports mouse/Enter/Space clicks until the next managed runtime tick, then clears; it is not an event subscription API. Text updates are capped at 4096 UTF-8 bytes. The diagnostic Windows Canvas overlay reflects those changes but Vulkan Game View/production font rendering remains future work.

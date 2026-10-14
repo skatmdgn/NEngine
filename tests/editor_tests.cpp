@@ -214,14 +214,16 @@ int main() {
     const auto canvas_before_reload = model.ui_canvas_asset();
     model.invalidate_runtime_asset_caches();
     check(model.ui_canvas_asset() == canvas_before_reload &&
-          model.ui_layout(640, 480).items.empty(),
-          "asset invalidation retains the selected Canvas ID");
+          model.ui_layout(640, 480).items.empty() &&
+          !model.ui_was_clicked(1u),
+          "asset invalidation retains Canvas identity but drops transient clicks");
     model.tick_runtime(1.0 / 60.0);
     check(model.ui_layout(640, 480).items.size() == 1u &&
           model.ui_canvas_asset() == canvas_before_reload,
           "Play Mode restores Canvas after file-watcher cache invalidation");
 
     check(model.stop_play_mode() &&
+          !model.ui_was_clicked(1u) &&
           model.ui_layout(640, 480).items.empty(),
           "stopping Play Mode hides runtime Canvas");
 

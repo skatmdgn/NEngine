@@ -406,6 +406,8 @@ Not yet implemented:
 - NEngineUI keyboard button activation now emits native Down/Up/Click phases for Enter and Space, with Escape cancelling pending activation and clearing focus. The Windows diagnostic Play Mode forwards all three keys, while mouse Down synchronizes keyboard focus. Focused buttons receive a clipped GDI focus indicator. These are native/diagnostic features and not yet a managed C# UI event bridge.
 - UiCanvas now supports cycle-safe whole-subtree reparenting, sibling paint-order changes and deep duplication with fresh persistent WidgetIds. UI tests cover hierarchy round-trip, descendant preservation and invalid operations; these are foundations for a future Canvas editor rather than a complete visual authoring workflow.
 
+- Managed UI gameplay bridge (ABI v16): a dedicated callback table exposes runtime-only Canvas label lookup, GetText/SetText, visibility and interactable flags, plus WasClicked activation through generated NEngine.UI C# APIs. It does not require a Scripting -> UI module dependency. Text setters cap UTF-8 byte length at 4096 and reject embedded NUL; missing/inactive widgets fail safely. UI clicks are retained until the next script frame and reset on asset swap/hot reload/Play stop. Windows still uses the diagnostic GDI Scene View overlay; this is NOT a production Game View, TextMesh/GPU font implementation or arbitrary Unity UI compatibility. Native and real .NET integration regressions cover the bridge.
+
 ## Immediate next work
 
 1. Validate full 3D compound inertia tensors with more varied mass ratios, high-angular-velocity contacts and larger/longer contact islands; continue polygon-style collider work and production broad-phase/solver tuning.
