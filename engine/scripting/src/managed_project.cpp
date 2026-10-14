@@ -1731,6 +1731,118 @@ std::string api_stub(
         }
     }
 
+    // The native UI module is exposed only through independent callbacks.
+    // No engine subsystem depends on the C# gameplay API.
+    internal static class NativeUi
+    {
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate ulong FindFn(nint context, nint utf8);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int QueryFn(nint context, ulong id, int operation);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int WriteFn(nint context, ulong id, int operation, int value);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int CopyTextFn(nint context, ulong id, nint buffer, int capacity);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int SetTextFn(nint context, ulong id, nint utf8);
+
+        private static nint _context;
+        private static FindFn? _find;
+        private static QueryFn? _query;
+        private static WriteFn? _write;
+        private static CopyTextFn? _copyText;
+        private static SetTextFn? _setText;
+
+        internal static void Configure(
+            nint context, nint find, nint query, nint write,
+            nint copyText, nint setText)
+        {
+            _context = context;
+            _find = Marshal.GetDelegateForFunctionPointer<FindFn>(find);
+            _query = Marshal.GetDelegateForFunctionPointer<QueryFn>(query);
+            _write = Marshal.GetDelegateForFunctionPointer<WriteFn>(write);
+            _copyText = Marshal.GetDelegateForFunctionPointer<CopyTextFn>(copyText);
+            _setText = Marshal.GetDelegateForFunctionPointer<SetTextFn>(setText);
+        }
+
+        internal static void Clear()
+        {
+            _context = 0;
+            _find = null;
+            _query = null;
+            _write = null;
+            _copyText = null;
+            _setText = null;
+        }
+
+        private static T WithUtf8<T>(string? value, Func<nint, T> callback, T fallback)
+        {
+            if (value == null || value.IndexOf(char.MinValue) >= 0)
+                return fallback;
+            int size = Encoding.UTF8.GetByteCount(value);
+            if (size > 4096) return fallback;
+            byte[] bytes = Encoding.UTF8.GetBytes(value);
+            nint buffer = Marshal.AllocHGlobal(bytes.Length + 1);
+            try
+            {
+                Marshal.Copy(bytes, 0, buffer, bytes.Length);
+                Marshal.WriteByte(buffer, bytes.Length, 0);
+                return callback(buffer);
+            }
+            finally { Marshal.FreeHGlobal(buffer); }
+        }
+
+        internal static ulong Find(string text) =>
+            _find == null ? 0UL : WithUtf8(
+                text, ptr => _find(_context, ptr), 0UL);
+
+        internal static int Query(ulong id, int operation) =>
+            id == 0UL ? -1 : (_query?.Invoke(_context, id, operation) ?? -1);
+
+        internal static bool Write(ulong id, int operation, bool value) =>
+            id != 0UL && _write?.Invoke(_context, id, operation, value ? 1 : 0) > 0;
+
+        internal static bool SetText(ulong id, string text) =>
+            id != 0UL && _setText != null && WithUtf8(
+                text, ptr => _setText(_context, id, ptr) > 0, false);
+
+        internal static string? GetText(ulong id)
+        {
+            if (id == 0UL || _copyText == null) return null;
+            int required = -_copyText(_context, id, 0, 0);
+            if (required <= 0 || required > 4097) return null;
+            nint buffer = Marshal.AllocHGlobal(required);
+            try
+            {
+                int copied = _copyText(_context, id, buffer, required);
+                if (copied != required) return null;
+                return Marshal.PtrToStringUTF8(buffer);
+            }
+            finally { Marshal.FreeHGlobal(buffer); }
+        }
+    }
+
+    public static class UI
+    {
+        // Returns the first matching widget ID. For duplicate labels,
+        // prefer stable IDs serialized in the .ncanvas asset.
+        public static ulong Find(string label) => NativeUi.Find(label);
+        public static bool WasClicked(ulong id) =>
+            NativeUi.Query(id, 2) > 0;
+        public static bool IsVisible(ulong id) =>
+            NativeUi.Query(id, 0) > 0;
+        public static bool SetVisible(ulong id, bool value) =>
+            NativeUi.Write(id, 0, value);
+        public static bool IsInteractable(ulong id) =>
+            NativeUi.Query(id, 1) > 0;
+        public static bool SetInteractable(ulong id, bool value) =>
+            NativeUi.Write(id, 1, value);
+        public static string? GetText(ulong id) =>
+            NativeUi.GetText(id);
+        public static bool SetText(ulong id, string text) =>
+            NativeUi.SetText(id, text);
+    }
+
     public abstract class Component
     {
         public GameObject gameObject { get; internal set; } = null!;
