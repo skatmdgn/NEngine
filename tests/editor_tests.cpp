@@ -300,6 +300,15 @@ int main() {
           !model.ui_edit_reparent_preserve_geometry(group_peer, 640, 480) &&
           model.ui_edit_undo() && model.ui_edit_redo(),
           "Canvas reparent preserves screen location, rejects cycles and supports Undo");
+    check(model.select_ui_widget(group_peer) &&
+          model.toggle_ui_widget(new_parent_id) &&
+          model.selected_ui_widgets().size() == 2u &&
+          model.ui_edit_remove_selected() &&
+          !model.select_ui_widget(group_peer) &&
+          !model.select_ui_widget(new_parent_id) &&
+          model.ui_edit_undo() &&
+          model.select_ui_widget(original_edit_id),
+          "group delete removes selected ancestor and descendant as one Undo step");
     check(model.ui_edit_dirty() &&
           !model.begin_ui_canvas_edit(ui_record->guid) &&
           model.ui_edit_widget() != nullptr,

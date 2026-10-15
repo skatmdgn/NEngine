@@ -885,10 +885,15 @@ ui::WidgetId EditorModel::ui_edit_duplicate_selected() {
 }
 
 bool EditorModel::ui_edit_remove_selected() {
-    if (!ui_edit_widget()) return false;
+    if (!has_ui_canvas_draft() || ui_edit_drag_active_ ||
+        ui_edit_selection_.empty()) return false;
     auto candidate = ui_edit_history_.canvas();
-    if (!candidate.remove(ui_edit_selected_) ||
-        !ui_edit_history_.commit(std::move(candidate))) return false;
+    bool changed = false;
+    for (auto id : ui_edit_selection_) {
+        // Removing a selected parent also removes its descendants.
+        if (candidate.find(id)) changed = candidate.remove(id) || changed;
+    }
+    if (!changed || !ui_edit_history_.commit(std::move(candidate))) return false;
     ui_edit_selected_ = ui::invalid_widget;
     ui_edit_selection_.clear();
     return true;
