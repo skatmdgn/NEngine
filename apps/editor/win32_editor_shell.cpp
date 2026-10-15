@@ -101,6 +101,8 @@ enum ControlId : int {
     IdCanvasDuplicate = 11042,
     IdCanvasBack = 11043,
     IdCanvasFront = 11044,
+    IdCanvasPreset = 11045,
+    IdCanvasApplyPreset = 11046,
 };
 
 struct GenericPropertyBinding {
@@ -325,6 +327,8 @@ struct Win32EditorShell::Impl {
     HWND canvas_duplicate{nullptr};
     HWND canvas_to_back{nullptr};
     HWND canvas_to_front{nullptr};
+    HWND canvas_preset{nullptr};
+    HWND canvas_apply_preset{nullptr};
     std::vector<nengine::ui::WidgetId> canvas_widget_rows{};
     bool canvas_mode{false};
 
@@ -1131,6 +1135,20 @@ struct Win32EditorShell::Impl {
             host, L"BUTTON", L"To Back", BS_PUSHBUTTON, IdCanvasBack);
         canvas_to_front = create_control(
             host, L"BUTTON", L"To Front", BS_PUSHBUTTON, IdCanvasFront);
+        canvas_preset = create_control(
+            host, L"COMBOBOX", L"", CBS_DROPDOWNLIST | WS_VSCROLL,
+            IdCanvasPreset);
+        canvas_apply_preset = create_control(
+            host, L"BUTTON", L"Apply Preset", BS_PUSHBUTTON,
+            IdCanvasApplyPreset);
+        for (const wchar_t* label : {
+                 L"Top Left", L"Top Center", L"Top Right",
+                 L"Middle Left", L"Middle Center", L"Middle Right",
+                 L"Bottom Left", L"Bottom Center", L"Bottom Right",
+                 L"Stretch Horizontal", L"Stretch Vertical", L"Stretch All"})
+            SendMessageW(canvas_preset, CB_ADDSTRING, 0,
+                         reinterpret_cast<LPARAM>(label));
+        SendMessageW(canvas_preset, CB_SETCURSEL, 0, 0);
         canvas_anchor_label = create_control(
             host, L"STATIC", L"Anchor min XY / max XY", 0);
         canvas_offset_label = create_control(
@@ -1149,7 +1167,8 @@ struct Win32EditorShell::Impl {
             host, L"BUTTON", L"Apply Anchors + RGBA",
             BS_PUSHBUTTON, IdCanvasApplyGeometry);
 
-        if (!canvas_widget_list || !canvas_duplicate ||
+        if (!canvas_preset || !canvas_apply_preset ||
+            !canvas_widget_list || !canvas_duplicate ||
             !canvas_to_back || !canvas_to_front ||
             !canvas_anchor_label || !canvas_offset_label ||
             !canvas_color_label || !canvas_apply_geometry ||
@@ -1934,6 +1953,8 @@ struct Win32EditorShell::Impl {
                 canvas_widget_list, canvas_duplicate,
                 canvas_to_back, canvas_to_front})
             ShowWindow(control, ui_authoring ? SW_SHOW : SW_HIDE);
+        ShowWindow(canvas_preset, ui_authoring ? SW_SHOW : SW_HIDE);
+        ShowWindow(canvas_apply_preset, ui_authoring ? SW_SHOW : SW_HIDE);
         for (HWND control : canvas_anchor_inputs)
             ShowWindow(control, ui_authoring ? SW_SHOW : SW_HIDE);
         for (HWND control : canvas_color_inputs)
@@ -1972,6 +1993,9 @@ struct Win32EditorShell::Impl {
                         quarter_width, 24, TRUE);
                 iy += 30;
             };
+            MoveWindow(canvas_preset, ix, iy, iw - 95, 200, TRUE);
+            MoveWindow(canvas_apply_preset, ix + iw - 91, iy, 91, 24, TRUE);
+            iy += 30;
             MoveWindow(canvas_anchor_label, ix, iy, iw, 20, TRUE); iy += 20;
             place_quad(canvas_anchor_inputs, 0);
             MoveWindow(canvas_offset_label, ix, iy, iw, 20, TRUE); iy += 20;
@@ -2639,6 +2663,8 @@ struct Win32EditorShell::Impl {
             EnableWindow(canvas_color_inputs[i], widget != nullptr);
         }
         EnableWindow(canvas_apply_geometry, widget != nullptr);
+        EnableWindow(canvas_preset, widget != nullptr);
+        EnableWindow(canvas_apply_preset, widget != nullptr);
     }
 
     void refresh_toolbar() {
@@ -3740,6 +3766,25 @@ struct Win32EditorShell::Impl {
             RECT bounds{};
             GetClientRect(host, &bounds);
             layout(bounds.right - bounds.left, bounds.bottom - bounds.top);
+            handled = true;
+            break;
+        }
+        case IdCanvasApplyPreset: {
+            if (notification != BN_CLICKED) return false;
+            if (canvas_mode && editor.ui_edit_widget() && scene) {
+                const int index = static_cast<int>(
+                    SendMessageW(canvas_preset, CB_GETCURSEL, 0, 0));
+                if (index >= 0 && index < 12) {
+                    RECT bounds{};
+                    GetClientRect(scene, &bounds);
+                    if (!editor.ui_edit_apply_anchor_preset(
+                            static_cast<nengine::ui::AnchorPreset>(index),
+                            static_cast<float>(bounds.right),
+                            static_cast<float>(bounds.bottom)))
+                        editor.console().warning(
+                            "UI", "Cannot apply preset to an invisible/invalid widget.");
+                }
+            }
             handled = true;
             break;
         }
