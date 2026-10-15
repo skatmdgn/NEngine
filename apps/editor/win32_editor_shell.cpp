@@ -2569,8 +2569,11 @@ struct Win32EditorShell::Impl {
         const bool active = canvas_mode && editor.has_ui_canvas_draft();
         EnableWindow(canvas_edit_toggle, editor.can_edit() &&
                      editor.ui_canvas_asset().valid());
-        SetWindowTextW(canvas_edit_toggle,
-            active ? L"Close Canvas Edit" : L"Canvas Edit");
+        const auto selected_count = editor.selected_ui_widgets().size();
+        const std::wstring label = active && selected_count > 1
+            ? L"Canvas Edit (" + std::to_wstring(selected_count) + L" selected)"
+            : (active ? L"Close Canvas Edit" : L"Canvas Edit");
+        SetWindowTextW(canvas_edit_toggle, label.c_str());
         if (!active) return;
         canvas_widget_rows.clear();
         SendMessageW(canvas_widget_list, CB_RESETCONTENT, 0, 0);
@@ -4401,9 +4404,16 @@ struct Win32EditorShell::Impl {
                 rect.bottom - rect.top);
 
         if (canvas_mode && editor.has_ui_canvas_draft()) {
-            const auto id = editor.select_ui_widget_at(
-                width, height, {static_cast<float>(x), static_cast<float>(y)});
-            if (id != nengine::ui::invalid_widget &&
+            const auto id = nengine::ui::hit_test_ui(
+                editor.ui_edit_layout(width, height),
+                {static_cast<float>(x), static_cast<float>(y)});
+            const bool ctrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+            if (ctrl) editor.toggle_ui_widget(id);
+            else if (!editor.is_ui_widget_selected(id))
+                editor.select_ui_widget(id);
+            // Ctrl-click edits selection only; dragging a selected member
+            // moves the entire selection.
+            if (!ctrl && id != nengine::ui::invalid_widget &&
                 editor.ui_edit_begin_drag()) {
                 canvas_dragging = true;
                 canvas_drag_resize = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
@@ -4883,7 +4893,9 @@ struct Win32EditorShell::Impl {
             const auto focused_widget = painting_ui_draft
                 ? editor.selected_ui_widget() : editor.focused_ui_widget();
             for (const auto& item : layout.items) {
-                if (item.id != focused_widget ||
+                if ((painting_ui_draft
+                     ? !editor.is_ui_widget_selected(item.id)
+                     : item.id != focused_widget) ||
                     (!painting_ui_draft &&
                      (item.kind != nengine::ui::WidgetKind::Button ||
                       !item.interactable)) ||

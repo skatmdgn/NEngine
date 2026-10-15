@@ -248,14 +248,16 @@ int main() {
     check(!model.ui_edit_reparent_selected(original_edit_id) &&
           !model.ui_edit_add_widget(ui::WidgetKind::Button, 99999),
           "Canvas editor rejects invalid parent and self-parenting");
-    check(model.select_ui_widget(original_edit_id) &&
-          model.toggle_ui_widget(new_widget) &&
+    const auto group_peer = model.ui_edit_add_widget(ui::WidgetKind::Text);
+    check(group_peer != ui::invalid_widget &&
+          model.select_ui_widget(original_edit_id) &&
+          model.toggle_ui_widget(group_peer) &&
           model.selected_ui_widgets().size() == 2u,
           "Canvas authoring can select two independent sibling widgets");
     const auto first_offset = model.ui_edit_widgets()[0].anchors.offset_min.x;
     const auto* other_node = std::find_if(
         model.ui_edit_widgets().begin(), model.ui_edit_widgets().end(),
-        [new_widget](const ui::Widget& node) { return node.id == new_widget; });
+        [group_peer](const ui::Widget& node) { return node.id == group_peer; });
     const float second_offset = other_node != model.ui_edit_widgets().end()
         ? other_node->anchors.offset_min.x : 0.0f;
     const auto undo_before_group = model.ui_edit_undo_count();
@@ -264,7 +266,12 @@ int main() {
           model.ui_edit_end_drag(true) &&
           model.ui_edit_undo_count() == undo_before_group + 1u &&
           model.ui_edit_widgets()[0].anchors.offset_min.x == first_offset + 9 &&
-          model.ui_edit_widgets().size() >= 2u,
+          std::find_if(model.ui_edit_widgets().begin(),
+                       model.ui_edit_widgets().end(),
+                       [group_peer, second_offset](const ui::Widget& node) {
+                           return node.id == group_peer &&
+                               node.anchors.offset_min.x == second_offset + 9;
+                       }) != model.ui_edit_widgets().end(),
           "multi-widget translation commits exactly one Undo transaction");
     check(model.ui_edit_dirty() &&
           !model.begin_ui_canvas_edit(ui_record->guid) &&
