@@ -209,6 +209,10 @@ int main() {
           !model.ui_edit_apply_anchor_preset(
               static_cast<ui::AnchorPreset>(255), 640, 480),
           "Canvas authoring applies viewport-aware anchor preset without moving UI");
+    // Later gesture regressions assert raw offsets, not pixel positions.
+    // Restore the exact pre-preset anchors before exercising those cases.
+    check(model.ui_edit_set_anchors(bounded_anchors),
+          "Canvas drag regression starts from the original anchor basis");
     const auto original_edit_id = model.selected_ui_widget();
     check(model.selected_ui_widgets().size() == 1 &&
           !model.toggle_ui_widget(9999) &&
