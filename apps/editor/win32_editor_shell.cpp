@@ -103,6 +103,8 @@ enum ControlId : int {
     IdCanvasFront = 11044,
     IdCanvasPreset = 11045,
     IdCanvasApplyPreset = 11046,
+    IdCanvasParent = 11047,
+    IdCanvasApplyParent = 11048,
 };
 
 struct GenericPropertyBinding {
@@ -329,6 +331,9 @@ struct Win32EditorShell::Impl {
     HWND canvas_to_front{nullptr};
     HWND canvas_preset{nullptr};
     HWND canvas_apply_preset{nullptr};
+    HWND canvas_parent_combo{nullptr};
+    HWND canvas_apply_parent{nullptr};
+    std::vector<nengine::ui::WidgetId> canvas_parent_rows{};
     std::vector<nengine::ui::WidgetId> canvas_widget_rows{};
     bool canvas_mode{false};
 
@@ -1135,6 +1140,12 @@ struct Win32EditorShell::Impl {
             host, L"BUTTON", L"To Back", BS_PUSHBUTTON, IdCanvasBack);
         canvas_to_front = create_control(
             host, L"BUTTON", L"To Front", BS_PUSHBUTTON, IdCanvasFront);
+        canvas_parent_combo = create_control(
+            host, L"COMBOBOX", L"", CBS_DROPDOWNLIST | WS_VSCROLL,
+            IdCanvasParent);
+        canvas_apply_parent = create_control(
+            host, L"BUTTON", L"Reparent", BS_PUSHBUTTON,
+            IdCanvasApplyParent);
         canvas_preset = create_control(
             host, L"COMBOBOX", L"", CBS_DROPDOWNLIST | WS_VSCROLL,
             IdCanvasPreset);
@@ -1167,7 +1178,8 @@ struct Win32EditorShell::Impl {
             host, L"BUTTON", L"Apply Anchors + RGBA",
             BS_PUSHBUTTON, IdCanvasApplyGeometry);
 
-        if (!canvas_preset || !canvas_apply_preset ||
+        if (!canvas_parent_combo || !canvas_apply_parent ||
+            !canvas_preset || !canvas_apply_preset ||
             !canvas_widget_list || !canvas_duplicate ||
             !canvas_to_back || !canvas_to_front ||
             !canvas_anchor_label || !canvas_offset_label ||
@@ -1953,6 +1965,8 @@ struct Win32EditorShell::Impl {
                 canvas_widget_list, canvas_duplicate,
                 canvas_to_back, canvas_to_front})
             ShowWindow(control, ui_authoring ? SW_SHOW : SW_HIDE);
+        ShowWindow(canvas_parent_combo, ui_authoring ? SW_SHOW : SW_HIDE);
+        ShowWindow(canvas_apply_parent, ui_authoring ? SW_SHOW : SW_HIDE);
         ShowWindow(canvas_preset, ui_authoring ? SW_SHOW : SW_HIDE);
         ShowWindow(canvas_apply_preset, ui_authoring ? SW_SHOW : SW_HIDE);
         for (HWND control : canvas_anchor_inputs)
@@ -1966,6 +1980,9 @@ struct Win32EditorShell::Impl {
         if (ui_authoring) {
             MoveWindow(canvas_widget_list, ix, iy, iw, 220, TRUE);
             iy += 32;
+            MoveWindow(canvas_parent_combo, ix, iy, iw - 95, 200, TRUE);
+            MoveWindow(canvas_apply_parent, ix + iw - 91, iy, 91, 24, TRUE);
+            iy += 30;
             MoveWindow(canvas_name, ix, iy, iw, 24, TRUE); iy += 29;
             MoveWindow(canvas_text, ix, iy, iw, 24, TRUE); iy += 29;
             MoveWindow(canvas_apply, ix, iy, iw, 24, TRUE); iy += 28;
@@ -2629,6 +2646,24 @@ struct Win32EditorShell::Impl {
         }
         SendMessageW(canvas_widget_list, CB_SETCURSEL, selected_index, 0);
         const auto* widget = editor.ui_edit_widget();
+        canvas_parent_rows.clear();
+        SendMessageW(canvas_parent_combo, CB_RESETCONTENT, 0, 0);
+        SendMessageW(canvas_parent_combo, CB_ADDSTRING, 0,
+                     reinterpret_cast<LPARAM>(L"(Canvas root)"));
+        canvas_parent_rows.push_back(nengine::ui::invalid_widget);
+        int parent_index = 0;
+        for (const auto& node : editor.ui_edit_widgets()) {
+            if (widget && node.id == widget->id) continue;
+            const auto label = utf8_to_wide(
+                "#" + std::to_string(node.id) + " " +
+                (node.name.empty() ? node.text : node.name));
+            SendMessageW(canvas_parent_combo, CB_ADDSTRING, 0,
+                         reinterpret_cast<LPARAM>(label.c_str()));
+            if (widget && node.id == widget->parent)
+                parent_index = static_cast<int>(canvas_parent_rows.size());
+            canvas_parent_rows.push_back(node.id);
+        }
+        SendMessageW(canvas_parent_combo, CB_SETCURSEL, parent_index, 0);
         set_text(canvas_name, widget ? widget->name : "");
         set_text(canvas_text, widget ? widget->text : "");
         EnableWindow(canvas_name, widget != nullptr);
@@ -2665,6 +2700,8 @@ struct Win32EditorShell::Impl {
         EnableWindow(canvas_apply_geometry, widget != nullptr);
         EnableWindow(canvas_preset, widget != nullptr);
         EnableWindow(canvas_apply_preset, widget != nullptr);
+        EnableWindow(canvas_parent_combo, widget != nullptr);
+        EnableWindow(canvas_apply_parent, widget != nullptr);
     }
 
     void refresh_toolbar() {
@@ -3766,6 +3803,26 @@ struct Win32EditorShell::Impl {
             RECT bounds{};
             GetClientRect(host, &bounds);
             layout(bounds.right - bounds.left, bounds.bottom - bounds.top);
+            handled = true;
+            break;
+        }
+        case IdCanvasApplyParent: {
+            if (notification != BN_CLICKED) return false;
+            if (canvas_mode && editor.ui_edit_widget() && scene) {
+                const auto selected = static_cast<int>(
+                    SendMessageW(canvas_parent_combo, CB_GETCURSEL, 0, 0));
+                if (selected >= 0 &&
+                    static_cast<std::size_t>(selected) < canvas_parent_rows.size()) {
+                    RECT bounds{};
+                    GetClientRect(scene, &bounds);
+                    if (!editor.ui_edit_reparent_preserve_geometry(
+                        canvas_parent_rows[static_cast<std::size_t>(selected)],
+                        static_cast<float>(bounds.right),
+                        static_cast<float>(bounds.bottom)))
+                        editor.console().warning(
+                            "UI", "Invalid parent, hierarchy cycle, or unchanged parent.");
+                }
+            }
             handled = true;
             break;
         }
