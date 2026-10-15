@@ -195,6 +195,9 @@ public:
     bool ui_edit_set_interactable(bool interactable);
     bool ui_edit_set_anchors(ui::RectAnchors anchors);
     bool ui_edit_set_color(ui::UiColor color);
+    bool ui_edit_apply_anchor_preset(
+        ui::AnchorPreset preset, float viewport_width,
+        float viewport_height);
     bool ui_edit_begin_drag();
     bool ui_edit_update_drag(core::Vec2 delta, bool resize);
     bool ui_edit_end_drag(bool commit);

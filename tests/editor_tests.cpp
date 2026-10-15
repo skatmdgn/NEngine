@@ -200,6 +200,15 @@ int main() {
     check(!model.ui_edit_set_anchors(rejected_anchors) &&
           model.ui_edit_widget()->anchors.offset_min.x == 24,
           "Canvas editor rejects nonfinite anchor offsets without new undo state");
+    const auto rect_before_preset = model.ui_edit_layout(640, 480).items[0].rect;
+    check(model.ui_edit_apply_anchor_preset(
+              ui::AnchorPreset::MiddleCenter, 640, 480) &&
+          model.ui_edit_widget()->anchors.anchor_min.x == 0.5f &&
+          model.ui_edit_layout(640, 480).items[0].rect.x == rect_before_preset.x &&
+          model.ui_edit_layout(640, 480).items[0].rect.y == rect_before_preset.y &&
+          !model.ui_edit_apply_anchor_preset(
+              static_cast<ui::AnchorPreset>(255), 640, 480),
+          "Canvas authoring applies viewport-aware anchor preset without moving UI");
     const auto original_edit_id = model.selected_ui_widget();
     const auto edits_before_drag = model.ui_edit_undo_count();
     check(model.ui_edit_begin_drag() &&

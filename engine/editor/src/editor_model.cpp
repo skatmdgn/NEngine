@@ -5,6 +5,7 @@
 #include "nengine/editor/scripting_integration.hpp"
 #include "nengine/physics/simulation.hpp"
 #include "nengine/ui/canvas_serialization.hpp"
+#include <algorithm>
 #include <chrono>
 #include <fstream>
 #include "nengine/render/components.hpp"
@@ -714,6 +715,29 @@ ui::WidgetId EditorModel::select_ui_widget_at(
     const auto id = ui::hit_test_ui(ui_edit_layout(width, height), pointer);
     select_ui_widget(id);
     return id;
+}
+
+bool EditorModel::ui_edit_apply_anchor_preset(
+    ui::AnchorPreset preset, float viewport_width, float viewport_height) {
+    if (!ui_edit_widget() || ui_edit_drag_active_) return false;
+    const auto* widget = ui_edit_widget();
+    const auto layout = ui_edit_layout(viewport_width, viewport_height);
+    const auto own = std::find_if(layout.items.begin(), layout.items.end(),
+        [this](const ui::UiLayoutItem& item) {
+            return item.id == ui_edit_selected_;
+        });
+    if (own == layout.items.end()) return false;
+    ui::UiRect parent{0, 0, viewport_width, viewport_height};
+    if (widget->parent != ui::invalid_widget) {
+        const auto found = std::find_if(layout.items.begin(), layout.items.end(),
+            [widget](const ui::UiLayoutItem& item) {
+                return item.id == widget->parent;
+            });
+        if (found == layout.items.end()) return false;
+        parent = found->rect;
+    }
+    const auto anchors = ui::apply_anchor_preset(parent, own->rect, preset);
+    return anchors && ui_edit_set_anchors(*anchors);
 }
 
 bool EditorModel::ui_edit_begin_drag() {
