@@ -765,6 +765,27 @@ bool EditorModel::ui_edit_begin_drag() {
     if (!widget || ui_edit_drag_active_) return false;
     ui_edit_drag_anchors_ = widget->anchors;
     ui_edit_drag_widget_ = ui_edit_selected_;
+    ui_edit_drag_targets_.clear();
+    const auto& canvas = ui_edit_history_.canvas();
+    for (auto id : ui_edit_selection_) {
+        const auto* node = canvas.find(id);
+        if (!node) continue;
+        // Parent movement already carries descendants in resolved layout.
+        bool ancestor_selected = false;
+        auto parent = node->parent;
+        while (parent != ui::invalid_widget) {
+            if (is_ui_widget_selected(parent)) {
+                ancestor_selected = true;
+                break;
+            }
+            const auto* ancestor = canvas.find(parent);
+            if (!ancestor) break;
+            parent = ancestor->parent;
+        }
+        if (!ancestor_selected)
+            ui_edit_drag_targets_.emplace_back(id, node->anchors);
+    }
+    if (ui_edit_drag_targets_.empty()) return false;
     ui_edit_drag_active_ = true;
     ui_edit_preview_.reset();
     return true;
@@ -772,11 +793,14 @@ bool EditorModel::ui_edit_begin_drag() {
 
 bool EditorModel::ui_edit_update_drag(core::Vec2 delta, bool resize) {
     if (!ui_edit_drag_active_ || !has_ui_canvas_draft()) return false;
-    const auto next = ui::drag_canvas_anchors(
-        ui_edit_drag_anchors_, delta, resize);
-    if (!next) return false;
     auto candidate = ui_edit_history_.canvas();
-    if (!candidate.set_anchors(ui_edit_drag_widget_, *next)) return false;
+    for (const auto& [id, anchors] : ui_edit_drag_targets_) {
+        // Resizing is always a primary-only operation, whereas translation
+        // acts on all selected roots in one transaction.
+        if (resize && id != ui_edit_drag_widget_) continue;
+        const auto next = ui::drag_canvas_anchors(anchors, delta, resize);
+        if (!next || !candidate.set_anchors(id, *next)) return false;
+    }
     ui_edit_preview_ = std::move(candidate);
     return true;
 }
@@ -785,6 +809,7 @@ bool EditorModel::ui_edit_end_drag(bool commit) {
     if (!ui_edit_drag_active_) return false;
     ui_edit_drag_active_ = false;
     ui_edit_drag_widget_ = ui::invalid_widget;
+    ui_edit_drag_targets_.clear();
     auto staged = std::move(ui_edit_preview_);
     ui_edit_preview_.reset();
     return commit && staged && ui_edit_history_.commit(std::move(*staged));

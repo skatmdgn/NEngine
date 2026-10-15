@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <optional>
+#include <utility>
 #include <vector>
 #include <cstdint>
 
@@ -307,6 +308,8 @@ private:
     bool ui_edit_drag_active_{false};
     ui::WidgetId ui_edit_drag_widget_{ui::invalid_widget};
     ui::RectAnchors ui_edit_drag_anchors_{};
+    std::vector<std::pair<ui::WidgetId, ui::RectAnchors>>
+        ui_edit_drag_targets_{};
     std::optional<ui::UiCanvas> ui_edit_preview_{};
     std::optional<ui::UiCanvas> ui_canvas_{};
     assets::AssetGuid ui_canvas_asset_{};
