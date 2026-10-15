@@ -7,6 +7,7 @@
 #include "nengine/ui/canvas_serialization.hpp"
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <fstream>
 #include "nengine/render/components.hpp"
 #include <utility>
@@ -898,6 +899,49 @@ bool EditorModel::ui_edit_reparent_selected(ui::WidgetId parent) {
     auto candidate = ui_edit_history_.canvas();
     if (!candidate.reparent(ui_edit_selected_, parent)) return false;
     return ui_edit_history_.commit(std::move(candidate));
+}
+
+bool EditorModel::ui_edit_reparent_preserve_geometry(
+    ui::WidgetId parent, float width, float height) {
+    if (!ui_edit_widget() || ui_edit_drag_active_ ||
+        !std::isfinite(width) || !std::isfinite(height) ||
+        width <= 0 || height <= 0) return false;
+    const auto old_layout = ui_edit_layout(width, height);
+    const auto own = std::find_if(old_layout.items.begin(),
+        old_layout.items.end(), [this](const ui::UiLayoutItem& item) {
+            return item.id == ui_edit_selected_;
+        });
+    if (own == old_layout.items.end()) return false;
+    const auto geometry = own->rect;
+    auto candidate = ui_edit_history_.canvas();
+    if (!candidate.reparent(ui_edit_selected_, parent)) return false;
+    ui::UiRect parent_rect{0, 0, width, height};
+    if (parent != ui::invalid_widget) {
+        const auto next_layout = candidate.layout(width, height);
+        const auto found = std::find_if(next_layout.items.begin(),
+            next_layout.items.end(), [parent](const ui::UiLayoutItem& item) {
+                return item.id == parent;
+            });
+        if (found == next_layout.items.end()) return false;
+        parent_rect = found->rect;
+    }
+    auto* widget = candidate.find(ui_edit_selected_);
+    if (!widget) return false;
+    // Keep the existing anchor configuration but recompute offsets against
+    // the new parent rectangle so reparenting does not teleport the widget.
+    auto anchors = widget->anchors;
+    anchors.offset_min = {
+        geometry.x - parent_rect.x -
+            parent_rect.width * anchors.anchor_min.x,
+        geometry.y - parent_rect.y -
+            parent_rect.height * anchors.anchor_min.y};
+    anchors.offset_max = {
+        geometry.x + geometry.width - parent_rect.x -
+            parent_rect.width * anchors.anchor_max.x,
+        geometry.y + geometry.height - parent_rect.y -
+            parent_rect.height * anchors.anchor_max.y};
+    return candidate.set_anchors(ui_edit_selected_, anchors) &&
+           ui_edit_history_.commit(std::move(candidate));
 }
 
 bool EditorModel::ui_edit_set_sibling_index(std::size_t index) {

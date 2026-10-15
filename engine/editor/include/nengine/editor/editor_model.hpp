@@ -217,6 +217,8 @@ public:
     ui::WidgetId ui_edit_duplicate_selected();
     bool ui_edit_remove_selected();
     bool ui_edit_reparent_selected(ui::WidgetId parent);
+    bool ui_edit_reparent_preserve_geometry(
+        ui::WidgetId parent, float width, float height);
     bool ui_edit_set_sibling_index(std::size_t index);
     bool save_ui_canvas_edit(std::string* error = nullptr);
     bool ui_edit_undo();

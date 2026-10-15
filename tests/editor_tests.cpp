@@ -273,6 +273,33 @@ int main() {
                                node.anchors.offset_min.x == second_offset + 9;
                        }) != model.ui_edit_widgets().end(),
           "multi-widget translation commits exactly one Undo transaction");
+    const auto new_parent_id =
+        model.ui_edit_add_widget(ui::WidgetKind::Panel);
+    check(model.select_ui_widget(group_peer),
+          "Canvas can select a widget for hierarchy reparenting");
+    const auto before_parent_move = model.ui_edit_layout(640, 480);
+    const auto child_before = std::find_if(
+        before_parent_move.items.begin(), before_parent_move.items.end(),
+        [group_peer](const ui::UiLayoutItem& item) {
+            return item.id == group_peer;
+        });
+    const float child_x = child_before != before_parent_move.items.end()
+        ? child_before->rect.x : -1.f;
+    check(new_parent_id != ui::invalid_widget &&
+          model.ui_edit_reparent_preserve_geometry(new_parent_id, 640, 480) &&
+          model.ui_edit_widget()->parent == new_parent_id,
+          "Canvas reparent preserves stable IDs and parent relationship");
+    const auto moved_layout = model.ui_edit_layout(640, 480);
+    const auto child_after = std::find_if(
+        moved_layout.items.begin(), moved_layout.items.end(),
+        [group_peer](const ui::UiLayoutItem& item) {
+            return item.id == group_peer;
+        });
+    check(child_after != moved_layout.items.end() &&
+          child_after->rect.x == child_x &&
+          !model.ui_edit_reparent_preserve_geometry(group_peer, 640, 480) &&
+          model.ui_edit_undo() && model.ui_edit_redo(),
+          "Canvas reparent preserves screen location, rejects cycles and supports Undo");
     check(model.ui_edit_dirty() &&
           !model.begin_ui_canvas_edit(ui_record->guid) &&
           model.ui_edit_widget() != nullptr,
