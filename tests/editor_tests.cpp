@@ -255,7 +255,7 @@ int main() {
           model.selected_ui_widgets().size() == 2u,
           "Canvas authoring can select two independent sibling widgets");
     const auto first_offset = model.ui_edit_widgets()[0].anchors.offset_min.x;
-    const auto* other_node = std::find_if(
+    const auto other_node = std::find_if(
         model.ui_edit_widgets().begin(), model.ui_edit_widgets().end(),
         [group_peer](const ui::Widget& node) { return node.id == group_peer; });
     const float second_offset = other_node != model.ui_edit_widgets().end()
