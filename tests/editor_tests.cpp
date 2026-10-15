@@ -300,6 +300,22 @@ int main() {
           !model.ui_edit_reparent_preserve_geometry(group_peer, 640, 480) &&
           model.ui_edit_undo() && model.ui_edit_redo(),
           "Canvas reparent preserves screen location, rejects cycles and supports Undo");
+    check(model.select_ui_widget(new_parent_id) &&
+          model.toggle_ui_widget(group_peer) &&
+          model.ui_edit_begin_drag() &&
+          model.ui_edit_update_drag({13, 0}, false) &&
+          model.ui_edit_end_drag(true),
+          "Canvas nested parent/child multi-drag commits one transaction");
+    const auto nested_layout = model.ui_edit_layout(640, 480);
+    const auto nested_child = std::find_if(
+        nested_layout.items.begin(), nested_layout.items.end(),
+        [group_peer](const ui::UiLayoutItem& item) {
+            return item.id == group_peer;
+        });
+    check(nested_child != nested_layout.items.end() &&
+          nested_child->rect.x == child_x + 13 &&
+          model.ui_edit_undo() && model.ui_edit_redo(),
+          "selected child inherits parent's translation exactly once");
     check(model.select_ui_widget(group_peer) &&
           model.toggle_ui_widget(new_parent_id) &&
           model.selected_ui_widgets().size() == 2u &&

@@ -258,6 +258,14 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Generated C# SpriteAnimator.controller AssetGuid setter/getter via existing property bridge
 - [x] Generated C# SpriteAnimator.SetBool with validated native runtime parameter bridge and fixed-step graph evaluation
 - [ ] animation clips/state machine/blend tree subset
+- [x] Geometry-preserving Canvas anchor presets: nine fixed alignments plus horizontal/vertical/full stretch
+- [x] Undoable viewport-aware anchor preset selection in EditorModel and Windows Inspector
+- [x] Ctrl-click Canvas multi-selection with stable primary selection and multi-outline GDI preview
+- [x] Atomic multi-widget drag translation with parent/descendant deduplication
+- [x] Geometry-preserving Canvas reparenting with cycle prevention and Undo
+- [x] Windows Canvas parent dropdown + Reparent button (safe hierarchy authoring)
+- [x] Atomic multi-selection subtree deletion with Undo restoration
+- [x] Nested selection/drag, invalid parent and anchor preset regression coverage
 - [ ] runtime Canvas-style UI
 - [ ] NavMesh agent/obstacle/link subset
 - [ ] particle system
