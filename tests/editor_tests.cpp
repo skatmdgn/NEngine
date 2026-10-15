@@ -210,6 +210,14 @@ int main() {
               static_cast<ui::AnchorPreset>(255), 640, 480),
           "Canvas authoring applies viewport-aware anchor preset without moving UI");
     const auto original_edit_id = model.selected_ui_widget();
+    check(model.selected_ui_widgets().size() == 1 &&
+          !model.toggle_ui_widget(9999) &&
+          model.toggle_ui_widget(original_edit_id) &&
+          model.selected_ui_widgets().empty() &&
+          model.selected_ui_widget() == ui::invalid_widget &&
+          model.toggle_ui_widget(original_edit_id) &&
+          model.selected_ui_widget() == original_edit_id,
+          "Canvas selection supports ctrl-style toggling and primary fallback");
     const auto edits_before_drag = model.ui_edit_undo_count();
     check(model.ui_edit_begin_drag() &&
           model.ui_edit_update_drag({11, -5}, false) &&

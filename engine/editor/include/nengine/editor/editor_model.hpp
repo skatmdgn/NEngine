@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <filesystem>
 #include <string>
 #include <string_view>
@@ -189,6 +190,14 @@ public:
     ui::WidgetId select_ui_widget_at(float width, float height,
                                     core::Vec2 pointer);
     bool select_ui_widget(ui::WidgetId id) noexcept;
+    bool toggle_ui_widget(ui::WidgetId id) noexcept;
+    const std::vector<ui::WidgetId>& selected_ui_widgets() const noexcept {
+        return ui_edit_selection_;
+    }
+    bool is_ui_widget_selected(ui::WidgetId id) const noexcept {
+        return std::find(ui_edit_selection_.begin(), ui_edit_selection_.end(), id)
+            != ui_edit_selection_.end();
+    }
     bool ui_edit_set_name(std::string name);
     bool ui_edit_set_text(std::string text);
     bool ui_edit_set_visible(bool visible);
@@ -294,6 +303,7 @@ private:
     assets::AssetGuid ui_edit_asset_{};
     bool ui_edit_open_{false};
     ui::WidgetId ui_edit_selected_{ui::invalid_widget};
+    std::vector<ui::WidgetId> ui_edit_selection_{};
     bool ui_edit_drag_active_{false};
     ui::WidgetId ui_edit_drag_widget_{ui::invalid_widget};
     ui::RectAnchors ui_edit_drag_anchors_{};
