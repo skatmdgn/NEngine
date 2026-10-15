@@ -68,6 +68,44 @@ std::optional<RectAnchors> drag_canvas_anchors(
     return start;
 }
 
+std::optional<RectAnchors> apply_anchor_preset(
+    UiRect parent, UiRect rect, AnchorPreset preset) noexcept {
+    if (!finite_rect(parent) || !finite_rect(rect) ||
+        parent.width <= 0 || parent.height <= 0 ||
+        rect.width <= 0 || rect.height <= 0)
+        return std::nullopt;
+    core::Vec2 amin{}, amax{};
+    switch (preset) {
+    case AnchorPreset::TopLeft: amin = amax = {0, 0}; break;
+    case AnchorPreset::TopCenter: amin = amax = {0.5f, 0}; break;
+    case AnchorPreset::TopRight: amin = amax = {1, 0}; break;
+    case AnchorPreset::MiddleLeft: amin = amax = {0, 0.5f}; break;
+    case AnchorPreset::MiddleCenter: amin = amax = {0.5f, 0.5f}; break;
+    case AnchorPreset::MiddleRight: amin = amax = {1, 0.5f}; break;
+    case AnchorPreset::BottomLeft: amin = amax = {0, 1}; break;
+    case AnchorPreset::BottomCenter: amin = amax = {0.5f, 1}; break;
+    case AnchorPreset::BottomRight: amin = amax = {1, 1}; break;
+    case AnchorPreset::StretchHorizontal:
+        amin = {0, 0.5f}; amax = {1, 0.5f}; break;
+    case AnchorPreset::StretchVertical:
+        amin = {0.5f, 0}; amax = {0.5f, 1}; break;
+    case AnchorPreset::StretchAll:
+        amin = {0, 0}; amax = {1, 1}; break;
+    default: return std::nullopt;
+    }
+    RectAnchors result;
+    result.anchor_min = amin;
+    result.anchor_max = amax;
+    result.offset_min = {rect.x - parent.x - parent.width * amin.x,
+                         rect.y - parent.y - parent.height * amin.y};
+    result.offset_max = {rect.x + rect.width - parent.x -
+                            parent.width * amax.x,
+                         rect.y + rect.height - parent.y -
+                            parent.height * amax.y};
+    if (!finite_anchors(result)) return std::nullopt;
+    return result;
+}
+
 bool UiRect::contains(core::Vec2 point) const noexcept {
     return finite_rect(*this) && width > 0.0f && height > 0.0f &&
         std::isfinite(point.x) && std::isfinite(point.y) &&

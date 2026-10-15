@@ -137,6 +137,27 @@ int main() {
           duplication_readback.find(duplicate_child)->parent == duplicate_a,
           "duplicated Canvas hierarchy serializes with stable fresh IDs");
 
+    for (const auto preset : {
+            AnchorPreset::TopLeft, AnchorPreset::MiddleCenter,
+            AnchorPreset::BottomRight, AnchorPreset::StretchHorizontal,
+            AnchorPreset::StretchVertical, AnchorPreset::StretchAll}) {
+        const auto changed = apply_anchor_preset(
+            {10, 20, 200, 150}, {50, 60, 100, 30}, preset);
+        const auto unchanged = UiCanvas{}.layout(200, 150);
+        (void)unchanged;
+        check(changed &&
+              10 + 200 * changed->anchor_min.x + changed->offset_min.x == 50 &&
+              20 + 150 * changed->anchor_min.y + changed->offset_min.y == 60 &&
+              10 + 200 * changed->anchor_max.x + changed->offset_max.x == 150 &&
+              20 + 150 * changed->anchor_max.y + changed->offset_max.y == 90,
+              "Canvas anchor presets retain on-screen geometry");
+    }
+    check(!apply_anchor_preset({0, 0, 0, 100}, {0, 0, 10, 10},
+                               AnchorPreset::StretchAll) &&
+          !apply_anchor_preset({0, 0, 100, 100}, {0, 0, -1, 10},
+                               AnchorPreset::TopLeft),
+          "Canvas anchor presets reject invalid parent and widget rects");
+
     RectAnchors gesture;
     const auto translated = drag_canvas_anchors(gesture, {12, -7}, false);
     const auto resized = drag_canvas_anchors(gesture, {12, -7}, true);

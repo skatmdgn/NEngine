@@ -47,6 +47,17 @@ struct RectAnchors {
 std::optional<RectAnchors> drag_canvas_anchors(
     RectAnchors start, core::Vec2 delta, bool resize) noexcept;
 
+// Presets preserve the widget's absolute rectangle at the current
+// authoring viewport, changing only its behavior under resizing.
+enum class AnchorPreset : std::uint8_t {
+    TopLeft, TopCenter, TopRight,
+    MiddleLeft, MiddleCenter, MiddleRight,
+    BottomLeft, BottomCenter, BottomRight,
+    StretchHorizontal, StretchVertical, StretchAll
+};
+std::optional<RectAnchors> apply_anchor_preset(
+    UiRect parent, UiRect rect, AnchorPreset preset) noexcept;
+
 enum class WidgetKind : std::uint8_t {
     Panel, Text, Image, Button
 };
