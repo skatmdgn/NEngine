@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <sstream>
 #include <utility>
 
 namespace nengine::input {
@@ -235,6 +236,197 @@ bool ActionMap::released(
         [&](const auto& binding) {
             return input.released(binding.key);
         });
+}
+
+
+namespace {
+
+constexpr std::size_t max_action_map_bytes = 64u * 1024u;
+constexpr std::size_t max_action_count = 128u;
+constexpr std::size_t max_action_name_bytes = 64u;
+constexpr std::size_t max_action_bindings = 16u;
+
+// Explicit labels avoid persisting enum ordinals that may change as new
+// input devices and keys are added in future engine versions.
+constexpr std::array<std::string_view,
+    static_cast<std::size_t>(Key::Count)> key_names{{
+    "",
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "F",
+    "G",
+    "H",
+    "I",
+    "J",
+    "K",
+    "L",
+    "M",
+    "N",
+    "O",
+    "P",
+    "Q",
+    "R",
+    "S",
+    "T",
+    "U",
+    "V",
+    "W",
+    "X",
+    "Y",
+    "Z",
+    "Digit0",
+    "Digit1",
+    "Digit2",
+    "Digit3",
+    "Digit4",
+    "Digit5",
+    "Digit6",
+    "Digit7",
+    "Digit8",
+    "Digit9",
+    "Space",
+    "Enter",
+    "Escape",
+    "Tab",
+    "Backspace",
+    "Up",
+    "Down",
+    "Left",
+    "Right",
+    "LeftShift",
+    "RightShift",
+    "LeftControl",
+    "RightControl",
+    "LeftAlt",
+    "RightAlt",
+    "MouseLeft",
+    "MouseRight",
+    "MouseMiddle"
+}};
+
+std::string_view key_name(Key key) noexcept {
+    const auto index = static_cast<std::size_t>(key);
+    return index < key_names.size() ? key_names[index] : std::string_view{};
+}
+
+Key parse_key(std::string_view name) noexcept {
+    for (std::size_t index = 1u; index < key_names.size(); ++index)
+        if (key_names[index] == name)
+            return static_cast<Key>(index);
+    return Key::Unknown;
+}
+
+bool valid_action_name(std::string_view name) noexcept {
+    if (name.empty() || name.size() > max_action_name_bytes)
+        return false;
+    for (const unsigned char ch : name) {
+        if ((ch >= 'A' && ch <= 'Z') ||
+            (ch >= 'a' && ch <= 'z') ||
+            (ch >= '0' && ch <= '9') ||
+            ch == '_' || ch == '-' || ch == '.')
+            continue;
+        return false;
+    }
+    return true;
+}
+
+bool failure(std::string* error, const char* message) {
+    if (error) *error = message;
+    return false;
+}
+
+} // namespace
+
+bool ActionMap::serialize(std::string& output, std::string* error) const {
+    if (bindings_.size() > max_action_count)
+        return failure(error, "action map has too many actions");
+    std::vector<std::string_view> ordered;
+    ordered.reserve(bindings_.size());
+    for (const auto& [name, keys] : bindings_) {
+        if (!valid_action_name(name) ||
+            keys.empty() || keys.size() > max_action_bindings)
+            return failure(error, "invalid action name or binding count");
+        ordered.push_back(name);
+    }
+    std::sort(ordered.begin(), ordered.end());
+
+    std::string encoded = "NENGINE_ACTION_MAP 1\n";
+    for (const auto name : ordered) {
+        encoded += "action ";
+        encoded += name;
+        for (const auto& binding : bindings_.at(std::string{name})) {
+            const auto label = key_name(binding.key);
+            if (label.empty())
+                return failure(error, "unsupported action binding key");
+            encoded += ' ';
+            encoded += label;
+        }
+        encoded += '\n';
+        if (encoded.size() > max_action_map_bytes)
+            return failure(error, "action map exceeds size limit");
+    }
+    output = std::move(encoded);
+    if (error) error->clear();
+    return true;
+}
+
+bool ActionMap::deserialize(
+    std::string_view source,
+    ActionMap& output,
+    std::string* error) {
+
+    if (source.size() > max_action_map_bytes)
+        return failure(error, "action map exceeds size limit");
+
+    std::istringstream lines{std::string{source}};
+    std::string line;
+    if (!std::getline(lines, line))
+        return failure(error, "missing action map header");
+    if (!line.empty() && line.back() == '\r') line.pop_back();
+    if (line != "NENGINE_ACTION_MAP 1")
+        return failure(error, "unsupported action map format or version");
+
+    ActionMap parsed;
+    std::size_t action_count = 0u;
+    while (std::getline(lines, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        std::istringstream fields{line};
+        std::string directive;
+        std::string action;
+        if (!(fields >> directive >> action) ||
+            directive != "action" || !valid_action_name(action))
+            return failure(error, "invalid action record");
+        if (parsed.contains(action))
+            return failure(error, "duplicate action name");
+        if (++action_count > max_action_count)
+            return failure(error, "too many action records");
+
+        std::string token;
+        std::size_t binding_count = 0u;
+        while (fields >> token) {
+            if (++binding_count > max_action_bindings)
+                return failure(error, "too many action bindings");
+            const auto key = parse_key(token);
+            if (key == Key::Unknown)
+                return failure(error, "unsupported action binding key");
+            const auto* existing = parsed.bindings(action);
+            if (existing && std::any_of(existing->begin(), existing->end(),
+                [key](const ActionBinding& binding) {
+                    return binding.key == key;
+                }))
+                return failure(error, "duplicate action binding");
+            if (!parsed.bind(action, key))
+                return failure(error, "failed to bind action");
+        }
+        if (binding_count == 0u)
+            return failure(error, "action has no bindings");
+    }
+    output = std::move(parsed);
+    if (error) error->clear();
+    return true;
 }
 
 } // namespace nengine::input
