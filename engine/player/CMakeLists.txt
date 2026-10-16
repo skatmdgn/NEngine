@@ -3,6 +3,7 @@ add_library(NEnginePlayerKit STATIC
   src/assets.cpp
   src/exporter.cpp
   src/runtime.cpp
+  src/managed_queries.cpp
 )
 target_include_directories(NEnginePlayerKit PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(NEnginePlayerKit PUBLIC NEngineCore NEngineAssets NEngineRender NEnginePhysics NEngineAudio NEngineScripting NEngineInput)
