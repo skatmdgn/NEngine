@@ -1,4 +1,7 @@
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -31,6 +34,32 @@ int main() {
     check(world.size() == 2, "create increments size");
     check(world.is_alive(parent), "new entity is alive");
     check(world.name(child) == "Child", "name roundtrip");
+    {
+        World reuse;
+        const auto stale_handle = reuse.create("BeforeClear");
+        reuse.clear();
+        const auto after_clear = reuse.create("AfterClear");
+        check(after_clear.valid() && stale_handle != after_clear &&
+                  !reuse.is_alive(stale_handle) && reuse.is_alive(after_clear),
+              "World clear never revalidates a stale entity handle");
+
+        const auto removed = after_clear;
+        check(reuse.destroy(after_clear), "World destroy after clear works");
+        const auto after_destroy = reuse.create("AfterDestroy");
+        check(after_destroy.valid() && after_destroy != removed &&
+                  !reuse.is_alive(removed) && !reuse.is_alive(stale_handle),
+              "slot reuse and multiple clear generations remain distinct");
+
+        World bad_hierarchy;
+        const auto first = bad_hierarchy.create("First");
+        const auto second = bad_hierarchy.create("Second");
+        const auto unrelated = bad_hierarchy.create("Unrelated");
+        bad_hierarchy.transform(first)->parent = second;
+        bad_hierarchy.transform(second)->parent = first;
+        check(!bad_hierarchy.set_parent(unrelated, first),
+              "preexisting malformed parent cycle cannot hang set_parent");
+    }
+
 
     check(world.set_parent(child, parent), "valid parenting succeeds");
     check(world.transform(child)->parent == parent, "parent stored");
@@ -165,6 +194,27 @@ int main() {
             "CoreTest",
             &component_serialization);
     check(captured.objects.size() == 2, "scene captures all objects");
+    {
+        World custom;
+        const auto object = custom.create("HasCustomComponent");
+        custom.add_component<TestHealth>(object, health_type);
+        SceneData unchanged;
+        unchanged.name = "KeepMe";
+        std::string capture_error;
+        check(!SceneSerializer::capture_checked(
+                  custom, unchanged, "Unsafe", &capture_error,
+                  &component_serialization) &&
+                  unchanged.name == "KeepMe" && !capture_error.empty(),
+              "strict Scene capture rejects unknown component without data loss");
+
+        World transform_only;
+        transform_only.create("OnlyTransform");
+        check(SceneSerializer::capture_checked(
+                  transform_only, unchanged, "Safe", &capture_error) &&
+                  unchanged.name == "Safe" && unchanged.objects.size() == 1u,
+              "strict Scene capture accepts completely serializable world");
+    }
+
 
     std::stringstream stream;
     std::string error;
@@ -206,6 +256,59 @@ int main() {
         "legacy v1 scene preserves object count");
     check(loaded.name == "CoreTest", "scene name roundtrip");
     check(loaded.objects.size() == 2, "scene object count roundtrip");
+
+    // Untrusted scene input must fail before allocating attacker-controlled
+    // object/component/property counts, keeping the old output intact.
+    const auto unchanged_name = loaded.name;
+    for (const auto& malicious : {
+             std::string{"NENGINE_SCENE 3\nNAME \"Huge\"\nOBJECTS 18446744073709551615\n"},
+             std::string{"NENGINE_SCENE 0\nNAME \"Bad\"\nOBJECTS 0\nEND_SCENE\n"},
+             std::string{"NENGINE_SCENE 3\nNAME \"Bad\"\nOBJECTS 1\nOBJECT 0 -1 1 \"A\"\nPOS 0 0 0\nROT 0 0 0 1\nSCALE 1 1 1\nCOMPONENTS 129\n"},
+             std::string{"NENGINE_SCENE 3\nNAME \"Bad\"\nOBJECTS 1\nOBJECT 0 -1 1 \"A\"\nPOS 0 0 0\nROT 0 0 0 1\nSCALE 1 1 1\nCOMPONENTS 1\nCOMPONENT 1 1 \"A\" 257\n"},
+             std::string{"NENGINE_SCENE 3\nNAME \"Bad\"\nOBJECTS 0\nEND_SCENE\nTRAILING\n"}
+         }) {
+        std::stringstream invalid(malicious);
+        check(!SceneSerializer::read(invalid, loaded, &error) &&
+                  loaded.name == unchanged_name,
+              "malformed bounded scene input rejected transactionally");
+    }
+
+    {
+        std::stringstream excessive(std::string(32u * 1024u * 1024u + 1u, 'x'));
+        check(!SceneSerializer::read(excessive, loaded, &error) &&
+                  loaded.name == unchanged_name,
+              "oversized scene stream rejected without parsing");
+    }
+
+    const auto scene_path = std::filesystem::temp_directory_path() /
+        "nengine_scene_atomic_core_test.nscene";
+    {
+        std::ofstream original(scene_path, std::ios::binary | std::ios::trunc);
+        original << "ORIGINAL";
+    }
+    auto malformed_save = loaded;
+    SerializedComponentData broken;
+    broken.type = link_type;
+    broken.version = 1u;
+    broken.type_name = "Tests.Broken";
+    SerializedPropertyData invalid_property;
+    invalid_property.name = "InvalidRuntimeEntity";
+    invalid_property.kind = PropertyKind::EntityReference;
+    invalid_property.value = Entity::make(0, 0);
+    broken.properties.push_back(std::move(invalid_property));
+    malformed_save.objects.front().components.push_back(std::move(broken));
+    check(!SceneSerializer::save_file(malformed_save, scene_path, &error),
+          "failed scene serialization does not report a saved file");
+    {
+        std::ifstream after(scene_path, std::ios::binary);
+        const std::string bytes{std::istreambuf_iterator<char>{after},
+                                std::istreambuf_iterator<char>{}};
+        check(bytes == "ORIGINAL", "failed save preserves original scene bytes");
+    }
+    check(SceneSerializer::save_file(loaded, scene_path, &error),
+          "valid scene atomically replaces existing file");
+    std::filesystem::remove(scene_path);
+
 
     World restored;
     check(

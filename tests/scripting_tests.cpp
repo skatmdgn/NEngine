@@ -2255,7 +2255,7 @@ int main() {
                 integration_root /
                 "Library" /
                 "ManagedBuild" /
-                "Debug";
+                "Debug&100%";
             integration_build.dotnet_executable =
                 *real_dotnet;
             integration_build.configuration =

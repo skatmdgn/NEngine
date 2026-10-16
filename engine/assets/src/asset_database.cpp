@@ -243,6 +243,14 @@ AssetScanResult AssetDatabase::scan(bool create_missing_meta) {
         }
 
         if (next_by_guid.contains(meta.guid)) {
+            if (!create_missing_meta) {
+                result.messages.push_back({
+                    AssetMessageSeverity::Error,
+                    meta_path,
+                    "duplicate AssetGuid in read-only asset scan"
+                });
+                continue;
+            }
             const auto old_guid = meta.guid;
             meta.guid = AssetGuid::generate();
 
