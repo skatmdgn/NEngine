@@ -132,6 +132,12 @@ PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
         stats.clamped_delta = true;
         accumulator_ = std::fmod(accumulator_, fixed);
     }
+    if (managed_runtime_.valid()) {
+        const auto script = script_system_.update(
+            world_, static_cast<float>(frame));
+        stats.managed_updates += script.updated + script.late_updated;
+        stats.managed_errors += script.unresolved;
+    }
     return stats;
 }
 
