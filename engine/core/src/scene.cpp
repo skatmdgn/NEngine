@@ -818,8 +818,8 @@ static bool read_scene_records(
         return false;
     }
 
-    if (parsed.version >
-        SceneData::current_version) {
+    if (parsed.version < 1u ||
+        parsed.version > SceneData::current_version) {
 
         set_error(
             error,
