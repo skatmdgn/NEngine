@@ -56,6 +56,7 @@ int main() {
         body_entity, nengine::physics::rigidbody2d_type());
     const auto wav_guid = nengine::assets::AssetGuid::generate();
     const auto nanim_guid = nengine::assets::AssetGuid::generate();
+    const auto controller_guid = nengine::assets::AssetGuid::generate();
     auto* sound = world.add_component<nengine::audio::AudioSource>(
         body_entity, nengine::audio::audio_source_type());
     if (!camera || !body || !sound) return 22;
@@ -70,6 +71,7 @@ int main() {
         body_entity, nengine::render::sprite_renderer_type());
     if (!animator || !sprite_renderer) return 34;
     animator->clip = nanim_guid;
+    animator->controller = controller_guid;
     auto* behaviour = world.add_component<nengine::scripting::ScriptBehaviour>(
         body_entity, nengine::scripting::script_behaviour_type());
     if (!behaviour) return 25;
@@ -99,6 +101,14 @@ int main() {
     { std::ofstream meta(project / "Assets" / "Animations" / "walk.nanim.meta");
       meta << "NENGINE_META 1\nGUID " << nanim_guid.to_string()
            << "\nIMPORTER " << std::quoted(std::string("NEngine.SpriteAnimation"))
+           << "\nEND_META\n"; }
+    { std::ofstream file(project / "Assets" / "Animations" / "walk.nanimctrl");
+      file << "NENGINE_ANIMATION_CONTROLLER 1\nDEFAULT \"Idle\"\n"
+           << "STATES 1\nSTATE \"Idle\" " << std::quoted(nanim_guid.to_string())
+           << " 1 1\nTRANSITIONS 0\nEND_ANIMATION_CONTROLLER\n"; }
+    { std::ofstream meta(project / "Assets" / "Animations" / "walk.nanimctrl.meta");
+      meta << "NENGINE_META 1\nGUID " << controller_guid.to_string()
+           << "\nIMPORTER " << std::quoted(std::string("NEngine.AnimationController"))
            << "\nEND_META\n"; }
     std::filesystem::create_directories(project / "Assets" / "Sounds");
     { const std::array<std::uint8_t, 46> wav{
@@ -159,14 +169,15 @@ int main() {
         decoded_ping->frame_count() != 1u) return 31;
     const auto sprite_clip = runtime.assets().load_sprite_clip(nanim_guid);
     if (!sprite_clip || sprite_clip->frames.size() != 2u ||
-        !sprite_clip->valid()) return 33;
+        !sprite_clip->valid() ||
+        !runtime.assets().load_controller(controller_guid)) return 33;
     if (runtime.advance(std::numeric_limits<float>::quiet_NaN()).physics_steps ||
         runtime.advance(0.f).physics_steps ||
         runtime.advance(1.f / 120.f).physics_steps != 0)
         return 28;
     const auto frame = runtime.advance(1.f / 120.f);
     if (frame.audio.advanced != 1u || frame.audio.looped != 1u ||
-        frame.sprite_sampled != 1u ||
+        frame.sprite_sampled != 1u || frame.controller_transitions != 1u ||
         !runtime.audio_clip(wav_guid)) return 32;
     bool sprite_visible = false;
     for (const auto entity : runtime.world().entities()) {

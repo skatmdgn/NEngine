@@ -50,6 +50,24 @@ std::optional<std::filesystem::path> PlayerAssets::source(
     if (error) error->clear();
     return path;
 }
+std::optional<render::AnimationController> PlayerAssets::load_controller(
+    assets::AssetGuid guid, std::string* error) const {
+    const auto path = source(guid, error);
+    if (!path || path->extension() != ".nanimctrl") return std::nullopt;
+    std::error_code ec;
+    const auto size = std::filesystem::file_size(*path, ec);
+    if (ec || size > 4u * 1024u * 1024u) {
+        if (error) *error = "animation controller exceeds player size limit";
+        return std::nullopt;
+    }
+    std::ifstream input(*path, std::ios::binary);
+    render::AnimationController controller;
+    if (!input || !render::read_animation_controller(input, controller, error))
+        return std::nullopt;
+    if (error) error->clear();
+    return controller;
+}
+
 std::optional<render::SpriteAnimationClip> PlayerAssets::load_sprite_clip(
     assets::AssetGuid guid, std::string* error) const {
     const auto path = source(guid, error);

@@ -39,6 +39,15 @@ PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
     stats.clamped_delta = frame < static_cast<double>(delta_seconds);
     elapsed_seconds_ += frame;
     for (const auto entity : world_.entities()) {
+        const auto* animator = world_.get_component<render::SpriteAnimator>(
+            entity, render::sprite_animator_type());
+        if (!animator) continue;
+        for (const auto& [name, value] : animator->bool_parameters)
+            sprite_controllers_.set_bool(entity, name, value);
+    }
+    stats.controller_transitions =
+        sprite_controllers_.evaluate(world_).transitions;
+    for (const auto entity : world_.entities()) {
         if (!world_.active(entity)) continue;
         auto* sprite = world_.get_component<render::SpriteAnimator>(
             entity, render::sprite_animator_type());
@@ -88,6 +97,7 @@ void PlayerRuntime::unload() noexcept {
     assets_.clear();
     audio_clips_.clear();
     sprite_clips_.clear();
+    sprite_controllers_.clear();
     audio_playback_.reset();
     physics_cache_.clear();
     accumulator_ = 0.0;
@@ -139,10 +149,25 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
         if (auto clip = catalog.load_sprite_clip(animator->clip))
             next_sprites.emplace(animator->clip, std::move(*clip));
     }
+    render::SpriteControllerRuntime next_controllers;
+    for (const auto entity : next_world.entities()) {
+        const auto* animator = next_world.get_component<render::SpriteAnimator>(
+            entity, render::sprite_animator_type());
+        if (!animator || !animator->controller.valid()) continue;
+        auto definition = catalog.load_controller(animator->controller);
+        if (!definition) continue;
+        for (const auto& state : definition->states) {
+            if (next_sprites.contains(state.clip)) continue;
+            if (auto clip = catalog.load_sprite_clip(state.clip))
+                next_sprites.emplace(state.clip, std::move(*clip));
+        }
+        next_controllers.bind(entity, std::move(*definition));
+    }
     world_ = std::move(next_world);
     assets_ = std::move(catalog);
     audio_clips_ = std::move(next_clips);
     sprite_clips_ = std::move(next_sprites);
+    sprite_controllers_ = std::move(next_controllers);
     audio_playback_.reset();
     physics_cache_.clear();
     accumulator_ = 0.0;
