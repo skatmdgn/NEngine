@@ -112,6 +112,12 @@ PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
         });
     accumulator_ += frame;
     while (accumulator_ + 1.0e-9 >= fixed && stats.physics_steps < 8u) {
+        if (managed_runtime_.valid()) {
+            const auto script = script_system_.fixed_update(
+                world_, static_cast<float>(fixed));
+            stats.managed_fixed_updates += script.fixed_updated;
+            stats.managed_errors += script.unresolved;
+        }
         const auto result = physics::step_physics(
             world_, static_cast<float>(fixed), {0, -9.81f, 0},
             &physics_cache_);

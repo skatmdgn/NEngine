@@ -25,6 +25,9 @@ struct PlayerFrameStats {
     std::size_t sprite_sampled{0};
     std::size_t sprite_unresolved{0};
     std::size_t controller_transitions{0};
+    std::size_t managed_fixed_updates{0};
+    std::size_t managed_updates{0};
+    std::size_t managed_errors{0};
 };
 
 // Isolated player World bootstrap. Never depends on the editor UI/model.
