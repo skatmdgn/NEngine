@@ -22,6 +22,7 @@ struct ExportReport {
     std::filesystem::path bundle_root{};
     std::size_t scene_objects{0};
     std::size_t copied_assets{0};
+    std::size_t cooked_textures{0};
 };
 
 // Produces a validated DATA bundle. The Player executable will be bundled

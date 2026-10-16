@@ -1,6 +1,9 @@
 #include "nengine/player/exporter.hpp"
 #include "nengine/player/bundle.hpp"
 #include "nengine/core/scene.hpp"
+#include "nengine/assets/asset_database.hpp"
+#include "nengine/assets/builtin_processors.hpp"
+#include "nengine/assets/asset_importer.hpp"
 #include <chrono>
 #include <array>
 #include <algorithm>
@@ -148,6 +151,39 @@ bool export_player_data(const ExportSettings& settings,
             }
         }
     }
+    // Cook texture descriptors at export time, never inside the shipped
+    // Player. The existing importer supplies source+descriptor roles.
+    std::size_t cooked_textures = 0;
+    if (settings.copy_supported_assets) {
+        const auto packaged = staging / "Content" / "Assets";
+        assets::AssetDatabase database(packaged);
+        const auto scan = database.scan(false);
+        for (const auto& message : scan.messages) {
+            if (message.severity == assets::AssetMessageSeverity::Error) {
+                cleanup();
+                return fail(error, "cannot index packaged assets");
+            }
+        }
+        const assets::ImporterDescriptor descriptor{
+            "NEngine.Texture", 1, {".png", ".jpg", ".jpeg", ".bmp", ".tga", ".webp"}, false};
+        for (const auto& record : database.records()) {
+            const auto extension = record.source_path.extension().string();
+            if (extension != ".png" && extension != ".jpg" &&
+                extension != ".jpeg" && extension != ".bmp" &&
+                extension != ".tga" && extension != ".webp") continue;
+            const auto folder = staging / "Content" / "Cooked" /
+                record.guid.to_string();
+            std::filesystem::create_directories(folder, ec);
+            if (ec) { cleanup(); return fail(error, "cannot create cooked texture directory"); }
+            const assets::ImportContext context{&record, &descriptor, folder};
+            const auto cooked = assets::texture_source_importer(context);
+            if (!cooked.success) {
+                cleanup();
+                return fail(error, "cannot cook Player texture: " + cooked.message);
+            }
+            ++cooked_textures;
+        }
+    }
     if (!settings.player_executable.empty()) {
         const auto executable = std::filesystem::canonical(
             settings.player_executable, ec);
@@ -172,7 +208,7 @@ bool export_player_data(const ExportSettings& settings,
     }
     std::filesystem::rename(staging, final_path, ec);
     if (ec) { cleanup(); return fail(error, "cannot atomically finish player bundle"); }
-    report = {final_path, scene.objects.size(), copied_assets};
+    report = {final_path, scene.objects.size(), copied_assets, cooked_textures};
     if (error) error->clear();
     return true;
 }
