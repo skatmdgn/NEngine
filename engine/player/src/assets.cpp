@@ -50,6 +50,24 @@ std::optional<std::filesystem::path> PlayerAssets::source(
     if (error) error->clear();
     return path;
 }
+std::optional<render::SpriteAnimationClip> PlayerAssets::load_sprite_clip(
+    assets::AssetGuid guid, std::string* error) const {
+    const auto path = source(guid, error);
+    if (!path || path->extension() != ".nanim") return std::nullopt;
+    std::error_code ec;
+    const auto bytes = std::filesystem::file_size(*path, ec);
+    if (ec || bytes > 4u * 1024u * 1024u) {
+        if (error) *error = "sprite clip exceeds player size limit";
+        return std::nullopt;
+    }
+    std::ifstream input(*path, std::ios::binary);
+    render::SpriteAnimationClip clip;
+    if (!input || !render::read_sprite_animation_clip(input, clip, error))
+        return std::nullopt;
+    if (error) error->clear();
+    return clip;
+}
+
 std::optional<audio::AudioClipData> PlayerAssets::load_wav(
     assets::AssetGuid guid, std::string* error) const {
     const auto path = source(guid, error);

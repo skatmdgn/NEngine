@@ -55,6 +55,7 @@ int main() {
     auto* body = world.add_component<nengine::physics::Rigidbody2D>(
         body_entity, nengine::physics::rigidbody2d_type());
     const auto wav_guid = nengine::assets::AssetGuid::generate();
+    const auto nanim_guid = nengine::assets::AssetGuid::generate();
     auto* sound = world.add_component<nengine::audio::AudioSource>(
         body_entity, nengine::audio::audio_source_type());
     if (!camera || !body || !sound) return 22;
@@ -82,6 +83,16 @@ int main() {
     { std::ofstream meta(project / "Assets" / "Textures" / "hero.png.meta");
       meta << "NENGINE_META 1\nGUID " << texture_guid.to_string()
            << "\nIMPORTER " << std::quoted(std::string("NEngine.Texture"))
+           << "\nEND_META\n"; }
+    std::filesystem::create_directories(project / "Assets" / "Animations");
+    { std::ofstream file(project / "Assets" / "Animations" / "walk.nanim");
+      file << "NENGINE_SPRITE_ANIMATION 1\nFRAMES 2\n"
+           << "FRAME " << std::quoted(texture_guid.to_string()) << " 0.1\n"
+           << "FRAME " << std::quoted(texture_guid.to_string()) << " 0.2\n"
+           << "END_SPRITE_ANIMATION\n"; }
+    { std::ofstream meta(project / "Assets" / "Animations" / "walk.nanim.meta");
+      meta << "NENGINE_META 1\nGUID " << nanim_guid.to_string()
+           << "\nIMPORTER " << std::quoted(std::string("NEngine.SpriteAnimation"))
            << "\nEND_META\n"; }
     std::filesystem::create_directories(project / "Assets" / "Sounds");
     { const std::array<std::uint8_t, 46> wav{
@@ -140,6 +151,9 @@ int main() {
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     if (!decoded_ping || decoded_ping->sample_rate != 8000 ||
         decoded_ping->frame_count() != 1u) return 31;
+    const auto sprite_clip = runtime.assets().load_sprite_clip(nanim_guid);
+    if (!sprite_clip || sprite_clip->frames.size() != 2u ||
+        !sprite_clip->valid()) return 33;
     if (runtime.advance(std::numeric_limits<float>::quiet_NaN()).physics_steps ||
         runtime.advance(0.f).physics_steps ||
         runtime.advance(1.f / 120.f).physics_steps != 0)
