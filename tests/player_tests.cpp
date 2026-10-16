@@ -6,6 +6,12 @@
 #include "nengine/player/exporter.hpp"
 #include "nengine/player/runtime.hpp"
 #include "nengine/core/scene.hpp"
+#include "nengine/render/components.hpp"
+#include "nengine/render/registration.hpp"
+#include "nengine/audio/components.hpp"
+#include "nengine/audio/registration.hpp"
+#include "nengine/physics/components.hpp"
+#include "nengine/physics/registration.hpp"
 
 int main() {
     using namespace nengine::player;
@@ -35,9 +41,23 @@ int main() {
     std::filesystem::create_directories(project / "Assets" / "Scenes");
     std::filesystem::create_directory(export_base);
     nengine::core::World world;
-    world.create("Camera");
-    world.create("Sprite");
-    auto scene = nengine::core::SceneSerializer::capture(world, "Main");
+    const auto camera_entity = world.create("Camera");
+    const auto body_entity = world.create("Sprite");
+    auto* camera = world.add_component<nengine::render::Camera>(
+        camera_entity, nengine::render::camera_type());
+    auto* body = world.add_component<nengine::physics::Rigidbody2D>(
+        body_entity, nengine::physics::rigidbody2d_type());
+    auto* sound = world.add_component<nengine::audio::AudioSource>(
+        body_entity, nengine::audio::audio_source_type());
+    if (!camera || !body || !sound) return 22;
+    camera->vertical_fov_degrees = 71.f;
+    body->mass = 2.5f;
+    sound->volume = 0.6f;
+    nengine::core::ComponentSerializationRegistry codecs;
+    if (!nengine::render::register_component_serializers(codecs) ||
+        !nengine::physics::register_component_serializers(codecs) ||
+        !nengine::audio::register_component_serializers(codecs)) return 23;
+    auto scene = nengine::core::SceneSerializer::capture(world, "Main", &codecs);
     if (!nengine::core::SceneSerializer::save_file(
         scene, project / "Assets" / "Scenes" / "Main.nscene")) return 7;
     std::filesystem::create_directories(project / "Assets" / "Textures");
@@ -69,6 +89,21 @@ int main() {
     PlayerRuntime runtime;
     if (!runtime.load(report.bundle_root, &error) ||
         !runtime.ready() || runtime.entity_count() != 2u) return 13;
+    bool restored_camera = false;
+    bool restored_body = false;
+    for (const auto entity : runtime.world().entities()) {
+        if (const auto* camera = runtime.world().get_component<
+                nengine::render::Camera>(
+                entity, nengine::render::camera_type()))
+            restored_camera = camera->vertical_fov_degrees == 71.f;
+        if (const auto* body = runtime.world().get_component<
+                nengine::physics::Rigidbody2D>(
+                entity, nengine::physics::rigidbody2d_type()))
+            restored_body = body->mass == 2.5f &&
+                runtime.world().get_component<nengine::audio::AudioSource>(
+                    entity, nengine::audio::audio_source_type()) != nullptr;
+    }
+    if (!restored_camera || !restored_body) return 24;
     BundleManifest tampered = built;
     tampered.scene = "Content/Nonexistent.nscene";
     if (!save_bundle(tampered,
