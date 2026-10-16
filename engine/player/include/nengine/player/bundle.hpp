@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <iosfwd>
+#include <optional>
 #include <string>
 
 namespace nengine::player {
@@ -17,6 +18,11 @@ struct BundleManifest {
     std::uint32_t width{1280};
     std::uint32_t height{720};
 };
+
+// Resolve existing scene only if it remains inside the bundle after symlinks.
+std::optional<std::filesystem::path> resolve_bundle_scene(
+    const std::filesystem::path& root, const BundleManifest& manifest,
+    std::string* error = nullptr);
 
 bool validate_bundle(const BundleManifest& manifest,
                      std::string* error = nullptr);

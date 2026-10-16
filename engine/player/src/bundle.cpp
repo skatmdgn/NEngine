@@ -36,6 +36,28 @@ bool validate_bundle(const BundleManifest& manifest, std::string* error) {
     return true;
 }
 
+std::optional<std::filesystem::path> resolve_bundle_scene(
+    const std::filesystem::path& root, const BundleManifest& manifest,
+    std::string* error) {
+    if (!validate_bundle(manifest, error)) return std::nullopt;
+    std::error_code ec;
+    const auto base = std::filesystem::canonical(root, ec);
+    if (ec || !std::filesystem::is_directory(base))
+        return fail(error, "bundle root does not exist"), std::nullopt;
+    const auto requested = base / manifest.scene;
+    if (std::filesystem::is_symlink(requested, ec) || ec)
+        return fail(error, "bundle scene may not be a symlink"), std::nullopt;
+    const auto source = std::filesystem::canonical(requested, ec);
+    if (ec || !std::filesystem::is_regular_file(source))
+        return fail(error, "bundle scene is not an existing file"), std::nullopt;
+    const auto relative = source.lexically_relative(base);
+    if (relative.empty() || relative == "." || relative.is_absolute() ||
+        *relative.begin() == "..")
+        return fail(error, "bundle scene escapes root"), std::nullopt;
+    if (error) error->clear();
+    return source;
+}
+
 bool write_bundle(std::ostream& output, const BundleManifest& manifest,
                   std::string* error) {
     if (!validate_bundle(manifest, error)) return false;
