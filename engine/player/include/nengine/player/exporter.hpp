@@ -9,6 +9,9 @@ struct ExportSettings {
     std::filesystem::path project_root{};
     std::filesystem::path startup_scene{};
     std::filesystem::path destination{};
+    // Host-platform standalone Player binary staged with the game data.
+    // Leave empty for data-only bundle generation in tests/tools.
+    std::filesystem::path player_executable{};
     std::string title{"NEngine Game"};
     std::uint32_t width{1280};
     std::uint32_t height{720};

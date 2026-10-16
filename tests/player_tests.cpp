@@ -61,6 +61,23 @@ int main() {
         !runtime.ready() || runtime.entity_count() != 2u) return 13;
     runtime.unload();
     if (runtime.ready() || runtime.entity_count() != 0) return 14;
+    { std::ofstream executable(root / "player.fixture", std::ios::binary);
+      executable << "test executable"; }
+    settings.destination = export_base / "RunnableBuild";
+    settings.player_executable = root / "player.fixture";
+    if (!export_player_data(settings, report, &error)) return 15;
+#if defined(_WIN32)
+    const auto packed_binary = report.bundle_root / "NEnginePlayer.exe";
+#else
+    const auto packed_binary = report.bundle_root / "NEnginePlayer";
+#endif
+    if (!std::filesystem::is_regular_file(packed_binary)) return 16;
+    settings.destination = export_base / "MissingBinary";
+    settings.player_executable = root / "missing-executable";
+    if (export_player_data(settings, report, &error) ||
+        std::filesystem::exists(settings.destination)) return 17;
+    settings.player_executable.clear();
+    settings.destination = export_base / "Build";
     if (export_player_data(settings, report, &error)) return 10;
     settings.destination = project / "BadExport";
     if (export_player_data(settings, report, &error) ||

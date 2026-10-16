@@ -80,6 +80,25 @@ bool export_player_data(const ExportSettings& settings,
         source, staging / "Content" / "Main.nscene",
         std::filesystem::copy_options::none, ec);
     if (ec) { cleanup(); return fail(error, "cannot copy player startup Scene"); }
+    if (!settings.player_executable.empty()) {
+        const auto executable = std::filesystem::canonical(
+            settings.player_executable, ec);
+        if (ec || !std::filesystem::is_regular_file(executable)) {
+            cleanup();
+            return fail(error, "Player executable is missing or not a regular file");
+        }
+#if defined(_WIN32)
+        const auto target_name = "NEnginePlayer.exe";
+#else
+        const auto target_name = "NEnginePlayer";
+#endif
+        std::filesystem::copy_file(executable, staging / target_name,
+            std::filesystem::copy_options::none, ec);
+        if (ec) {
+            cleanup();
+            return fail(error, "cannot stage player executable");
+        }
+    }
     if (!save_bundle(manifest, staging / "NEngine.player", error)) {
         cleanup(); return false;
     }
