@@ -205,6 +205,29 @@ bool export_player_data(const ExportSettings& settings,
             ++cooked_materials;
         }
     }
+    std::size_t cooked_models = 0;
+    if (settings.copy_supported_assets) {
+        const auto packaged = staging / "Content" / "Assets";
+        assets::AssetDatabase db(packaged);
+        db.scan(false);
+        const assets::ImporterDescriptor descriptor{
+            "NEngine.Model", 1, {".glb", ".gltf", ".obj"}, false};
+        for (const auto& record : db.records()) {
+            const auto extension = record.source_path.extension().string();
+            if (extension != ".glb" && extension != ".gltf" &&
+                extension != ".obj") continue;
+            const auto folder = staging / "Content" / "Cooked" /
+                record.guid.to_string();
+            std::filesystem::create_directories(folder, ec);
+            if (ec) { cleanup(); return fail(error, "cannot create model cook directory"); }
+            const assets::ImportContext context{&record, &descriptor, folder};
+            const auto cooked = assets::model_source_importer(context);
+            if (!cooked.success) {
+                cleanup(); return fail(error, "cannot cook Player model: " + cooked.message);
+            }
+            ++cooked_models;
+        }
+    }
     std::size_t managed_files = 0;
     if (!settings.managed_directory.empty()) {
         // Managed binaries are opt-in: never ship source code or arbitrary
@@ -274,7 +297,7 @@ bool export_player_data(const ExportSettings& settings,
     std::filesystem::rename(staging, final_path, ec);
     if (ec) { cleanup(); return fail(error, "cannot atomically finish player bundle"); }
     report = {final_path, scene.objects.size(), copied_assets,
-              cooked_textures, cooked_materials, managed_files};
+              cooked_textures, cooked_materials, cooked_models, managed_files};
     if (error) error->clear();
     return true;
 }

@@ -26,6 +26,7 @@ struct ExportReport {
     std::size_t copied_assets{0};
     std::size_t cooked_textures{0};
     std::size_t cooked_materials{0};
+    std::size_t cooked_models{0};
     std::size_t managed_files{0};
 };
 
