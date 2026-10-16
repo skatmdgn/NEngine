@@ -2,6 +2,7 @@
 
 #include "nengine/audio/registration.hpp"
 #include "nengine/audio/components.hpp"
+#include "nengine/render/components.hpp"
 #include "nengine/physics/registration.hpp"
 #include "nengine/render/registration.hpp"
 #include "nengine/scripting/registration.hpp"
@@ -37,6 +38,27 @@ PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
         static_cast<double>(delta_seconds), max_frame);
     stats.clamped_delta = frame < static_cast<double>(delta_seconds);
     elapsed_seconds_ += frame;
+    for (const auto entity : world_.entities()) {
+        if (!world_.active(entity)) continue;
+        auto* sprite = world_.get_component<render::SpriteAnimator>(
+            entity, render::sprite_animator_type());
+        if (!sprite || !sprite->enabled || !sprite->playing) continue;
+        const auto it = sprite_clips_.find(sprite->clip);
+        if (it == sprite_clips_.end()) {
+            ++stats.sprite_unresolved;
+            continue;
+        }
+        if (std::isfinite(sprite->speed) && sprite->speed > 0.f)
+            sprite->time_seconds += static_cast<float>(frame) * sprite->speed;
+        const auto sampled = render::sample_sprite_animation_frame(
+            it->second, sprite->time_seconds, sprite->loop);
+        if (!sampled) { ++stats.sprite_unresolved; continue; }
+        if (auto* renderer = world_.get_component<render::SpriteRenderer>(
+                entity, render::sprite_renderer_type())) {
+            renderer->texture = it->second.frames[*sampled].texture;
+            ++stats.sprite_sampled;
+        }
+    }
     stats.audio = audio_playback_.update(world_, static_cast<float>(frame),
         [this](assets::AssetGuid guid) -> std::optional<float> {
             if (const auto* clip = audio_clip(guid))
@@ -65,6 +87,7 @@ void PlayerRuntime::unload() noexcept {
     world_.clear();
     assets_.clear();
     audio_clips_.clear();
+    sprite_clips_.clear();
     audio_playback_.reset();
     physics_cache_.clear();
     accumulator_ = 0.0;
@@ -106,9 +129,20 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
         if (auto clip = catalog.load_wav(source->clip))
             next_clips.emplace(source->clip, std::move(*clip));
     }
+    std::unordered_map<assets::AssetGuid, render::SpriteAnimationClip,
+                       assets::AssetGuidHash> next_sprites;
+    for (const auto entity : next_world.entities()) {
+        const auto* animator = next_world.get_component<render::SpriteAnimator>(
+            entity, render::sprite_animator_type());
+        if (!animator || !animator->clip.valid() ||
+            next_sprites.contains(animator->clip)) continue;
+        if (auto clip = catalog.load_sprite_clip(animator->clip))
+            next_sprites.emplace(animator->clip, std::move(*clip));
+    }
     world_ = std::move(next_world);
     assets_ = std::move(catalog);
     audio_clips_ = std::move(next_clips);
+    sprite_clips_ = std::move(next_sprites);
     audio_playback_.reset();
     physics_cache_.clear();
     accumulator_ = 0.0;

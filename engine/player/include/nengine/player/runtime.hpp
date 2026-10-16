@@ -19,6 +19,8 @@ struct PlayerFrameStats {
     std::size_t integrated_2d{0};
     bool clamped_delta{false};
     audio::AudioPlaybackStats audio{};
+    std::size_t sprite_sampled{0};
+    std::size_t sprite_unresolved{0};
 };
 
 // Isolated player World bootstrap. Never depends on the editor UI/model.
@@ -49,6 +51,8 @@ private:
     double elapsed_seconds_{0.0};
     physics::ContactImpulseCache physics_cache_{};
     audio::AudioPlaybackSystem audio_playback_{};
+    std::unordered_map<assets::AssetGuid, render::SpriteAnimationClip,
+                       assets::AssetGuidHash> sprite_clips_{};
     std::unordered_map<assets::AssetGuid, audio::AudioClipData,
                        assets::AssetGuidHash> audio_clips_{};
 };

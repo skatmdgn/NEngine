@@ -64,6 +64,12 @@ int main() {
     sound->volume = 0.6f;
     sound->clip = wav_guid;
     sound->loop = true;
+    auto* animator = world.add_component<nengine::render::SpriteAnimator>(
+        body_entity, nengine::render::sprite_animator_type());
+    auto* sprite_renderer = world.add_component<nengine::render::SpriteRenderer>(
+        body_entity, nengine::render::sprite_renderer_type());
+    if (!animator || !sprite_renderer) return 34;
+    animator->clip = nanim_guid;
     auto* behaviour = world.add_component<nengine::scripting::ScriptBehaviour>(
         body_entity, nengine::scripting::script_behaviour_type());
     if (!behaviour) return 25;
@@ -160,7 +166,17 @@ int main() {
         return 28;
     const auto frame = runtime.advance(1.f / 120.f);
     if (frame.audio.advanced != 1u || frame.audio.looped != 1u ||
+        frame.sprite_sampled != 1u ||
         !runtime.audio_clip(wav_guid)) return 32;
+    bool sprite_visible = false;
+    for (const auto entity : runtime.world().entities()) {
+        const auto* sprite = runtime.world().get_component<
+            nengine::render::SpriteRenderer>(
+                entity, nengine::render::sprite_renderer_type());
+        if (sprite && sprite->texture == texture_guid)
+            sprite_visible = true;
+    }
+    if (!sprite_visible) return 35;
     if (frame.physics_steps != 1 || frame.integrated_2d != 1 ||
         runtime.elapsed_seconds() <= 0.0)
         return 29;
