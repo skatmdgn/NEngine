@@ -1,443 +1,62 @@
-## Windows Player continuation — model/material cooking and managed input/queries
-
-A fifteen-chunk milestone extends standalone Player export to versioned, GUID-addressed .nmat materials and GLB/glTF/OBJ model source/descriptor artifacts. Built-in model imports stage supported relative external sidecars; unresolved or unsafe references abort export and remove the staged output. The Vulkan World resolver now receives model/material roles in addition to texture roles. Automatic generated glTF PBR material subassets are **not** shipped yet: this is source/descriptor-level model cooking, not full imported-material parity.
-
-Standalone Player InputState is now driven by focused Win32 keyboard and pointer polling, bound to the optional managed API and tested for pressed/held/released transitions. Player C# callbacks include 2D/3D raycasts, overlaps, and box casts plus finite-validated native property read/write for Transform, Rigidbody2D and AudioSource. Other component properties and action-map bindings remain to be completed. CI includes model/material package fixtures and invalid glTF sidecar regression tests; interactive .NET and GPU validation still require a real Windows computer.
-
-# Current state
-
-Version: 0.5.0-dev
-Milestone: C# gameplay scripting is active on top of the asset/Vulkan foundations.
-
-## Verified baseline
-
-The user previously verified the 0.2.6 Windows editor runtime:
-- Editor opens and remains stable.
-- Hierarchy / selection / Inspector work.
-- Name and Transform editing work.
-- Undo / Redo work.
-- Play / Pause / Step / Stop work.
-- Scene Save / Open round-trip works.
-- UTF-8 names including Korean display correctly.
-
-Newer 0.3/0.4/0.5 work is continuously built and tested on Windows + Ubuntu CI. A fresh user-side Windows acceptance pass is still required after the Vulkan/editor and managed-runtime changes.
-
-## Core / Scene / Prefab
-
-Implemented:
-- Generational Entity handles and World lifetime.
-- Parent/child Transform hierarchy with cycle prevention.
-- Type-erased native component pools.
-- Stable component type IDs and reflection metadata.
-- World clone/snapshot for Play Mode.
-- Scene v3 serialization.
-- Generic native component serialization codecs.
-- Scene-local EntityReference remapping across save/load.
-- AssetReference serialization as GUID strings.
-- Transactional Scene instantiate.
-- Legacy Scene v1 read compatibility.
-- Prefab model/override representation.
-- Prefab structural validation independent of loaded runtime component codecs.
-- Prefab EntityReference validation.
-
-## Windows Editor
-
-Implemented:
-- Native Win32 editor shell.
-- Hierarchy / Scene / Inspector / Assets / Console panes.
-- Resizable Hierarchy / Inspector / bottom splitters.
-- Persistent editor pane layout.
-- Structured Console model with severity and duplicate collapse.
-- Selection + command stack + Undo/Redo.
-- Undo-aware Scene dirty/savepoint tracking.
-- Dirty marker in editor title.
-- Play Mode cloned Runtime World.
-- Scene View click selection.
-- X/Z translation gizmo drag committed as one command.
-- Generic reflection-driven Inspector presentation.
-- Generic property text editing for bool/int/uint/float/string/Vec3/Quaternion/EntityReference/AssetReference.
-- Generic SetPropertyCommand path for arbitrary registered components.
-- Scene Open / Save.
-- Project startup Scene load.
-- Asset double-click routing for Scene/script/external assets.
-- C# solution generation/open workflow.
-- Win32 Scene View attempts Vulkan window-context bootstrap.
-- Vulkan bootstrap success/failure is reported to Console without making Vulkan availability an editor-startup requirement.
-
-The Scene View still uses GDI by default for interactive diagnostic object/gizmo drawing. An opt-in **VK Preview** toolbar toggle now renders the actual presentation World through Vulkan when supported: it reads the active Camera plus MeshRenderer items from RenderSnapshot, resolves built-in Cube/Quad AssetGuids and supported imported glTF/GLB AssetGuids to cached GPU meshes, computes per-object MVP matrices, and submits multiple indexed draws in one render pass. Imported geometry uses an explicitly assigned .nmat texture when available; if material is unset, imported glTF/GLB submeshes first resolve persistent cooked material/texture subassets per primitive material slot, with the direct glTF PBR base-color decoder retained only as a fallback. Otherwise the renderer retains its diagnostic textured fallback. Turning the toggle off immediately returns to the GDI interaction view.
-
-## Project / Asset database
-
-Implemented:
-- Persistent NEngine.nproject manifest.
-- Safe project-relative startup Scene validation.
-- Project bootstrap with Assets/Scenes, Assets/Scripts, Assets/Materials, ProjectSettings, Packages and Library/Cache.
-- Persistent startup Main.nscene.
-- Startup Scene contains native Camera and Light components.
-- GUID + .meta asset identity.
-- Extension importer registry.
-- Polling file watcher.
-- Automatic rescan and reimport for changed files.
-- Import fingerprint/cache manifest v3.
-- Deterministic generated subasset GUIDs, persistent generated artifact lists, lazy ProjectSession GUID recovery after reopen, and stale generated artifact pruning after reimport.
-- Validated cache artifact lookup rejecting stale source/importer versions.
-- Dependency graph forward/reverse edges, plus reimport of transitive dependents after file changes.
-- Assets panel backed by AssetDatabase.
-- Scene/script/raw source staging.
-- Texture source staging + metadata descriptor.
-  - PNG/BMP/TGA/JPEG dimension probing where supported.
-- .nmat material importer with base-color Texture AssetGuid dependency extraction into the dependency graph.
-- Audio source staging + WAV metadata descriptor.
-  - channels, sample rate, bits/sample, data bytes.
-- Model source staging + format/source-size descriptor.
-- External .gltf sidecar BIN/image staging, AssetGuid dependency graph edges, content-hash import fingerprints, percent-decoded safe local URIs, and watcher-triggered parent reimport; deletion/restoration recovers the parent even when the sidecar .meta was lost.
-- First glTF 2.0 geometry decode path:
-  - .glb 2.0 JSON/BIN chunks.
-  - .gltf base64 data-URI buffers.
-  - external .gltf buffer/image sidecars copied into matching nested paths in the import cache, with sandboxed relative-URI checks.
-  - TRIANGLES primitives.
-  - float plus normalized BYTE/UNSIGNED_BYTE/SHORT/UNSIGNED_SHORT POSITION/NORMAL/TEXCOORD_0 attributes.
-  - unsigned byte/short/int indices, including sparse index overlays.
-  - sparse VEC2/VEC3 attribute overlays, including accessors with no base bufferView.
-  - interleaved byteStride support.
-  - multiple mesh primitives concatenated into MeshData while preserving submesh index ranges/material slots.
-  - right-handed glTF -> NEngine left-handed Z reflection + winding conversion.
-  - selected glTF scene node hierarchy baked into MeshData using parent/child world transforms.
-  - node translation/rotation/scale and explicit column-major 4x4 matrix transforms.
-  - inverse-transpose normal transformation plus mirrored-node winding correction.
-  - repeated mesh node instances are baked as independent transformed geometry ranges.
-  - cyclic/invalid node graphs and singular transforms are rejected diagnostically.
-  - glTF external buffer/image path traversal and unsupported URI forms rejected.
-- Referenced glTF material slots are cooked at import time into deterministic generated Texture + .nmat subassets; a persistent model material map binds submesh material slots back to those GUIDs.
-- OBJ geometry decode with v/vt/vn, positive/negative face indices, n-gon fan triangulation, UV normalization, generated flat normals, bounds and shared MeshData/GPU-cache routing.
-- OBJ usemtl/mtllib/map_Kd staging and MTL diffuse color/alpha/texture cooking into deterministic generated Texture + .nmat subassets.
-- SPIR-V shader import.
-  - .spv validation by size/magic.
-  - .vert.spv/.frag.spv stage hints.
-  - shader.nasset descriptor.
-- Automatic import feedback in Console.
-
-Not yet implemented:
-- WebP pixel decoding and texture compression/transcoding policy (gamma-aware CPU mip generation + Vulkan mip upload are implemented).
-- glTF skins and morph targets; current material cooking supports base color, normal, metallic-roughness, emissive, occlusion, factors, alpha mode/cutoff and double-sided metadata.
-- Remote/nonlocal or outside-model-directory glTF resource policy/support; local percent-encoded sidecars are implemented.
-- FBX decoding/cooking.
-- HLSL compiler-path parity/validation; GLSL -> SPIR-V compile/embed tooling is implemented and exercised in CI.
-- Streaming decode and OGG/MP3/FLAC runtime decode remain; Windows WASAPI shared-mode device output and WAV PCM/float runtime decode are implemented.
-- Dependency extraction from asset contents.
-
-## C# / IDE foundation
-
-Implemented:
-- Managed project generator.
-- .sln / .csproj generation.
-- Assets/Scripts source inclusion.
-- managed-packages.txt NuGet reference manifest.
-- Visual Studio/Rider/default .sln association open path.
-- hostfxr discovery/dynamic loading with generated runtimeconfig.
-- dotnet SDK discovery, deterministic gameplay DLL/PDB build output and Editor **Build C#** action.
-- Managed ABI v15 shared through stable NEngine.API/NEngine.Bridge assemblies.
-- Native ScriptBehaviour component with Scene serialization, Add Component and generic Inspector editing.
-- Play Mode ScriptBehaviour instance management against the cloned runtime World.
-- Managed Behaviour Awake / OnEnable / Start / FixedUpdate / Update / LateUpdate / OnDisable / OnDestroy execution with managed instances preserved while disabled or inactive.
-- Native <-> managed local Transform position/rotation/scale synchronization around lifecycle calls.
-- Generated NEngine.API, stable NEngine.Bridge and gameplay projects are separate assemblies; collectible gameplay AssemblyLoadContext reloads user code without restarting hostfxr.
-- Managed GameObject name/active state, Transform parent/children/TRS and built-in component presence query native World state.
-- Managed GameObject construction and Find route through native World create/find callbacks.
-- GameObject.Destroy uses an end-of-simulation-tick native destroy queue so self-destroy and foreign/duplicate destroy requests do not invalidate ScriptSystem iteration.
-- Cross-platform keyboard/mouse Input callbacks expose KeyCode, GetKey/GetKeyDown/GetKeyUp, mouse position/delta and wheel.
-- Managed Time.deltaTime/time/frameCount advances once per host Update frame regardless of Behaviour count; Time.fixedDeltaTime is supplied on each fixed simulation step without advancing the host frame clock.
-- Coroutine scheduling supports StartCoroutine, StopCoroutine, StopAllCoroutines, nested IEnumerator, yield return null and WaitForSeconds.
-- Generic ABI v15 native component property transport is backed by the Editor PropertyAccessRegistry; bool/integer/float/vector/quaternion/UTF-8 string values round-trip, with public managed AssetGuid support for SpriteRenderer.texture and MeshRenderer.mesh/material.
-- Managed SpriteAnimator exposes enabled/clip/playing/loop/speed/runtime time plus Play/Pause/Stop/Restart helpers; Clip changes reset playback time and negative Time writes are rejected.
-
-Not yet implemented:
-- Packaged/versioned distribution of the NEngine managed API.
-- Native AddComponent/remove-component parity for managed scripts.
-- Visual Studio debugger attach integration.
-- NuGet runtime/package loading beyond generated project references.
-
-## Renderer 0.4
-
-### World/render data
-
-Implemented:
-- NEngineRender module.
-- Native Camera component.
-- Native Light component.
-- Native MeshRenderer component using AssetGuid mesh/material references.
-- Reflection metadata + Scene serialization codecs for render components.
-- Editor generic property accessors for render components.
-- RenderSnapshot extraction from active World objects.
-- Hierarchy-resolved world matrices inside RenderSnapshot.
-- Column-major Mat4 math.
-- Affine inverse.
-- Perspective and orthographic Vulkan depth-range projections.
-- Camera world/view/projection/view-projection construction.
-- CPU MeshData contract.
-- Built-in unit Cube and Quad geometry with normals/UVs/bounds.
-
-### Imported render assets
-
-Implemented:
-- AssetGuid -> validated cached texture metadata resolution.
-- AssetGuid + import-fingerprint decoded texture cache.
-- PNG/JPEG -> RGBA8 decoding through pinned vendored stb_image.
-- BMP 24/32-bit uncompressed true-color -> normalized top-left RGBA8 decoding.
-- TGA 24/32-bit uncompressed true-color -> normalized top-left RGBA8 decoding.
-- Per-device AssetGuid Vulkan texture/material cache that uploads decoded RGBA8 pixels, generates a complete gamma-aware mip chain, and reuses matching fingerprints.
-- First .nmat Material AssetGuid format containing a base-color Texture AssetGuid.
-- Per-device Vulkan Material AssetGuid cache resolving .nmat -> texture cache -> combined-image-sampler descriptor.
-- AssetGuid -> validated cached model metadata resolution.
-- AssetGuid + import-fingerprint decoded MeshData cache for glTF/GLB/OBJ geometry.
-- Per-device AssetGuid Vulkan mesh cache reusing uploaded vertex/index buffers while preserving submesh ranges.
-- VK Preview can resolve imported glTF/GLB/OBJ MeshRenderer.mesh GUIDs through the project cache.
-- MeshRenderer.material can resolve a .nmat AssetGuid to a real imported PNG/JPEG/BMP/TGA texture and Vulkan descriptor, with diagnostic material fallback on failure.
-- When no explicit material is assigned, glTF/GLB primitive material slots prefer import-time cooked generated .nmat/Texture subassets; PNG/JPEG bufferView, data-URI, external image and baseColorFactor paths are baked to ordinary cached texture/material artifacts. Direct glTF decode remains a compatibility fallback.
-- glTF PBR baseColorFactor: synthesizes a 1x1 sRGB texture for image-free color materials, or multiplies the image in linear space then encodes to sRGB; alpha channel is multiplied linearly.
-- Explicit .nmat overrides the automatic glTF texture; a missing/unsupported auto texture falls back to diagnostic material without repeated parsing every frame.
-- Imported mesh/material GPU caches are invalidated after asset filesystem changes.
-- AssetGuid -> shader descriptor + SPIR-V word resolution.
-- Descriptor/source consistency checks for shader word counts and SPIR-V magic.
-
-### Vulkan runtime bootstrap
-
-Implemented:
-- Vulkan dynamic loader.
-  - vulkan-1.dll on Windows.
-  - libvulkan.so.1 on POSIX.
-- Instance extension enumeration.
-- VkInstance creation/destruction.
-- Physical-device enumeration.
-- Graphics queue-family selection.
-- Optional presentation-surface support requirement.
-- Logical VkDevice + graphics queue creation/destruction.
-- Win32 VkSurfaceKHR creation/destruction.
-- Swapchain format/present-mode/extent selection.
-- VkSwapchainKHR creation and image enumeration.
-- Resize/recreate lifecycle through VulkanContext.
-- Swapchain image views.
-- Color-only render pass.
-- Shared device-local depth image + depth image view.
-- Color+depth render pass.
-- Per-swapchain-image framebuffers using the shared depth attachment.
-- Command pool/buffers.
-- Acquire/semaphore/fence/submit/present frame synchronization.
-- Render-pass clear/present frame path.
-- Graceful diagnostic fallback when Vulkan/ICD/surface support is unavailable.
-
-### Vulkan GPU resources
-
-Implemented:
-- Vulkan buffer allocation/binding.
-- Physical-device memory-type selection.
-- Host-visible coherent buffer upload.
-- Device-local buffer initialization through a synchronous staging buffer and vkCmdCopyBuffer.
-- CPU MeshData -> device-local GPU vertex/index buffers.
-- SPIR-V VkShaderModule creation/destruction contract.
-- Reusable single-color VulkanRenderPass resource.
-- Fixed MeshVertex graphics pipeline with:
-  - position/normal/uv vertex layout.
-  - dynamic viewport/scissor.
-  - 64-byte MVP vertex push constant.
-- Indexed mesh draw command recording with vkCmdDrawIndexed.
-- Built-in diagnostic GLSL sources + audited SPIR-V fixtures.
-- Headless CI graphics-pipeline creation using the diagnostic shaders.
-- Opt-in Win32 Scene View Vulkan Preview.
-- Stable built-in Unit Cube/Quad AssetGuids.
-- Built-in CPU mesh GUID resolver and per-device Vulkan GPU mesh cache.
-- Multi-draw indexed submission in one render pass.
-- VK Preview renders the actual presentation World Camera + supported built-in MeshRenderer snapshot.
-- Depth-tested pipelines with depth clear/write/LESS compare.
-
-Implemented:
-- RGBA8 Vulkan texture upload from decoded CPU pixels with full 1x1 mip-chain generation.
-- Host-visible staging buffer -> device-local sampled VkImage.
-- Image layout transitions to shader-read-only.
-- Texture VkImageView.
-- Default linear/repeat VkSampler.
-- Textured material descriptor resource:
-  - set 0 / binding 0 combined image sampler layout.
-  - descriptor pool + descriptor set allocation.
-  - image view/sampler descriptor update.
-- Graphics pipeline layouts can optionally include the material descriptor-set layout.
-- Indexed Vulkan mesh draws can carry an optional material resource and bind set 0 through vkCmdBindDescriptorSets.
-- Diagnostic textured vertex/fragment GLSL sources with audited SPIR-V fixtures.
-- Textured vertex path forwards MeshVertex UVs to the fragment stage.
-- Diagnostic fragment shader samples set 0 / binding 0 sampler2D.
-- VK Preview uses a diagnostic fallback material, imported .nmat/PBR material descriptors, per-submesh cooked model materials and direct glTF fallback when required.
-- SpriteRenderer renders Texture AssetGuids as PPU-scaled XY quads through a depthless alpha-blended Vulkan pipeline with flip/sort support.
-- SpriteAnimation clips are imported/cached and update SpriteRenderer frame textures during Play Mode.
-- Headless Vulkan CI validates texture upload, sampler creation, material descriptors, textured shader modules, a real texture-sampling graphics pipeline, .nmat -> texture descriptors and glTF auto-texture upload. CPU tests cover GLB JSON/BIN geometry plus PNG bufferView, glTF PNG data URIs, baseColorFactor and sRGB tinting, staged external .gltf BIN/PNG rendering resources, sidecar watcher invalidation/recovery and unsafe URI rejection.
-
-Not yet implemented:
-- Full sampler-state cooking and remaining production PBR validation/shadow integration.
-- Shader reflection and HLSL compiler-path parity; GLSL compilation/embed tooling exists.
-- General descriptor/uniform binding beyond the first texture slot.
-- Vulkan Game View.
-- Production lighting/shadows and remaining full-PBR validation.
-- Android Vulkan surface.
-
-## RHI boundary
-
-Implemented vocabulary/contracts:
-- backend selection.
-- opaque buffer/texture/pipeline handles.
-- buffer/texture/pipeline descriptors.
-- swapchain descriptor.
-- RenderDevice interface.
-
-The concrete Vulkan backend currently grows beneath this contract. The long-term public renderer should not expose raw Vulkan objects to gameplay/editor systems.
-
-## Physics foundation
-
-Implemented:
-- Dedicated NEnginePhysics module.
-- Native Rigidbody / BoxCollider / SphereCollider / CapsuleCollider and Rigidbody2D / BoxCollider2D / CircleCollider2D / CapsuleCollider2D components.
-- Reflection metadata and Scene serialization for mass, gravity, linear/angular velocity, Rigidbody sleep enable/threshold, trigger, collider layer/collision-mask, friction/restitution, center, box size, radial radius, Capsule radius/height/direction and Capsule2D size/direction state, with legacy Scene defaults for angular velocity, sleep, filter and contact-material fields; runtime sleep state/timers are intentionally transient.
-- Editor Add Component, Inspector and generic PropertyAccess integration for all eight physics components.
-- Managed Rigidbody / BoxCollider / SphereCollider / CapsuleCollider / Rigidbody2D / BoxCollider2D / CircleCollider2D / CapsuleCollider2D proxies over ABI v15, including Unity-familiar velocity/angularVelocity/useGravity/isKinematic naming and CapsuleDirection2D; Rigidbody2D.angularVelocity uses degrees/sec while native planar angular velocity is stored in Z radians/sec.
-- Fixed-step rigidbody foundation runs after managed FixedUpdate so script velocity changes affect the same simulation step; sleeping bodies skip gravity/integration until velocity, impact or support changes wake them.
-- 3D gravity + linear/angular velocity Transform integration and 2D XY + Z-axis angular integration with normalized quaternion updates; kinematic/inactive bodies are skipped and 2D X/Y angular components are discarded. Solver inertia uses Box and Sphere analytic mass properties, Box2D/Circle2D planar formulas, and uniform-density cylinder/hemisphere Capsule3D inertia and rectangle/semicircle Capsule2D planar inertia with volume-weighted Box/Sphere/Capsule 3D and area-weighted Box2D/Circle2D/Capsule2D solid compound mass distribution plus collider-center parallel-axis terms (full symmetric 3D inertia tensor including cross-axis products is inverted in local space and rotated with the Rigidbody).
-- BoxCollider/SphereCollider/CapsuleCollider and BoxCollider2D/CircleCollider2D/CapsuleCollider2D share the X-axis sweep-and-prune broad phase; rotated boxes and capsules contribute conservative world AABBs while narrow phase handles OBB-OBB, radial-radial, oriented box-radial, capsule-radial, capsule-capsule and oriented box-capsule pairs with layer/collision-mask filtering and trigger separation.
-- Collision detection records a fixed-capacity ContactManifold (up to four ContactPoints) on each solid overlap. Box/Box2D face contacts now choose a SAT-aligned reference face, construct the opposing incident face/edge, and Sutherland-Hodgman clip it against the reference side planes to retain up to four 3D or two 2D contacts even when neither original face contributes contained vertices. SAT edge-edge axes and non-box shape pairs fall back to a representative support-midpoint contact. Each point carries penetration.
-- 3D/2D contact resolution performs inverse-mass-weighted positional correction once with a tiny persistent contact slop, then runs up to twenty-four projected Gauss-Seidel-style sequential velocity passes over individual manifold points. Contact-point velocity includes omega x r, normal/tangent effective mass includes rotational inertia, impulses update both linear and angular velocity, and each point accumulates a non-negative normal impulse plus Coulomb-clamped tangent impulse for the current solve.
-- PhysicsStep accepts an optional scene-owned ContactImpulseCache; persistent solid pairs with matching contact position and normal reuse their 3D/2D accumulated linear/angular impulses on the next frame, using indexed shape-aware current/previous frame cache lookup, stable entity-ID-normalized pair ordering and collider-shape-isolated, maximum-coverage, minimum-distance one-to-one matching across at most four manifold points, so matching does not depend on new-point visitation order; reused friction impulses are projected into the current contact tangent plane, limited by current friction, and nonfinite cache entries are rejected. The solver selects friction and restitution from the actual collider shape in each contact (with finite material sanitization). The cache evicts separated contacts and is reset with Editor Play Mode and script runtime resets; direct one-shot solvers retain uncached behavior.
-- Rigidbody/Rigidbody2D sleep state now propagates through same-dimensional, non-trigger dynamic contact islands. Every connected dynamic member must remain quiet and sleeping-enabled for 0.5 seconds; islands require at least one static/kinematic contact anchor, and motion/support loss wakes the group. The managed Sleep(), WakeUp(), IsSleeping(), allowSleep and sleepThreshold APIs remain available. Regression tests cover sixteen-body 3D/2D anchored chains, distal wake propagation, planar contact connectivity across different Z coordinates, and trigger-anchor support loss.
-- ContactTracker derives Enter/Stay/Exit phases for collision and trigger pairs; solid Enter/Stay events carry the active manifold count plus its centroid as the representative native point, trigger events keep zero contacts, and Exit retains the prior manifold centroid with zero active contacts.
-- Editor Play Mode dispatches tracked contact phases to both active managed Behaviours with side-correct contact normals.
-- Generated C# exposes Collision/Collision2D plus Collider/Collider2D callback payloads for OnCollisionEnter/Stay/Exit, OnTriggerEnter/Stay/Exit and their 2D variants.
-- Native Raycast/Raycast2D transform rays into BoxCollider/BoxCollider2D local axes for exact rotated-box hits and analytically intersect capsule segment+radii, selecting the nearest box/radial/capsule result; OverlapBox/OverlapBox2D use the same OBB/radial/capsule narrow phase.
-- ABI v15 carries raycast/box-cast layer masks plus multi-hit overlap query callbacks without introducing a Scripting -> Physics dependency.
-- Generated Physics.Raycast / Physics2D.Raycast and Physics.OverlapBox / Physics2D.OverlapBoxAll resolve Box/Sphere/Capsule and Box2D/Circle2D/Capsule2D collider proxies; Physics.BoxCast / Physics2D.BoxCast keep an axis-aligned moving cast box and now consider box, radial and capsule targets.
-- Native BoxCast / BoxCast2D use continuous SAT against fixed-orientation box targets and convex distance/root solving against sphere/circle/capsule targets to return nearest time-of-impact, target-facing hit normal and cast-center position; managed casts preserve those semantics.
-- Native serialization/property tests and real managed C# property round-trip coverage.
-
-Not yet implemented:
-- Production broad-phase tuning and remaining polygon-style collider variants remain; additional cast shapes such as SphereCast/CapsuleCast are not yet exposed.
-- Production contact solving beyond the current collider-derived inertia + per-manifold-point rotational constraint foundation: warm-start contact matching refinement, fuller capsule inertia tensors/compound-collider mass properties and island wake propagation refinements; SAT edge-edge contacts still use a single fallback point.
-- Additional shape casts and richer hit semantics/query filtering policy.
-- Physics materials and joints.
-- Production 3D/2D backend selection/integration.
-
-## Audio foundation
-
-Implemented:
-- Dedicated NEngineAudio module.
-- Native AudioSource / AudioListener components with reflection metadata, Scene serialization, Editor Add Component factories and generic PropertyAccess bindings.
-- AudioSource clip AssetGuid, playOnAwake, loop, spatialize, volume, pitch and panStereo authoring properties.
-- Managed AudioSource / AudioListener proxies over the ABI v15 generic native property bridge.
-- Managed AudioSource Play / Pause / UnPause / Stop, isPlaying and runtime time controls.
-- Deterministic AudioPlaybackSystem with play-on-awake, pitch-scaled time, loop wrapping and non-loop end-of-clip stopping.
-- AudioMixSnapshot extracts the active listener plus source state using hierarchy-resolved world transforms, listener orientation, configurable min/max distance attenuation and stereo pan.
-- RIFF/WAVE runtime decode supports PCM 8/16/24/32-bit and IEEE float32 into normalized interleaved float samples.
-- AudioClipCache resolves ProjectSession cached NEngine.Audio source artifacts by AssetGuid + import fingerprint and supplies real WAV duration to Play Mode playback.
-- Existing NEngine.Audio import pipeline stages WAV/OGG/MP3/FLAC sources and records WAV metadata.
-- Software stereo renderer mixes cached clip PCM with pitch/resampling/loop/gain into interleaved output buffers.
-- AudioOutputDevice provides a portable output boundary; Windows uses WASAPI shared mode with frame-pumped padding-aware buffer fills and a null fallback when no endpoint is available.
-- Editor Play Mode pumps the audio output device from the current mix snapshot, and new project Main Camera objects receive an AudioListener by default.
-- Cross-platform NEngineAudioTests cover serialization, validation, hierarchy/orientation spatial mixing, playback timing, WAV/WAVEFORMATEXTENSIBLE decode, clip-cache reuse, software rendering and device abstraction.
-
-Not yet implemented:
-- Event/callback-driven realtime device thread; the current WASAPI path is intentionally frame-pumped and padding-aware.
-- Streaming audio decode.
-- OGG/MP3/FLAC runtime decoders.
-- Production 3D audio additions such as HRTF, Doppler, reverb and mixer buses/effects.
-- User-side Windows audible-output acceptance test on a real audio endpoint.
-
-## Input foundation
-- Cross-platform InputState tracks held/pressed/released key and mouse-button transitions per frame.
-- Pointer state tracks position, delta and vertical wheel accumulation.
-- Win32 platform event polling feeds keyboard, mouse buttons, focus-loss releases and cursor position into InputState.
-- ActionMap can bind multiple keys/buttons to named actions and query held/pressed/released aggregation.
-- EditorModel receives the platform InputState every frame.
-- Managed ABI v15 has a separate native Input callback table; generated C# exposes Unity-familiar KeyCode, Input.GetKey/GetKeyDown/GetKeyUp, mousePosition, mouseDelta and mouseScrollDelta.
-- Cross-platform tests cover same-frame press/release, focus loss, pointer accumulation, action bindings and real managed C# Input callbacks.
-
-Not yet implemented:
-- Gamepad and touch device backends.
-- Persistent project Input Action asset/editor.
-- Analog axes/composites/rebinding.
-
-- Physics regressions now include 480 sequential 3D/2D mixed-shape contact frames with small displacement jitter and cache persistence checks. These are deterministic smoke tests, not large-scale production stability certification.
-
-- Angular rotation integration now uses double-precision angular magnitude, wrapped phase and normalized quaternions for extreme 3D/2D spin inputs; invalid angular velocities cannot contaminate rotation.
-
-- Contact impulse solving guards invalid/denormal Rigidbody masses and maintains finite 3D/2D responses at mass ratios of 1e8 in regression tests.
-
-- Contact island union-find now joins by component size and compresses roots; anchored sleeping and distal wake regressions cover 64 connected bodies in both 3D and 2D.
-
-- Direct 3D/2D contact solvers discard NaN/infinite penetration and invalid, non-planar or degenerate normals before calculating impulses, protecting velocities and persistent caches.
-
-- Milestone 0.7 started: a native SpriteAnimationController graph now validates named states, clip GUIDs, speed and ordered boolean/exit-time transitions. It is a data/runtime foundation; serialized controller assets and visual editor are still pending.
-
-- Native SpriteControllerRuntime can now bind validated state graphs to live SpriteAnimator components, drive transitions from boolean parameters/exit timing, and discard bindings for destroyed generational Entity IDs. Sprite frame sampling remains owned by the existing runtime update; controller asset serialization/editor UI and automatic Play Mode wiring remain pending.
-
-- An independent NEngineUI native module now has Canvas/Panel/Text/Image/Button widget descriptors, anchored screen-space layout, hierarchical visibility, optional clipping, stable IDs and cross-platform layout regressions. Pixel rendering and editor/scene serialization are not yet connected.
-
-- UI native pointer routing can use InputState mouse coordinates and left-button state, hit-test topmost interactable Button, and dispatch Enter/Exit/Down/Up/Click with release-inside capture semantics. This is logic-side UI groundwork; no font/glyph drawing, Canvas serialization, or Editor/Player viewport integration yet.
-
-- Sprite AnimationController now supports a versioned human-readable `.nanimctrl` parser/writer with transactional validation and exact state/transition round-trip; importer registration and editor data binding follow.
-
-- `.nanimctrl` assets now register with ProjectSession, are parsed/validated on import, track referenced clip AssetGuids, and can be resolved through a fingerprint-aware native controller cache. Scene-level controller assignment and automatic Play Mode evaluation still need wiring.
-
-- The UI module now emits backend-independent clipped color rectangle draws (Panel/Button/Image placeholder), with a deterministic RGBA8 CPU reference rasterizer and alpha-blend tests. Text glyph rendering, sampled images and Vulkan/Game View consumption remain unfinished.
-
-- The UI Canvas widget tree can now round-trip through versioned `.ncanvas` text files, preserving stable widget IDs, parent-child relationships, anchors, text and colors with malformed-source atomic rejection. UI asset import, interactive Editor Game View and font/texture rendering remain separate work.
-
-- SpriteAnimator now exposes an optional `.nanimctrl` Controller AssetGuid in Scene serialization and Inspector generic property editing, preserving old scenes that lack the field. Play Mode auto-loading is the next integration step.
-
-- Editor Play Mode now auto-loads SpriteAnimator controller GUIDs through project cached artifacts, binds per-Entity controller graphs, evaluates them ahead of sprite sampling each fixed frame, and provides a native boolean-parameter setter; native runtime state resets on Stop and cache invalidation. C# controller parameter APIs and high-level Animator editor remain.
-
-- `.ncanvas` sources are now first-class ProjectSession assets, validated on import and resolved through a fingerprint-aware Canvas cache. The Editor/Game viewport consumption and managed UI bridge are still future milestones.
-
-- The editor can resolve a `.ncanvas` AssetGuid, automatically use `Assets/UI/Main.ncanvas` as a Play Mode diagnostic UI, route pointer hover/press/click through NEngineUI and display a basic opaque GDI overlay in non-Vulkan Scene View. This is NOT production Vulkan Game View, alpha-correct presentation, or managed UI callbacks; these remain pending.
-
-- C# generated NEngine `SpriteAnimator.controller` now exposes the scene-assigned `.nanimctrl` AssetGuid for managed game scripts (without changing the native ABI).
-
-- SpriteAnimator.SetBool(parameter, value) is now exposed to C# via the existing string property callback, backed by runtime-only bounded boolean parameters. Play Mode copies parameters into each controller before clip evaluation, and fixed-step scripts can modify the same frame's state.
-
-- Double-clicking a `.ncanvas` in the Windows Assets panel now selects it for the Play Mode diagnostic Canvas preview. The `Assets/UI/Main.ncanvas` convention is a fallback rather than the only path.
-
-- UI button capture now handles Windows WM_CAPTURECHANGED, cancelling stale pressed state and suppressing ghost Click events after focus/capture loss.
-
-- Windows diagnostic GDI Canvas preview now alpha-blends premultiplied rectangle draws and clips widget text; this is still not Vulkan Game View or production text rendering.
-
-- NEngineUI now has a platform-neutral keyboard focus router with Tab/Shift+Tab navigation and Enter-release click semantics. Connecting it to the Win32 Scene View and C# UI events remains.
-
-- EditorModel and Windows Scene View now forward keyboard Tab/Shift+Tab/Enter events to Canvas focus navigation and record resulting click events, with keyboard state reset on focus loss and Play stop.
-
-- Canvas hot-reload invalidation now preserves its assigned AssetGuid and reloads the refreshed asset on the next Play Mode tick, with a single bounded attempt per invalidation and a regression test. The remaining Vulkan Game View and C# UI event system are not yet completed.
-
-- NEngineUI keyboard button activation now emits native Down/Up/Click phases for Enter and Space, with Escape cancelling pending activation and clearing focus. The Windows diagnostic Play Mode forwards all three keys, while mouse Down synchronizes keyboard focus. Focused buttons receive a clipped GDI focus indicator. These are native/diagnostic features and not yet a managed C# UI event bridge.
-- UiCanvas now supports cycle-safe whole-subtree reparenting, sibling paint-order changes and deep duplication with fresh persistent WidgetIds. UI tests cover hierarchy round-trip, descendant preservation and invalid operations; these are foundations for a future Canvas editor rather than a complete visual authoring workflow.
-
-- Managed UI gameplay bridge (ABI v16): a dedicated callback table exposes runtime-only Canvas label lookup, GetText/SetText, visibility and interactable flags, plus WasClicked activation through generated NEngine.UI C# APIs. It does not require a Scripting -> UI module dependency. Text setters cap UTF-8 byte length at 4096 and reject embedded NUL; missing/inactive widgets fail safely. UI clicks are retained until the next script frame and reset on asset swap/hot reload/Play stop. Windows still uses the diagnostic GDI Scene View overlay; this is NOT a production Game View, TextMesh/GPU font implementation or arbitrary Unity UI compatibility. Native and real .NET integration regressions cover the bridge.
-
-- Canvas authoring groundwork now includes versioned v2 `.ncanvas` optional unique script names (backward-compatible v1 import), source-line length limits and transactional malformed-record rejection. The `UiCanvas` edit operations support a backend-independent topmost visible/clipped hit-test and an in-memory bounded `CanvasEditHistory` supporting Undo/Redo with full serialization validation before commit. A visual Canvas inspector and writing edits back to disk are NOT yet connected.
-- Managed `NEngine.UI.Find` prefers script names so label text changes do not break bindings, falling back to text for older widgets. `UI.AddClickListener`/`RemoveClickListener` provide native-click snapshot subscriptions dispatched once per managed frame; delegate lists are cleared on Play reset, gameplay unload and UI bridge shutdown to avoid retaining collectible assemblies. C# integration tests exercise subscriptions and mutation-safe unsubscribe. This remains diagnostic UI presentation; Vulkan Game View/production glyph and texture UI rendering still remain.
-
-- Windows Canvas authoring milestone: double-clicking a `.ncanvas` asset in the Assets panel opens a separate editable Canvas draft in Edit Mode (or use the Inspector's **Canvas Edit** button for the selected preview). In GDI Scene View, widgets are visible and pickable; the selected widget is outlined. The inspector exposes name/text fields, Add Button/Text, Delete UI, UI Undo/Redo, and Save Canvas; Ctrl+Z/Y/S works when Scene View has focus. Source file saves are constrained to regular files under project Assets, staged via a same-directory temporary file and backup before replacement, then imported again. Play Mode cannot write Canvas edits; unsaved drafts cannot silently be replaced. The existing 3D entity Inspector and gizmos remain distinct. This is an initial native Windows authoring surface, not a production Vulkan Game View, comprehensive layout/anchor/color inspector or final runtime UI renderer.
-
-- Canvas editing enhancement: Inspector now has a hierarchical widget picker, Duplicate / To Back / To Front actions, numeric **Anchor Min XY / Max XY**, **Offsets left top right bottom**, and **RGBA (0..1)** fields with a separate Apply button. Scene View mouse-drag translates a selected widget and Shift+mouse-drag resizes its right/bottom offsets; while dragging, the draft is preview-only and adds one Undo entry on successful release. Capture loss or focus loss rolls back. Finite coordinates, bounded anchors, valid RGBA and invalid IDs are rejected. Unsaved Canvas drafts cannot be replaced via Assets selection. Native 3D Inspector controls hide during Canvas editing. Remaining authoring work includes interactive anchor handles, clip/color pickers, multi-selection, parent drag/drop, full layout presets and an independent Vulkan runtime Game View.
-
-- Extended Canvas authoring (10 commits): Canvas anchor presets include Top/Middle/Bottom × Left/Center/Right and Stretch Horizontal/Vertical/All, preserving the current viewport-space rectangle and using bounded finite offsets. Inspector exposes an anchor preset dropdown and a parent dropdown with geometry-preserving Reparent. Ctrl-click in Scene View toggles multi-selection, with a separate outlined rectangle per selected visible widget. Dragging a selected group translates independent roots in one undo transaction; selected descendants do not move twice. Multi-selection Delete removes complete subtrees in one Undo step. Selection state is synchronized on draft replacement, add/duplicate/delete and Undo/Redo. These are GDI diagnostic Windows authoring capabilities, not Vulkan Game View, Unity UI binary compatibility, or a finished UI scene hierarchy drag-drop interface.
-
-- Windows Player 0.9 bootstrap milestone (15 commits): `NEnginePlayerKit` defines a validated, versioned `NEngine.player` manifest, a portable Player World bootstrap that registers render/physics/audio/scripting component codecs, and an atomic Scene + allowlisted asset exporter with bounded inputs and symlink/traversal checks. A separate `NEnginePlayer` executable opens a Win32 window and tries Vulkan World presentation (portable non-Windows executable validates startup Scene headlessly). `NEnginePlayerBuild` reads `NEngine.nproject`, bundles an existing Player executable and exports the project into a NEW destination directory. CI exercises the builder end-to-end and uploads Windows Player/Builder executables. **This is a developer bootstrap, not a complete distributable game runtime**: managed ScriptBehaviours deserialize but are not executed by the standalone Player; cooked asset/GUID material resolver, runtime 2D/3D physics scheduling, audio device scheduling, production packaging and real GPU acceptance remain. Android APK/AAB still unimplemented.
-
-- Standalone Player gameplay runtime advancement (15 commits, following the Player bootstrap): `PlayerRuntime::advance` now integrates 2D/3D physics on a bounded 60 Hz fixed-step accumulator and advances game audio/sprite animation on the host frame clock, with pause, contact stats and state reset upon Scene replacement. A read-only bundled `.meta` GUID catalog resolves on-disk assets without Editor import; bounded WAV decoding preloads referenced clips and Windows WASAPI renders mix snapshots when the device is available. Raw packaged `.nanim` clips sample SpriteRenderer texture IDs; `.nanimctrl` controllers evaluate state transitions and runtime boolean parameters. Portable CI tests exercise packaged resource reads, play-on-awake/loop timing, animation controller transitions, physics and transactional Scene reload. Limitations: custom mesh/texture GUID references are **not yet resolved through cooked Vulkan artifacts**, so sprite frame GUID updates alone do not guarantee visible textured sprites; C# ScriptBehaviour gameplay is still **not hosted** by standalone Player; audio currently supports preloaded WAV, not OGG/MP3 streaming; runtime Canvas, collision event forwarding to managed behaviours, Android exporter and production GPU/device QA remain unfinished.
-
-- Windows Player follow-up (15 commits): corrects .nanim/.nspriteanim consistency, cooks standalone texture descriptors + sources into `Content/Cooked/<GUID>/` at export time and binds a read-only cooked asset resolver to Vulkan Player's `present_world`. Export optionally includes allowlisted C# build outputs (`GameScripts.dll`, `NEngine.Bridge.dll`, `NEngine.API.dll`, runtimeconfig, optional deps/PDB); Player attempts hostfxr managed initialization only when `GameScripts.dll` exists and surfaces startup errors. Managed gameplay hooks now run FixedUpdate before physics and Update/LateUpdate after simulation, with collision Enter/Stay/Exit callbacks and world reload cleanup. Native Player and C# runtime still need Windows interactive acceptance, and custom imported meshes/cooked materials, packaging of third-party .NET dependencies, managed input/property/query binding parity, full UI runtime and Android export are not finished.
-
-## Immediate next work
-
-1. Validate full 3D compound inertia tensors with more varied mass ratios, high-angular-velocity contacts and larger/longer contact islands; continue polygon-style collider work and production broad-phase/solver tuning.
-2. Extend audio with streaming + OGG/MP3/FLAC runtime decode and a callback-driven device path after real-Windows audible acceptance.
-3. Extend managed physics queries with additional shape casts and richer hit/filtering semantics.
-4. Package/version the managed NEngine API surface and add debugger attach/symbol workflow.
-5. Finish production PBR validation: sampler state, lights/shadows and remaining material behavior.
-6. Decide and implement the explicit policy for remote/nonlocal or outside-directory glTF resources while preserving sandbox safety.
-7. Add WebP decoding plus texture compression/transcoding policy; mipmap generation/upload is already implemented.
-8. Choose a vendored FBX decoder strategy and add FBX mesh/material cooking.
-9. Replace the GDI Scene View presentation only together with a Vulkan Editor Camera + matching picking/gizmo projection.
-10. Extend shader tooling with reflection and validated HLSL compiler parity.
+# NEngine current state
+
+Status snapshot: **2026-10-17 (KST)**, reviewed against `main` commit [`51db15f`](https://github.com/skatmdgn/NEngine/commit/51db15f79eaa443368e956cada956884aa7dec48).
+Development version: **0.9.0-dev** (pre-1.0; the number identifies the active standalone-Player integration milestone, **not** completed 0.9 scope).
+Authoritative product target: [MASTER_PLAN.md](MASTER_PLAN.md). Detailed feature checkboxes: [ROADMAP.md](ROADMAP.md). Detailed historical implementation notes: [history/CURRENT_STATE_THROUGH_2026-10-16.md](history/CURRENT_STATE_THROUGH_2026-10-16.md).
+
+## What is verified and what is not
+
+- **Repository inspection:** CMake targets/source tree and representative public headers were checked; this is **not** an exhaustive line-by-line code audit.
+- **Latest known CI:** [NEngine CI #1037](https://github.com/skatmdgn/NEngine/actions/runs/38903656615), commit `51db15f`, completed 2026-10-16 UTC: **11/11 CTest groups passed on Ubuntu and 11/11 passed on Windows**. Tests cover Core, Editor, Assets, Scripting, Render, Input, Physics, Audio, UI, Player, and Player CLI. Both builds and Windows executable artifact uploads succeeded.
+- **Historical user acceptance:** Windows editor 0.2.6 previously opened successfully; Hierarchy, Inspector, rename/Transform, Undo/Redo, Play/Pause/Step/Stop, .nscene save/load, and Korean names were checked by the user.
+- **Not verified by CI:** Production Windows Vulkan GPU/rendering, audible playback on physical devices, a complete interactive packaged .NET game, cross-vendor drivers, long-running stability, and Android device/build QA. These must not be presented as passed.
+
+## Architecture implemented in the repository
+
+```text
+apps/editor   -> engine/editor (EditorModel)
+apps/player   -> engine/player (PlayerRuntime / bundle / exporter)
+engine/editor -> engine/core, assets, render, physics, audio, input, scripting, ui
+engine/player -> engine/core, assets, render, physics, audio, input, scripting
+engine/render -> engine/core, assets
+engine/physics-> engine/core
+engine/scripting -> engine/core, input
+engine/ui     -> engine/core, input, assets
+engine/core   -> World / component pools / Scene / Prefab / serialization
+engine/platform -> native Win32 window and portable stub
+```
+
+This is a **dependency overview**, not a complete generated dependency graph. The target 20-subsystem architecture includes planned packages, navigation, jobs, Android toolchains and profiling that are **not** all implemented as separate modules yet.
+
+## Implemented foundations (code + focused automated tests)
+
+| Area | Present in source | Important boundary |
+| --- | --- | --- |
+| Core / World / Scenes | Generational entities, hierarchy, component registry/pools, Scene v3 codecs, references, cloning and Prefab foundation | Full production Prefab workflow/variants remain incomplete |
+| Windows Editor | Native Win32 shell, panes, Inspector editing, history, scene/project workflows, diagnostic Scene View, optional Vulkan Preview | Default edit viewport is still GDI; complete Vulkan Game View and freeform docking not finished |
+| Assets | GUID/.meta DB, importer/cache/dependency watcher, glTF/GLB/OBJ/MTL, texture/material/shader foundations | FBX, WebP decode/transcoding and complete external resource policy remain |
+| Rendering / 2D | Vulkan Win32 swapchain, buffers, depth, material/mesh/texture paths, SpriteRenderer, sprite clips/controllers | Production PBR/lighting/shadows, modern Vulkan editor/game view, Android surface require work |
+| Scripting | C# hostfxr, generated projects/assemblies, lifecycle and hot reload; native managed property/query/UI bridges | Packaged API/debugger support, comprehensive bindings and third-party managed dependency resolution not finished |
+| Physics 2D/3D | Body/collider contacts, impulse/mass/inertia solver, queries, sleeping, managed callbacks | Additional shapes/casts, production tuning and hardware integration QA remain |
+| Audio and Input | WAV decode/WASAPI, native playback, keyboard/mouse, simple action maps | Compressed streaming, real hardware acceptance, gamepad/touch and full action persistence remain |
+| Runtime UI / Animation | Native Canvas model, authoring draft/Undo, GDI diagnostic overlays, C# UI bridge, sprite state graphs | Vulkan runtime UI, production text rendering, general skeletal/blend-tree animation, navigation/particles incomplete |
+| Standalone Windows Player (0.9 partial) | Bundle/CLI exporter, World simulation, WAV/sprite, prebuilt managed-game DLL hosting, 2D/3D events, texture + model/.nmat descriptor cooking, focused Win32 keyboard/mouse and 2D/3D queries | Not yet a generally shippable Windows game exporter; imported material subasset cooking, wider API parity, production GPU/.NET/input QA missing |
+| Android / SDK plugins | Windows+Android target and extension policy documented | APK/AAB, Vulkan Android surface, toolchain profiles, native/plugin integration still unimplemented |
+
+## Highest-priority next work
+
+1. **Player completion:** exported glTF/OBJ generated material/texture subassets, managed action map/property parity, and genuine Windows GPU + .NET + input acceptance.
+2. **Shippable runtime:** Vulkan Game View/editor picking, runtime Canvas textures/text, renderer PBR/shadow validation, and packaging/dependency deployment.
+3. **Cross-platform:** Android Vulkan surface, versioned SDK/NDK/JDK/Gradle profiles, APK/AAB exporter and touch input.
+4. **Ecosystem:** managed/native plugin contracts and NuGet/runtime resolution, Visual Studio debugger attach/symbol workflow.
+5. **Subsystem depth:** stable/extended physics queries, production audio streaming and real-time scheduling, broader animation/navigation/particle features, asset import extensions.
+
+Priorities are **not** claims that later areas are already done; see unchecked items in ROADMAP. Review and adjust this snapshot after every significant functional milestone; do not append dated progress paragraphs above the heading. Keep historical logs in `docs/history/`.
+
+## Resume procedure
+
+1. Read `MASTER_PLAN.md`, this file, `ROADMAP.md`, `ARCHITECTURE.md`, `DECISIONS.md`.
+2. Inspect latest `main` SHA, changed files, relevant implementation and GitHub Actions checks; the documented snapshot may lag.
+3. Choose one testable vertical slice or a regression fix; inspect its public contracts and implementation.
+4. Make code + regression-test changes, run applicable builds/tests, and record exact scope and results.
+5. Update this snapshot and the roadmap **only for verified changes**; do not equate CI compilation with real GPU/device acceptance. Preserve detailed older progress in `history/`.
