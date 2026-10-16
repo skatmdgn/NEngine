@@ -10,6 +10,7 @@
 #include "nengine/audio/playback.hpp"
 #include <unordered_map>
 #include "nengine/physics/simulation.hpp"
+#include "nengine/physics/contact_events.hpp"
 #include "nengine/scripting/managed_runtime.hpp"
 #include "nengine/scripting/script_system.hpp"
 
@@ -28,6 +29,7 @@ struct PlayerFrameStats {
     std::size_t managed_fixed_updates{0};
     std::size_t managed_updates{0};
     std::size_t managed_errors{0};
+    std::size_t contact_events{0};
 };
 
 // Isolated player World bootstrap. Never depends on the editor UI/model.
@@ -67,6 +69,7 @@ private:
     double accumulator_{0.0};
     double elapsed_seconds_{0.0};
     physics::ContactImpulseCache physics_cache_{};
+    physics::ContactTracker contact_tracker_{};
     audio::AudioPlaybackSystem audio_playback_{};
     render::SpriteControllerRuntime sprite_controllers_{};
     std::unordered_map<assets::AssetGuid, render::SpriteAnimationClip,

@@ -125,6 +125,24 @@ PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
         stats.integrated_3d += result.integration.integrated_3d;
         stats.integrated_2d += result.integration.integrated_2d;
         stats.physics_contacts += result.collisions.overlaps.size();
+        const auto contacts = contact_tracker_.update(result.collisions.overlaps);
+        stats.contact_events += contacts.size();
+        if (managed_runtime_.valid()) {
+            for (const auto& event : contacts) {
+                const int phase = static_cast<int>(event.phase);
+                if (!script_system_.dispatch_physics_event(
+                        world_, event.first, event.second, phase,
+                        event.is_trigger, event.is_2d, event.normal,
+                        event.penetration))
+                    ++stats.managed_errors;
+                if (!script_system_.dispatch_physics_event(
+                        world_, event.second, event.first, phase,
+                        event.is_trigger, event.is_2d,
+                        {-event.normal.x, -event.normal.y, -event.normal.z},
+                        event.penetration))
+                    ++stats.managed_errors;
+            }
+        }
         accumulator_ -= fixed;
     }
     // Avoid an unbounded backlog after a debugger stop or window stall.
@@ -152,6 +170,8 @@ void PlayerRuntime::unload() noexcept {
     sprite_controllers_.clear();
     audio_playback_.reset();
     physics_cache_.clear();
+    contact_tracker_.clear();
+    contact_tracker_.clear();
     accumulator_ = 0.0;
     elapsed_seconds_ = 0.0;
     ready_ = false;
