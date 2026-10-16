@@ -88,7 +88,7 @@ bool read_canvas(
     if (!input.getline(header_tail.data(),
             static_cast<std::streamsize>(header_tail.size())))
         return fail(error, "Canvas header line too large or truncated");
-    if (std::string_view(header_tail.data()).find_first_not_of(" \\t\\r") != std::string_view::npos)
+    if (std::string_view(header_tail.data()).find_first_not_of(" \t\r") != std::string_view::npos)
         return fail(error, "invalid Canvas header trailing data");
 
     UiCanvas candidate;
