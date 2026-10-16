@@ -1,5 +1,15 @@
 #include "nengine/core/scene.hpp"
 
+#include <array>
+#include <atomic>
+#include <chrono>
+#include <sstream>
+#include <system_error>
+
+#if defined(_WIN32)
+#include <windows.h>
+#endif
+
 #include <fstream>
 #include <iomanip>
 #include <istream>
@@ -11,6 +21,11 @@
 
 namespace nengine::core {
 namespace {
+constexpr std::size_t max_scene_bytes = 32u * 1024u * 1024u;
+constexpr std::size_t max_scene_objects = 10000u;
+constexpr std::size_t max_object_components = 128u;
+constexpr std::size_t max_component_properties = 256u;
+
 
 void set_error(
     std::string* error,
@@ -326,6 +341,10 @@ bool read_component(
         return false;
     }
 
+    if (property_count > max_component_properties) {
+        set_error(error, "scene component exceeds property limit");
+        return false;
+    }
     component.properties.clear();
     component.properties.reserve(property_count);
 
@@ -500,6 +519,41 @@ SceneData SceneSerializer::capture(
     }
 
     return scene;
+}
+
+bool SceneSerializer::capture_checked(
+    const World& world,
+    SceneData& output,
+    std::string scene_name,
+    std::string* error,
+    const ComponentSerializationRegistry* components) {
+
+    SceneData staged = capture(world, std::move(scene_name), components);
+    const auto entities = world.entities();
+    if (staged.objects.size() != entities.size()) {
+        set_error(error, "Scene capture skipped an invalid world object");
+        return false;
+    }
+    for (std::size_t i = 0; i < entities.size(); ++i) {
+        std::size_t expected = 0u;
+        for (const auto type : world.component_types(entities[i])) {
+            if (type == World::transform_type) continue;
+            if (!components || !components->find(type)) {
+                set_error(error,
+                    "Scene capture cannot serialize component type " +
+                    std::to_string(type));
+                return false;
+            }
+            ++expected;
+        }
+        if (staged.objects[i].components.size() != expected) {
+            set_error(error, "Scene capture codec omitted a component");
+            return false;
+        }
+    }
+    output = std::move(staged);
+    if (error) error->clear();
+    return true;
 }
 
 bool SceneSerializer::instantiate(
@@ -781,7 +835,7 @@ bool SceneSerializer::write(
     return true;
 }
 
-bool SceneSerializer::read(
+static bool read_scene_records(
     std::istream& input,
     SceneData& scene,
     std::string* error) {
@@ -799,8 +853,8 @@ bool SceneSerializer::read(
         return false;
     }
 
-    if (parsed.version >
-        SceneData::current_version) {
+    if (parsed.version < 1u ||
+        parsed.version > SceneData::current_version) {
 
         set_error(
             error,
@@ -830,6 +884,10 @@ bool SceneSerializer::read(
         return false;
     }
 
+    if (object_count > max_scene_objects) {
+        set_error(error, "scene object count exceeds limit");
+        return false;
+    }
     parsed.objects.reserve(
         object_count);
 
@@ -910,6 +968,10 @@ bool SceneSerializer::read(
                 return false;
             }
 
+            if (component_count > max_object_components) {
+                set_error(error, "scene components per object exceed limit");
+                return false;
+            }
             object.components.reserve(
                 component_count);
 
@@ -947,12 +1009,13 @@ bool SceneSerializer::read(
             std::move(object));
     }
 
-    if (!(input >> token) ||
-        token != "END_SCENE") {
-
-        set_error(
-            error,
-            "missing scene terminator");
+    if (!(input >> token) || token != "END_SCENE") {
+        set_error(error, "missing scene terminator");
+        return false;
+    }
+    input >> std::ws;
+    if (input.peek() != std::char_traits<char>::eof()) {
+        set_error(error, "unexpected data after scene terminator");
         return false;
     }
 
@@ -960,27 +1023,101 @@ bool SceneSerializer::read(
     return true;
 }
 
+bool SceneSerializer::read(
+    std::istream& input,
+    SceneData& scene,
+    std::string* error) {
+
+    // Bound the stream before std::quoted or any declared record count
+    // can allocate memory. This also protects non-file input streams.
+    std::string bytes;
+    std::array<char, 4096> buffer{};
+    for (;;) {
+        input.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+        const auto read = static_cast<std::size_t>(input.gcount());
+        if (read > max_scene_bytes - bytes.size()) {
+            set_error(error, "scene input exceeds 32 MiB limit");
+            return false;
+        }
+        bytes.append(buffer.data(), read);
+        if (input.eof()) break;
+        if (!input) {
+            set_error(error, "failed reading scene input stream");
+            return false;
+        }
+    }
+    std::istringstream bounded(bytes);
+    return read_scene_records(bounded, scene, error);
+}
+
 bool SceneSerializer::save_file(
     const SceneData& scene,
     const std::filesystem::path& path,
     std::string* error) {
 
-    std::ofstream output(
-        path,
-        std::ios::binary |
-            std::ios::trunc);
-
-    if (!output) {
-        set_error(
-            error,
-            "could not open scene file for writing");
+    // Complete serialization before touching any destination file.
+    std::ostringstream serialized;
+    if (!write(scene, serialized, error)) return false;
+    const auto data = serialized.str();
+    if (data.size() > max_scene_bytes) {
+        set_error(error, "scene output exceeds 32 MiB limit");
         return false;
     }
 
-    return write(
-        scene,
-        output,
-        error);
+    static std::atomic<std::uint64_t> sequence{0};
+    auto temporary = path;
+    temporary += ".nengine-tmp-" +
+        std::to_string(std::chrono::steady_clock::now()
+            .time_since_epoch().count()) + "-" +
+        std::to_string(++sequence);
+    const auto cleanup = [&temporary] {
+        std::error_code ignored;
+        std::filesystem::remove(temporary, ignored);
+    };
+
+    {
+        std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+        if (!output) {
+            set_error(error, "could not open temporary scene file");
+            return false;
+        }
+        output.write(data.data(), static_cast<std::streamsize>(data.size()));
+        output.flush();
+        if (!output) {
+            output.close();
+            cleanup();
+            set_error(error, "failed to flush temporary scene file");
+            return false;
+        }
+        output.close();
+        if (!output) {
+            cleanup();
+            set_error(error, "failed to close temporary scene file");
+            return false;
+        }
+    }
+
+#if defined(_WIN32)
+    const bool replaced = MoveFileExW(
+        temporary.c_str(), path.c_str(),
+        MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
+    if (!replaced) {
+        cleanup();
+        set_error(error, "could not atomically replace destination scene");
+        return false;
+    }
+#else
+    std::error_code rename_error;
+    std::filesystem::rename(temporary, path, rename_error);
+    if (rename_error) {
+        cleanup();
+        set_error(error, "could not atomically replace destination scene: " +
+            rename_error.message());
+        return false;
+    }
+#endif
+    if (error) error->clear();
+    return true;
 }
 
 bool SceneSerializer::load_file(

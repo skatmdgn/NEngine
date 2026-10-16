@@ -1,9 +1,15 @@
 #include "nengine/core/world.hpp"
 
 #include <algorithm>
+#include <atomic>
+#include <limits>
 #include <utility>
 
 namespace nengine::core {
+
+namespace {
+std::atomic<std::uint64_t> next_entity_generation{0};
+}
 
 const ComponentTypeId World::transform_type = ComponentRegistry::stable_id("NEngine.Transform");
 
@@ -33,6 +39,15 @@ void World::copy_from(const World& other) {
 }
 
 Entity World::create(std::string name) {
+    if (free_indices_.empty() &&
+        slots_.size() >= std::numeric_limits<std::uint32_t>::max())
+        return Entity::invalid();
+    // A new World created for Scene/Player reload must never resurrect
+    // handles from the previous World that occupied this owner.
+    const auto issued = next_entity_generation.fetch_add(
+        1u, std::memory_order_relaxed);
+    if (issued >= std::numeric_limits<std::uint32_t>::max())
+        return Entity::invalid();
     std::uint32_t index = 0;
     if (!free_indices_.empty()) {
         index = free_indices_.back();
@@ -43,6 +58,7 @@ Entity World::create(std::string name) {
     }
 
     auto& slot = slots_[index];
+    slot.generation = static_cast<std::uint32_t>(issued);
     slot.alive = true;
     slot.active = true;
     slot.name = name.empty() ? "GameObject" : std::move(name);
@@ -124,7 +140,9 @@ const Transform* World::transform(Entity entity) const {
 
 bool World::would_create_cycle(Entity child, Entity parent) const noexcept {
     auto current = parent;
+    std::size_t steps = 0;
     while (is_alive(current)) {
+        if (++steps > alive_count_) return true;
         if (current == child) {
             return true;
         }

@@ -85,6 +85,9 @@ bool export_player_data(const ExportSettings& settings,
         source, staging / "Content" / "Main.nscene",
         std::filesystem::copy_options::none, ec);
     if (ec) { cleanup(); return fail(error, "cannot copy player startup Scene"); }
+    // Even a data-only/empty-asset bundle needs a valid empty catalog.
+    std::filesystem::create_directories(staging / "Content" / "Assets", ec);
+    if (ec) { cleanup(); return fail(error, "cannot stage empty asset catalog"); }
     std::size_t copied_assets = 0;
     if (settings.copy_supported_assets) {
         const auto assets_root = root / "Assets";
@@ -121,6 +124,13 @@ bool export_player_data(const ExportSettings& settings,
                 }
                 const auto source_path = it->path();
                 const auto ext = source_path.extension().string();
+                // Staging WebP as a valid texture would produce a Player
+                // bundle whose GPU pixel decoder cannot render the asset.
+                if (ext == ".webp") {
+                    cleanup();
+                    return fail(error,
+                        "WebP textures are not supported by the Player renderer");
+                }
                 if (std::find(extensions.begin(), extensions.end(), ext) ==
                     extensions.end()) continue;
                 const auto bytes = it->file_size(ec);

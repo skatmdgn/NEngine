@@ -676,6 +676,46 @@ int main() {
             retained_artifact_path),
         "first generated-subasset import writes retained and soon-stale artifacts");
 
+    // Cached manifest records are untrusted. Oversized counts must not
+    // reserve huge memory and must trigger a safe cache miss.
+    const auto cleanup_dir =
+        cleanup_cache_root / cleanup_record.guid.to_string();
+    const auto cleanup_manifest = cleanup_dir / "import.meta";
+    const auto original_manifest = read_all(cleanup_manifest);
+    const std::string empty_artifacts = "ARTIFACTS 0\n";
+    const auto count_offset = original_manifest.find(empty_artifacts);
+    check(count_offset != std::string::npos,
+          "generated import manifest has no root artifacts");
+    if (count_offset != std::string::npos) {
+        auto oversized_manifest = original_manifest;
+        oversized_manifest.replace(count_offset, empty_artifacts.size(),
+            "ARTIFACTS 999999999\n");
+        write_file(cleanup_manifest, oversized_manifest);
+        check(!cleanup_pipeline.cached_artifacts(
+                cleanup_record, importers, cleanup_cache_root),
+              "oversized cached artifact count is rejected before reserve");
+        write_file(cleanup_manifest, original_manifest);
+
+        const auto external = root / "OutsideCache";
+        const auto victim = external / "victim.bin";
+        write_file(victim, "do-not-delete");
+        const auto cache_link = cleanup_dir / "external-link";
+        std::error_code symlink_error;
+        std::filesystem::create_directory_symlink(
+            external, cache_link, symlink_error);
+        if (!symlink_error) {
+            auto malicious = original_manifest;
+            malicious.replace(count_offset, empty_artifacts.size(),
+                "ARTIFACTS 1\nARTIFACT \"source\" \"external-link/victim.bin\"\n");
+            write_file(cleanup_manifest, malicious);
+            check(!cleanup_pipeline.cached_artifacts(
+                    cleanup_record, importers, cleanup_cache_root),
+                  "cache symlink escape is rejected on lookup");
+            // The subsequent re-import runs stale artifact cleanup.
+            // A vulnerable implementation would remove external/victim.bin.
+        }
+    }
+
     emit_stale_subasset = false;
     ++cleanup_record.write_stamp;
 
@@ -696,6 +736,9 @@ int main() {
         !std::filesystem::exists(
             stale_artifact_path),
         "reimport removes artifacts no longer referenced by root/subasset manifest while retaining current files");
+
+    check(read_all(root / "OutsideCache" / "victim.bin") == "do-not-delete",
+          "cache cleanup never deletes an external file through a symlink");
 
     write_file(
         scene,
@@ -729,6 +772,31 @@ int main() {
     check(graph.dependents(b).size() == 1 && graph.dependents(b)[0] == a, "dependency graph stores reverse edges");
     graph.remove(b);
     check(graph.dependencies(a).size() == 1 && graph.dependencies(a)[0] == c, "dependency removal cleans reverse and forward edges");
+
+    // Verification scans must not mutate GUID identity or .meta files.
+    const auto duplicate_root = root / "DuplicatedGuids";
+    const auto asset_a = duplicate_root / "a.bin";
+    const auto asset_b = duplicate_root / "b.bin";
+    write_file(asset_a, "a");
+    write_file(asset_b, "b");
+    const auto reused_guid = AssetGuid::generate().to_string();
+    const auto duplicate_meta =
+        "NENGINE_META 1\nGUID " + reused_guid +
+        "\nIMPORTER \"Raw\"\nEND_META\n";
+    write_file(std::filesystem::path(asset_a.string() + ".meta"), duplicate_meta);
+    write_file(std::filesystem::path(asset_b.string() + ".meta"), duplicate_meta);
+    AssetDatabase readonly_database(duplicate_root);
+    const auto readonly_result = readonly_database.scan(false);
+    bool has_collision_error = false;
+    for (const auto& message : readonly_result.messages)
+        has_collision_error |= message.severity == AssetMessageSeverity::Error;
+    check(has_collision_error && readonly_database.size() == 1u &&
+              read_all(std::filesystem::path(asset_a.string() + ".meta")) == duplicate_meta &&
+              read_all(std::filesystem::path(asset_b.string() + ".meta")) == duplicate_meta,
+          "read-only duplicate GUID scan emits error without changing metadata");
+    const auto repaired_result = readonly_database.scan(true);
+    check(readonly_database.size() == 2u && repaired_result.meta_repaired > 0,
+          "mutable Editor scan can explicitly repair GUID collisions");
 
     std::filesystem::remove_all(root, ec);
 
