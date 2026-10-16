@@ -165,6 +165,27 @@ int main() {
             "CoreTest",
             &component_serialization);
     check(captured.objects.size() == 2, "scene captures all objects");
+    {
+        World custom;
+        const auto object = custom.create("HasCustomComponent");
+        custom.add_component<TestHealth>(object, health_type);
+        SceneData unchanged;
+        unchanged.name = "KeepMe";
+        std::string capture_error;
+        check(!SceneSerializer::capture_checked(
+                  custom, unchanged, "Unsafe", &capture_error,
+                  &component_serialization) &&
+                  unchanged.name == "KeepMe" && !capture_error.empty(),
+              "strict Scene capture rejects unknown component without data loss");
+
+        World transform_only;
+        transform_only.create("OnlyTransform");
+        check(SceneSerializer::capture_checked(
+                  transform_only, unchanged, "Safe", &capture_error) &&
+                  unchanged.name == "Safe" && unchanged.objects.size() == 1u,
+              "strict Scene capture accepts completely serializable world");
+    }
+
 
     std::stringstream stream;
     std::string error;
