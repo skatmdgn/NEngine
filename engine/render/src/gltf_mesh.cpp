@@ -785,10 +785,9 @@ bool read_binary_file(
     const auto size =
         input.tellg();
 
-    if (size < 0) {
-        set_error(
-            error,
-            "could not determine glTF buffer size");
+    if (size < 0 ||
+        static_cast<std::uintmax_t>(size) > 256ull * 1024ull * 1024ull) {
+        set_error(error, "glTF buffer exceeds 256 MiB decode limit");
         return false;
     }
 
@@ -1118,9 +1117,16 @@ bool load_gltf_source(
         return false;
     }
 
+    input.seekg(0, std::ios::end);
+    const auto json_bytes = input.tellg();
+    if (json_bytes < 0 ||
+        static_cast<std::uintmax_t>(json_bytes) > 16ull * 1024ull * 1024ull) {
+        set_error(error, "glTF JSON exceeds 16 MiB decode limit");
+        return false;
+    }
+    input.seekg(0, std::ios::beg);
     source.json.assign(
-        std::istreambuf_iterator<char>{
-            input},
+        std::istreambuf_iterator<char>{input},
         std::istreambuf_iterator<char>{});
 
     if (!input.good() &&
