@@ -176,6 +176,19 @@ int main() {
         !runtime.ready() || runtime.entity_count() != 2u ||
         runtime.pending_script_count() != 1u ||
         !runtime.assets().source(texture_guid)) return test_failure(13, __LINE__);
+    runtime.begin_input_frame();
+    runtime.input().set_key(nengine::input::Key::A, true);
+    if (!runtime.input().held(nengine::input::Key::A) ||
+        !runtime.input().pressed(nengine::input::Key::A))
+        return test_failure(47, __LINE__);
+    runtime.begin_input_frame();
+    runtime.input().set_key(nengine::input::Key::A, true);
+    if (runtime.input().pressed(nengine::input::Key::A))
+        return test_failure(48, __LINE__);
+    runtime.begin_input_frame();
+    runtime.input().set_key(nengine::input::Key::A, false);
+    if (!runtime.input().released(nengine::input::Key::A))
+        return test_failure(49, __LINE__);
     if (runtime.managed_ready() ||
         runtime.initialize_managed(&error) ||
         !runtime.ready() || runtime.entity_count() != 2u ||
