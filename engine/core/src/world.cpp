@@ -1,10 +1,15 @@
 #include "nengine/core/world.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <limits>
 #include <utility>
 
 namespace nengine::core {
+
+namespace {
+std::atomic<std::uint64_t> next_entity_generation{0};
+}
 
 const ComponentTypeId World::transform_type = ComponentRegistry::stable_id("NEngine.Transform");
 
@@ -27,7 +32,6 @@ void World::copy_from(const World& other) {
     slots_ = other.slots_;
     free_indices_ = other.free_indices_;
     alive_count_ = other.alive_count_;
-    next_generation_ = other.next_generation_;
     component_pools_.clear();
     for (const auto& [type, pool] : other.component_pools_) {
         component_pools_.emplace(type, pool->clone());
@@ -35,9 +39,14 @@ void World::copy_from(const World& other) {
 }
 
 Entity World::create(std::string name) {
-    if (next_generation_ >= std::numeric_limits<std::uint32_t>::max() ||
-        (free_indices_.empty() &&
-         slots_.size() >= std::numeric_limits<std::uint32_t>::max()))
+    if (free_indices_.empty() &&
+        slots_.size() >= std::numeric_limits<std::uint32_t>::max())
+        return Entity::invalid();
+    // A new World created for Scene/Player reload must never resurrect
+    // handles from the previous World that occupied this owner.
+    const auto issued = next_entity_generation.fetch_add(
+        1u, std::memory_order_relaxed);
+    if (issued >= std::numeric_limits<std::uint32_t>::max())
         return Entity::invalid();
     std::uint32_t index = 0;
     if (!free_indices_.empty()) {
@@ -46,11 +55,10 @@ Entity World::create(std::string name) {
     } else {
         index = static_cast<std::uint32_t>(slots_.size());
         slots_.push_back({});
-        slots_.back().generation =
-            static_cast<std::uint32_t>(next_generation_++);
     }
 
     auto& slot = slots_[index];
+    slot.generation = static_cast<std::uint32_t>(issued);
     slot.alive = true;
     slot.active = true;
     slot.name = name.empty() ? "GameObject" : std::move(name);
@@ -83,10 +91,7 @@ bool World::destroy(Entity entity) {
     slot.alive = false;
     slot.active = false;
     slot.name.clear();
-    slot.generation = next_generation_ <
-        std::numeric_limits<std::uint32_t>::max()
-        ? static_cast<std::uint32_t>(next_generation_++)
-        : std::numeric_limits<std::uint32_t>::max();
+    ++slot.generation;
     free_indices_.push_back(entity.index());
     --alive_count_;
     return true;
