@@ -1,12 +1,24 @@
 #include "nengine/player/managed_properties.hpp"
 #include "nengine/scripting/managed_runtime.hpp"
 #include "nengine/physics/components.hpp"
+#include "nengine/audio/components.hpp"
 #include <cmath>
 #include <variant>
 namespace nengine::player {
 bool read_player_transform_property(const core::World& world,
     core::Entity entity, std::string_view component,
     std::string_view property, core::PropertyValue& value) {
+    if (component == "NEngine.AudioSource") {
+        const auto* audio = world.get_component<audio::AudioSource>(
+            entity, audio::audio_source_type());
+        if (!audio) return false;
+        if (property == "Volume") value = static_cast<double>(audio->volume);
+        else if (property == "Loop") value = audio->loop;
+        else if (property == "Enabled") value = audio->enabled;
+        else if (property == "Playing") value = audio->playing;
+        else return false;
+        return true;
+    }
     if (component == "NEngine.Rigidbody2D") {
         const auto* body = world.get_component<physics::Rigidbody2D>(
             entity, physics::rigidbody2d_type());
@@ -29,6 +41,25 @@ bool read_player_transform_property(const core::World& world,
 bool write_player_transform_property(core::World& world,
     core::Entity entity, std::string_view component,
     std::string_view property, const core::PropertyValue& value) {
+    if (component == "NEngine.AudioSource") {
+        auto* audio = world.get_component<audio::AudioSource>(
+            entity, audio::audio_source_type());
+        if (!audio) return false;
+        if (property == "Volume") {
+            const auto* v = std::get_if<double>(&value);
+            if (!v || !std::isfinite(*v) || *v < 0.0 || *v > 1.0)
+                return false;
+            audio->volume = static_cast<float>(*v);
+            return true;
+        }
+        const auto* v = std::get_if<bool>(&value);
+        if (!v) return false;
+        if (property == "Loop") audio->loop = *v;
+        else if (property == "Enabled") audio->enabled = *v;
+        else if (property == "Playing") audio->playing = *v;
+        else return false;
+        return true;
+    }
     if (component == "NEngine.Rigidbody2D") {
         auto* body = world.get_component<physics::Rigidbody2D>(
             entity, physics::rigidbody2d_type());

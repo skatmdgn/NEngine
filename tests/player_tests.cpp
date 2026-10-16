@@ -252,6 +252,23 @@ int main() {
             std::get<double>(mass) == 2.5;
     }
     if (!body_property_ok) return test_failure(53, __LINE__);
+    bool audio_property_ok = false;
+    for (const auto entity : runtime.world().entities()) {
+        if (!runtime.world().get_component<nengine::audio::AudioSource>(
+                entity, nengine::audio::audio_source_type())) continue;
+        nengine::core::PropertyValue volume;
+        audio_property_ok = read_player_transform_property(
+            runtime.world(), entity, "NEngine.AudioSource",
+            "Volume", volume) &&
+            write_player_transform_property(
+                runtime.world(), entity, "NEngine.AudioSource",
+                "Volume", 0.25) &&
+            !write_player_transform_property(
+                runtime.world(), entity, "NEngine.AudioSource",
+                "Volume", 1.5) &&
+            std::get<double>(volume) > 0.5;
+    }
+    if (!audio_property_ok) return test_failure(54, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto cooked_model = runtime.assets().cooked_artifacts(model_guid);
     const auto cooked_material = runtime.assets().cooked_artifacts(material_guid);
