@@ -4,6 +4,9 @@
 
 #include "nengine/editor/project_manifest.hpp"
 #include "nengine/player/exporter.hpp"
+#if defined(_WIN32)
+#include <windows.h>
+#endif
 
 #if defined(_WIN32)
 int wmain(int argc, wchar_t** argv) {
@@ -38,11 +41,21 @@ int main(int argc, char** argv) {
     if (argc == 4) {
         settings.player_executable = std::filesystem::path(argv[3]);
     } else {
-        auto executable = std::filesystem::absolute(
-            std::filesystem::path(argv[0])).parent_path();
 #if defined(_WIN32)
+        // Shell PATH lookup need not contain an absolute argv[0].
+        // Resolve the builder's actual module location instead.
+        wchar_t module_path[32768]{};
+        const DWORD count = GetModuleFileNameW(
+            nullptr, module_path, static_cast<DWORD>(32768));
+        if (!count || count >= 32768) {
+            std::cerr << "Cannot locate Player builder executable\n";
+            return 6;
+        }
+        auto executable = std::filesystem::path(module_path).parent_path();
         executable /= "NEnginePlayer.exe";
 #else
+        auto executable = std::filesystem::absolute(
+            std::filesystem::path(argv[0])).parent_path();
         executable /= "NEnginePlayer";
 #endif
         settings.player_executable = std::move(executable);
