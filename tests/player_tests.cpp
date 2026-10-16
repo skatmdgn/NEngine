@@ -4,6 +4,7 @@
 #include <sstream>
 #include "nengine/player/bundle.hpp"
 #include "nengine/player/exporter.hpp"
+#include "nengine/player/runtime.hpp"
 #include "nengine/core/scene.hpp"
 
 int main() {
@@ -55,6 +56,11 @@ int main() {
         built.title != settings.title ||
         !resolve_bundle_scene(report.bundle_root, built, &error))
         return 9;
+    PlayerRuntime runtime;
+    if (!runtime.load(report.bundle_root, &error) ||
+        !runtime.ready() || runtime.entity_count() != 2u) return 13;
+    runtime.unload();
+    if (runtime.ready() || runtime.entity_count() != 0) return 14;
     if (export_player_data(settings, report, &error)) return 10;
     settings.destination = project / "BadExport";
     if (export_player_data(settings, report, &error) ||
