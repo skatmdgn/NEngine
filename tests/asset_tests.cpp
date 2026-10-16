@@ -676,6 +676,46 @@ int main() {
             retained_artifact_path),
         "first generated-subasset import writes retained and soon-stale artifacts");
 
+    // Cached manifest records are untrusted. Oversized counts must not
+    // reserve huge memory and must trigger a safe cache miss.
+    const auto cleanup_dir =
+        cleanup_cache_root / cleanup_record.guid.to_string();
+    const auto cleanup_manifest = cleanup_dir / "import.meta";
+    const auto original_manifest = read_all(cleanup_manifest);
+    const std::string empty_artifacts = "ARTIFACTS 0\n";
+    const auto count_offset = original_manifest.find(empty_artifacts);
+    check(count_offset != std::string::npos,
+          "generated import manifest has no root artifacts");
+    if (count_offset != std::string::npos) {
+        auto oversized_manifest = original_manifest;
+        oversized_manifest.replace(count_offset, empty_artifacts.size(),
+            "ARTIFACTS 999999999\n");
+        write_file(cleanup_manifest, oversized_manifest);
+        check(!cleanup_pipeline.cached_artifacts(
+                cleanup_record, importers, cleanup_cache_root),
+              "oversized cached artifact count is rejected before reserve");
+        write_file(cleanup_manifest, original_manifest);
+
+        const auto external = root / "OutsideCache";
+        const auto victim = external / "victim.bin";
+        write_file(victim, "do-not-delete");
+        const auto cache_link = cleanup_dir / "external-link";
+        std::error_code symlink_error;
+        std::filesystem::create_directory_symlink(
+            external, cache_link, symlink_error);
+        if (!symlink_error) {
+            auto malicious = original_manifest;
+            malicious.replace(count_offset, empty_artifacts.size(),
+                "ARTIFACTS 1\nARTIFACT \"source\" \"external-link/victim.bin\"\n");
+            write_file(cleanup_manifest, malicious);
+            check(!cleanup_pipeline.cached_artifacts(
+                    cleanup_record, importers, cleanup_cache_root),
+                  "cache symlink escape is rejected on lookup");
+            // The subsequent re-import runs stale artifact cleanup.
+            // A vulnerable implementation would remove external/victim.bin.
+        }
+    }
+
     emit_stale_subasset = false;
     ++cleanup_record.write_stamp;
 
