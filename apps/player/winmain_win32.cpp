@@ -71,6 +71,14 @@ int run() {
 
     std::uint32_t old_width = window.client_width();
     std::uint32_t old_height = window.client_height();
+    // The Scene holds Vulkan pipelines and GPU caches associated with the
+    // old render pass. Shut it down before rebuilding swapchain resources.
+    const auto recreate_swapchain = [&](std::uint32_t width,
+                                        std::uint32_t height) {
+        scene.shutdown();
+        return renderer.resize(width, height) &&
+            scene.initialize(renderer);
+    };
     auto last_frame = std::chrono::steady_clock::now();
     while (window.poll_events()) {
         const auto now = std::chrono::steady_clock::now();
@@ -138,13 +146,26 @@ int run() {
         if (width != old_width || height != old_height) {
             old_width = width;
             old_height = height;
-            if (width && height) renderer.resize(width, height);
+            if (width && height && !recreate_swapchain(width, height)) {
+                message("Vulkan resize failed: " + renderer.diagnostic());
+                return 7;
+            }
         }
         if (width && height && !scene.present_world(
                 renderer, runtime.world(),
                 [&runtime](nengine::assets::AssetGuid guid) {
                     return runtime.assets().cooked_artifacts(guid);
                 })) {
+            if (renderer.needs_resize()) {
+                // OUT_OF_DATE / SUBOPTIMAL is recoverable; refresh swapchain,
+                // render targets and render-pass dependent pipelines.
+                if (!recreate_swapchain(width, height)) {
+                    message("Vulkan swapchain recovery failed: " +
+                            renderer.diagnostic());
+                    return 7;
+                }
+                continue;
+            }
             message(scene.diagnostic());
             return 7;
         }
