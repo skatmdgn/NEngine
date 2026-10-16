@@ -50,7 +50,14 @@ int run() {
     }
     std::uint32_t old_width = window.client_width();
     std::uint32_t old_height = window.client_height();
+    auto last_frame = std::chrono::steady_clock::now();
     while (window.poll_events()) {
+        const auto now = std::chrono::steady_clock::now();
+        const auto delta = std::chrono::duration<float>(now - last_frame).count();
+        last_frame = now;
+        // The stand-alone Player World advances independently of Editor Play.
+        // PlayerRuntime limits large frame stalls to eight fixed steps.
+        runtime.advance(delta);
         const auto width = window.client_width();
         const auto height = window.client_height();
         if (width != old_width || height != old_height) {
