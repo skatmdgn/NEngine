@@ -2515,13 +2515,15 @@ struct Win32EditorShell::Impl {
             scene_name = "Untitled";
         }
 
-        const auto data =
-            nengine::core::SceneSerializer::capture(
-                editor.world(),
-                scene_name,
-                &editor.component_serialization());
-
+        nengine::core::SceneData data;
         std::string error;
+        if (!nengine::core::SceneSerializer::capture_checked(
+                editor.world(), data, scene_name, &error,
+                &editor.component_serialization())) {
+            editor.console().warning("Scene", "Save blocked: " + error);
+            refresh_console();
+            return false;
+        }
         if (!nengine::core::SceneSerializer::save_file(
                 data,
                 path,
