@@ -1,4 +1,7 @@
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -206,6 +209,59 @@ int main() {
         "legacy v1 scene preserves object count");
     check(loaded.name == "CoreTest", "scene name roundtrip");
     check(loaded.objects.size() == 2, "scene object count roundtrip");
+
+    // Untrusted scene input must fail before allocating attacker-controlled
+    // object/component/property counts, keeping the old output intact.
+    const auto unchanged_name = loaded.name;
+    for (const auto& malicious : {
+             std::string{"NENGINE_SCENE 3\nNAME \"Huge\"\nOBJECTS 18446744073709551615\n"},
+             std::string{"NENGINE_SCENE 0\nNAME \"Bad\"\nOBJECTS 0\nEND_SCENE\n"},
+             std::string{"NENGINE_SCENE 3\nNAME \"Bad\"\nOBJECTS 1\nOBJECT 0 -1 1 \"A\"\nPOS 0 0 0\nROT 0 0 0 1\nSCALE 1 1 1\nCOMPONENTS 129\n"},
+             std::string{"NENGINE_SCENE 3\nNAME \"Bad\"\nOBJECTS 1\nOBJECT 0 -1 1 \"A\"\nPOS 0 0 0\nROT 0 0 0 1\nSCALE 1 1 1\nCOMPONENTS 1\nCOMPONENT 1 1 \"A\" 257\n"},
+             std::string{"NENGINE_SCENE 3\nNAME \"Bad\"\nOBJECTS 0\nEND_SCENE\nTRAILING\n"}
+         }) {
+        std::stringstream invalid(malicious);
+        check(!SceneSerializer::read(invalid, loaded, &error) &&
+                  loaded.name == unchanged_name,
+              "malformed bounded scene input rejected transactionally");
+    }
+
+    {
+        std::stringstream excessive(std::string(32u * 1024u * 1024u + 1u, 'x'));
+        check(!SceneSerializer::read(excessive, loaded, &error) &&
+                  loaded.name == unchanged_name,
+              "oversized scene stream rejected without parsing");
+    }
+
+    const auto scene_path = std::filesystem::temp_directory_path() /
+        "nengine_scene_atomic_core_test.nscene";
+    {
+        std::ofstream original(scene_path, std::ios::binary | std::ios::trunc);
+        original << "ORIGINAL";
+    }
+    auto malformed_save = loaded;
+    SerializedComponentData broken;
+    broken.type = link_type;
+    broken.version = 1u;
+    broken.type_name = "Tests.Broken";
+    SerializedPropertyData invalid_property;
+    invalid_property.name = "InvalidRuntimeEntity";
+    invalid_property.kind = PropertyKind::EntityReference;
+    invalid_property.value = Entity::make(0, 0);
+    broken.properties.push_back(std::move(invalid_property));
+    malformed_save.objects.front().components.push_back(std::move(broken));
+    check(!SceneSerializer::save_file(malformed_save, scene_path, &error),
+          "failed scene serialization does not report a saved file");
+    {
+        std::ifstream after(scene_path, std::ios::binary);
+        const std::string bytes{std::istreambuf_iterator<char>{after},
+                                std::istreambuf_iterator<char>{}};
+        check(bytes == "ORIGINAL", "failed save preserves original scene bytes");
+    }
+    check(SceneSerializer::save_file(loaded, scene_path, &error),
+          "valid scene atomically replaces existing file");
+    std::filesystem::remove(scene_path);
+
 
     World restored;
     check(
