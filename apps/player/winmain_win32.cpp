@@ -108,6 +108,10 @@ int run() {
         }};
         for (const auto [key, virtual_key] : mapped)
             input.set_key(key, down(virtual_key));
+        // Window::poll_events already consumed WM_MOUSEWHEEL. Forward the
+        // event delta to the Player's distinct managed-facing InputState.
+        if (focused)
+            input.add_wheel(window.input_state().pointer().wheel_y);
         POINT pointer{};
         if (focused && GetCursorPos(&pointer) &&
             ScreenToClient(native_window, &pointer))
