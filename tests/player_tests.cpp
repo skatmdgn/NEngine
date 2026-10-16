@@ -167,6 +167,17 @@ int main() {
         !std::filesystem::exists(
             report.bundle_root / "Content" / "Main.nscene"))
         return test_failure(8, __LINE__);
+    // A package must never report success for an unsupported WebP source.
+    const auto unsupported_webp = project / "Assets" / "Textures" / "bad.webp";
+    { std::ofstream file(unsupported_webp, std::ios::binary); file << "webp"; }
+    ExportSettings with_webp = settings;
+    with_webp.destination = export_base / "UnsupportedWebP";
+    ExportReport unsupported_report;
+    if (export_player_data(with_webp, unsupported_report, &error) ||
+        std::filesystem::exists(with_webp.destination) ||
+        error.find("WebP") == std::string::npos)
+        return test_failure(56, __LINE__);
+    std::filesystem::remove(unsupported_webp);
     BundleManifest built;
     if (!load_bundle(report.bundle_root / "NEngine.player", built, &error) ||
         built.title != settings.title ||
