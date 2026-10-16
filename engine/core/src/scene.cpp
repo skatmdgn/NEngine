@@ -502,6 +502,41 @@ SceneData SceneSerializer::capture(
     return scene;
 }
 
+bool SceneSerializer::capture_checked(
+    const World& world,
+    SceneData& output,
+    std::string scene_name,
+    std::string* error,
+    const ComponentSerializationRegistry* components) {
+
+    SceneData staged = capture(world, std::move(scene_name), components);
+    const auto entities = world.entities();
+    if (staged.objects.size() != entities.size()) {
+        set_error(error, "Scene capture skipped an invalid world object");
+        return false;
+    }
+    for (std::size_t i = 0; i < entities.size(); ++i) {
+        std::size_t expected = 0u;
+        for (const auto type : world.component_types(entities[i])) {
+            if (type == World::transform_type) continue;
+            if (!components || !components->find(type)) {
+                set_error(error,
+                    "Scene capture cannot serialize component type " +
+                    std::to_string(type));
+                return false;
+            }
+            ++expected;
+        }
+        if (staged.objects[i].components.size() != expected) {
+            set_error(error, "Scene capture codec omitted a component");
+            return false;
+        }
+    }
+    output = std::move(staged);
+    if (error) error->clear();
+    return true;
+}
+
 bool SceneSerializer::instantiate(
     const SceneData& scene,
     World& destination,
