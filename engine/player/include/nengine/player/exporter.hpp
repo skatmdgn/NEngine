@@ -13,6 +13,8 @@ struct ExportSettings {
     // Leave empty for data-only bundle generation in tests/tools.
     std::filesystem::path player_executable{};
     bool copy_supported_assets{true};
+    std::filesystem::path managed_directory{};
+    std::string managed_assembly_name{"GameScripts"};
     std::string title{"NEngine Game"};
     std::uint32_t width{1280};
     std::uint32_t height{720};
@@ -23,6 +25,7 @@ struct ExportReport {
     std::size_t scene_objects{0};
     std::size_t copied_assets{0};
     std::size_t cooked_textures{0};
+    std::size_t managed_files{0};
 };
 
 // Produces a validated DATA bundle. The Player executable will be bundled

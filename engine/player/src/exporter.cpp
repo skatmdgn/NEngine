@@ -184,6 +184,50 @@ bool export_player_data(const ExportSettings& settings,
             ++cooked_textures;
         }
     }
+    std::size_t managed_files = 0;
+    if (!settings.managed_directory.empty()) {
+        // Managed binaries are opt-in: never ship source code or arbitrary
+        // build-directory files. Accept a closed set of runtime payloads.
+        const auto name = settings.managed_assembly_name;
+        if (name.empty() || name.size() > 100 ||
+            !std::all_of(name.begin(), name.end(), [](unsigned char c) {
+                return (c >= 'a' && c <= 'z') ||
+                       (c >= 'A' && c <= 'Z') ||
+                       (c >= '0' && c <= '9') || c == '_' || c == '.';
+            }) || name.front() == '.' || name.back() == '.') {
+            cleanup(); return fail(error, "invalid managed assembly name");
+        }
+        const auto managed_root = std::filesystem::canonical(
+            settings.managed_directory, ec);
+        if (ec || !std::filesystem::is_directory(managed_root)) {
+            cleanup(); return fail(error, "managed build directory missing");
+        }
+        const auto target = staging / "Content" / "Managed";
+        std::filesystem::create_directory(target, ec);
+        if (ec) { cleanup(); return fail(error, "cannot create managed payload directory"); }
+        const std::array<std::string, 6> names{
+            name + ".dll", name + ".runtimeconfig.json",
+            name + ".deps.json", "NEngine.Bridge.dll",
+            "NEngine.API.dll", name + ".pdb"};
+        for (std::size_t i = 0; i < names.size(); ++i) {
+            const auto source_path = managed_root / names[i];
+            if (!std::filesystem::exists(source_path, ec)) {
+                if (i < 2 || i == 3 || i == 4) {
+                    cleanup(); return fail(error, "required managed runtime payload missing: " + names[i]);
+                }
+                continue;
+            }
+            const auto file_size = std::filesystem::file_size(source_path, ec);
+            if (ec || std::filesystem::is_symlink(source_path, ec) ||
+                file_size > 64u * 1024u * 1024u || ec) {
+                cleanup(); return fail(error, "unsafe managed payload: " + names[i]);
+            }
+            std::filesystem::copy_file(source_path, target / names[i],
+                std::filesystem::copy_options::none, ec);
+            if (ec) { cleanup(); return fail(error, "failed to copy managed payload"); }
+            ++managed_files;
+        }
+    }
     if (!settings.player_executable.empty()) {
         const auto executable = std::filesystem::canonical(
             settings.player_executable, ec);
@@ -208,7 +252,8 @@ bool export_player_data(const ExportSettings& settings,
     }
     std::filesystem::rename(staging, final_path, ec);
     if (ec) { cleanup(); return fail(error, "cannot atomically finish player bundle"); }
-    report = {final_path, scene.objects.size(), copied_assets, cooked_textures};
+    report = {final_path, scene.objects.size(), copied_assets,
+              cooked_textures, managed_files};
     if (error) error->clear();
     return true;
 }
