@@ -47,3 +47,16 @@ add_executable(NEnginePlayerTests player_tests.cpp)
 target_link_libraries(NEnginePlayerTests PRIVATE NEnginePlayerKit)
 target_compile_features(NEnginePlayerTests PRIVATE cxx_std_20)
 add_test(NAME NEnginePlayerTests COMMAND NEnginePlayerTests)
+
+if(TARGET NEnginePlayerBuild AND TARGET NEnginePlayer)
+  add_executable(NEnginePlayerCLIFixture player_cli_fixture.cpp)
+  target_link_libraries(NEnginePlayerCLIFixture PRIVATE NEngineCore NEngineEditorModel)
+  target_compile_features(NEnginePlayerCLIFixture PRIVATE cxx_std_20)
+  add_test(NAME NEnginePlayerCLIIntegration COMMAND
+    ${CMAKE_COMMAND}
+    "-DFIXTURE=$<TARGET_FILE:NEnginePlayerCLIFixture>"
+    "-DBUILDER=$<TARGET_FILE:NEnginePlayerBuild>"
+    "-DPLAYER=$<TARGET_FILE:NEnginePlayer>"
+    "-DTEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/player_cli_bundle"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/player_cli_smoke.cmake")
+endif()
