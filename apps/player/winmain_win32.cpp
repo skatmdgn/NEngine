@@ -9,6 +9,8 @@
 #include "nengine/player/runtime.hpp"
 #include "nengine/render/vulkan_context.hpp"
 #include "nengine/render/vulkan_diagnostic_scene.hpp"
+#include "nengine/audio/audio_device.hpp"
+#include "nengine/audio/mix_snapshot.hpp"
 
 namespace {
 std::filesystem::path executable_directory() {
@@ -48,6 +50,14 @@ int run() {
     if (!scene.initialize(renderer)) {
         message(scene.diagnostic()); return 6;
     }
+    nengine::audio::AudioOutputDevice audio_device;
+    std::string audio_error;
+    bool audio_ready = audio_device.open(&audio_error);
+    if (!audio_ready)
+        OutputDebugStringA(
+            ("NEngine Player: audio device unavailable: " +
+             audio_error + "\n").c_str());
+
     std::uint32_t old_width = window.client_width();
     std::uint32_t old_height = window.client_height();
     auto last_frame = std::chrono::steady_clock::now();
@@ -58,6 +68,22 @@ int run() {
         // The stand-alone Player World advances independently of Editor Play.
         // PlayerRuntime limits large frame stalls to eight fixed steps.
         runtime.advance(delta);
+        if (audio_ready) {
+            const auto mix = nengine::audio::build_mix_snapshot(runtime.world());
+            std::string pump_error;
+            audio_device.pump(mix,
+                [&runtime](nengine::assets::AssetGuid guid)
+                    -> const nengine::audio::AudioClipData* {
+                    return runtime.audio_clip(guid);
+                }, &pump_error);
+            if (!pump_error.empty()) {
+                OutputDebugStringA(
+                    ("NEngine Player: audio stream error: " +
+                     pump_error + "\n").c_str());
+                audio_device.close();
+                audio_ready = false;
+            }
+        }
         const auto width = window.client_width();
         const auto height = window.client_height();
         if (width != old_width || height != old_height) {
@@ -71,6 +97,7 @@ int run() {
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
+    audio_device.close();
     scene.shutdown();
     renderer.shutdown();
     return 0;
