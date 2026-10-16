@@ -137,8 +137,6 @@ private:
     std::vector<Slot> slots_{};
     std::vector<std::uint32_t> free_indices_{};
     std::size_t alive_count_{0};
-    // Monotonic generation issuance invalidates handles across clear/reload.
-    std::uint64_t next_generation_{0};
     std::unordered_map<ComponentTypeId, std::unique_ptr<ComponentPoolBase>> component_pools_{};
 };
 
