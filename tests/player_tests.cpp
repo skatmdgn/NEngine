@@ -10,6 +10,7 @@
 #include "nengine/player/bundle.hpp"
 #include "nengine/player/exporter.hpp"
 #include "nengine/player/runtime.hpp"
+#include "nengine/player/managed_properties.hpp"
 #include "nengine/core/scene.hpp"
 #include "nengine/render/components.hpp"
 #include "nengine/render/registration.hpp"
@@ -209,6 +210,32 @@ int main() {
                     entity, nengine::audio::audio_source_type()) != nullptr;
     }
     if (!restored_camera || !restored_body) return test_failure(24, __LINE__);
+    const auto first_entity = runtime.world().entities().front();
+    nengine::core::PropertyValue property;
+    if (!read_player_transform_property(
+            runtime.world(), first_entity, "NEngine.Transform",
+            "Local Position", property) ||
+        !std::holds_alternative<nengine::core::Vec3>(property))
+        return test_failure(50, __LINE__);
+    if (!write_player_transform_property(
+            runtime.world(), first_entity, "NEngine.Transform",
+            "Local Position", nengine::core::Vec3{3, 4, 5}) ||
+        !read_player_transform_property(
+            runtime.world(), first_entity, "NEngine.Transform",
+            "Local Position", property) ||
+        std::get<nengine::core::Vec3>(property).x != 3.f)
+        return test_failure(51, __LINE__);
+    if (write_player_transform_property(
+            runtime.world(), first_entity, "NEngine.Transform",
+            "Local Position", nengine::core::Vec3{
+                std::numeric_limits<float>::infinity(), 0, 0}) ||
+        write_player_transform_property(
+            runtime.world(), first_entity, "NEngine.Transform",
+            "Unknown", nengine::core::Vec3{0, 0, 0}) ||
+        write_player_transform_property(
+            runtime.world(), first_entity, "NEngine.Unknown",
+            "Local Scale", nengine::core::Vec3{1, 1, 1}))
+        return test_failure(52, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto cooked_model = runtime.assets().cooked_artifacts(model_guid);
     const auto cooked_material = runtime.assets().cooked_artifacts(material_guid);
