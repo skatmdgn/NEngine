@@ -1,5 +1,8 @@
 #include "nengine/player/assets.hpp"
 #include <filesystem>
+#include <fstream>
+#include <vector>
+#include <cstdint>
 #include <utility>
 namespace nengine::player {
 bool PlayerAssets::open(const std::filesystem::path& bundle_root,
@@ -47,4 +50,27 @@ std::optional<std::filesystem::path> PlayerAssets::source(
     if (error) error->clear();
     return path;
 }
+std::optional<audio::AudioClipData> PlayerAssets::load_wav(
+    assets::AssetGuid guid, std::string* error) const {
+    const auto path = source(guid, error);
+    if (!path || path->extension() != ".wav") return std::nullopt;
+    std::ifstream stream(*path, std::ios::binary | std::ios::ate);
+    if (!stream) return std::nullopt;
+    const auto bytes = stream.tellg();
+    if (bytes < 44 || bytes > 64 * 1024 * 1024) {
+        if (error) *error = "WAV asset exceeds supported decode limit";
+        return std::nullopt;
+    }
+    std::vector<std::uint8_t> buffer(static_cast<std::size_t>(bytes));
+    stream.seekg(0);
+    if (!stream.read(reinterpret_cast<char*>(buffer.data()),
+                     static_cast<std::streamsize>(buffer.size())))
+        return std::nullopt;
+    audio::AudioClipData result;
+    if (!audio::decode_wav(buffer, result, error))
+        return std::nullopt;
+    if (error) error->clear();
+    return result;
+}
+
 } // namespace nengine::player

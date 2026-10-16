@@ -1,3 +1,5 @@
+#include <array>
+#include <cstdint>
 #include <cmath>
 #include <limits>
 #include <filesystem>
@@ -78,6 +80,18 @@ int main() {
       meta << "NENGINE_META 1\nGUID " << texture_guid.to_string()
            << "\nIMPORTER " << std::quoted(std::string("NEngine.Texture"))
            << "\nEND_META\n"; }
+    std::filesystem::create_directories(project / "Assets" / "Sounds");
+    const auto wav_guid = nengine::assets::AssetGuid::generate();
+    { const std::array<std::uint8_t, 46> wav{
+        'R','I','F','F',38,0,0,0,'W','A','V','E','f','m','t',' ',
+        16,0,0,0,1,0,1,0,64,31,0,0,128,62,0,0,
+        2,0,16,0,'d','a','t','a',2,0,0,0,0,0};
+      std::ofstream file(project / "Assets" / "Sounds" / "ping.wav", std::ios::binary);
+      file.write(reinterpret_cast<const char*>(wav.data()), wav.size()); }
+    { std::ofstream meta(project / "Assets" / "Sounds" / "ping.wav.meta");
+      meta << "NENGINE_META 1\nGUID " << wav_guid.to_string()
+           << "\nIMPORTER " << std::quoted(std::string("NEngine.Audio"))
+           << "\nEND_META\n"; }
     { std::ofstream file(project / "Assets" / "Textures" / "ignore.cs");
       file << "do not ship source code"; }
     ExportSettings settings;
@@ -121,6 +135,9 @@ int main() {
                     entity, nengine::audio::audio_source_type()) != nullptr;
     }
     if (!restored_camera || !restored_body) return 24;
+    const auto decoded_ping = runtime.assets().load_wav(wav_guid);
+    if (!decoded_ping || decoded_ping->sample_rate != 8000 ||
+        decoded_ping->frame_count() != 1u) return 31;
     if (runtime.advance(std::numeric_limits<float>::quiet_NaN()).physics_steps ||
         runtime.advance(0.f).physics_steps ||
         runtime.advance(1.f / 120.f).physics_steps != 0)
