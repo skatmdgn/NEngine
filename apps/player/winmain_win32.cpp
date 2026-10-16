@@ -80,7 +80,9 @@ int run() {
         // Win32 polling here is intentionally separate from Editor input.
         runtime.begin_input_frame();
         auto& input = runtime.input();
-        const bool focused = GetForegroundWindow() == window.native_handle();
+        const HWND native_window =
+            static_cast<HWND>(window.native_handle());
+        const bool focused = GetForegroundWindow() == native_window;
         const auto down = [focused](int virtual_key) {
             return focused && (GetAsyncKeyState(virtual_key) & 0x8000) != 0;
         };
@@ -108,7 +110,7 @@ int run() {
             input.set_key(key, down(virtual_key));
         POINT pointer{};
         if (focused && GetCursorPos(&pointer) &&
-            ScreenToClient(window.native_handle(), &pointer))
+            ScreenToClient(native_window, &pointer))
             input.set_pointer_position(
                 static_cast<float>(pointer.x),
                 static_cast<float>(pointer.y));
