@@ -167,6 +167,19 @@ int main() {
         !std::filesystem::exists(
             report.bundle_root / "Content" / "Main.nscene"))
         return test_failure(8, __LINE__);
+    // Data-only exports still need a valid empty catalog for PlayerRuntime.
+    ExportSettings no_assets = settings;
+    no_assets.copy_supported_assets = false;
+    no_assets.destination = export_base / "EmptyAssetCatalog";
+    ExportReport no_assets_report;
+    PlayerRuntime no_assets_runtime;
+    if (!export_player_data(no_assets, no_assets_report, &error) ||
+        !std::filesystem::is_directory(
+            no_assets_report.bundle_root / "Content" / "Assets") ||
+        !no_assets_runtime.load(no_assets_report.bundle_root, &error) ||
+        !no_assets_runtime.ready() ||
+        no_assets_runtime.entity_count() != 2u)
+        return test_failure(55, __LINE__);
     BundleManifest built;
     if (!load_bundle(report.bundle_root / "NEngine.player", built, &error) ||
         built.title != settings.title ||

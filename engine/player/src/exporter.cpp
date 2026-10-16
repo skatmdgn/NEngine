@@ -85,6 +85,9 @@ bool export_player_data(const ExportSettings& settings,
         source, staging / "Content" / "Main.nscene",
         std::filesystem::copy_options::none, ec);
     if (ec) { cleanup(); return fail(error, "cannot copy player startup Scene"); }
+    // Even a data-only/empty-asset bundle needs a valid empty catalog.
+    std::filesystem::create_directories(staging / "Content" / "Assets", ec);
+    if (ec) { cleanup(); return fail(error, "cannot stage empty asset catalog"); }
     std::size_t copied_assets = 0;
     if (settings.copy_supported_assets) {
         const auto assets_root = root / "Assets";
