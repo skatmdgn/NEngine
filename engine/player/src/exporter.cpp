@@ -99,8 +99,8 @@ bool export_player_data(const ExportSettings& settings,
             constexpr std::uintmax_t max_total = 1024ull * 1024 * 1024;
             constexpr std::uintmax_t max_file = 512ull * 1024 * 1024;
             std::uintmax_t total = 0;
-            const std::array<std::string_view, 21> extensions{
-                ".meta", ".nscene", ".ncanvas", ".nanim", ".nanimctrl",
+            const std::array<std::string_view, 22> extensions{
+                ".meta", ".nscene", ".ncanvas", ".nanim", ".nspriteanim", ".nanimctrl",
                 ".nmat", ".glb", ".gltf", ".bin", ".png",
                 ".jpg", ".jpeg", ".bmp", ".tga", ".webp",
                 ".wav", ".ogg", ".mp3", ".flac", ".obj", ".mtl"};

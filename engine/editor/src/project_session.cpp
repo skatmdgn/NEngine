@@ -94,7 +94,7 @@ void ProjectSession::register_builtin_importers() {
 
     importers_.register_importer({
         "NEngine.SpriteAnimation", 1,
-        {".nspriteanim"},
+        {".nanim", ".nspriteanim"},
         false
     });
 

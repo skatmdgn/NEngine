@@ -87,7 +87,8 @@ std::optional<render::AnimationController> PlayerAssets::load_controller(
 std::optional<render::SpriteAnimationClip> PlayerAssets::load_sprite_clip(
     assets::AssetGuid guid, std::string* error) const {
     const auto path = source(guid, error);
-    if (!path || path->extension() != ".nanim") return std::nullopt;
+    if (!path || (path->extension() != ".nanim" &&
+                  path->extension() != ".nspriteanim")) return std::nullopt;
     std::error_code ec;
     const auto bytes = std::filesystem::file_size(*path, ec);
     if (ec || bytes > 4u * 1024u * 1024u) {
