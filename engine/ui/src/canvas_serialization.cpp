@@ -84,9 +84,11 @@ bool read_canvas(
     // A widget record must fit on a single reasonably sized line;
     // bounded reads prevent hostile .ncanvas sources from allocating an
     // unbounded quoted string before validation.
-    std::string header_tail;
-    std::getline(input, header_tail);
-    if (header_tail.find_first_not_of(" \t\r") != std::string::npos)
+    std::array<char, 256> header_tail{};
+    if (!input.getline(header_tail.data(),
+            static_cast<std::streamsize>(header_tail.size())))
+        return fail(error, "Canvas header line too large or truncated");
+    if (std::string_view(header_tail.data()).find_first_not_of(" \\t\\r") != std::string_view::npos)
         return fail(error, "invalid Canvas header trailing data");
 
     UiCanvas candidate;
