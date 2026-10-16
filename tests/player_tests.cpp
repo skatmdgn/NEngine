@@ -98,6 +98,21 @@ int main() {
       meta << "NENGINE_META 1\nGUID " << texture_guid.to_string()
            << "\nIMPORTER " << std::quoted(std::string("NEngine.Texture"))
            << "\nEND_META\n"; }
+    const auto material_guid = nengine::assets::AssetGuid::generate();
+    const auto model_guid = nengine::assets::AssetGuid::generate();
+    std::filesystem::create_directories(project / "Assets" / "Materials");
+    { std::ofstream file(project / "Assets" / "Materials" / "default.nmat");
+      file << "NENGINE_MATERIAL 1\nBASE_COLOR_TEXTURE "
+           << std::quoted(texture_guid.to_string()) << "\nEND_MATERIAL\n"; }
+    { std::ofstream meta(project / "Assets" / "Materials" / "default.nmat.meta");
+      meta << "NENGINE_META 1\nGUID " << material_guid.to_string()
+           << "\nIMPORTER \"NEngine.Material\"\nEND_META\n"; }
+    std::filesystem::create_directories(project / "Assets" / "Models");
+    { std::ofstream file(project / "Assets" / "Models" / "triangle.obj");
+      file << "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"; }
+    { std::ofstream meta(project / "Assets" / "Models" / "triangle.obj.meta");
+      meta << "NENGINE_META 1\nGUID " << model_guid.to_string()
+           << "\nIMPORTER \"NEngine.Model\"\nEND_META\n"; }
     std::filesystem::create_directories(project / "Assets" / "Animations");
     { std::ofstream file(project / "Assets" / "Animations" / "walk.nanim");
       file << "NENGINE_SPRITE_ANIMATION 1\nFRAMES 2\n"
@@ -142,6 +157,8 @@ int main() {
         report.scene_objects != 2u ||
         report.copied_assets < 2u ||
         report.cooked_textures < 1u ||
+        report.cooked_materials != 1u ||
+        report.cooked_models != 1u ||
         !std::filesystem::exists(
             report.bundle_root / "Content" / "Assets" / "Textures" / "hero.png") ||
         std::filesystem::exists(
@@ -180,6 +197,14 @@ int main() {
     }
     if (!restored_camera || !restored_body) return test_failure(24, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
+    const auto cooked_model = runtime.assets().cooked_artifacts(model_guid);
+    const auto cooked_material = runtime.assets().cooked_artifacts(material_guid);
+    if (!cooked_model || cooked_model->importer_id != "NEngine.Model" ||
+        cooked_model->artifacts.size() < 2u ||
+        cooked_model->artifacts[1].role != "model-descriptor" ||
+        !cooked_material || cooked_material->artifacts.size() != 1u ||
+        cooked_material->importer_id != "NEngine.Material")
+        return test_failure(45, __LINE__);
     const auto cooked_texture = runtime.assets().cooked_artifacts(texture_guid);
     if (!cooked_texture || cooked_texture->artifacts.size() != 2u ||
         cooked_texture->artifacts[0].role != "source" ||
