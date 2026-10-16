@@ -57,3 +57,17 @@ The Windows Player now drives `PlayerRuntime::advance(delta_seconds)` from the s
 For testing, the `NEnginePlayerTests` target includes an exported Camera, SpriteRenderer/SpriteAnimator controller, Rigidbody2D, AudioSource and ScriptBehaviour Scene. It verifies GUID-based loading, WAV clocks, animation transitions, fixed physics substeps, pause, invalid manifest recovery and atomic export. The CI `NEnginePlayerCLIIntegration` performs independent builder -> packaged Player smoke coverage (headless on Linux; Windows package files checked but hardware rendering not exercised).
 
 **Not yet a shippable ordinary game:** Player C# gameplay/managed physics callbacks are not running; GPU texture and mesh assets need a cooked-artifact resolver; UI Canvas is not yet presented through the Vulkan Player; there is no full audio streaming or Android Player build. Manual Windows GPU/WASAPI acceptance remains separate from successful automated builds.
+
+## Windows Player cooked textures and optional managed gameplay
+
+Player export cooks recognized project textures (.png/.jpg/.jpeg/.bmp/.tga/.webp) into `Content/Cooked/<AssetGuid>/` using the existing native texture importer. A read-only Player asset resolver supplies cooked texture descriptors and staged sources to the Vulkan World renderer, including SpriteRenderer texture GUIDs. This does not yet guarantee arbitrary model/material import or a textured sprite on untested GPUs; imported model/material asset cooking is a separate milestone.
+
+To include **prebuilt** .NET C# gameplay, use the optional fourth CLI argument (the third remains the Player executable path):
+
+```powershell
+NEnginePlayerBuild.exe "C:\\MyProject" "C:\\MyExports\\Game" "C:\\Build\\NEnginePlayer.exe" "C:\\MyManagedBuild"
+```
+
+The managed build folder must contain `GameScripts.dll`, `GameScripts.runtimeconfig.json`, `NEngine.Bridge.dll`, and `NEngine.API.dll`. The exporter copies only these plus optional `GameScripts.deps.json` and `GameScripts.pdb`; it never includes C# source files or arbitrary plugins. On Windows, if `Content/Managed/GameScripts.dll` is present the Player looks for a compatible installed .NET hostfxr and initializes NEngine's existing managed bridge, running ScriptBehaviour FixedUpdate, Update/LateUpdate and 2D/3D contact event callbacks. Startup fails visibly if packaged C# runtime files exist but cannot be initialized. Without a DLL, native physics/animation/WAV playback still work, while ScriptBehaviour execution is unavailable.
+
+This is **not** a bundled .NET redistributable, NuGet dependency resolver, complete Vulkan model cooker, full runtime Canvas renderer, or Android APK/AAB pipeline. Use real Windows hardware and .NET 8 for manual Player acceptance; successful CI builds verify C++ integration and packaging tests, not live managed gameplay or GPU presentation.

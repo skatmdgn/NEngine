@@ -290,6 +290,11 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Packaged .nanim clip frame sampling and SpriteRenderer texture switching in Player
 - [x] Packaged .nanimctrl sprite state machine runtime, boolean transitions and speed switching
 - [x] Portable Player integration tests for asset GUIDs, audio timing, sprite transitions and pause semantics
+- [x] Export-time GUID-keyed texture cooking and Player Vulkan sprite texture artifact resolver
+- [x] Optional managed .NET GameScripts + NEngine.Bridge/NEngine.API DLL bundling with strict allowlist
+- [x] Standalone Player hostfxr managed startup, ScriptBehaviour FixedUpdate/Update/LateUpdate
+- [x] Standalone Player 2D/3D collision event forwarding into managed scripts
+- [x] Packaged managed payload validation and cooked texture regression tests
 - [ ] Windows Player exporter (complete gameplay runtime, cooked assets, production QA)
 - [ ] Android APK/AAB exporter
 - [ ] side-by-side Android toolchain profiles
