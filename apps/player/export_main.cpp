@@ -13,9 +13,9 @@ int wmain(int argc, wchar_t** argv) {
 #else
 int main(int argc, char** argv) {
 #endif
-    if (argc < 3 || argc > 4) {
+    if (argc < 3 || argc > 5) {
         std::cerr << "Usage: NEnginePlayerBuild <project-root> <destination>"
-                     " [player-executable]\n";
+                     " [player-executable] [managed-build-directory]\n";
         return 2;
     }
     const std::filesystem::path project{argv[1]};
@@ -38,7 +38,7 @@ int main(int argc, char** argv) {
     settings.startup_scene = project_manifest.startup_scene;
     settings.destination = destination;
     settings.title = project_manifest.name;
-    if (argc == 4) {
+    if (argc >= 4) {
         settings.player_executable = std::filesystem::path(argv[3]);
     } else {
 #if defined(_WIN32)
@@ -60,12 +60,16 @@ int main(int argc, char** argv) {
 #endif
         settings.player_executable = std::move(executable);
     }
+    if (argc == 5)
+        settings.managed_directory = std::filesystem::path(argv[4]);
     nengine::player::ExportReport result;
     if (!nengine::player::export_player_data(settings, result, &error)) {
         std::cerr << "Player export failed: " << error << "\n";
         return 5;
     }
     std::cout << "Player bundle ready: " << result.bundle_root.string()
-              << " (" << result.scene_objects << " scene objects)\n";
+              << " (" << result.scene_objects << " scene objects, "
+              << result.cooked_textures << " cooked textures, "
+              << result.managed_files << " managed files)\n";
     return 0;
 }
