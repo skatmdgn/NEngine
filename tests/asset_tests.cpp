@@ -737,6 +737,9 @@ int main() {
             stale_artifact_path),
         "reimport removes artifacts no longer referenced by root/subasset manifest while retaining current files");
 
+    check(read_all(root / "OutsideCache" / "victim.bin") == "do-not-delete",
+          "cache cleanup never deletes an external file through a symlink");
+
     write_file(
         scene,
         "scene-data-changed");
