@@ -31,6 +31,43 @@ int main() {
     check(world.size() == 2, "create increments size");
     check(world.is_alive(parent), "new entity is alive");
     check(world.name(child) == "Child", "name roundtrip");
+    {
+        World reuse;
+        const auto stale_handle = reuse.create("BeforeClear");
+        reuse.clear();
+        const auto after_clear = reuse.create("AfterClear");
+        check(after_clear.valid() && stale_handle != after_clear &&
+                  !reuse.is_alive(stale_handle) && reuse.is_alive(after_clear),
+              "World clear never revalidates a stale entity handle");
+
+        const auto removed = after_clear;
+        check(reuse.destroy(after_clear), "World destroy after clear works");
+        const auto after_destroy = reuse.create("AfterDestroy");
+        check(after_destroy.valid() && after_destroy != removed &&
+                  !reuse.is_alive(removed) && !reuse.is_alive(stale_handle),
+              "slot reuse and multiple clear generations remain distinct");
+        World loaded_world;
+        const auto new_scene_entity = loaded_world.create("LoadedScene");
+        World destination_world;
+        const auto obsolete = destination_world.create("PreviousScene");
+        destination_world = std::move(loaded_world);
+        check(new_scene_entity.valid() &&
+                  destination_world.is_alive(new_scene_entity) &&
+                  !destination_world.is_alive(obsolete) &&
+                  obsolete != new_scene_entity,
+              "World replacement cannot revive handles from previous Scene");
+
+
+        World bad_hierarchy;
+        const auto first = bad_hierarchy.create("First");
+        const auto second = bad_hierarchy.create("Second");
+        const auto unrelated = bad_hierarchy.create("Unrelated");
+        bad_hierarchy.transform(first)->parent = second;
+        bad_hierarchy.transform(second)->parent = first;
+        check(!bad_hierarchy.set_parent(unrelated, first),
+              "preexisting malformed parent cycle cannot hang set_parent");
+    }
+
 
     check(world.set_parent(child, parent), "valid parenting succeeds");
     check(world.transform(child)->parent == parent, "parent stored");
