@@ -41,7 +41,7 @@ jobs:
           echo "=== NENGINE_PBR_FRAGMENT_SPIRV_END ==="
 
       - name: Configure
-        run: cmake -S . -B build -DNENGINE_BUILD_TESTS=ON -DNENGINE_BUILD_EDITOR=ON
+        run: cmake -S . -B build -DNENGINE_BUILD_TESTS=ON -DNENGINE_BUILD_EDITOR=ON -DNENGINE_BUILD_PLAYER=ON
 
       - name: Build
         run: cmake --build build --config Release
@@ -55,4 +55,14 @@ jobs:
         with:
           name: NEngineEditor-windows-x64
           path: build/apps/editor/Release/NEngineEditor.exe
+          if-no-files-found: error
+
+      - name: Upload Windows Player bootstrap and exporter
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEnginePlayerBootstrap-windows-x64
+          path: |
+            build/apps/player/Release/NEnginePlayer.exe
+            build/apps/player/Release/NEnginePlayerBuild.exe
           if-no-files-found: error
