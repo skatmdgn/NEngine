@@ -40,6 +40,11 @@ int main() {
     auto scene = nengine::core::SceneSerializer::capture(world, "Main");
     if (!nengine::core::SceneSerializer::save_file(
         scene, project / "Assets" / "Scenes" / "Main.nscene")) return 7;
+    std::filesystem::create_directories(project / "Assets" / "Textures");
+    { std::ofstream file(project / "Assets" / "Textures" / "hero.png");
+      file << "texture test bytes"; }
+    { std::ofstream file(project / "Assets" / "Textures" / "ignore.cs");
+      file << "do not ship source code"; }
     ExportSettings settings;
     settings.project_root = project;
     settings.startup_scene = "Assets/Scenes/Main.nscene";
@@ -48,6 +53,11 @@ int main() {
     ExportReport report;
     if (!export_player_data(settings, report, &error) ||
         report.scene_objects != 2u ||
+        report.copied_assets < 2u ||
+        !std::filesystem::exists(
+            report.bundle_root / "Content" / "Assets" / "Textures" / "hero.png") ||
+        std::filesystem::exists(
+            report.bundle_root / "Content" / "Assets" / "Textures" / "ignore.cs") ||
         !std::filesystem::exists(
             report.bundle_root / "Content" / "Main.nscene"))
         return 8;

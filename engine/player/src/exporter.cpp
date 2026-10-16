@@ -2,6 +2,8 @@
 #include "nengine/player/bundle.hpp"
 #include "nengine/core/scene.hpp"
 #include <chrono>
+#include <array>
+#include <algorithm>
 #include <filesystem>
 #include <string>
 #include <utility>
@@ -80,6 +82,72 @@ bool export_player_data(const ExportSettings& settings,
         source, staging / "Content" / "Main.nscene",
         std::filesystem::copy_options::none, ec);
     if (ec) { cleanup(); return fail(error, "cannot copy player startup Scene"); }
+    std::size_t copied_assets = 0;
+    if (settings.copy_supported_assets) {
+        const auto assets_root = root / "Assets";
+        if (std::filesystem::is_symlink(assets_root, ec) || ec) {
+            cleanup();
+            return fail(error, "project Assets directory must not be a symlink");
+        }
+        if (std::filesystem::exists(assets_root)) {
+            const auto asset_target = staging / "Content" / "Assets";
+            std::filesystem::create_directory(asset_target, ec);
+            if (ec) {
+                cleanup();
+                return fail(error, "cannot stage player Assets directory");
+            }
+            constexpr std::uintmax_t max_total = 1024ull * 1024 * 1024;
+            constexpr std::uintmax_t max_file = 512ull * 1024 * 1024;
+            std::uintmax_t total = 0;
+            const std::array<std::string_view, 21> extensions{
+                ".meta", ".nscene", ".ncanvas", ".nanim", ".nanimctrl",
+                ".nmat", ".glb", ".gltf", ".bin", ".png",
+                ".jpg", ".jpeg", ".bmp", ".tga", ".webp",
+                ".wav", ".ogg", ".mp3", ".flac", ".obj", ".mtl"};
+            for (std::filesystem::recursive_directory_iterator it(
+                     assets_root, ec), end; it != end && !ec;
+                     it.increment(ec)) {
+                if (it->is_symlink(ec) || ec) {
+                    cleanup();
+                    return fail(error, "project Assets contain a symlink");
+                }
+                if (it->is_directory(ec)) continue;
+                if (ec || !it->is_regular_file(ec)) {
+                    cleanup();
+                    return fail(error, "invalid asset source file");
+                }
+                const auto source_path = it->path();
+                const auto ext = source_path.extension().string();
+                if (std::find(extensions.begin(), extensions.end(), ext) ==
+                    extensions.end()) continue;
+                const auto bytes = it->file_size(ec);
+                if (ec || bytes > max_file || total > max_total - bytes ||
+                    copied_assets >= 20000) {
+                    cleanup();
+                    return fail(error, "player assets exceed safe export limits");
+                }
+                total += bytes;
+                const auto relative = source_path.lexically_relative(assets_root);
+                const auto target = asset_target / relative;
+                std::filesystem::create_directories(target.parent_path(), ec);
+                if (ec) {
+                    cleanup();
+                    return fail(error, "cannot create staged asset directory");
+                }
+                std::filesystem::copy_file(source_path, target,
+                    std::filesystem::copy_options::none, ec);
+                if (ec) {
+                    cleanup();
+                    return fail(error, "cannot stage player asset");
+                }
+                ++copied_assets;
+            }
+            if (ec) {
+                cleanup();
+                return fail(error, "failed to enumerate project assets");
+            }
+        }
+    }
     if (!settings.player_executable.empty()) {
         const auto executable = std::filesystem::canonical(
             settings.player_executable, ec);
@@ -104,7 +172,7 @@ bool export_player_data(const ExportSettings& settings,
     }
     std::filesystem::rename(staging, final_path, ec);
     if (ec) { cleanup(); return fail(error, "cannot atomically finish player bundle"); }
-    report = {final_path, scene.objects.size()};
+    report = {final_path, scene.objects.size(), copied_assets};
     if (error) error->clear();
     return true;
 }

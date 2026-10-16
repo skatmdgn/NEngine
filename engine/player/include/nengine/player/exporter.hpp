@@ -12,6 +12,7 @@ struct ExportSettings {
     // Host-platform standalone Player binary staged with the game data.
     // Leave empty for data-only bundle generation in tests/tools.
     std::filesystem::path player_executable{};
+    bool copy_supported_assets{true};
     std::string title{"NEngine Game"};
     std::uint32_t width{1280};
     std::uint32_t height{720};
@@ -20,6 +21,7 @@ struct ExportSettings {
 struct ExportReport {
     std::filesystem::path bundle_root{};
     std::size_t scene_objects{0};
+    std::size_t copied_assets{0};
 };
 
 // Produces a validated DATA bundle. The Player executable will be bundled
