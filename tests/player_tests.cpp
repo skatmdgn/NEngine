@@ -274,7 +274,31 @@ int main() {
     settings.player_executable = root / "missing-executable";
     if (export_player_data(settings, report, &error) ||
         std::filesystem::exists(settings.destination)) return test_failure(17, __LINE__);
+    const auto managed_dir = root / "ManagedTest";
+    std::filesystem::create_directory(managed_dir);
+    for (const auto& filename : {"GameScripts.dll",
+                                  "GameScripts.runtimeconfig.json",
+                                  "NEngine.Bridge.dll", "NEngine.API.dll"}) {
+        std::ofstream dll(managed_dir / filename);
+        dll << "fixture";
+    }
+    { std::ofstream dll(managed_dir / "Unsafe.cs"); dll << "do not ship"; }
     settings.player_executable.clear();
+    settings.managed_directory = managed_dir;
+    settings.destination = export_base / "ManagedBuild";
+    if (!export_player_data(settings, report, &error) ||
+        report.managed_files != 4u ||
+        !std::filesystem::is_regular_file(report.bundle_root / "Content" /
+                                           "Managed" / "NEngine.Bridge.dll") ||
+        std::filesystem::exists(report.bundle_root / "Content" /
+                                "Managed" / "Unsafe.cs"))
+        return test_failure(42, __LINE__);
+    std::filesystem::remove(managed_dir / "NEngine.Bridge.dll");
+    settings.destination = export_base / "BrokenManaged";
+    if (export_player_data(settings, report, &error) ||
+        std::filesystem::exists(settings.destination))
+        return test_failure(43, __LINE__);
+    settings.managed_directory.clear();
     settings.destination = export_base / "Build";
     if (export_player_data(settings, report, &error)) return test_failure(10, __LINE__);
     settings.destination = project / "BadExport";
