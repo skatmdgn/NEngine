@@ -171,7 +171,6 @@ void PlayerRuntime::unload() noexcept {
     audio_playback_.reset();
     physics_cache_.clear();
     contact_tracker_.clear();
-    contact_tracker_.clear();
     accumulator_ = 0.0;
     elapsed_seconds_ = 0.0;
     ready_ = false;
@@ -246,6 +245,7 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
     sprite_controllers_ = std::move(next_controllers);
     audio_playback_.reset();
     physics_cache_.clear();
+    contact_tracker_.clear();
     accumulator_ = 0.0;
     elapsed_seconds_ = 0.0;
     manifest_ = std::move(manifest);

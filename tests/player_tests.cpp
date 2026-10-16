@@ -159,6 +159,11 @@ int main() {
         !runtime.ready() || runtime.entity_count() != 2u ||
         runtime.pending_script_count() != 1u ||
         !runtime.assets().source(texture_guid)) return test_failure(13, __LINE__);
+    if (runtime.managed_ready() ||
+        runtime.initialize_managed(&error) ||
+        !runtime.ready() || runtime.entity_count() != 2u ||
+        runtime.managed_ready())
+        return test_failure(44, __LINE__);
     bool restored_camera = false;
     bool restored_body = false;
     for (const auto entity : runtime.world().entities()) {
