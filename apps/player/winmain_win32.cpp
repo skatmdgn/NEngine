@@ -32,9 +32,19 @@ int run() {
     std::string error;
     if (!runtime.load(root, &error)) { message(error); return 3; }
 
-    if (runtime.pending_script_count())
-        OutputDebugStringA("NEngine Player: ScriptBehaviour components loaded"
-                           " but managed gameplay hosting is not yet attached.\n");
+    const auto gameplay_path =
+        root / "Content" / "Managed" / "GameScripts.dll";
+    if (std::filesystem::is_regular_file(gameplay_path)) {
+        std::string script_error;
+        if (!runtime.initialize_managed(&script_error)) {
+            message("C# gameplay host failed: " + script_error);
+            return 8;
+        }
+        OutputDebugStringA("NEngine Player: managed C# gameplay initialized.\n");
+    } else if (runtime.pending_script_count()) {
+        OutputDebugStringA("NEngine Player: ScriptBehaviours present without"
+                           " packaged GameScripts.dll; managed gameplay disabled.\n");
+    }
     const auto& config = runtime.manifest();
     nengine::platform::Window window({
         config.title, config.width, config.height, true});
