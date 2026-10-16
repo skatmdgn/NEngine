@@ -1,3 +1,9 @@
+## Windows Player continuation — model/material cooking and managed input/queries
+
+A fifteen-chunk milestone extends standalone Player export to versioned, GUID-addressed .nmat materials and GLB/glTF/OBJ model source/descriptor artifacts. Built-in model imports stage supported relative external sidecars; unresolved or unsafe references abort export and remove the staged output. The Vulkan World resolver now receives model/material roles in addition to texture roles. Automatic generated glTF PBR material subassets are **not** shipped yet: this is source/descriptor-level model cooking, not full imported-material parity.
+
+Standalone Player InputState is now driven by focused Win32 keyboard and pointer polling, bound to the optional managed API and tested for pressed/held/released transitions. Player C# callbacks include 2D/3D raycasts, overlaps, and box casts plus finite-validated native property read/write for Transform, Rigidbody2D and AudioSource. Other component properties and action-map bindings remain to be completed. CI includes model/material package fixtures and invalid glTF sidecar regression tests; interactive .NET and GPU validation still require a real Windows computer.
+
 # Current state
 
 Version: 0.5.0-dev

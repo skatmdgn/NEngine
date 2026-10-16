@@ -1,3 +1,16 @@
+### Player milestone: exported geometry and managed gameplay access
+
+- [x] Export-time raw model + metadata cooking for GLB, glTF, OBJ with collected sidecars
+- [x] GUID-based Vulkan model descriptor/source/sidecar and .nmat material resolver
+- [x] Reject missing glTF sidecars before atomic export publishes game bundle
+- [x] Native Player Win32 keyboard and mouse input state with managed binding
+- [x] Managed 2D/3D raycast, overlap, box cast callbacks in independent Player
+- [x] Managed Transform, Rigidbody2D and AudioSource property bridge with finite validation
+- [ ] Full imported model generated material and texture subasset cooking
+- [ ] Production Windows GPU + .NET runtime + game input hardware acceptance
+- [ ] Full Player input action map and parity for all managed component properties
+
+
 # Roadmap
 
 Roadmap entries are implementation order, not promises tied to dates.
