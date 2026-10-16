@@ -184,6 +184,27 @@ bool export_player_data(const ExportSettings& settings,
             ++cooked_textures;
         }
     }
+    std::size_t cooked_materials = 0;
+    if (settings.copy_supported_assets) {
+        const auto packaged = staging / "Content" / "Assets";
+        assets::AssetDatabase db(packaged);
+        db.scan(false);
+        const assets::ImporterDescriptor descriptor{
+            "NEngine.Material", 1, {".nmat"}, false};
+        for (const auto& record : db.records()) {
+            if (record.source_path.extension() != ".nmat") continue;
+            const auto folder = staging / "Content" / "Cooked" /
+                record.guid.to_string();
+            std::filesystem::create_directories(folder, ec);
+            if (ec) { cleanup(); return fail(error, "cannot create material cook directory"); }
+            const assets::ImportContext context{&record, &descriptor, folder};
+            const auto cooked = assets::material_source_importer(context);
+            if (!cooked.success) {
+                cleanup(); return fail(error, "invalid Player material: " + cooked.message);
+            }
+            ++cooked_materials;
+        }
+    }
     std::size_t managed_files = 0;
     if (!settings.managed_directory.empty()) {
         // Managed binaries are opt-in: never ship source code or arbitrary
@@ -253,7 +274,7 @@ bool export_player_data(const ExportSettings& settings,
     std::filesystem::rename(staging, final_path, ec);
     if (ec) { cleanup(); return fail(error, "cannot atomically finish player bundle"); }
     report = {final_path, scene.objects.size(), copied_assets,
-              cooked_textures, managed_files};
+              cooked_textures, cooked_materials, managed_files};
     if (error) error->clear();
     return true;
 }
