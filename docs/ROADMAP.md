@@ -279,7 +279,12 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [ ] adapter SDK
 
 ## 0.9 — Build/toolchain/productization
-- [ ] Windows Player exporter
+- [x] Standalone Windows Player bootstrap target and project export CLI (foundation only)
+- [x] Versioned Player bundle manifest with path traversal protection and atomic export staging
+- [x] Isolated Player World loads serialized render/physics/audio/script components
+- [x] Exported Content/Assets allowlist, symlink checks, size limits and omission of .cs source
+- [x] Player export CLI integration smoke tests and Windows CI bootstrap artifact
+- [ ] Windows Player exporter (complete gameplay runtime, cooked assets, production QA)
 - [ ] Android APK/AAB exporter
 - [ ] side-by-side Android toolchain profiles
 - [ ] updater/package cache

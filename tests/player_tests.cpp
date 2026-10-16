@@ -154,6 +154,18 @@ int main() {
     settings.startup_scene = "../outside.nscene";
     if (export_player_data(settings, report, &error) ||
         std::filesystem::exists(settings.destination)) return 12;
+    settings.startup_scene = "Assets/Scenes/Main.nscene";
+    settings.title.clear();
+    settings.destination = export_base / "BadTitle";
+    if (export_player_data(settings, report, &error) ||
+        std::filesystem::exists(settings.destination)) return 26;
+    settings.title = "Test Player";
+    settings.destination = export_base / "MalformedScene";
+    { std::ofstream invalid(project / "Assets" / "Scenes" / "Main.nscene",
+                            std::ios::binary | std::ios::trunc);
+      invalid << "INVALID_SCENE\n"; }
+    if (export_player_data(settings, report, &error) ||
+        std::filesystem::exists(settings.destination)) return 27;
     std::filesystem::remove_all(root);
     std::cout << "player bundle export tests passed\n";
     return 0;

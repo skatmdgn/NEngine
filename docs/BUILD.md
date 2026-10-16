@@ -35,3 +35,17 @@ In Windows Canvas Edit Mode, use the widget dropdown at the top of Inspector to 
 While editing a Canvas, pick a widget in the hierarchy dropdown or click it in the GDI Scene View. Hold **Ctrl while clicking** to add/remove widgets from the multi-selection (an outline appears around each visible selected item). **Drag** a selected widget to move the selected group once; selected descendants inherit their selected parent's translation instead of receiving a second delta. **Shift+drag** resizes the primary selection only. Releasing commits one Undo snapshot, and capture loss cancels the preview.
 
 Select one of 12 anchor presets (nine fixed compass alignments, Stretch Horizontal, Stretch Vertical, Stretch All) then click **Apply Preset**. The widget keeps its current pixel rectangle at that viewport size; future parent resizing follows its new anchors. To change hierarchy, choose a parent in the **Parent** dropdown and click **Reparent**. Cycles and invalid/unavailable parents are rejected and the widget retains its pixel rectangle when changing parent. Press **Delete UI** to delete all selected subtrees in one Undo step. Save Canvas to persist changes.
+
+## Windows Player bootstrap (0.9 work in progress)
+
+Configure and compile the standalone Player and export command:
+
+```powershell
+cmake -S . -B build -DNENGINE_BUILD_PLAYER=ON
+cmake --build build --config Release
+.\build\apps\player\Release\NEnginePlayerBuild.exe "C:\Games\MyNEngineProject" "C:\Exports\MyGame"
+```
+
+The first argument is a project directory containing `NEngine.nproject`; the second is a **new, nonexistent** destination directory outside the project. By default the builder finds `NEnginePlayer.exe` beside itself, or you can supply the compiled player executable as an optional third argument. The output contains `NEnginePlayer.exe`, `NEngine.player`, `Content/Main.nscene` and an allowlisted copy of project assets under `Content/Assets/`. Run `NEnginePlayer.exe` in the exported directory. For CI, the Windows artifact `NEnginePlayerBootstrap-windows-x64` contains both build tools, but no project-specific game data. The editor artifact remains separate.
+
+**Current limitations:** Only the startup Scene and raw allowed assets are packaged. Shader/texture/model cooked caches and GUID runtime asset resolution are not yet wired to the standalone Player, so custom imported visuals can be absent. `ScriptBehaviour` components deserialize but C# gameplay does **not** execute yet. Physics fixed ticks, animation scheduling, production audio, runtime UI and user-facing build profiles are not complete. Windows GPU initialization and real-game launch require manual driver/device QA; CI builds and tests, but cannot prove a player will run on arbitrary hardware. This is not a finished Windows game exporter and does not produce Android packages.
