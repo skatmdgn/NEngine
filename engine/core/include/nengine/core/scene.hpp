@@ -36,6 +36,14 @@ public:
         std::string scene_name = "Untitled",
         const ComponentSerializationRegistry* components = nullptr);
 
+    // Strict authoring save: never silently omit an unserializable component.
+    static bool capture_checked(
+        const World& world,
+        SceneData& output,
+        std::string scene_name = "Untitled",
+        std::string* error = nullptr,
+        const ComponentSerializationRegistry* components = nullptr);
+
     static bool instantiate(
         const SceneData& scene,
         World& destination,
