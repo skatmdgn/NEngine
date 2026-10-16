@@ -16,6 +16,7 @@ endif()
 
 option(NENGINE_BUILD_TESTS "Build NEngine tests" ON)
 option(NENGINE_BUILD_EDITOR "Build the editor bootstrap" ON)
+option(NENGINE_BUILD_PLAYER "Build standalone Player runtime bootstrap" ON)
 
 add_subdirectory(engine/core)
 add_subdirectory(engine/input)
@@ -31,6 +32,10 @@ add_subdirectory(engine/player)
 
 if(NENGINE_BUILD_EDITOR)
   add_subdirectory(apps/editor)
+endif()
+
+if(NENGINE_BUILD_PLAYER)
+  add_subdirectory(apps/player)
 endif()
 
 if(NENGINE_BUILD_TESTS)
