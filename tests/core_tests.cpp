@@ -46,6 +46,17 @@ int main() {
         check(after_destroy.valid() && after_destroy != removed &&
                   !reuse.is_alive(removed) && !reuse.is_alive(stale_handle),
               "slot reuse and multiple clear generations remain distinct");
+        World loaded_world;
+        const auto new_scene_entity = loaded_world.create("LoadedScene");
+        World destination_world;
+        const auto obsolete = destination_world.create("PreviousScene");
+        destination_world = std::move(loaded_world);
+        check(new_scene_entity.valid() &&
+                  destination_world.is_alive(new_scene_entity) &&
+                  !destination_world.is_alive(obsolete) &&
+                  obsolete != new_scene_entity,
+              "World replacement cannot revive handles from previous Scene");
+
 
         World bad_hierarchy;
         const auto first = bad_hierarchy.create("First");
