@@ -300,6 +300,21 @@ int main() {
     const auto packed_binary = report.bundle_root / "NEnginePlayer";
 #endif
     if (!std::filesystem::is_regular_file(packed_binary)) return test_failure(16, __LINE__);
+    // A referenced external glTF buffer must be packaged, never silently
+    // dropped; failure must not publish the destination directory.
+    { std::ofstream gltf(project / "Assets" / "Models" / "broken.gltf");
+      gltf << "{\"asset\":{\"version\":\"2.0\"},"
+              "\"buffers\":[{\"uri\":\"missing.bin\",\"byteLength\":4}]}"; }
+    { std::ofstream meta(project / "Assets" / "Models" / "broken.gltf.meta");
+      meta << "NENGINE_META 1\nGUID "
+           << nengine::assets::AssetGuid::generate().to_string()
+           << "\nIMPORTER \"NEngine.Model\"\nEND_META\n"; }
+    settings.destination = export_base / "MissingSidecar";
+    if (export_player_data(settings, report, &error) ||
+        std::filesystem::exists(settings.destination))
+        return test_failure(46, __LINE__);
+    std::filesystem::remove(project / "Assets" / "Models" / "broken.gltf");
+    std::filesystem::remove(project / "Assets" / "Models" / "broken.gltf.meta");
     settings.destination = export_base / "MissingBinary";
     settings.player_executable = root / "missing-executable";
     if (export_player_data(settings, report, &error) ||
