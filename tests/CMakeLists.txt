@@ -42,3 +42,8 @@ add_executable(NEngineUITests ui_tests.cpp)
 target_link_libraries(NEngineUITests PRIVATE NEngineUI)
 target_compile_features(NEngineUITests PRIVATE cxx_std_20)
 add_test(NAME NEngineUITests COMMAND NEngineUITests)
+
+add_executable(NEnginePlayerTests player_tests.cpp)
+target_link_libraries(NEnginePlayerTests PRIVATE NEnginePlayerKit)
+target_compile_features(NEnginePlayerTests PRIVATE cxx_std_20)
+add_test(NAME NEnginePlayerTests COMMAND NEnginePlayerTests)

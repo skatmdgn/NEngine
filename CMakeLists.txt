@@ -27,6 +27,7 @@ add_subdirectory(engine/render)
 add_subdirectory(engine/ui)
 add_subdirectory(engine/scripting)
 add_subdirectory(engine/editor)
+add_subdirectory(engine/player)
 
 if(NENGINE_BUILD_EDITOR)
   add_subdirectory(apps/editor)
