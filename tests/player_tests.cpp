@@ -1,3 +1,5 @@
+#include <cmath>
+#include <limits>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -112,6 +114,17 @@ int main() {
                     entity, nengine::audio::audio_source_type()) != nullptr;
     }
     if (!restored_camera || !restored_body) return 24;
+    if (runtime.advance(std::numeric_limits<float>::quiet_NaN()).physics_steps ||
+        runtime.advance(0.f).physics_steps ||
+        runtime.advance(1.f / 120.f).physics_steps != 0)
+        return 28;
+    const auto frame = runtime.advance(1.f / 120.f);
+    if (frame.physics_steps != 1 || frame.integrated_2d != 1 ||
+        runtime.elapsed_seconds() <= 0.0)
+        return 29;
+    const auto long_frame = runtime.advance(2.f);
+    if (!long_frame.clamped_delta || long_frame.physics_steps > 8)
+        return 30;
     BundleManifest tampered = built;
     tampered.scene = "Content/Nonexistent.nscene";
     if (!save_bundle(tampered,
