@@ -279,187 +279,28 @@ Productization work includes:
 
 ## 10. Milestone plan
 
-### 0.1 — Core foundation
-Goal: stable World, serialization and component foundations.
+The authoritative, line-item completion checklist is [ROADMAP.md](ROADMAP.md); current feature/QA distinctions are in [CURRENT_STATE.md](CURRENT_STATE.md). Do not infer a milestone is complete from a version label.
 
-Includes:
-- generational Entity/World lifetime.
-- Transform hierarchy.
-- component storage/type registry.
-- reflection.
-- Scene serialization.
-- EntityReference/AssetReference.
-- Prefab data model foundations.
-- Play Mode World cloning.
-- tests/CI.
-
-Status: substantially complete.
-
-### 0.2 — Windows editor foundation
-Goal: a usable native editor shell around the core model.
-
-Includes:
-- Hierarchy / Inspector / Scene / Assets / Console.
-- selection.
-- property editing.
-- Undo/Redo.
-- Scene dirty/savepoint model.
-- Play/Pause/Step/Stop.
-- Scene selection/gizmo.
-- persistent layout.
-- Scene open/save.
-
-Status: substantially complete; full freeform docking remains.
-
-### 0.3 — Asset database
-Goal: stable project and imported-asset identity/cache architecture.
-
-Includes:
-- project manifest/bootstrap.
-- GUID/meta.
-- importer registry.
-- file watcher.
-- import fingerprints.
-- cache validation.
-- dependency graph.
-- source metadata importers.
-- shader binary import.
-
-Remaining major work:
-- WebP decoding plus production texture compression/transcoding policy.
-- explicit safe policy/support for nonlocal or outside-model-directory glTF resources.
-- FBX mesh/material cooking.
-- validated HLSL compiler-path parity and shader reflection.
-
-### 0.4 — Vulkan renderer
-Goal: move from renderer bootstrap to real asset-backed Scene/Game rendering.
-
-Implemented foundation includes:
-- loader / instance / physical/logical device.
-- Win32 surface.
-- swapchain.
-- image views/render pass/framebuffers.
-- shared depth target.
-- synchronization.
-- Vulkan buffers.
-- staging uploads.
-- GPU meshes.
-- shader modules.
-- graphics pipelines.
-- MVP push constants.
-- indexed drawing.
-- built-in Cube/Quad GPU cache.
-- World Camera/MeshRenderer preview.
-- GPU texture upload.
-- sampler.
-- material combined-image-sampler descriptor.
-- material descriptor binding.
-- diagnostic textured vertex/fragment shader path.
-- real combined-image-sampler texture sampling in VK Preview.
-- AssetGuid + fingerprint decoded RGBA8 cache with BMP/TGA decoding foundation.
-- per-device Vulkan texture/material AssetGuid cache.
-- glTF/GLB geometry decode into MeshData with handedness conversion.
-- glTF selected-scene node hierarchy baking with parent/child TRS or explicit matrices, normal transforms and mirrored winding correction.
-- AssetGuid + fingerprint CPU/GPU mesh caches.
-- imported glTF/GLB MeshRenderer geometry resolution in VK Preview.
-- pinned stb_image PNG/JPEG RGBA8 decoding.
-- .nmat Material AssetGuid format with texture dependency tracking.
-- .nmat -> imported Texture AssetGuid -> Vulkan descriptor binding in VK Preview.
-- First-primitive glTF PBR base-color PNG/JPEG decoding and automatic Vulkan sampled material in VK Preview when MeshRenderer.material is unset; explicit .nmat overrides.
-- glTF linear baseColorFactor auto colors and texture tinting baked to the existing Vulkan SRGB material path.
-- External .gltf sidecar BIN/images staged and tracked through AssetGuid dependency invalidation and file-watcher reimports.
-
-Remaining implementation order:
-1. Finish production PBR behavior, lights/shadows and sampler-state validation.
-2. Add WebP plus texture compression/transcoding policy.
-3. Add shader reflection and validated HLSL compiler-path parity.
-4. Replace remaining GDI presentation only with matching Vulkan Editor Camera, picking and gizmo projection.
-5. Add Vulkan Game View and Android Vulkan surface.
-6. Add FBX cooking and finalize the safe nonlocal glTF resource policy.
-
-### 0.5 — C# scripting + IDE
-Goal: real gameplay scripting.
-
-Implemented foundation:
-- hostfxr runtime discovery/loading and generated runtimeconfig.
-- generated NEngine.API / NEngine.Bridge / gameplay projects and solution.
-- deterministic dotnet gameplay DLL/PDB build.
-- ScriptBehaviour Scene/Inspector integration and Play Mode execution.
-- stable ABI v15 native World callback table.
-- GameObject name/active, Transform hierarchy/TRS and component presence.
-- native-backed GameObject create/find plus deferred destroy.
-- collectible gameplay AssemblyLoadContext reload without restarting hostfxr.
-- keyboard/mouse managed Input.
-- global managed Time frame clock with fixedDeltaTime support.
-- FixedUpdate fixed-step scheduling separated from host-frame Update/LateUpdate.
-- managed Camera/Light plus MeshRenderer/SpriteRenderer scalar and AssetGuid properties over the generic native property bridge.
-- managed SpriteAnimator clip/playback/time properties plus Play/Pause/Stop/Restart controls.
-- NEnginePhysics 3D/2D Rigidbody with contact-supported sleeping plus rotated BoxCollider/SphereCollider/CapsuleCollider and BoxCollider2D/CircleCollider2D/CapsuleCollider2D data/Scene/Editor/C# bindings, shared sweep-and-prune broad phase with OBB/radial/segment narrow phase contacts, collider friction/restitution impulse response, layer/mask filtering, managed collision/trigger callbacks, and rotation-aware box/radial/capsule Raycast/OverlapBox/BoxCast target queries over the ABI v15 query bridge.
-- NEngineAudio AudioSource/AudioListener Scene/Editor/C# bindings, deterministic playback timing, hierarchy/listener-oriented spatial stereo mixing, WAV PCM/float runtime decode, software stereo rendering, AssetGuid/fingerprint clip caching and Windows WASAPI shared-mode output; compressed/streaming decode and production DSP remain.
-- coroutine scheduling including WaitForSeconds.
-
-Remaining major work:
-- remaining physics shapes, cross-frame warm starting over the collider-derived inertia/per-contact rotational manifold solver, refined capsule/compound mass properties, production sleep-island refinements, and managed cast/richer query APIs, plus streaming/compressed audio decode and production DSP/device scheduling.
-- packaged/versioned managed API distribution.
-- debugger symbols/attach workflow.
-- NuGet runtime/package integration.
-
-### 0.6 — Physics, input, audio
-Goal: ordinary playable gameplay foundation.
-
-Includes:
-- 3D physics.
-- 2D physics.
-- input actions and convenience APIs.
-- keyboard/mouse/gamepad/touch.
-- audio source/listener/mixer.
-- runtime audio decode/streaming.
-
-### 0.7 — Animation, UI, navigation
-Goal: mainstream game presentation and interaction systems.
-
-Includes:
-- animation clips/state machine/blend trees.
-- runtime Canvas-style UI.
-- NavMesh.
-- particle system.
-- smart-camera helpers.
-
-### 0.8 — Packages/plugins
-Goal: practical third-party integration.
-
-Includes:
-- managed/native plugin loading.
-- NuGet.
-- Windows DLL.
-- Android AAR/JAR/SO/Maven.
-- dependency resolution.
-- manifest/Gradle contributions.
-- adapter SDK.
-
-### 0.9 — Build/toolchain/productization
-Goal: create redistributable games rather than only running inside the editor.
-
-Includes:
-- Windows Player exporter.
-- Android APK/AAB exporter.
-- Android toolchain profiles.
-- signing.
-- profiler/frame debugger.
-- installer/update/package cache.
-
-### 1.0 — First complete product target
-Completion means an experienced Unity developer can reasonably build and ship an ordinary 2D/general 3D Windows/Android game using NEngine without having to adopt a fundamentally different workflow.
+| Milestone | Goal | Status as of 2026-10-17 |
+| --- | --- | --- |
+| 0.1 Core | World, Scene, reflection/serialization, Prefab basis | Substantially implemented/tested; Prefab product workflow extends beyond baseline |
+| 0.2 Editor | Native Windows panels, editing, Play/Undo/Save | Usable foundation; freeform docking and production Vulkan Game View pending |
+| 0.3 Assets | GUID cache/import/dependencies | Implemented foundation; FBX, WebP/transcoding and other import parity pending |
+| 0.4 Render | Vulkan on Windows + 2D/3D drawing | Vulkan Preview, materials, sprites implemented; production PBR/shadows/Game View/Android pending |
+| 0.5 C# | Gameplay host, lifecycle, IDE project generation | Implemented foundation; packaged SDK, attach/debug symbols and binding parity pending |
+| 0.6 Physics/Input/Audio | 2D/3D contact simulation, queries, WAV/input | Significant implementations and regression suites; advanced input/audio/solver QA pending |
+| 0.7 Animation/UI/Nav | Sprite animation and authoring/runtime UI | Sprite + Canvas foundations present; general animation, production UI, NavMesh and particles pending |
+| 0.8 Packages | Third-party managed/native/Android SDK integrations | Mostly not implemented |
+| 0.9 Player/toolchains | Redistributable Windows + Android games | **Active, partial** Windows Player/export pipeline; Android exporter/toolchains absent |
+| 1.0 Product | Ordinary 2D/3D Windows and Android shipping workflow | Not achieved |
 
 ## 11. Current development focus
 
-The active development line is now crossing from **0.5 — C# scripting + IDE** into **0.6 — Physics, input, audio**. The 0.3 asset and 0.4 Vulkan foundations are sufficiently proven to support real gameplay-runtime integration, although their production follow-up items remain on the roadmap.
+**Development label: `0.9.0-dev`.** This denotes work underway on standalone Windows Player export/runtime integration, not successful completion of 0.1–0.9. Earlier subsystem milestones continue to receive fixes and production hardening.
 
-The immediate sequence is:
+Immediate integration path: **complete Player cooked imported-model/material subassets -> finish standalone managed input/property parity -> real Windows Vulkan/.NET/audio/input acceptance -> production Vulkan UI/gameplay render and plugin/package capabilities -> Android runtime/build/QA**.
 
-`scalable physics/query expansion -> streaming/compressed audio + production device scheduling -> debugger/IDE polish`
-
-Renderer work continues as a secondary line around production PBR, Scene/Game Vulkan presentation, WebP/transcoding, HLSL/reflection and Android Vulkan support.
+Other outstanding work includes production PBR/shadows, compressed streaming audio, richer physics/collider/query tuning, nonlocal glTF asset policy, FBX/WebP, HLSL/reflection, navigation, particles, and advanced animation. Detailed scope and current blockers live in ROADMAP and CURRENT_STATE; avoid maintaining a second independent feature checklist here.
 
 ## 12. Definition of done for important features
 
@@ -476,13 +317,4 @@ Where applicable, completion requires:
 
 ## 13. Project continuity rule
 
-When resuming NEngine development in a new session:
-
-1. Read `docs/MASTER_PLAN.md`.
-2. Read `docs/CURRENT_STATE.md`.
-3. Read `docs/ROADMAP.md`.
-4. Inspect latest `main` commit.
-5. Inspect latest CI result.
-6. Continue from the first incomplete item in the active milestone unless a regression must be fixed first.
-
-This keeps long-running development sessions aligned even when conversation context is unavailable.
+A new session must read `docs/MASTER_PLAN.md`, `docs/CURRENT_STATE.md`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md` and `docs/DECISIONS.md`, then inspect latest `main` commits, CI results and the relevant **actual source**. Documentation is a checkpoint, not proof of correctness. See [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md) for the practical update protocol.

@@ -118,7 +118,7 @@ int run_editor() {
     reset_log();
 
     write_log(
-        "START: NEngine Editor 0.3.0-dev");
+        "START: NEngine Editor 0.9.0-dev");
 
     write_log(
         "STEP: constructing EditorModel");
@@ -219,7 +219,7 @@ int run_editor() {
         "STEP: creating native Win32 window");
 
     nengine::platform::Window window({
-        "NEngine Editor 0.3.0-dev",
+        "NEngine Editor 0.9.0-dev",
         1440,
         900,
         true});

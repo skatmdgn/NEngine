@@ -13,7 +13,9 @@ Target scope:
 
 ## Current milestone
 
-`0.5.0-dev — C# gameplay scripting is active on top of the asset and Vulkan runtime foundations`
+**Status:** source and CI validated on 2026-10-17 KST at `main` `51db15f`. Windows + Ubuntu CI each passed all 11 CTest groups on that revision. This **does not** mean GPU/.NET end-to-end hardware QA or Android shipment is complete. See [CURRENT_STATE](docs/CURRENT_STATE.md).
+
+`0.9.0-dev — standalone Windows Player/runtime/export integration in progress (pre-release, not feature-complete)`
 
 The repository currently includes:
 - generational Entity/World lifetime and Transform hierarchy
@@ -56,6 +58,8 @@ The repository currently includes:
 - OBJ/MTL import, SpriteRenderer/SpriteAnimation, multi-slot PBR material cooking and GLSL/SPIR-V fixture tooling
 - Windows + Ubuntu CI tests
 
+The standalone Windows Player can export a validated project bundle, perform fixed-step physics, WAV/sprite updates and (when a compatible .NET host and prebuilt managed assemblies are available) invoke managed gameplay callbacks. Cooked textures and model/material descriptors have been added, but generated imported-model material subassets, complete input/property parity, real-world hardware acceptance, production Vulkan UI, third-party plugin deployment and Android APK/AAB export remain incomplete.
+
 The Win32 Scene View still uses GDI by default for interactive object/gizmo editing. The opt-in VK Preview now uses the real Vulkan graphics path for depth-tested indexed World rendering, while the GDI view remains the safe editing fallback.
 
 The .NET gameplay path is now live: the editor can build C# gameplay assemblies, host them through hostfxr, run ScriptBehaviour instances in Play Mode, and reload collectible gameplay assemblies without restarting the host runtime. The managed API is still a development surface rather than a packaged/versioned SDK, and broader component/lifecycle/debugger coverage remains.
@@ -72,4 +76,4 @@ ctest --test-dir build -C Release --output-on-failure
 
 On single-config generators such as Ninja/Unix Makefiles, the `-C Release` argument to `ctest` is optional.
 
-Start with `docs/MASTER_PLAN.md` for the product goal and full development plan, then read `docs/CURRENT_STATE.md` and `docs/ROADMAP.md` before doing project work.
+Start with `docs/MASTER_PLAN.md`, then read `docs/CURRENT_STATE.md`, `docs/ROADMAP.md` and `docs/DEVELOPMENT_WORKFLOW.md`. Old status-log detail is archived under `docs/history/`.
