@@ -10,3 +10,8 @@ else()
     NEnginePlayerKit)
 endif()
 target_compile_features(NEnginePlayer PRIVATE cxx_std_20)
+
+# Authoring-side CLI, never linked into the shipped Player executable.
+add_executable(NEnginePlayerBuild export_main.cpp)
+target_compile_features(NEnginePlayerBuild PRIVATE cxx_std_20)
+target_link_libraries(NEnginePlayerBuild PRIVATE NEnginePlayerKit NEngineEditorModel)
