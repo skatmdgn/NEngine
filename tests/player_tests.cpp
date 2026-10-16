@@ -236,6 +236,22 @@ int main() {
             runtime.world(), first_entity, "NEngine.Unknown",
             "Local Scale", nengine::core::Vec3{1, 1, 1}))
         return test_failure(52, __LINE__);
+    bool body_property_ok = false;
+    for (const auto entity : runtime.world().entities()) {
+        if (!runtime.world().get_component<nengine::physics::Rigidbody2D>(
+                entity, nengine::physics::rigidbody2d_type())) continue;
+        nengine::core::PropertyValue mass;
+        body_property_ok = read_player_transform_property(
+            runtime.world(), entity, "NEngine.Rigidbody2D", "Mass", mass) &&
+            write_player_transform_property(
+                runtime.world(), entity, "NEngine.Rigidbody2D",
+                "Mass", 3.5) &&
+            !write_player_transform_property(
+                runtime.world(), entity, "NEngine.Rigidbody2D",
+                "Mass", -1.0) &&
+            std::get<double>(mass) == 2.5;
+    }
+    if (!body_property_ok) return test_failure(53, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto cooked_model = runtime.assets().cooked_artifacts(model_guid);
     const auto cooked_material = runtime.assets().cooked_artifacts(material_guid);
