@@ -1,5 +1,6 @@
 #include <windows.h>
 
+#include <array>
 #include <chrono>
 #include <filesystem>
 #include <string>
@@ -75,6 +76,42 @@ int run() {
         const auto now = std::chrono::steady_clock::now();
         const auto delta = std::chrono::duration<float>(now - last_frame).count();
         last_frame = now;
+        // Sample held keys once per rendered frame, ahead of C# Update.
+        // Win32 polling here is intentionally separate from Editor input.
+        runtime.begin_input_frame();
+        auto& input = runtime.input();
+        const bool focused = GetForegroundWindow() == window.native_handle();
+        const auto down = [focused](int virtual_key) {
+            return focused && (GetAsyncKeyState(virtual_key) & 0x8000) != 0;
+        };
+        for (int index = 0; index < 26; ++index)
+            input.set_key(static_cast<nengine::input::Key>(
+                static_cast<int>(nengine::input::Key::A) + index),
+                down('A' + index));
+        for (int index = 0; index < 10; ++index)
+            input.set_key(static_cast<nengine::input::Key>(
+                static_cast<int>(nengine::input::Key::Digit0) + index),
+                down('0' + index));
+        using Key = nengine::input::Key;
+        constexpr std::array<std::pair<Key, int>, 18> mapped{{
+            {Key::Space, VK_SPACE}, {Key::Enter, VK_RETURN},
+            {Key::Escape, VK_ESCAPE}, {Key::Tab, VK_TAB},
+            {Key::Backspace, VK_BACK}, {Key::Up, VK_UP},
+            {Key::Down, VK_DOWN}, {Key::Left, VK_LEFT}, {Key::Right, VK_RIGHT},
+            {Key::LeftShift, VK_LSHIFT}, {Key::RightShift, VK_RSHIFT},
+            {Key::LeftControl, VK_LCONTROL}, {Key::RightControl, VK_RCONTROL},
+            {Key::LeftAlt, VK_LMENU}, {Key::RightAlt, VK_RMENU},
+            {Key::MouseLeft, VK_LBUTTON}, {Key::MouseRight, VK_RBUTTON},
+            {Key::MouseMiddle, VK_MBUTTON}
+        }};
+        for (const auto [key, virtual_key] : mapped)
+            input.set_key(key, down(virtual_key));
+        POINT pointer{};
+        if (focused && GetCursorPos(&pointer) &&
+            ScreenToClient(window.native_handle(), &pointer))
+            input.set_pointer_position(
+                static_cast<float>(pointer.x),
+                static_cast<float>(pointer.y));
         // The stand-alone Player World advances independently of Editor Play.
         // PlayerRuntime limits large frame stalls to eight fixed steps.
         runtime.advance(delta);
