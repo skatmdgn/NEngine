@@ -730,6 +730,31 @@ int main() {
     graph.remove(b);
     check(graph.dependencies(a).size() == 1 && graph.dependencies(a)[0] == c, "dependency removal cleans reverse and forward edges");
 
+    // Verification scans must not mutate GUID identity or .meta files.
+    const auto duplicate_root = root / "DuplicatedGuids";
+    const auto asset_a = duplicate_root / "a.bin";
+    const auto asset_b = duplicate_root / "b.bin";
+    write_file(asset_a, "a");
+    write_file(asset_b, "b");
+    const auto reused_guid = AssetGuid::generate().to_string();
+    const auto duplicate_meta =
+        "NENGINE_META 1\nGUID " + reused_guid +
+        "\nIMPORTER \"Raw\"\nEND_META\n";
+    write_file(std::filesystem::path(asset_a.string() + ".meta"), duplicate_meta);
+    write_file(std::filesystem::path(asset_b.string() + ".meta"), duplicate_meta);
+    AssetDatabase readonly_database(duplicate_root);
+    const auto readonly_result = readonly_database.scan(false);
+    bool has_collision_error = false;
+    for (const auto& message : readonly_result.messages)
+        has_collision_error |= message.severity == AssetMessageSeverity::Error;
+    check(has_collision_error && readonly_database.size() == 1u &&
+              read_all(std::filesystem::path(asset_a.string() + ".meta")) == duplicate_meta &&
+              read_all(std::filesystem::path(asset_b.string() + ".meta")) == duplicate_meta,
+          "read-only duplicate GUID scan emits error without changing metadata");
+    const auto repaired_result = readonly_database.scan(true);
+    check(readonly_database.size() == 2u && repaired_result.meta_repaired > 0,
+          "mutable Editor scan can explicitly repair GUID collisions");
+
     std::filesystem::remove_all(root, ec);
 
     if (failures == 0) {
