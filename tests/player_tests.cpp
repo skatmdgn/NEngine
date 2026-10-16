@@ -175,8 +175,18 @@ int main() {
     }
     if (!restored_camera || !restored_body) return test_failure(24, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
-    if (!runtime.assets().cooked_artifacts(texture_guid)) return test_failure(39, __LINE__);
+    const auto cooked_texture = runtime.assets().cooked_artifacts(texture_guid);
+    if (!cooked_texture || cooked_texture->artifacts.size() != 2u ||
+        cooked_texture->artifacts[0].role != "source" ||
+        cooked_texture->artifacts[1].role != "texture-descriptor" ||
+        cooked_texture->importer_id != "NEngine.Texture")
+        return test_failure(39, __LINE__);
     if (runtime.assets().cooked_artifacts(wav_guid)) return test_failure(40, __LINE__);
+    { std::ifstream descriptor(cooked_texture->artifacts[1].path);
+      std::string header; int version = 0;
+      if (!(descriptor >> header >> version) ||
+          header != "NENGINE_TEXTURE" || version != 1)
+          return test_failure(41, __LINE__); }
     if (!decoded_ping || decoded_ping->sample_rate != 8000 ||
         decoded_ping->frame_count() != 1u) return test_failure(31, __LINE__);
     const auto sprite_clip = runtime.assets().load_sprite_clip(nanim_guid);
