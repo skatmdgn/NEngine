@@ -1,6 +1,7 @@
 #include "nengine/scripting/managed_build.hpp"
 
 #include <algorithm>
+#include <climits>
 #include <cstdlib>
 #include <filesystem>
 #include <optional>
@@ -11,7 +12,9 @@
 #include <utility>
 #include <vector>
 
-#if !defined(_WIN32)
+#if defined(_WIN32)
+#include <windows.h>
+#else
 #include <sys/wait.h>
 #endif
 
@@ -145,58 +148,44 @@ from_path_environment() {
 }
 
 #if defined(_WIN32)
-std::string shell_quote(
-    std::string_view argument) {
-
-    if (argument.empty()) {
-        return "\"\"";
-    }
-
-    if (argument.find_first_of(
-            " \t\"") ==
-        std::string_view::npos) {
-        return std::string{
-            argument};
-    }
-
-    std::string quoted;
-    quoted.push_back('"');
-
-    std::size_t backslashes = 0u;
-
-    for (const char ch :
-         argument) {
-
-        if (ch == '\\') {
+// Encode argv according to CommandLineToArgvW/CRT rules, NOT cmd.exe rules.
+// The actual executable is launched directly through CreateProcessW.
+std::wstring windows_argv_quote(std::wstring_view argument) {
+    std::wstring quoted = L"\"";
+    std::size_t backslashes = 0;
+    for (const wchar_t ch : argument) {
+        if (ch == L'\\') {
             ++backslashes;
             continue;
         }
-
-        if (ch == '"') {
-            quoted.append(
-                backslashes * 2u +
-                    1u,
-                '\\');
-
-            quoted.push_back('"');
-            backslashes = 0u;
+        if (ch == L'"') {
+            quoted.append(backslashes * 2u + 1u, L'\\');
+            quoted.push_back(ch);
+            backslashes = 0;
             continue;
         }
-
-        quoted.append(
-            backslashes,
-            '\\');
-
-        backslashes = 0u;
+        quoted.append(backslashes, L'\\');
+        backslashes = 0;
         quoted.push_back(ch);
     }
-
-    quoted.append(
-        backslashes * 2u,
-        '\\');
-
-    quoted.push_back('"');
+    quoted.append(backslashes * 2u, L'\\');
+    quoted.push_back(L'"');
     return quoted;
+}
+
+std::optional<std::wstring> utf8_to_wide(std::string_view argument) {
+    if (argument.empty()) return std::wstring{};
+    if (argument.size() > static_cast<std::size_t>(INT_MAX))
+        return std::nullopt;
+    const int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+        argument.data(), static_cast<int>(argument.size()), nullptr, 0);
+    if (count <= 0) return std::nullopt;
+    std::wstring output(static_cast<std::size_t>(count), L'\0');
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+            argument.data(), static_cast<int>(argument.size()),
+            output.data(), count) != count)
+        return std::nullopt;
+    return output;
 }
 #else
 std::string shell_quote(
@@ -335,15 +324,19 @@ make_managed_build_plan(
     plan.executable =
         *executable;
 
+    const auto utf8_path = [](const std::filesystem::path& path) {
+        const auto utf8 = path.u8string();
+        return std::string{reinterpret_cast<const char*>(utf8.data()),
+                           utf8.size()};
+    };
+
     plan.arguments = {
         "build",
-        config.project_path
-            .string(),
+        utf8_path(config.project_path),
         "--configuration",
         config.configuration,
         "--output",
-        config.output_directory
-            .string(),
+        utf8_path(config.output_directory),
         "--nologo"
     };
 
@@ -403,28 +396,40 @@ ManagedBuildResult run_managed_build(
         return result;
     }
 
-    std::ostringstream command;
-    command
-        << shell_quote(
-            result.plan.executable
-                .string());
-
-    for (const auto& argument :
-         result.plan.arguments) {
-
-        command
-            << ' '
-            << shell_quote(
-                argument);
+#if defined(_WIN32)
+    std::wstring command = windows_argv_quote(result.plan.executable.wstring());
+    for (const auto& argument : result.plan.arguments) {
+        const auto wide = utf8_to_wide(argument);
+        if (!wide) {
+            result.message = "managed build argument is not valid UTF-8";
+            return result;
+        }
+        command.push_back(L' ');
+        command += windows_argv_quote(*wide);
     }
-
-    const auto raw_exit =
-        std::system(
-            command.str().c_str());
-
-    result.exit_code =
-        normalize_exit_code(
-            raw_exit);
+    STARTUPINFOW startup{};
+    startup.cb = sizeof(startup);
+    PROCESS_INFORMATION process{};
+    if (!CreateProcessW(result.plan.executable.c_str(), command.data(),
+            nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
+            nullptr, nullptr, &startup, &process)) {
+        result.message = "could not launch dotnet build with CreateProcessW";
+        return result;
+    }
+    const DWORD wait_status = WaitForSingleObject(process.hProcess, INFINITE);
+    DWORD exit_code = 0;
+    const bool finished = wait_status == WAIT_OBJECT_0 &&
+        GetExitCodeProcess(process.hProcess, &exit_code);
+    CloseHandle(process.hThread);
+    CloseHandle(process.hProcess);
+    result.exit_code = finished ? static_cast<int>(exit_code) : -1;
+#else
+    std::ostringstream command;
+    command << shell_quote(result.plan.executable.string());
+    for (const auto& argument : result.plan.arguments)
+        command << ' ' << shell_quote(argument);
+    result.exit_code = normalize_exit_code(std::system(command.str().c_str()));
+#endif
 
     if (result.exit_code != 0) {
         result.message =
