@@ -4,8 +4,19 @@
 #include "nengine/physics/registration.hpp"
 #include "nengine/render/registration.hpp"
 #include "nengine/scripting/registration.hpp"
+#include "nengine/scripting/components.hpp"
 
 namespace nengine::player {
+
+std::size_t PlayerRuntime::pending_script_count() const noexcept {
+    if (!ready_) return 0;
+    std::size_t count = 0;
+    for (const auto entity : world_.entities())
+        if (world_.has_component(
+                entity, scripting::script_behaviour_type()))
+            ++count;
+    return count;
+}
 
 void PlayerRuntime::unload() noexcept {
     world_.clear();

@@ -14,6 +14,10 @@ int main(int argc, char** argv) {
         return 1;
     }
     // Portable CI/headless verification. Windows uses its own Vulkan runner.
+    if (runtime.pending_script_count())
+        std::cerr << "WARNING: " << runtime.pending_script_count()
+                  << " ScriptBehaviour component(s) loaded without managed"
+                     " gameplay execution; standalone bootstrap is incomplete.\n";
     std::cout << "Player scene loaded: " << runtime.manifest().title
               << " (" << runtime.entity_count() << " entities)\n";
     return 0;

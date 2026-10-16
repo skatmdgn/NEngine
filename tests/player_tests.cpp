@@ -12,6 +12,8 @@
 #include "nengine/audio/registration.hpp"
 #include "nengine/physics/components.hpp"
 #include "nengine/physics/registration.hpp"
+#include "nengine/scripting/components.hpp"
+#include "nengine/scripting/registration.hpp"
 
 int main() {
     using namespace nengine::player;
@@ -53,10 +55,15 @@ int main() {
     camera->vertical_fov_degrees = 71.f;
     body->mass = 2.5f;
     sound->volume = 0.6f;
+    auto* behaviour = world.add_component<nengine::scripting::ScriptBehaviour>(
+        body_entity, nengine::scripting::script_behaviour_type());
+    if (!behaviour) return 25;
+    behaviour->type_name = "Game.Player";
     nengine::core::ComponentSerializationRegistry codecs;
     if (!nengine::render::register_component_serializers(codecs) ||
         !nengine::physics::register_component_serializers(codecs) ||
-        !nengine::audio::register_component_serializers(codecs)) return 23;
+        !nengine::audio::register_component_serializers(codecs) ||
+        !nengine::scripting::register_component_serializers(codecs)) return 23;
     auto scene = nengine::core::SceneSerializer::capture(world, "Main", &codecs);
     if (!nengine::core::SceneSerializer::save_file(
         scene, project / "Assets" / "Scenes" / "Main.nscene")) return 7;
@@ -88,7 +95,8 @@ int main() {
         return 9;
     PlayerRuntime runtime;
     if (!runtime.load(report.bundle_root, &error) ||
-        !runtime.ready() || runtime.entity_count() != 2u) return 13;
+        !runtime.ready() || runtime.entity_count() != 2u ||
+        runtime.pending_script_count() != 1u) return 13;
     bool restored_camera = false;
     bool restored_body = false;
     for (const auto entity : runtime.world().entities()) {
@@ -119,7 +127,8 @@ int main() {
         !runtime.ready() || runtime.entity_count() != 2u)
         return 21;
     runtime.unload();
-    if (runtime.ready() || runtime.entity_count() != 0) return 14;
+    if (runtime.ready() || runtime.entity_count() != 0 ||
+        runtime.pending_script_count() != 0) return 14;
     { std::ofstream executable(root / "player.fixture", std::ios::binary);
       executable << "test executable"; }
     settings.destination = export_base / "RunnableBuild";

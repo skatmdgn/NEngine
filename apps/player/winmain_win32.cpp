@@ -30,6 +30,9 @@ int run() {
     std::string error;
     if (!runtime.load(root, &error)) { message(error); return 3; }
 
+    if (runtime.pending_script_count())
+        OutputDebugStringA("NEngine Player: ScriptBehaviour components loaded"
+                           " but managed gameplay hosting is not yet attached.\n");
     const auto& config = runtime.manifest();
     nengine::platform::Window window({
         config.title, config.width, config.height, true});

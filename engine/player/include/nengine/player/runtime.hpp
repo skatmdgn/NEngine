@@ -20,6 +20,9 @@ public:
     const BundleManifest& manifest() const noexcept { return manifest_; }
     bool ready() const noexcept { return ready_; }
     std::size_t entity_count() const noexcept { return world_.size(); }
+    // Managed gameplay isn't yet attached in this standalone bootstrap.
+    // Surface this explicitly rather than silently promising script execution.
+    std::size_t pending_script_count() const noexcept;
 private:
     core::World world_{};
     BundleManifest manifest_{};
