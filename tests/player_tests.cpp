@@ -141,6 +141,7 @@ int main() {
     if (!export_player_data(settings, report, &error) ||
         report.scene_objects != 2u ||
         report.copied_assets < 2u ||
+        report.cooked_textures < 1u ||
         !std::filesystem::exists(
             report.bundle_root / "Content" / "Assets" / "Textures" / "hero.png") ||
         std::filesystem::exists(
@@ -174,6 +175,8 @@ int main() {
     }
     if (!restored_camera || !restored_body) return test_failure(24, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
+    if (!runtime.assets().cooked_artifacts(texture_guid)) return test_failure(39, __LINE__);
+    if (runtime.assets().cooked_artifacts(wav_guid)) return test_failure(40, __LINE__);
     if (!decoded_ping || decoded_ping->sample_rate != 8000 ||
         decoded_ping->frame_count() != 1u) return test_failure(31, __LINE__);
     const auto sprite_clip = runtime.assets().load_sprite_clip(nanim_guid);

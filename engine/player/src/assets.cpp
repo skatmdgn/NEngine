@@ -43,6 +43,32 @@ bool PlayerAssets::open(const std::filesystem::path& bundle_root,
     if (error) error->clear();
     return true;
 }
+std::optional<assets::CachedArtifactSet> PlayerAssets::cooked_artifacts(
+    assets::AssetGuid guid) const {
+    const auto* record = database_.find(guid);
+    if (!record || !guid.valid() || root_.empty()) return std::nullopt;
+    const auto folder = root_.parent_path() / "Cooked" / guid.to_string();
+    std::error_code ec;
+    if (std::filesystem::is_symlink(folder, ec) || ec)
+        return std::nullopt;
+    const auto descriptor = folder / "texture.nasset";
+    const auto staged = folder / ("source" + record->source_path.extension().string());
+    if (std::filesystem::is_symlink(descriptor, ec) ||
+        std::filesystem::is_symlink(staged, ec) || ec ||
+        !std::filesystem::is_regular_file(descriptor, ec) ||
+        !std::filesystem::is_regular_file(staged, ec) || ec)
+        return std::nullopt;
+    const auto actual = std::filesystem::canonical(folder, ec);
+    if (ec || actual != folder.lexically_normal()) return std::nullopt;
+    assets::CachedArtifactSet artifacts;
+    artifacts.importer_id = "NEngine.Texture";
+    artifacts.importer_version = 1;
+    artifacts.fingerprint = "Player-Cooked-v1-" + guid.to_string();
+    artifacts.artifacts.push_back({staged, "source"});
+    artifacts.artifacts.push_back({descriptor, "texture-descriptor"});
+    return artifacts;
+}
+
 void PlayerAssets::clear() {
     database_.clear();
     root_.clear();

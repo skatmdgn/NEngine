@@ -4,6 +4,7 @@
 #include <string>
 #include "nengine/assets/asset_database.hpp"
 #include "nengine/audio/audio_clip.hpp"
+#include "nengine/assets/import_pipeline.hpp"
 #include "nengine/render/sprite_animation.hpp"
 #include "nengine/render/animation_controller.hpp"
 namespace nengine::player {
@@ -17,6 +18,8 @@ public:
     std::optional<std::filesystem::path> source(
         assets::AssetGuid guid, std::string* error = nullptr) const;
     std::size_t size() const noexcept { return database_.size(); }
+    std::optional<assets::CachedArtifactSet> cooked_artifacts(
+        assets::AssetGuid guid) const;
     std::optional<render::AnimationController> load_controller(
         assets::AssetGuid guid, std::string* error = nullptr) const;
     std::optional<render::SpriteAnimationClip> load_sprite_clip(
