@@ -1,5 +1,6 @@
 #include "nengine/player/runtime.hpp"
 #include "nengine/player/managed_queries.hpp"
+#include "nengine/player/managed_properties.hpp"
 
 #include "nengine/audio/registration.hpp"
 #include "nengine/audio/components.hpp"
@@ -45,6 +46,7 @@ bool PlayerRuntime::initialize_managed(std::string* error) {
     }
     managed_runtime_.bind_input(&input_);
     bind_player_physics_queries(managed_runtime_);
+    bind_player_properties(managed_runtime_);
     script_system_.bind(&managed_runtime_);
     if (error) error->clear();
     return true;
