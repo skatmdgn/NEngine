@@ -42,6 +42,7 @@ bool PlayerRuntime::initialize_managed(std::string* error) {
         if (error) *error = managed_runtime_.diagnostic();
         return false;
     }
+    managed_runtime_.bind_input(&input_);
     script_system_.bind(&managed_runtime_);
     if (error) error->clear();
     return true;
@@ -163,6 +164,7 @@ void PlayerRuntime::unload() noexcept {
     script_system_.clear(&world_);
     managed_runtime_.shutdown();
     world_.clear();
+    input_.release_all();
     bundle_root_.clear();
     assets_.clear();
     audio_clips_.clear();
@@ -239,6 +241,7 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
     managed_runtime_.shutdown();
     world_ = std::move(next_world);
     bundle_root_ = root;
+    input_ = {};
     assets_ = std::move(catalog);
     audio_clips_ = std::move(next_clips);
     sprite_clips_ = std::move(next_sprites);

@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include "nengine/physics/simulation.hpp"
 #include "nengine/physics/contact_events.hpp"
+#include "nengine/input/input_state.hpp"
 #include "nengine/scripting/managed_runtime.hpp"
 #include "nengine/scripting/script_system.hpp"
 
@@ -48,6 +49,9 @@ public:
     bool ready() const noexcept { return ready_; }
     PlayerFrameStats advance(float delta_seconds);
     void set_paused(bool value) noexcept { paused_ = value; }
+    input::InputState& input() noexcept { return input_; }
+    const input::InputState& input() const noexcept { return input_; }
+    void begin_input_frame() noexcept { input_.begin_frame(); }
     bool paused() const noexcept { return paused_; }
     float fixed_delta_seconds() const noexcept { return 1.0f / 60.0f; }
     const PlayerAssets& assets() const noexcept { return assets_; }
@@ -62,6 +66,7 @@ private:
     std::filesystem::path bundle_root_{};
     scripting::ManagedRuntime managed_runtime_{};
     scripting::ManagedScriptSystem script_system_{};
+    input::InputState input_{};
     PlayerAssets assets_{};
     BundleManifest manifest_{};
     bool ready_{false};
