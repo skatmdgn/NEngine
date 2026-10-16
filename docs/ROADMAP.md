@@ -284,6 +284,12 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Isolated Player World loads serialized render/physics/audio/script components
 - [x] Exported Content/Assets allowlist, symlink checks, size limits and omission of .cs source
 - [x] Player export CLI integration smoke tests and Windows CI bootstrap artifact
+- [x] Standalone Player 3D/2D physics fixed-step integration with eight-step catch-up cap and pause control
+- [x] Read-only GUID asset catalog from exported .meta records; asset path and symlink safeguards
+- [x] Bounded packaged WAV runtime decoding, AudioSource playback clock and WASAPI mixing with device fallback
+- [x] Packaged .nanim clip frame sampling and SpriteRenderer texture switching in Player
+- [x] Packaged .nanimctrl sprite state machine runtime, boolean transitions and speed switching
+- [x] Portable Player integration tests for asset GUIDs, audio timing, sprite transitions and pause semantics
 - [ ] Windows Player exporter (complete gameplay runtime, cooked assets, production QA)
 - [ ] Android APK/AAB exporter
 - [ ] side-by-side Android toolchain profiles
