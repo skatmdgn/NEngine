@@ -121,6 +121,13 @@ bool export_player_data(const ExportSettings& settings,
                 }
                 const auto source_path = it->path();
                 const auto ext = source_path.extension().string();
+                // Staging WebP as a valid texture would produce a Player
+                // bundle whose GPU pixel decoder cannot render the asset.
+                if (ext == ".webp") {
+                    cleanup();
+                    return fail(error,
+                        "WebP textures are not supported by the Player renderer");
+                }
                 if (std::find(extensions.begin(), extensions.end(), ext) ==
                     extensions.end()) continue;
                 const auto bytes = it->file_size(ec);
