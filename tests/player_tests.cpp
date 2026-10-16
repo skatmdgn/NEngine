@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <iomanip>
 #include "nengine/player/bundle.hpp"
 #include "nengine/player/exporter.hpp"
 #include "nengine/player/runtime.hpp"
@@ -72,6 +73,11 @@ int main() {
     std::filesystem::create_directories(project / "Assets" / "Textures");
     { std::ofstream file(project / "Assets" / "Textures" / "hero.png");
       file << "texture test bytes"; }
+    const auto texture_guid = nengine::assets::AssetGuid::generate();
+    { std::ofstream meta(project / "Assets" / "Textures" / "hero.png.meta");
+      meta << "NENGINE_META 1\nGUID " << texture_guid.to_string()
+           << "\nIMPORTER " << std::quoted(std::string("NEngine.Texture"))
+           << "\nEND_META\n"; }
     { std::ofstream file(project / "Assets" / "Textures" / "ignore.cs");
       file << "do not ship source code"; }
     ExportSettings settings;
@@ -98,7 +104,8 @@ int main() {
     PlayerRuntime runtime;
     if (!runtime.load(report.bundle_root, &error) ||
         !runtime.ready() || runtime.entity_count() != 2u ||
-        runtime.pending_script_count() != 1u) return 13;
+        runtime.pending_script_count() != 1u ||
+        !runtime.assets().source(texture_guid)) return 13;
     bool restored_camera = false;
     bool restored_body = false;
     for (const auto entity : runtime.world().entities()) {

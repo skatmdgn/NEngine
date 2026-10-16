@@ -50,6 +50,7 @@ PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
 
 void PlayerRuntime::unload() noexcept {
     world_.clear();
+    assets_.clear();
     physics_cache_.clear();
     accumulator_ = 0.0;
     elapsed_seconds_ = 0.0;
@@ -78,7 +79,10 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
     if (!core::SceneSerializer::instantiate(
             source, next_world, error, &codecs))
         return false;
+    PlayerAssets catalog;
+    if (!catalog.open(root, error)) return false;
     world_ = std::move(next_world);
+    assets_ = std::move(catalog);
     physics_cache_.clear();
     accumulator_ = 0.0;
     elapsed_seconds_ = 0.0;
