@@ -30,7 +30,8 @@ std::size_t PlayerRuntime::pending_script_count() const noexcept {
 
 PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
     PlayerFrameStats stats;
-    if (!ready_ || !std::isfinite(delta_seconds) || delta_seconds <= 0.f)
+    if (!ready_ || paused_ ||
+        !std::isfinite(delta_seconds) || delta_seconds <= 0.f)
         return stats;
     constexpr double fixed = 1.0 / 60.0;
     constexpr double max_frame = 0.25;
@@ -82,6 +83,7 @@ PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
         ++stats.physics_steps;
         stats.integrated_3d += result.integration.integrated_3d;
         stats.integrated_2d += result.integration.integrated_2d;
+        stats.physics_contacts += result.collisions.overlaps.size();
         accumulator_ -= fixed;
     }
     // Avoid an unbounded backlog after a debugger stop or window stall.
@@ -103,6 +105,7 @@ void PlayerRuntime::unload() noexcept {
     accumulator_ = 0.0;
     elapsed_seconds_ = 0.0;
     ready_ = false;
+    paused_ = false;
 }
 
 bool PlayerRuntime::load(const std::filesystem::path& root,
@@ -174,6 +177,7 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
     elapsed_seconds_ = 0.0;
     manifest_ = std::move(manifest);
     ready_ = true;
+    paused_ = false;
     if (error) error->clear();
     return true;
 }

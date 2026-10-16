@@ -17,6 +17,7 @@ struct PlayerFrameStats {
     std::size_t physics_steps{0};
     std::size_t integrated_3d{0};
     std::size_t integrated_2d{0};
+    std::size_t physics_contacts{0};
     bool clamped_delta{false};
     audio::AudioPlaybackStats audio{};
     std::size_t sprite_sampled{0};
@@ -35,6 +36,8 @@ public:
     const BundleManifest& manifest() const noexcept { return manifest_; }
     bool ready() const noexcept { return ready_; }
     PlayerFrameStats advance(float delta_seconds);
+    void set_paused(bool value) noexcept { paused_ = value; }
+    bool paused() const noexcept { return paused_; }
     float fixed_delta_seconds() const noexcept { return 1.0f / 60.0f; }
     const PlayerAssets& assets() const noexcept { return assets_; }
     const audio::AudioClipData* audio_clip(assets::AssetGuid guid) const noexcept;
@@ -48,6 +51,7 @@ private:
     PlayerAssets assets_{};
     BundleManifest manifest_{};
     bool ready_{false};
+    bool paused_{false};
     double accumulator_{0.0};
     double elapsed_seconds_{0.0};
     physics::ContactImpulseCache physics_cache_{};

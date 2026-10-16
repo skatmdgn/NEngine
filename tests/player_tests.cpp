@@ -191,6 +191,12 @@ int main() {
     if (frame.physics_steps != 1 || frame.integrated_2d != 1 ||
         runtime.elapsed_seconds() <= 0.0)
         return 29;
+    const auto time_before_pause = runtime.elapsed_seconds();
+    runtime.set_paused(true);
+    if (!runtime.paused() ||
+        runtime.advance(1.f).physics_steps != 0 ||
+        runtime.elapsed_seconds() != time_before_pause) return 36;
+    runtime.set_paused(false);
     const auto long_frame = runtime.advance(2.f);
     if (!long_frame.clamped_delta || long_frame.physics_steps > 8)
         return 30;
