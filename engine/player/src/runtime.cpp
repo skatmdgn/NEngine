@@ -1,6 +1,7 @@
 #include "nengine/player/runtime.hpp"
 
 #include "nengine/audio/registration.hpp"
+#include "nengine/audio/components.hpp"
 #include "nengine/physics/registration.hpp"
 #include "nengine/render/registration.hpp"
 #include "nengine/scripting/registration.hpp"
@@ -9,6 +10,12 @@
 #include <cmath>
 
 namespace nengine::player {
+
+const audio::AudioClipData* PlayerRuntime::audio_clip(
+    assets::AssetGuid guid) const noexcept {
+    const auto it = audio_clips_.find(guid);
+    return it == audio_clips_.end() ? nullptr : &it->second;
+}
 
 std::size_t PlayerRuntime::pending_script_count() const noexcept {
     if (!ready_) return 0;
@@ -30,6 +37,12 @@ PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
         static_cast<double>(delta_seconds), max_frame);
     stats.clamped_delta = frame < static_cast<double>(delta_seconds);
     elapsed_seconds_ += frame;
+    stats.audio = audio_playback_.update(world_, static_cast<float>(frame),
+        [this](assets::AssetGuid guid) -> std::optional<float> {
+            if (const auto* clip = audio_clip(guid))
+                return clip->duration_seconds();
+            return std::nullopt;
+        });
     accumulator_ += frame;
     while (accumulator_ + 1.0e-9 >= fixed && stats.physics_steps < 8u) {
         const auto result = physics::step_physics(
@@ -51,6 +64,8 @@ PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
 void PlayerRuntime::unload() noexcept {
     world_.clear();
     assets_.clear();
+    audio_clips_.clear();
+    audio_playback_.reset();
     physics_cache_.clear();
     accumulator_ = 0.0;
     elapsed_seconds_ = 0.0;
@@ -81,8 +96,20 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
         return false;
     PlayerAssets catalog;
     if (!catalog.open(root, error)) return false;
+    std::unordered_map<assets::AssetGuid, audio::AudioClipData,
+                       assets::AssetGuidHash> next_clips;
+    for (const auto entity : next_world.entities()) {
+        const auto* source = next_world.get_component<audio::AudioSource>(
+            entity, audio::audio_source_type());
+        if (!source || !source->clip.valid() ||
+            next_clips.contains(source->clip)) continue;
+        if (auto clip = catalog.load_wav(source->clip))
+            next_clips.emplace(source->clip, std::move(*clip));
+    }
     world_ = std::move(next_world);
     assets_ = std::move(catalog);
+    audio_clips_ = std::move(next_clips);
+    audio_playback_.reset();
     physics_cache_.clear();
     accumulator_ = 0.0;
     elapsed_seconds_ = 0.0;

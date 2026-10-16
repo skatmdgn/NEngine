@@ -54,12 +54,15 @@ int main() {
         camera_entity, nengine::render::camera_type());
     auto* body = world.add_component<nengine::physics::Rigidbody2D>(
         body_entity, nengine::physics::rigidbody2d_type());
+    const auto wav_guid = nengine::assets::AssetGuid::generate();
     auto* sound = world.add_component<nengine::audio::AudioSource>(
         body_entity, nengine::audio::audio_source_type());
     if (!camera || !body || !sound) return 22;
     camera->vertical_fov_degrees = 71.f;
     body->mass = 2.5f;
     sound->volume = 0.6f;
+    sound->clip = wav_guid;
+    sound->loop = true;
     auto* behaviour = world.add_component<nengine::scripting::ScriptBehaviour>(
         body_entity, nengine::scripting::script_behaviour_type());
     if (!behaviour) return 25;
@@ -81,7 +84,6 @@ int main() {
            << "\nIMPORTER " << std::quoted(std::string("NEngine.Texture"))
            << "\nEND_META\n"; }
     std::filesystem::create_directories(project / "Assets" / "Sounds");
-    const auto wav_guid = nengine::assets::AssetGuid::generate();
     { const std::array<std::uint8_t, 46> wav{
         'R','I','F','F',38,0,0,0,'W','A','V','E','f','m','t',' ',
         16,0,0,0,1,0,1,0,64,31,0,0,128,62,0,0,
@@ -143,6 +145,8 @@ int main() {
         runtime.advance(1.f / 120.f).physics_steps != 0)
         return 28;
     const auto frame = runtime.advance(1.f / 120.f);
+    if (frame.audio.advanced != 1u || frame.audio.looped != 1u ||
+        !runtime.audio_clip(wav_guid)) return 32;
     if (frame.physics_steps != 1 || frame.integrated_2d != 1 ||
         runtime.elapsed_seconds() <= 0.0)
         return 29;
