@@ -67,6 +67,10 @@ public:
         return swapchain_.valid() &&
             presenter_.ready();
     }
+    bool needs_resize() const noexcept {
+        return presenter_.needs_resize();
+    }
+
 
     const VulkanLoader& loader() const noexcept {
         return loader_;
