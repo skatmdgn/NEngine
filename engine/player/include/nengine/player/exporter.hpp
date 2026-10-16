@@ -1,0 +1,26 @@
+#pragma once
+#include <cstdint>
+#include <filesystem>
+#include <string>
+
+namespace nengine::player {
+
+struct ExportSettings {
+    std::filesystem::path project_root{};
+    std::filesystem::path startup_scene{};
+    std::filesystem::path destination{};
+    std::string title{"NEngine Game"};
+    std::uint32_t width{1280};
+    std::uint32_t height{720};
+};
+
+struct ExportReport {
+    std::filesystem::path bundle_root{};
+    std::size_t scene_objects{0};
+};
+
+// Produces a validated DATA bundle. The Player executable will be bundled
+// separately once the runner path is known; not yet an APK/AAB exporter.
+bool export_player_data(const ExportSettings& settings,
+                        ExportReport& report, std::string* error = nullptr);
+}
