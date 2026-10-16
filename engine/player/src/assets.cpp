@@ -56,24 +56,50 @@ std::optional<assets::CachedArtifactSet> PlayerAssets::cooked_artifacts(
         extension == ".jpeg" || extension == ".webp" ||
         extension == ".bmp" || extension == ".tga";
     const bool material = extension == ".nmat";
-    if (!texture && !material) return std::nullopt;
-    const auto descriptor = folder / "texture.nasset";
+    const bool model = extension == ".glb" ||
+        extension == ".gltf" || extension == ".obj";
+    if (!texture && !material && !model) return std::nullopt;
+    const auto descriptor = folder /
+        (model ? "model.nasset" : "texture.nasset");
     const auto staged = folder / ("source" + extension);
     if (std::filesystem::is_symlink(staged, ec) || ec ||
         !std::filesystem::is_regular_file(staged, ec) || ec)
         return std::nullopt;
-    if (texture && (std::filesystem::is_symlink(descriptor, ec) || ec ||
-        !std::filesystem::is_regular_file(descriptor, ec) || ec))
+    if ((texture || model) &&
+        (std::filesystem::is_symlink(descriptor, ec) || ec ||
+         !std::filesystem::is_regular_file(descriptor, ec) || ec))
         return std::nullopt;
     const auto actual = std::filesystem::canonical(folder, ec);
     if (ec || actual != folder.lexically_normal()) return std::nullopt;
     assets::CachedArtifactSet artifacts;
-    artifacts.importer_id = texture ? "NEngine.Texture" : "NEngine.Material";
+    artifacts.importer_id = texture ? "NEngine.Texture" :
+        (model ? "NEngine.Model" : "NEngine.Material");
     artifacts.importer_version = 1;
     artifacts.fingerprint = "Player-Cooked-v1-" + guid.to_string();
     artifacts.artifacts.push_back({staged, "source"});
     if (texture)
         artifacts.artifacts.push_back({descriptor, "texture-descriptor"});
+    if (model) {
+        artifacts.artifacts.push_back({descriptor, "model-descriptor"});
+        for (std::filesystem::recursive_directory_iterator it(folder, ec), end;
+             it != end && !ec; it.increment(ec)) {
+            if (it->is_symlink(ec) || ec) return std::nullopt;
+            if (it->is_directory(ec)) continue;
+            if (ec || !it->is_regular_file(ec)) return std::nullopt;
+            const auto asset = it->path();
+            if (asset == staged || asset == descriptor) continue;
+            const auto relative = asset.lexically_relative(folder);
+            if (relative.empty() || relative.is_absolute() ||
+                *relative.begin() == "..") return std::nullopt;
+            const auto role = extension == ".obj"
+                ? (asset.extension() == ".mtl"
+                    ? "obj-mtl-sidecar" : "obj-texture-sidecar")
+                : "model-sidecar";
+            artifacts.artifacts.push_back({asset, role});
+            if (artifacts.artifacts.size() > 1024u) return std::nullopt;
+        }
+        if (ec) return std::nullopt;
+    }
     return artifacts;
 }
 
