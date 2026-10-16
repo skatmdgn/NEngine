@@ -104,8 +104,11 @@ int main() {
            << "\nEND_META\n"; }
     { std::ofstream file(project / "Assets" / "Animations" / "walk.nanimctrl");
       file << "NENGINE_ANIMATION_CONTROLLER 1\nDEFAULT \"Idle\"\n"
-           << "STATES 1\nSTATE \"Idle\" " << std::quoted(nanim_guid.to_string())
-           << " 1 1\nTRANSITIONS 0\nEND_ANIMATION_CONTROLLER\n"; }
+           << "STATES 2\nSTATE \"Idle\" " << std::quoted(nanim_guid.to_string())
+           << " 1 1\nSTATE \"Run\" " << std::quoted(nanim_guid.to_string())
+           << " 1 2\nTRANSITIONS 1\n"
+           << "TRANSITION \"Idle\" \"Run\" \"moving\" 1 0\n"
+           << "END_ANIMATION_CONTROLLER\n"; }
     { std::ofstream meta(project / "Assets" / "Animations" / "walk.nanimctrl.meta");
       meta << "NENGINE_META 1\nGUID " << controller_guid.to_string()
            << "\nIMPORTER " << std::quoted(std::string("NEngine.AnimationController"))
@@ -188,6 +191,23 @@ int main() {
             sprite_visible = true;
     }
     if (!sprite_visible) return 35;
+    for (const auto entity : runtime.world().entities()) {
+        if (auto* animator = runtime.world().get_component<
+                nengine::render::SpriteAnimator>(
+                entity, nengine::render::sprite_animator_type()))
+            animator->bool_parameters["moving"] = true;
+    }
+    const auto controller_frame = runtime.advance(0.02f);
+    if (controller_frame.controller_transitions != 1u) return 37;
+    bool running = false;
+    for (const auto entity : runtime.world().entities()) {
+        const auto* animator = runtime.world().get_component<
+            nengine::render::SpriteAnimator>(
+                entity, nengine::render::sprite_animator_type());
+        if (animator && animator->clip == nanim_guid &&
+            animator->speed == 2.0f) running = true;
+    }
+    if (!running) return 38;
     if (frame.physics_steps != 1 || frame.integrated_2d != 1 ||
         runtime.elapsed_seconds() <= 0.0)
         return 29;
