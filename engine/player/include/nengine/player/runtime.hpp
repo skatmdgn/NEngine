@@ -10,6 +10,8 @@
 #include "nengine/audio/playback.hpp"
 #include <unordered_map>
 #include "nengine/physics/simulation.hpp"
+#include "nengine/scripting/managed_runtime.hpp"
+#include "nengine/scripting/script_system.hpp"
 
 namespace nengine::player {
 
@@ -28,6 +30,10 @@ struct PlayerFrameStats {
 // Isolated player World bootstrap. Never depends on the editor UI/model.
 class PlayerRuntime {
 public:
+    // Call after load(); managed payloads are optional but require installed
+    // hostfxr/.NET and the NEngine.API + Bridge assemblies.
+    bool initialize_managed(std::string* error = nullptr);
+    bool managed_ready() const noexcept { return managed_runtime_.valid(); }
     bool load(const std::filesystem::path& bundle_root,
               std::string* error = nullptr);
     void unload() noexcept;
@@ -48,6 +54,9 @@ public:
     std::size_t pending_script_count() const noexcept;
 private:
     core::World world_{};
+    std::filesystem::path bundle_root_{};
+    scripting::ManagedRuntime managed_runtime_{};
+    scripting::ManagedScriptSystem script_system_{};
     PlayerAssets assets_{};
     BundleManifest manifest_{};
     bool ready_{false};

@@ -7,10 +7,45 @@
 #include "nengine/render/registration.hpp"
 #include "nengine/scripting/registration.hpp"
 #include "nengine/scripting/components.hpp"
+#include "nengine/scripting/dotnet_host.hpp"
 #include <algorithm>
 #include <cmath>
 
 namespace nengine::player {
+
+bool PlayerRuntime::initialize_managed(std::string* error) {
+    if (!ready_ || bundle_root_.empty()) {
+        if (error) *error = "Player Scene must load before .NET runtime";
+        return false;
+    }
+    const auto managed = bundle_root_ / "Content" / "Managed";
+    const auto gameplay = managed / "GameScripts.dll";
+    const auto configuration = managed / "GameScripts.runtimeconfig.json";
+    std::error_code ec;
+    if (!std::filesystem::is_regular_file(gameplay, ec) ||
+        !std::filesystem::is_regular_file(configuration, ec) ||
+        !std::filesystem::is_regular_file(managed / "NEngine.Bridge.dll", ec) ||
+        !std::filesystem::is_regular_file(managed / "NEngine.API.dll", ec)) {
+        if (error) *error = "Player managed payload missing";
+        return false;
+    }
+    std::string discovery_error;
+    const auto host = scripting::discover_dotnet_host({}, &discovery_error);
+    if (!host) {
+        if (error) *error = std::move(discovery_error);
+        return false;
+    }
+    script_system_.clear(&world_);
+    managed_runtime_.shutdown();
+    if (!managed_runtime_.initialize(
+            host->hostfxr_path, configuration, gameplay, "GameScripts")) {
+        if (error) *error = managed_runtime_.diagnostic();
+        return false;
+    }
+    script_system_.bind(&managed_runtime_);
+    if (error) error->clear();
+    return true;
+}
 
 const audio::AudioClipData* PlayerRuntime::audio_clip(
     assets::AssetGuid guid) const noexcept {
@@ -95,7 +130,10 @@ PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
 }
 
 void PlayerRuntime::unload() noexcept {
+    script_system_.clear(&world_);
+    managed_runtime_.shutdown();
     world_.clear();
+    bundle_root_.clear();
     assets_.clear();
     audio_clips_.clear();
     sprite_clips_.clear();
@@ -166,7 +204,10 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
         }
         next_controllers.bind(entity, std::move(*definition));
     }
+    script_system_.clear(&world_);
+    managed_runtime_.shutdown();
     world_ = std::move(next_world);
+    bundle_root_ = root;
     assets_ = std::move(catalog);
     audio_clips_ = std::move(next_clips);
     sprite_clips_ = std::move(next_sprites);
