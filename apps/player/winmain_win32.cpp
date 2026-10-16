@@ -91,7 +91,11 @@ int run() {
             old_height = height;
             if (width && height) renderer.resize(width, height);
         }
-        if (width && height && !scene.present_world(renderer, runtime.world())) {
+        if (width && height && !scene.present_world(
+                renderer, runtime.world(),
+                [&runtime](nengine::assets::AssetGuid guid) {
+                    return runtime.assets().cooked_artifacts(guid);
+                })) {
             message(scene.diagnostic());
             return 7;
         }
