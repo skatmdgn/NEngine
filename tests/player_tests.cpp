@@ -69,6 +69,20 @@ int main() {
     PlayerRuntime runtime;
     if (!runtime.load(report.bundle_root, &error) ||
         !runtime.ready() || runtime.entity_count() != 2u) return 13;
+    BundleManifest tampered = built;
+    tampered.scene = "Content/Nonexistent.nscene";
+    if (!save_bundle(tampered,
+            report.bundle_root / "NEngine.player", &error)) return 18;
+    if (runtime.load(report.bundle_root, &error) ||
+        !runtime.ready() || runtime.entity_count() != 2u)
+        return 19; // Failed reload must not partially overwrite old World.
+    if (!save_bundle(built,
+            report.bundle_root / "NEngine.player", &error)) return 20;
+    std::filesystem::remove(
+        report.bundle_root / "Content" / "Main.nscene");
+    if (runtime.load(report.bundle_root, &error) ||
+        !runtime.ready() || runtime.entity_count() != 2u)
+        return 21;
     runtime.unload();
     if (runtime.ready() || runtime.entity_count() != 0) return 14;
     { std::ofstream executable(root / "player.fixture", std::ios::binary);
