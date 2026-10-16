@@ -20,29 +20,35 @@
 #include "nengine/scripting/components.hpp"
 #include "nengine/scripting/registration.hpp"
 
+static int test_failure(int code, int line) {
+    std::cerr << "FAIL: NEnginePlayerTests check " << code
+              << " at line " << line << '\n';
+    return code;
+}
+
 int main() {
     using namespace nengine::player;
     BundleManifest manifest;
     manifest.title = "Demo";
     std::stringstream stream;
-    if (!write_bundle(stream, manifest)) return 1;
+    if (!write_bundle(stream, manifest)) return test_failure(1, __LINE__);
     BundleManifest restored;
     if (!read_bundle(stream, restored) ||
         restored.title != manifest.title ||
-        restored.scene != manifest.scene) return 2;
+        restored.scene != manifest.scene) return test_failure(2, __LINE__);
     restored.scene = "../outside.nscene";
-    if (validate_bundle(restored)) return 3;
+    if (validate_bundle(restored)) return test_failure(3, __LINE__);
     restored = manifest;
     restored.width = 0;
-    if (validate_bundle(restored)) return 4;
+    if (validate_bundle(restored)) return test_failure(4, __LINE__);
     const auto root = std::filesystem::temp_directory_path() /
         "nengine_player_bundle_test";
     std::filesystem::remove_all(root);
     std::filesystem::create_directories(root / "Content");
     { std::ofstream file(root / "Content" / "Main.nscene"); file << "fixture"; }
     std::string error;
-    if (!resolve_bundle_scene(root, manifest, &error)) return 5;
-    if (resolve_bundle_scene(root / "missing", manifest, &error)) return 6;
+    if (!resolve_bundle_scene(root, manifest, &error)) return test_failure(5, __LINE__);
+    if (resolve_bundle_scene(root / "missing", manifest, &error)) return test_failure(6, __LINE__);
     const auto project = root / "Project";
     const auto export_base = root / "Exports";
     std::filesystem::create_directories(project / "Assets" / "Scenes");
@@ -59,7 +65,7 @@ int main() {
     const auto controller_guid = nengine::assets::AssetGuid::generate();
     auto* sound = world.add_component<nengine::audio::AudioSource>(
         body_entity, nengine::audio::audio_source_type());
-    if (!camera || !body || !sound) return 22;
+    if (!camera || !body || !sound) return test_failure(22, __LINE__);
     camera->vertical_fov_degrees = 71.f;
     body->mass = 2.5f;
     sound->volume = 0.6f;
@@ -69,21 +75,21 @@ int main() {
         body_entity, nengine::render::sprite_animator_type());
     auto* sprite_renderer = world.add_component<nengine::render::SpriteRenderer>(
         body_entity, nengine::render::sprite_renderer_type());
-    if (!animator || !sprite_renderer) return 34;
+    if (!animator || !sprite_renderer) return test_failure(34, __LINE__);
     animator->clip = nanim_guid;
     animator->controller = controller_guid;
     auto* behaviour = world.add_component<nengine::scripting::ScriptBehaviour>(
         body_entity, nengine::scripting::script_behaviour_type());
-    if (!behaviour) return 25;
+    if (!behaviour) return test_failure(25, __LINE__);
     behaviour->type_name = "Game.Player";
     nengine::core::ComponentSerializationRegistry codecs;
     if (!nengine::render::register_component_serializers(codecs) ||
         !nengine::physics::register_component_serializers(codecs) ||
         !nengine::audio::register_component_serializers(codecs) ||
-        !nengine::scripting::register_component_serializers(codecs)) return 23;
+        !nengine::scripting::register_component_serializers(codecs)) return test_failure(23, __LINE__);
     auto scene = nengine::core::SceneSerializer::capture(world, "Main", &codecs);
     if (!nengine::core::SceneSerializer::save_file(
-        scene, project / "Assets" / "Scenes" / "Main.nscene")) return 7;
+        scene, project / "Assets" / "Scenes" / "Main.nscene")) return test_failure(7, __LINE__);
     std::filesystem::create_directories(project / "Assets" / "Textures");
     { std::ofstream file(project / "Assets" / "Textures" / "hero.png");
       file << "texture test bytes"; }
@@ -141,17 +147,17 @@ int main() {
             report.bundle_root / "Content" / "Assets" / "Textures" / "ignore.cs") ||
         !std::filesystem::exists(
             report.bundle_root / "Content" / "Main.nscene"))
-        return 8;
+        return test_failure(8, __LINE__);
     BundleManifest built;
     if (!load_bundle(report.bundle_root / "NEngine.player", built, &error) ||
         built.title != settings.title ||
         !resolve_bundle_scene(report.bundle_root, built, &error))
-        return 9;
+        return test_failure(9, __LINE__);
     PlayerRuntime runtime;
     if (!runtime.load(report.bundle_root, &error) ||
         !runtime.ready() || runtime.entity_count() != 2u ||
         runtime.pending_script_count() != 1u ||
-        !runtime.assets().source(texture_guid)) return 13;
+        !runtime.assets().source(texture_guid)) return test_failure(13, __LINE__);
     bool restored_camera = false;
     bool restored_body = false;
     for (const auto entity : runtime.world().entities()) {
@@ -166,22 +172,25 @@ int main() {
                 runtime.world().get_component<nengine::audio::AudioSource>(
                     entity, nengine::audio::audio_source_type()) != nullptr;
     }
-    if (!restored_camera || !restored_body) return 24;
+    if (!restored_camera || !restored_body) return test_failure(24, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     if (!decoded_ping || decoded_ping->sample_rate != 8000 ||
-        decoded_ping->frame_count() != 1u) return 31;
+        decoded_ping->frame_count() != 1u) return test_failure(31, __LINE__);
     const auto sprite_clip = runtime.assets().load_sprite_clip(nanim_guid);
     if (!sprite_clip || sprite_clip->frames.size() != 2u ||
         !sprite_clip->valid() ||
-        !runtime.assets().load_controller(controller_guid)) return 33;
+        !runtime.assets().load_controller(controller_guid)) return test_failure(33, __LINE__);
     if (runtime.advance(std::numeric_limits<float>::quiet_NaN()).physics_steps ||
-        runtime.advance(0.f).physics_steps ||
-        runtime.advance(1.f / 120.f).physics_steps != 0)
-        return 28;
+        runtime.advance(0.f).physics_steps) return test_failure(28, __LINE__);
+    // The first valid host frame initializes the controller's Idle state.
+    // The following half frame advances the 60 Hz physics accumulator.
+    const auto initial_frame = runtime.advance(1.f / 120.f);
+    if (initial_frame.physics_steps != 0 ||
+        initial_frame.controller_transitions != 1u) return test_failure(28, __LINE__);
     const auto frame = runtime.advance(1.f / 120.f);
     if (frame.audio.advanced != 1u || frame.audio.looped != 1u ||
-        frame.sprite_sampled != 1u || frame.controller_transitions != 1u ||
-        !runtime.audio_clip(wav_guid)) return 32;
+        frame.sprite_sampled != 1u || frame.controller_transitions != 0u ||
+        !runtime.audio_clip(wav_guid)) return test_failure(32, __LINE__);
     bool sprite_visible = false;
     for (const auto entity : runtime.world().entities()) {
         const auto* sprite = runtime.world().get_component<
@@ -190,7 +199,7 @@ int main() {
         if (sprite && sprite->texture == texture_guid)
             sprite_visible = true;
     }
-    if (!sprite_visible) return 35;
+    if (!sprite_visible) return test_failure(35, __LINE__);
     for (const auto entity : runtime.world().entities()) {
         if (auto* animator = runtime.world().get_component<
                 nengine::render::SpriteAnimator>(
@@ -198,7 +207,7 @@ int main() {
             animator->bool_parameters["moving"] = true;
     }
     const auto controller_frame = runtime.advance(0.02f);
-    if (controller_frame.controller_transitions != 1u) return 37;
+    if (controller_frame.controller_transitions != 1u) return test_failure(37, __LINE__);
     bool running = false;
     for (const auto entity : runtime.world().entities()) {
         const auto* animator = runtime.world().get_component<
@@ -207,73 +216,73 @@ int main() {
         if (animator && animator->clip == nanim_guid &&
             animator->speed == 2.0f) running = true;
     }
-    if (!running) return 38;
+    if (!running) return test_failure(38, __LINE__);
     if (frame.physics_steps != 1 || frame.integrated_2d != 1 ||
         runtime.elapsed_seconds() <= 0.0)
-        return 29;
+        return test_failure(29, __LINE__);
     const auto time_before_pause = runtime.elapsed_seconds();
     runtime.set_paused(true);
     if (!runtime.paused() ||
         runtime.advance(1.f).physics_steps != 0 ||
-        runtime.elapsed_seconds() != time_before_pause) return 36;
+        runtime.elapsed_seconds() != time_before_pause) return test_failure(36, __LINE__);
     runtime.set_paused(false);
     const auto long_frame = runtime.advance(2.f);
     if (!long_frame.clamped_delta || long_frame.physics_steps > 8)
-        return 30;
+        return test_failure(30, __LINE__);
     BundleManifest tampered = built;
     tampered.scene = "Content/Nonexistent.nscene";
     if (!save_bundle(tampered,
-            report.bundle_root / "NEngine.player", &error)) return 18;
+            report.bundle_root / "NEngine.player", &error)) return test_failure(18, __LINE__);
     if (runtime.load(report.bundle_root, &error) ||
         !runtime.ready() || runtime.entity_count() != 2u)
-        return 19; // Failed reload must not partially overwrite old World.
+        return test_failure(19, __LINE__); // Failed reload must not partially overwrite old World.
     if (!save_bundle(built,
-            report.bundle_root / "NEngine.player", &error)) return 20;
+            report.bundle_root / "NEngine.player", &error)) return test_failure(20, __LINE__);
     std::filesystem::remove(
         report.bundle_root / "Content" / "Main.nscene");
     if (runtime.load(report.bundle_root, &error) ||
         !runtime.ready() || runtime.entity_count() != 2u)
-        return 21;
+        return test_failure(21, __LINE__);
     runtime.unload();
     if (runtime.ready() || runtime.entity_count() != 0 ||
-        runtime.pending_script_count() != 0) return 14;
+        runtime.pending_script_count() != 0) return test_failure(14, __LINE__);
     { std::ofstream executable(root / "player.fixture", std::ios::binary);
       executable << "test executable"; }
     settings.destination = export_base / "RunnableBuild";
     settings.player_executable = root / "player.fixture";
-    if (!export_player_data(settings, report, &error)) return 15;
+    if (!export_player_data(settings, report, &error)) return test_failure(15, __LINE__);
 #if defined(_WIN32)
     const auto packed_binary = report.bundle_root / "NEnginePlayer.exe";
 #else
     const auto packed_binary = report.bundle_root / "NEnginePlayer";
 #endif
-    if (!std::filesystem::is_regular_file(packed_binary)) return 16;
+    if (!std::filesystem::is_regular_file(packed_binary)) return test_failure(16, __LINE__);
     settings.destination = export_base / "MissingBinary";
     settings.player_executable = root / "missing-executable";
     if (export_player_data(settings, report, &error) ||
-        std::filesystem::exists(settings.destination)) return 17;
+        std::filesystem::exists(settings.destination)) return test_failure(17, __LINE__);
     settings.player_executable.clear();
     settings.destination = export_base / "Build";
-    if (export_player_data(settings, report, &error)) return 10;
+    if (export_player_data(settings, report, &error)) return test_failure(10, __LINE__);
     settings.destination = project / "BadExport";
     if (export_player_data(settings, report, &error) ||
-        std::filesystem::exists(settings.destination)) return 11;
+        std::filesystem::exists(settings.destination)) return test_failure(11, __LINE__);
     settings.destination = export_base / "Bad";
     settings.startup_scene = "../outside.nscene";
     if (export_player_data(settings, report, &error) ||
-        std::filesystem::exists(settings.destination)) return 12;
+        std::filesystem::exists(settings.destination)) return test_failure(12, __LINE__);
     settings.startup_scene = "Assets/Scenes/Main.nscene";
     settings.title.clear();
     settings.destination = export_base / "BadTitle";
     if (export_player_data(settings, report, &error) ||
-        std::filesystem::exists(settings.destination)) return 26;
+        std::filesystem::exists(settings.destination)) return test_failure(26, __LINE__);
     settings.title = "Test Player";
     settings.destination = export_base / "MalformedScene";
     { std::ofstream invalid(project / "Assets" / "Scenes" / "Main.nscene",
                             std::ios::binary | std::ios::trunc);
       invalid << "INVALID_SCENE\n"; }
     if (export_player_data(settings, report, &error) ||
-        std::filesystem::exists(settings.destination)) return 27;
+        std::filesystem::exists(settings.destination)) return test_failure(27, __LINE__);
     std::filesystem::remove_all(root);
     std::cout << "player bundle export tests passed\n";
     return 0;
