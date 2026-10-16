@@ -51,21 +51,29 @@ std::optional<assets::CachedArtifactSet> PlayerAssets::cooked_artifacts(
     std::error_code ec;
     if (std::filesystem::is_symlink(folder, ec) || ec)
         return std::nullopt;
+    const auto extension = record->source_path.extension().string();
+    const bool texture = extension == ".png" || extension == ".jpg" ||
+        extension == ".jpeg" || extension == ".webp" ||
+        extension == ".bmp" || extension == ".tga";
+    const bool material = extension == ".nmat";
+    if (!texture && !material) return std::nullopt;
     const auto descriptor = folder / "texture.nasset";
-    const auto staged = folder / ("source" + record->source_path.extension().string());
-    if (std::filesystem::is_symlink(descriptor, ec) ||
-        std::filesystem::is_symlink(staged, ec) || ec ||
-        !std::filesystem::is_regular_file(descriptor, ec) ||
+    const auto staged = folder / ("source" + extension);
+    if (std::filesystem::is_symlink(staged, ec) || ec ||
         !std::filesystem::is_regular_file(staged, ec) || ec)
+        return std::nullopt;
+    if (texture && (std::filesystem::is_symlink(descriptor, ec) || ec ||
+        !std::filesystem::is_regular_file(descriptor, ec) || ec))
         return std::nullopt;
     const auto actual = std::filesystem::canonical(folder, ec);
     if (ec || actual != folder.lexically_normal()) return std::nullopt;
     assets::CachedArtifactSet artifacts;
-    artifacts.importer_id = "NEngine.Texture";
+    artifacts.importer_id = texture ? "NEngine.Texture" : "NEngine.Material";
     artifacts.importer_version = 1;
     artifacts.fingerprint = "Player-Cooked-v1-" + guid.to_string();
     artifacts.artifacts.push_back({staged, "source"});
-    artifacts.artifacts.push_back({descriptor, "texture-descriptor"});
+    if (texture)
+        artifacts.artifacts.push_back({descriptor, "texture-descriptor"});
     return artifacts;
 }
 
