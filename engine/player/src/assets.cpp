@@ -8,10 +8,26 @@ namespace nengine::player {
 bool PlayerAssets::open(const std::filesystem::path& bundle_root,
                         std::string* error) {
     std::error_code ec;
-    const auto content = std::filesystem::canonical(
-        bundle_root / "Content" / "Assets", ec);
+    const auto base = std::filesystem::canonical(bundle_root, ec);
+    if (ec || !std::filesystem::is_directory(base)) {
+        if (error) *error = "Player bundle root unavailable";
+        return false;
+    }
+    const auto content_path = base / "Content";
+    const auto asset_path = content_path / "Assets";
+    if (std::filesystem::is_symlink(content_path, ec) ||
+        std::filesystem::is_symlink(asset_path, ec) || ec) {
+        if (error) *error = "Player Content directories cannot be symlinks";
+        return false;
+    }
+    const auto content = std::filesystem::canonical(asset_path, ec);
     if (ec || !std::filesystem::is_directory(content)) {
         if (error) *error = "Player Content/Assets directory unavailable";
+        return false;
+    }
+    const auto rel = content.lexically_relative(base);
+    if (rel.empty() || rel.is_absolute() || *rel.begin() == "..") {
+        if (error) *error = "Player asset catalog escapes bundle root";
         return false;
     }
     assets::AssetDatabase next(content);
