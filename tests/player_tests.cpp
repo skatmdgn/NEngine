@@ -146,6 +146,23 @@ int main() {
       meta << "NENGINE_META 1\nGUID " << wav_guid.to_string()
            << "\nIMPORTER " << std::quoted(std::string("NEngine.Audio"))
            << "\nEND_META\n"; }
+    // Additional bundled sources deliberately unreferenced by the saved
+    // Scene exercise Player clip loading after a managed property change.
+    const auto dynamic_wav_guid = nengine::assets::AssetGuid::generate();
+    std::filesystem::copy_file(
+        project / "Assets" / "Sounds" / "ping.wav",
+        project / "Assets" / "Sounds" / "extra.wav");
+    { std::ofstream meta(project / "Assets" / "Sounds" / "extra.wav.meta");
+      meta << "NENGINE_META 1\nGUID " << dynamic_wav_guid.to_string()
+           << "\nIMPORTER \"NEngine.Audio\"\nEND_META\n"; }
+    const auto dynamic_sprite_guid = nengine::assets::AssetGuid::generate();
+    { std::ofstream file(project / "Assets" / "Animations" / "extra.nanim");
+      file << "NENGINE_SPRITE_ANIMATION 1\nFRAMES 1\n"
+           << "FRAME " << std::quoted(texture_guid.to_string()) << " 0.1\n"
+           << "END_SPRITE_ANIMATION\n"; }
+    { std::ofstream meta(project / "Assets" / "Animations" / "extra.nanim.meta");
+      meta << "NENGINE_META 1\nGUID " << dynamic_sprite_guid.to_string()
+           << "\nIMPORTER \"NEngine.SpriteAnimation\"\nEND_META\n"; }
     { std::ofstream file(project / "Assets" / "Textures" / "ignore.cs");
       file << "do not ship source code"; }
     ExportSettings settings;
@@ -177,6 +194,38 @@ int main() {
         !runtime.ready() || runtime.entity_count() != 2u ||
         runtime.pending_script_count() != 1u ||
         !runtime.assets().source(texture_guid)) return test_failure(13, __LINE__);
+    {
+        PlayerRuntime dynamic;
+        if (!dynamic.load(report.bundle_root, &error) ||
+            dynamic.audio_clip(dynamic_wav_guid))
+            return test_failure(118, __LINE__);
+        const auto entity = dynamic.world().create("Runtime asset reassignment");
+        auto* sound = dynamic.world().add_component<nengine::audio::AudioSource>(
+            entity, nengine::audio::audio_source_type());
+        auto* animator = dynamic.world().add_component<
+            nengine::render::SpriteAnimator>(
+            entity, nengine::render::sprite_animator_type());
+        auto* renderer = dynamic.world().add_component<
+            nengine::render::SpriteRenderer>(
+            entity, nengine::render::sprite_renderer_type());
+        if (!sound || !animator || !renderer) return test_failure(119, __LINE__);
+        sound->clip = dynamic_wav_guid;
+        sound->playing = true;
+        animator->clip = dynamic_sprite_guid;
+        animator->playing = true;
+        if (const auto f = dynamic.advance(1.f / 60.f);
+            !dynamic.audio_clip(dynamic_wav_guid) ||
+            f.sprite_sampled < 1u || renderer->texture != texture_guid)
+            return test_failure(120, __LINE__);
+        const auto missing_guid = nengine::assets::AssetGuid::generate();
+        sound->clip = missing_guid;
+        animator->clip = missing_guid;
+        dynamic.advance(1.f / 60.f);
+        dynamic.advance(1.f / 60.f);
+        if (dynamic.audio_clip(missing_guid) != nullptr)
+            return test_failure(121, __LINE__);
+        dynamic.unload();
+    }
     runtime.begin_input_frame();
     runtime.input().set_key(nengine::input::Key::A, true);
     if (!runtime.input().held(nengine::input::Key::A) ||

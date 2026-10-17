@@ -9,6 +9,7 @@
 #include "nengine/player/assets.hpp"
 #include "nengine/audio/playback.hpp"
 #include <unordered_map>
+#include <unordered_set>
 #include "nengine/physics/simulation.hpp"
 #include "nengine/physics/contact_events.hpp"
 #include "nengine/input/input_state.hpp"
@@ -62,6 +63,13 @@ public:
     // Surface this explicitly rather than silently promising script execution.
     std::size_t pending_script_count() const noexcept;
 private:
+    // Resolve newly assigned C# clip GUIDs from the immutable export bundle
+    // without repeatedly attempting to decode invalid/missing assets.
+    void ensure_referenced_assets();
+    std::unordered_set<assets::AssetGuid, assets::AssetGuidHash>
+        missing_audio_clips_{};
+    std::unordered_set<assets::AssetGuid, assets::AssetGuidHash>
+        missing_sprite_clips_{};
     core::World world_{};
     std::filesystem::path bundle_root_{};
     scripting::ManagedRuntime managed_runtime_{};

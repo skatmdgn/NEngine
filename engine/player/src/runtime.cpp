@@ -68,6 +68,35 @@ std::size_t PlayerRuntime::pending_script_count() const noexcept {
     return count;
 }
 
+void PlayerRuntime::ensure_referenced_assets() {
+    // Editor scene import preloads only the clips referenced at load time.
+    // Scripts may assign a different, already bundled AssetGuid at runtime.
+    for (const auto entity : world_.entities()) {
+        if (const auto* audio = world_.get_component<audio::AudioSource>(
+                entity, audio::audio_source_type())) {
+            const auto guid = audio->clip;
+            if (guid.valid() && !audio_clips_.contains(guid) &&
+                !missing_audio_clips_.contains(guid)) {
+                if (auto clip = assets_.load_wav(guid))
+                    audio_clips_.emplace(guid, std::move(*clip));
+                else
+                    missing_audio_clips_.insert(guid);
+            }
+        }
+        if (const auto* animator = world_.get_component<render::SpriteAnimator>(
+                entity, render::sprite_animator_type())) {
+            const auto guid = animator->clip;
+            if (guid.valid() && !sprite_clips_.contains(guid) &&
+                !missing_sprite_clips_.contains(guid)) {
+                if (auto clip = assets_.load_sprite_clip(guid))
+                    sprite_clips_.emplace(guid, std::move(*clip));
+                else
+                    missing_sprite_clips_.insert(guid);
+            }
+        }
+    }
+}
+
 PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
     PlayerFrameStats stats;
     if (!ready_ || paused_ ||
@@ -79,6 +108,7 @@ PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
         static_cast<double>(delta_seconds), max_frame);
     stats.clamped_delta = frame < static_cast<double>(delta_seconds);
     elapsed_seconds_ += frame;
+    ensure_referenced_assets();
     for (const auto entity : world_.entities()) {
         const auto* animator = world_.get_component<render::SpriteAnimator>(
             entity, render::sprite_animator_type());
@@ -173,6 +203,8 @@ void PlayerRuntime::unload() noexcept {
     assets_.clear();
     audio_clips_.clear();
     sprite_clips_.clear();
+    missing_audio_clips_.clear();
+    missing_sprite_clips_.clear();
     sprite_controllers_.clear();
     audio_playback_.reset();
     physics_cache_.clear();
@@ -249,6 +281,8 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
     assets_ = std::move(catalog);
     audio_clips_ = std::move(next_clips);
     sprite_clips_ = std::move(next_sprites);
+    missing_audio_clips_.clear();
+    missing_sprite_clips_.clear();
     sprite_controllers_ = std::move(next_controllers);
     audio_playback_.reset();
     physics_cache_.clear();

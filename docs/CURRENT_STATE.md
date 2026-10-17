@@ -49,6 +49,8 @@ This is a **dependency overview**, not a complete generated dependency graph. Th
 
 - **Audio property bridge:** The standalone Player now exposes C# AudioSource clip, playback, time, pitch, pan, spatialization/distance and AudioListener volume/enabled properties with validation, including clip-change playback reset tests. Streaming decoding and real WASAPI device QA remain pending.
 
+- **Runtime asset reassignment:** Standalone Player now scans referenced AudioSource/SpriteAnimator clips during frame advance and caches newly selected bundled WAV/.nanim assets; missing GUIDs are negatively cached until Scene reload. Regression fixtures verify previously unreferenced clips load and missing references fail safely. Dynamic controller-graph rebinding and non-WAV streaming remain future work.
+
 ## Highest-priority next work
 
 1. **Player completion:** exported glTF/OBJ generated material/texture subassets, managed action map/property parity, and genuine Windows GPU + .NET + input acceptance.
