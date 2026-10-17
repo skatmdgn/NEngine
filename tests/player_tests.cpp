@@ -251,6 +251,12 @@ int main() {
             animator->time_seconds >= 0.1f ||
             extreme.sprite_sampled == 0u)
             return test_failure(129, __LINE__);
+        renderer->enabled = false;
+        renderer->texture = {};
+        if (dynamic.advance(1.f / 60.f).sprite_sampled != 0u ||
+            renderer->texture.valid())
+            return test_failure(130, __LINE__);
+        renderer->enabled = true;
         const auto missing_guid = nengine::assets::AssetGuid::generate();
         sound->clip = missing_guid;
         animator->clip = missing_guid;

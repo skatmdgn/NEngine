@@ -191,7 +191,8 @@ PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
             sprite->playing = false;
         }
         if (auto* renderer = world_.get_component<render::SpriteRenderer>(
-                entity, render::sprite_renderer_type())) {
+                entity, render::sprite_renderer_type());
+            renderer && renderer->enabled) {
             renderer->texture = it->second.frames[*sampled].texture;
             ++stats.sprite_sampled;
         }
