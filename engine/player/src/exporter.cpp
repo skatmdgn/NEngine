@@ -256,11 +256,18 @@ bool export_player_data(const ExportSettings& settings,
                 cleanup();
                 return false;
             }
+            if (generated_materials > 8192u || generated_textures > 8192u ||
+                cooked.subassets.size() > 1024u) {
+                cleanup(); return fail(error, "too many generated Player subassets");
+            }
             for (const auto& subasset : cooked.subassets) {
                 if (subasset.importer_id == "NEngine.Material")
                     ++generated_materials;
                 if (subasset.importer_id == "NEngine.Texture")
                     ++generated_textures;
+                if (generated_materials > 8192u || generated_textures > 8192u) {
+                    cleanup(); return fail(error, "too many generated Player subassets");
+                }
             }
             ++cooked_models;
         }
