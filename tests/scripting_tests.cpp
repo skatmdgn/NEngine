@@ -1711,7 +1711,7 @@ int main() {
             "GetAbiVersion") !=
                 std::string::npos &&
         bridge.find(
-            "AbiVersion = 16") !=
+            "AbiVersion = 17") !=
                 std::string::npos &&
         bridge.find(
             "GameplayLoadContext") !=

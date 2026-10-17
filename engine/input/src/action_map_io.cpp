@@ -43,6 +43,10 @@ bool save_action_map_file(const std::filesystem::path& file, const ActionMap& ma
         std::filesystem::is_symlink(file, ec) || ec ||
         !std::filesystem::is_directory(file.parent_path(), ec) || ec)
         return fail(error, "invalid action map output path");
+    // Never rename over an existing file: POSIX rename replaces it, while
+    // Windows rename refuses it. Enforce one portable non-overwrite policy.
+    if (std::filesystem::exists(file, ec) || ec)
+        return fail(error, "action map target already exists");
     auto temporary = file;
     temporary += ".nengine-" + std::to_string(
         std::chrono::steady_clock::now().time_since_epoch().count()) + ".tmp";

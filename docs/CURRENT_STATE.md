@@ -70,6 +70,7 @@ This is a **dependency overview**, not a complete generated dependency graph. Th
 
 - Added validated v1 action-map serialization (integrating work previously present in open PR #1), bounded runtime bindings, per-key unbinding and portable project `Input.ninput` reading/writing.
 - Player export stages a canonical validated input map at `Content/Input.ninput`, rejecting corrupt and symlink inputs. Player load resolves this map transactionally; legacy bundles without a map retain empty actions.
+- Changed managed Bridge ABI to v17 for the appended native InputAction callback; stale v16 managed binaries must be rebuilt.
 - Standalone managed .NET gameplay now exposes `Input.GetButton(string)`, `Input.GetButtonDown(string)`, and `Input.GetButtonUp(string)`, backed by a new optional native input-action callback. Invalid action names and unavailable bindings report false.
 - Expanded portable input, Player bundle/CLI, script-generated API and (when dotnet is installed) managed gameplay callback regression coverage.
 - **New changes must pass Windows + Ubuntu final CI**; neither successful CTest nor .NET smoke checks constitute interactive Win32/Vulkan GPU, hardware audio or Android release acceptance.
