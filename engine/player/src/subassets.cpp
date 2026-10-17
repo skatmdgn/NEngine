@@ -98,9 +98,60 @@ bool write_model_subassets(const std::filesystem::path& model_folder,
     return true;
 }
 
-bool read_model_subassets(const std::filesystem::path&,
+bool read_model_subassets(const std::filesystem::path& model_folder,
     std::vector<CookedSubasset>& out, std::string* error) {
-    out.clear();
+    const auto path = model_folder / "subassets.nasset";
+    std::error_code ec;
+    const auto status = std::filesystem::symlink_status(path, ec);
+    if (ec == std::errc::no_such_file_or_directory) ec.clear();
+    if (ec || std::filesystem::is_symlink(status))
+        return fail(error, "unsafe model subasset index");
+    if (!std::filesystem::exists(status)) {
+        out.clear();
+        if (error) error->clear();
+        return true;
+    }
+    const auto bytes = std::filesystem::file_size(path, ec);
+    if (ec || bytes > max_manifest_size)
+        return fail(error, "model subasset index exceeds size limit");
+    std::ifstream stream(path, std::ios::binary);
+    std::string token;
+    int version = 0;
+    std::size_t count = 0;
+    if (!stream || !(stream >> token >> version) ||
+        token != "NENGINE_PLAYER_SUBASSETS" || version != 1 ||
+        !(stream >> token >> count) || token != "COUNT" || count > max_subassets)
+        return fail(error, "invalid model subasset index header");
+    std::vector<CookedSubasset> parsed;
+    std::set<std::string> seen;
+    for (std::size_t i = 0; i < count; ++i) {
+        CookedSubasset item;
+        std::string guid;
+        std::size_t artifacts = 0;
+        if (!(stream >> token >> std::quoted(guid) >>
+              std::quoted(item.importer_id) >> artifacts) || token != "ITEM" ||
+            artifacts == 0 || artifacts > max_artifacts)
+            return fail(error, "invalid model subasset entry");
+        const auto parsed_guid = assets::AssetGuid::parse(guid);
+        if (!parsed_guid || !parsed_guid->valid() || !seen.insert(guid).second)
+            return fail(error, "duplicate or invalid model subasset GUID");
+        item.guid = *parsed_guid;
+        for (std::size_t j = 0; j < artifacts; ++j) {
+            std::string relative, role;
+            if (!(stream >> token >> std::quoted(relative) >> std::quoted(role)) ||
+                token != "ARTIFACT" ||
+                !contained_file(model_folder, relative))
+                return fail(error, "invalid or unsafe model subasset artifact");
+            item.artifacts.push_back({model_folder / relative, role});
+        }
+        if (!(stream >> token) || token != "END_ITEM" || !valid_role(item))
+            return fail(error, "invalid model subasset type or roles");
+        parsed.push_back(std::move(item));
+    }
+    if (!(stream >> token) || token != "END_SUBASSETS" || stream >> token)
+        return fail(error, "model subasset index terminator invalid");
+    if (!stream.eof()) return fail(error, "model subasset index trailing stream error");
+    out = std::move(parsed);
     if (error) error->clear();
     return true;
 }
