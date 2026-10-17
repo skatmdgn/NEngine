@@ -627,6 +627,22 @@ int main() {
             !read("NEngine.SphereCollider", "Radius") ||
             std::get<double>(collider_value) != 3.0)
             return test_failure(137, __LINE__);
+// 3D capsule cannot be set shorter than twice its radius.
+        if (!write("NEngine.CapsuleCollider", "Height", 8.0) ||
+            !write("NEngine.CapsuleCollider", "Radius", 2.0) ||
+            !write("NEngine.CapsuleCollider", "Direction", std::int64_t{2}) ||
+            !read("NEngine.CapsuleCollider", "Direction") ||
+            std::get<std::int64_t>(collider_value) != 2 ||
+            write("NEngine.CapsuleCollider", "Radius", 5.0) ||
+            write("NEngine.CapsuleCollider", "Height", 3.0) ||
+            write("NEngine.CapsuleCollider", "Direction", std::int64_t{3}) ||
+            write("NEngine.CapsuleCollider", "Radius",
+                  std::numeric_limits<double>::infinity()) ||
+            !read("NEngine.CapsuleCollider", "Radius") ||
+            std::get<double>(collider_value) != 2.0 ||
+            !read("NEngine.CapsuleCollider", "Height") ||
+            std::get<double>(collider_value) != 8.0)
+            return test_failure(138, __LINE__);
         // COLLIDER_CASES
     }
     if (!runtime.world().destroy(collider_entity))
