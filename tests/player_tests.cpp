@@ -659,6 +659,18 @@ int main() {
             !read("NEngine.BoxCollider2D", "Size") ||
             std::get<nengine::core::Vec3>(collider_value).y != 3.f)
             return test_failure(139, __LINE__);
+// Circular 2D primitive supports contact coefficients and radius.
+        if (!write("NEngine.CircleCollider2D", "Radius", 0.75) ||
+            !write("NEngine.CircleCollider2D", "Is Trigger", true) ||
+            !write("NEngine.CircleCollider2D", "Restitution", 0.5) ||
+            !read("NEngine.CircleCollider2D", "Radius") ||
+            std::get<double>(collider_value) != 0.75 ||
+            write("NEngine.CircleCollider2D", "Radius", 0.0) ||
+            write("NEngine.CircleCollider2D", "Radius", 1.0e20) ||
+            write("NEngine.CircleCollider2D", "Restitution", -0.1) ||
+            !read("NEngine.CircleCollider2D", "Radius") ||
+            std::get<double>(collider_value) != 0.75)
+            return test_failure(140, __LINE__);
         // COLLIDER_CASES
     }
     if (!runtime.world().destroy(collider_entity))
