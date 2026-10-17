@@ -290,6 +290,10 @@ int main() {
             return test_failure(132, __LINE__);
         dynamic.unload();
     }
+    if (!runtime.actions().contains("Jump") ||
+        !runtime.actions().contains("Fire") ||
+        runtime.actions().action_count() != 2u)
+        return test_failure(148, __LINE__);
     runtime.begin_input_frame();
     runtime.input().set_key(nengine::input::Key::A, true);
     if (!runtime.input().held(nengine::input::Key::A) ||
