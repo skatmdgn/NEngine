@@ -269,6 +269,74 @@ int main() {
             std::get<double>(volume) > 0.5;
     }
     if (!audio_property_ok) return test_failure(54, __LINE__);
+    // Exported Player has to expose the same native 3D/2D Rigidbody
+    // properties used by generated C# gameplay, including wake semantics.
+    const auto bridge_entity = runtime.world().create("Player Rigidbody bridge");
+    if (!runtime.world().add_component<nengine::physics::Rigidbody>(
+            bridge_entity, nengine::physics::rigidbody_type()) ||
+        !runtime.world().add_component<nengine::physics::Rigidbody2D>(
+            bridge_entity, nengine::physics::rigidbody2d_type()))
+        return test_failure(101, __LINE__);
+    for (const auto* kind : {"NEngine.Rigidbody", "NEngine.Rigidbody2D"}) {
+        nengine::core::PropertyValue value;
+        const auto read = [&](std::string_view name) {
+            return read_player_transform_property(
+                runtime.world(), bridge_entity, kind, name, value);
+        };
+        const auto write = [&](std::string_view name,
+                               const nengine::core::PropertyValue& input) {
+            return write_player_transform_property(
+                runtime.world(), bridge_entity, kind, name, input);
+        };
+        if (!write("Use Gravity", false) || !read("Use Gravity") ||
+            std::get<bool>(value) ||
+            !write("Is Kinematic", true) || !read("Is Kinematic") ||
+            !std::get<bool>(value) ||
+            !write("Mass", 7.25) || !read("Mass") ||
+            std::get<double>(value) != 7.25 ||
+            !write("Gravity Scale", 0.0) || !read("Gravity Scale") ||
+            std::get<double>(value) != 0.0 ||
+            !write("Sleep Threshold", 0.125) ||
+            !read("Sleep Threshold") ||
+            std::get<double>(value) != 0.125)
+            return test_failure(102, __LINE__);
+        if (!write("Linear Velocity", nengine::core::Vec3{1, 2, 3}) ||
+            !write("Angular Velocity", nengine::core::Vec3{4, 5, 6}) ||
+            !read("Angular Velocity") ||
+            std::get<nengine::core::Vec3>(value).z != 6.f ||
+            !write("Sleeping", true) || !read("Sleeping") ||
+            !std::get<bool>(value) ||
+            !read("Linear Velocity") ||
+            std::get<nengine::core::Vec3>(value).x != 0.f)
+            return test_failure(103, __LINE__);
+        if (!write("Linear Velocity", nengine::core::Vec3{2, 0, 0}) ||
+            !read("Sleeping") || std::get<bool>(value) ||
+            !write("Sleeping", true) ||
+            !write("Allow Sleep", false) || !read("Sleeping") ||
+            std::get<bool>(value) ||
+            !write("Sleeping", true) || !read("Sleeping") ||
+            std::get<bool>(value))
+            return test_failure(104, __LINE__);
+        if (write("Mass", -1.0) || write("Mass", 0.0) ||
+            write("Mass", 1.0e-300) ||
+            write("Gravity Scale", -0.5) ||
+            write("Mass", std::numeric_limits<double>::infinity()) ||
+            write("Sleep Threshold", std::numeric_limits<double>::quiet_NaN()) ||
+            write("Linear Velocity", nengine::core::Vec3{
+                std::numeric_limits<float>::infinity(), 0, 0}) ||
+            write("Angular Velocity", nengine::core::Vec3{
+                0, std::numeric_limits<float>::quiet_NaN(), 0}) ||
+            write("Enabled", 1.0) ||
+            write("Made Up", true) || read("Made Up"))
+            return test_failure(105, __LINE__);
+    }
+    if (read_player_transform_property(
+            runtime.world(), first_entity, "NEngine.Rigidbody",
+            "Mass", property) ||
+        write_player_transform_property(
+            runtime.world(), first_entity, "NEngine.Rigidbody",
+            "Mass", 2.0))
+        return test_failure(106, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto cooked_model = runtime.assets().cooked_artifacts(model_guid);
     const auto cooked_material = runtime.assets().cooked_artifacts(material_guid);

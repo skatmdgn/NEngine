@@ -292,6 +292,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Managed Transform, Rigidbody2D and AudioSource property bridge with finite validation
 - [ ] Full imported model generated material and texture subasset cooking
 - [ ] Production Windows GPU + .NET runtime + game input hardware acceptance
+- [x] Full native Player 3D/2D Rigidbody C# property bridge with sleeping/wake semantics and invalid-value regressions
 - [ ] Full Player input action map and parity for all managed component properties
 
 - [x] Standalone Windows Player bootstrap target and project export CLI (foundation only)

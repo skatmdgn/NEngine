@@ -43,6 +43,8 @@ This is a **dependency overview**, not a complete generated dependency graph. Th
 | Standalone Windows Player (0.9 partial) | Bundle/CLI exporter, World simulation, WAV/sprite, prebuilt managed-game DLL hosting, 2D/3D events, texture + model/.nmat descriptor cooking, focused Win32 keyboard/mouse and 2D/3D queries | Not yet a generally shippable Windows game exporter; imported material subasset cooking, wider API parity, production GPU/.NET/input QA missing |
 | Android / SDK plugins | Windows+Android target and extension policy documented | APK/AAB, Vulkan Android surface, toolchain profiles, native/plugin integration still unimplemented |
 
+- **Rigidbody parity update:** Standalone Player managed native property bridge supports both 3D and 2D Rigidbody, including Use Gravity, Is Kinematic, Allow Sleep, Sleeping, Mass, Gravity Scale, Sleep Threshold, Linear Velocity and Angular Velocity. Invalid types/nonfinite values are rejected, and velocity edits wake sleeping bodies. These are focused regression-tested code paths; interactive .NET Player hardware acceptance is still pending.
+
 ## Highest-priority next work
 
 1. **Player completion:** exported glTF/OBJ generated material/texture subassets, managed action map/property parity, and genuine Windows GPU + .NET + input acceptance.
