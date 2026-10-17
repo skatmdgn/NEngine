@@ -104,12 +104,31 @@ bool write_common(T& c, std::string_view property,
 bool read_player_collider_property(const core::World& world,
     core::Entity entity, std::string_view component,
     std::string_view property, core::PropertyValue& value) {
+    if (component == "NEngine.BoxCollider") {
+        const auto* c = world.get_component<physics::BoxCollider>(entity, physics::box_collider_type());
+        if (!c) return false;
+        if (common_name(property)) return read_common(*c, property, value);
+        if (property == "Size") { value = c->size; return true; }
+        return false;
+    }
     return false;
 }
 
 bool write_player_collider_property(core::World& world,
     core::Entity entity, std::string_view component,
     std::string_view property, const core::PropertyValue& value) {
+    if (component == "NEngine.BoxCollider") {
+        auto* c = world.get_component<physics::BoxCollider>(entity, physics::box_collider_type());
+        if (!c) return false;
+        if (common_name(property)) return write_common(*c, property, value, false);
+        if (property == "Size") {
+            core::Vec3 next{};
+            if (!vector_field(value, next, true, false)) return false;
+            c->size = next;
+            return true;
+        }
+        return false;
+    }
     return false;
 }
 } // namespace nengine::player
