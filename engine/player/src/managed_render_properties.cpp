@@ -184,6 +184,44 @@ bool write_sprite(render::SpriteRenderer& v, std::string_view key,
     return false;
 }
 
+
+bool read_animator(const render::SpriteAnimator& a, std::string_view key,
+                   core::PropertyValue& out) {
+    if (key == "Enabled") out = a.enabled;
+    else if (key == "Playing") out = a.playing;
+    else if (key == "Loop") out = a.loop;
+    else if (key == "Clip") out = asset_text(a.clip);
+    else if (key == "Controller") out = asset_text(a.controller);
+    else if (key == "Speed") out = static_cast<double>(a.speed);
+    else if (key == "Time") out = static_cast<double>(a.time_seconds);
+    else if (key == "Bool Parameter") out = a.last_bool_parameter;
+    else return false;
+    return true;
+}
+
+bool write_animator(render::SpriteAnimator& a, std::string_view key,
+                    const core::PropertyValue& value) {
+    if (key == "Enabled") return bool_value(value, a, &render::SpriteAnimator::enabled);
+    if (key == "Playing") return bool_value(value, a, &render::SpriteAnimator::playing);
+    if (key == "Loop") return bool_value(value, a, &render::SpriteAnimator::loop);
+    if (key == "Clip" || key == "Controller") {
+        assets::AssetGuid next;
+        if (!asset_value(value, next)) return false;
+        if (key == "Clip") a.clip = next;
+        else a.controller = next;
+        a.time_seconds = 0.f;
+        return true;
+    }
+    float f{};
+    if (key == "Speed" || key == "Time") {
+        if (!bounded_float(value, f, 0.0, 1.0e6)) return false;
+        if (key == "Speed") a.speed = f;
+        else a.time_seconds = f;
+        return true;
+    }
+    return false;
+}
+
 bool read_mesh(const render::MeshRenderer& v, std::string_view key,
                core::PropertyValue& out) {
     if (key == "Enabled") out = v.enabled;
@@ -232,6 +270,11 @@ bool read_player_render_property(const core::World& world,
             entity, render::sprite_renderer_type());
         return c && read_sprite(*c, property, value);
     }
+    if (component == "NEngine.SpriteAnimator") {
+        const auto* animator = world.get_component<render::SpriteAnimator>(
+            entity, render::sprite_animator_type());
+        return animator && read_animator(*animator, property, value);
+    }
     if (component == "NEngine.MeshRenderer") {
         const auto* c = world.get_component<render::MeshRenderer>(
             entity, render::mesh_renderer_type());
@@ -257,6 +300,11 @@ bool write_player_render_property(core::World& world,
         auto* c = world.get_component<render::SpriteRenderer>(
             entity, render::sprite_renderer_type());
         return c && write_sprite(*c, property, value);
+    }
+    if (component == "NEngine.SpriteAnimator") {
+        auto* animator = world.get_component<render::SpriteAnimator>(
+            entity, render::sprite_animator_type());
+        return animator && write_animator(*animator, property, value);
     }
     if (component == "NEngine.MeshRenderer") {
         auto* c = world.get_component<render::MeshRenderer>(
