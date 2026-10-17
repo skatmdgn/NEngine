@@ -85,6 +85,18 @@ void PlayerRuntime::ensure_referenced_assets() {
         }
         if (const auto* animator = world_.get_component<render::SpriteAnimator>(
                 entity, render::sprite_animator_type())) {
+            const auto existing = controller_bindings_.find(entity.value);
+            if (existing != controller_bindings_.end() &&
+                existing->second != animator->controller) {
+                sprite_controllers_.unbind(entity);
+                controller_bindings_.erase(existing);
+            }
+            if (animator->controller.valid() &&
+                !controller_bindings_.contains(entity.value)) {
+                auto definition = assets_.load_controller(animator->controller);
+                if (definition && sprite_controllers_.bind(entity, std::move(*definition)))
+                    controller_bindings_[entity.value] = animator->controller;
+            }
             const auto guid = animator->clip;
             if (guid.valid() && !sprite_clips_.contains(guid) &&
                 !missing_sprite_clips_.contains(guid)) {
