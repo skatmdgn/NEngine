@@ -1,5 +1,6 @@
 #include "nengine/player/exporter.hpp"
 #include "nengine/player/bundle.hpp"
+#include "nengine/input/action_map_io.hpp"
 #include "nengine/core/scene.hpp"
 #include "nengine/assets/asset_database.hpp"
 #include "nengine/assets/builtin_processors.hpp"
@@ -85,6 +86,19 @@ bool export_player_data(const ExportSettings& settings,
         source, staging / "Content" / "Main.nscene",
         std::filesystem::copy_options::none, ec);
     if (ec) { cleanup(); return fail(error, "cannot copy player startup Scene"); }
+    const auto action_source = root / "Input.ninput";
+    if (std::filesystem::exists(action_source, ec) && !ec) {
+        input::ActionMap map;
+        if (!input::load_action_map_file(action_source, map, error)) {
+            cleanup();
+            return false;
+        }
+        std::filesystem::copy_file(action_source, staging / "Content" / "Input.ninput",
+            std::filesystem::copy_options::none, ec);
+        if (ec) { cleanup(); return fail(error, "cannot export action map"); }
+    } else if (ec) {
+        cleanup(); return fail(error, "cannot inspect project Input.ninput");
+    }
     std::size_t copied_assets = 0;
     if (settings.copy_supported_assets) {
         const auto assets_root = root / "Assets";
