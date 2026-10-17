@@ -208,6 +208,9 @@ int main() {
         too_many_actions += "action A" + std::to_string(i) + " Space\n";
     reject(too_many_actions, "more than 128 actions is rejected");
 
+    check(restored.action_count() == 2u && removable.action_count() == 0u,
+          "bounded action count reflects load and precise removal");
+
     ActionMap every_key;
     for (int index = 1; index < static_cast<int>(Key::Count); ++index)
         check(

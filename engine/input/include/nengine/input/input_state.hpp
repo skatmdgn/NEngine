@@ -115,6 +115,8 @@ public:
     bool contains(
         std::string_view action) const;
 
+    std::size_t action_count() const noexcept { return bindings_.size(); }
+
     bool held(
         std::string_view action,
         const InputState& input) const;
