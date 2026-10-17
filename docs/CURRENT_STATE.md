@@ -59,6 +59,13 @@ This is a **dependency overview**, not a complete generated dependency graph. Th
 - Bounded negative caches for invalid asset GUIDs, added sprite property/controller/overflow/Scene reload regressions.
 - These are code changes submitted for CI; interactive Windows Vulkan, real managed DLL execution and Android export require separate acceptance.
 
+## Player managed Collider 2D/3D bridge (2026-10-17 batch; awaiting CI at final SHA)
+
+- Implemented dedicated managed property handling for the six Player collider components: 3D Box/Sphere/Capsule and 2D Box/Circle/Capsule. This closes a previously missing part of generated C# Physics API support in standalone Player.
+- Common fields include Enabled, Is Trigger, Layer, Collision Mask, Friction, Restitution and Center. Geometries support box Size, radial Radius, capsule Height/Direction or 2D Size/Direction, with finite/bounded checks, axis constraints, transactional rejection and 2D XY canonicalization.
+- Added portable Player tests for all six types (read/write, invalid inputs, absent components) plus 2D physics raycast integration proving C# property changes affect collision query outcomes.
+- These are **source + proposed regressions awaiting Windows/Ubuntu CI**; actual .NET gameplay deployment, Vulkan GPU acceptance and Android builds remain outside this test scope.
+
 ## Highest-priority next work
 
 1. **Player completion:** exported glTF/OBJ generated material/texture subassets, managed action map/property parity, and genuine Windows GPU + .NET + input acceptance.

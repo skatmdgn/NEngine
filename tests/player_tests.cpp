@@ -17,6 +17,7 @@
 #include "nengine/audio/components.hpp"
 #include "nengine/audio/registration.hpp"
 #include "nengine/physics/components.hpp"
+#include "nengine/physics/collision.hpp"
 #include "nengine/physics/registration.hpp"
 #include "nengine/scripting/components.hpp"
 #include "nengine/scripting/registration.hpp"
@@ -720,6 +721,29 @@ int main() {
     }
     if (!runtime.world().destroy(collider_entity))
         return test_failure(134, __LINE__);
+    // The managed Player collider bridge must also affect actual physics
+    // queries, not merely return changed values through a property getter.
+    const auto ray_entity = runtime.world().create("Managed 2D ray target");
+    if (!runtime.world().add_component<nengine::physics::BoxCollider2D>(
+            ray_entity, nengine::physics::box_collider2d_type()) ||
+        !write_player_transform_property(runtime.world(), ray_entity,
+            "NEngine.BoxCollider2D", "Layer", std::int64_t{3}) ||
+        !write_player_transform_property(runtime.world(), ray_entity,
+            "NEngine.BoxCollider2D", "Is Trigger", true))
+        return test_failure(144, __LINE__);
+    const auto ray = [&](bool triggers, std::uint32_t layers) {
+        return nengine::physics::raycast_2d(
+            runtime.world(), {-5.f, 0.f}, {1.f, 0.f},
+            10.f, triggers, layers);
+    };
+    if (ray(false, 1u << 3) || ray(true, 1u << 2) ||
+        !ray(true, 1u << 3) ||
+        ray(true, 1u << 3)->entity != ray_entity ||
+        !write_player_transform_property(runtime.world(), ray_entity,
+            "NEngine.BoxCollider2D", "Enabled", false) ||
+        ray(true, 1u << 3) ||
+        !runtime.world().destroy(ray_entity))
+        return test_failure(145, __LINE__);
     // Audio C# property parity in a packaged Player: clip changes must
     // reset playback and bad inputs must not mutate accepted state.
     const auto audio_entity = runtime.world().create("Managed audio bridge");
