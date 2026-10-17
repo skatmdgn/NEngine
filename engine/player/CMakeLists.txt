@@ -1,6 +1,7 @@
 add_library(NEnginePlayerKit STATIC
   src/bundle.cpp
   src/assets.cpp
+  src/subassets.cpp
   src/exporter.cpp
   src/runtime.cpp
   src/managed_queries.cpp
