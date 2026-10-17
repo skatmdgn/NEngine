@@ -1,6 +1,9 @@
 #include <iostream>
 
 #include "nengine/input/input_state.hpp"
+#include "nengine/input/action_map_io.hpp"
+#include <filesystem>
+#include <fstream>
 
 namespace {
 int failures = 0;
@@ -270,6 +273,18 @@ int main() {
         !excessive_export.serialize(untouched) &&
         untouched == "existing export contents",
         "oversized action binding lists cannot be exported");
+
+    const auto io_root = std::filesystem::temp_directory_path() /
+        "nengine_input_map_io_tests";
+    std::filesystem::remove_all(io_root);
+    std::filesystem::create_directories(io_root);
+    const auto io_file = io_root / "Input.ninput";
+    check(save_action_map_file(io_file, persistent, &persistence_error),
+          "project action map persists to a standalone source file");
+    ActionMap io_restored;
+    check(load_action_map_file(io_file, io_restored, &persistence_error) &&
+          io_restored.contains("Jump") && io_restored.contains("Fire"),
+          "bounded project action map loads back with all entries");
 
     if (failures != 0) {
         std::cerr << "NEngineInputTests: "
