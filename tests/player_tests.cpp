@@ -416,6 +416,67 @@ int main() {
                 "Intensity", prop))
             return test_failure(112, __LINE__);
     }
+    // Audio C# property parity in a packaged Player: clip changes must
+    // reset playback and bad inputs must not mutate accepted state.
+    const auto audio_entity = runtime.world().create("Managed audio bridge");
+    if (!runtime.world().add_component<nengine::audio::AudioSource>(
+            audio_entity, nengine::audio::audio_source_type()) ||
+        !runtime.world().add_component<nengine::audio::AudioListener>(
+            audio_entity, nengine::audio::audio_listener_type()))
+        return test_failure(114, __LINE__);
+    {
+        nengine::core::PropertyValue prop;
+        const auto read = [&](std::string_view comp, std::string_view name) {
+            return read_player_transform_property(
+                runtime.world(), audio_entity, comp, name, prop);
+        };
+        const auto write = [&](std::string_view comp, std::string_view name,
+                               const nengine::core::PropertyValue& value) {
+            return write_player_transform_property(
+                runtime.world(), audio_entity, comp, name, value);
+        };
+        if (!write("NEngine.AudioSource", "Clip", wav_guid.to_string()) ||
+            !read("NEngine.AudioSource", "Clip") ||
+            std::get<std::string>(prop) != wav_guid.to_string() ||
+            !write("NEngine.AudioSource", "Play On Awake", false) ||
+            !write("NEngine.AudioSource", "Spatialize", true) ||
+            !write("NEngine.AudioSource", "Volume", 0.75) ||
+            !write("NEngine.AudioSource", "Pitch", 2.0) ||
+            !write("NEngine.AudioSource", "Pan Stereo", -0.25) ||
+            !write("NEngine.AudioSource", "Min Distance", 3.0) ||
+            !write("NEngine.AudioSource", "Max Distance", 20.0) ||
+            !write("NEngine.AudioSource", "Time", 4.0) ||
+            !write("NEngine.AudioSource", "Playing", true) ||
+            !read("NEngine.AudioSource", "Time") ||
+            std::get<double>(prop) != 4.0)
+            return test_failure(115, __LINE__);
+        if (write("NEngine.AudioSource", "Clip", std::string{"bad"}) ||
+            write("NEngine.AudioSource", "Volume", 2.0) ||
+            write("NEngine.AudioSource", "Pitch", -1.0) ||
+            write("NEngine.AudioSource", "Pan Stereo",
+                std::numeric_limits<double>::infinity()) ||
+            write("NEngine.AudioSource", "Min Distance", 25.0) ||
+            write("NEngine.AudioSource", "Max Distance", 1.0) ||
+            write("NEngine.AudioSource", "Time",
+                std::numeric_limits<double>::quiet_NaN()) ||
+            !read("NEngine.AudioSource", "Clip") ||
+            std::get<std::string>(prop) != wav_guid.to_string())
+            return test_failure(116, __LINE__);
+        const auto replacement = nengine::assets::AssetGuid::generate();
+        if (!write("NEngine.AudioSource", "Clip", replacement.to_string()) ||
+            !read("NEngine.AudioSource", "Playing") || std::get<bool>(prop) ||
+            !read("NEngine.AudioSource", "Time") ||
+            std::get<double>(prop) != 0.0 ||
+            !write("NEngine.AudioListener", "Enabled", false) ||
+            !write("NEngine.AudioListener", "Volume", 0.25) ||
+            !read("NEngine.AudioListener", "Volume") ||
+            std::get<double>(prop) != 0.25 ||
+            write("NEngine.AudioListener", "Volume", -0.1) ||
+            write("NEngine.AudioListener", "Enabled", 1.0) ||
+            read("NEngine.AudioListener", "Playing") ||
+            !runtime.world().destroy(audio_entity))
+            return test_failure(117, __LINE__);
+    }
     // Keep bridge fixtures out of the later fixed-step integration tests:
     // those assert exact entity counts and one simulated Rigidbody2D.
     if (!runtime.world().destroy(bridge_entity) ||

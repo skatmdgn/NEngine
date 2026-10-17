@@ -47,6 +47,8 @@ This is a **dependency overview**, not a complete generated dependency graph. Th
 
 - **Render property bridge:** Player C# native property calls can now read/write Camera, Light, SpriteRenderer and MeshRenderer attributes and AssetGuid references, with finite/range/type checks and portable tests. This does not imply production Vulkan Game View or real driver acceptance.
 
+- **Audio property bridge:** The standalone Player now exposes C# AudioSource clip, playback, time, pitch, pan, spatialization/distance and AudioListener volume/enabled properties with validation, including clip-change playback reset tests. Streaming decoding and real WASAPI device QA remain pending.
+
 ## Highest-priority next work
 
 1. **Player completion:** exported glTF/OBJ generated material/texture subassets, managed action map/property parity, and genuine Windows GPU + .NET + input acceptance.
