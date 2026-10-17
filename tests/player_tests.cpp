@@ -914,6 +914,26 @@ int main() {
         generated_pixels.width != 1u || generated_pixels.height != 1u ||
         !generated_pixels.valid())
         return test_failure(164, __LINE__);
+    // Corrupting one exported index must fail a new catalog bootstrap
+    // without silently dropping the offending material.
+    const auto real_index = report.bundle_root / "Content" / "Cooked" /
+        model_guid.to_string() / "subassets.nasset";
+    std::string saved_index;
+    { std::ifstream in(real_index, std::ios::binary);
+      saved_index.assign(std::istreambuf_iterator<char>(in),
+                         std::istreambuf_iterator<char>()); }
+    if (saved_index.empty()) return test_failure(165, __LINE__);
+    { std::ofstream out(real_index, std::ios::binary | std::ios::trunc);
+      out << "NENGINE_PLAYER_SUBASSETS 99\n"; }
+    PlayerAssets tampered_catalog;
+    if (tampered_catalog.open(report.bundle_root, &error) ||
+        tampered_catalog.generated_subasset_count() != 0u)
+        return test_failure(166, __LINE__);
+    { std::ofstream out(real_index, std::ios::binary | std::ios::trunc);
+      out << saved_index; }
+    if (!tampered_catalog.open(report.bundle_root, &error) ||
+        tampered_catalog.generated_subasset_count() != 2u)
+        return test_failure(167, __LINE__);
     const auto cooked_model = runtime.assets().cooked_artifacts(model_guid);
     const auto cooked_material = runtime.assets().cooked_artifacts(material_guid);
     nengine::render::CookedModelMaterialMap generated_mappings;
