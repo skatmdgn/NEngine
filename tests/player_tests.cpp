@@ -1087,6 +1087,18 @@ int main() {
     bad_generated[1].artifacts[0].path = generated_material_path;
     if (write_model_subassets(generated, bad_generated, &error))
         return test_failure(158, __LINE__);
+    bad_generated = generated_subassets;
+    bad_generated[1].guid = generated_material_guid;
+    if (write_model_subassets(generated, bad_generated, &error))
+        return test_failure(159, __LINE__);
+    bad_generated = generated_subassets;
+    bad_generated[1].importer_id = "NEngine.GameCode";
+    if (write_model_subassets(generated, bad_generated, &error))
+        return test_failure(160, __LINE__);
+    bad_generated = generated_subassets;
+    bad_generated[1].artifacts[1].role = "source";
+    if (write_model_subassets(generated, bad_generated, &error))
+        return test_failure(161, __LINE__);
     // GENERATED_SUBASSET_TESTS
     std::filesystem::remove_all(root);
     std::cout << "player bundle export tests passed\n";
