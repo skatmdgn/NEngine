@@ -137,7 +137,8 @@ bool ActionMap::bind(
 
     if (action.empty() ||
         key == Key::Unknown ||
-        key == Key::Count ||
+        static_cast<std::size_t>(key) >=
+            static_cast<std::size_t>(Key::Count) ||
         action.size() > 64u ||
         !std::all_of(action.begin(), action.end(), [](unsigned char ch) {
             return (ch >= 'a' && ch <= 'z') ||

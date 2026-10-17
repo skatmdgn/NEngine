@@ -256,23 +256,27 @@ int main() {
           too_many_live_keys.bindings("Jump")->size() == 16u,
           "17th key rejected without breaking idempotent bind");
 
+    // Invalid authoring data is rejected at bind time now, rather than
+    // existing as an unserializable in-memory map as in the old tests.
     ActionMap invalid_for_export;
-    invalid_for_export.bind("Invalid Action", Key::A);
+    check(!invalid_for_export.bind("Invalid Action", Key::A) &&
+          invalid_for_export.action_count() == 0u,
+          "unsafe authoring action names rejected before serialization");
     std::string untouched = "existing export contents";
     persistence_error.clear();
-    check(
-        !invalid_for_export.serialize(untouched, &persistence_error) &&
-        untouched == "existing export contents" &&
-        !persistence_error.empty(),
-        "invalid action map export does not overwrite caller data");
+    check(invalid_for_export.serialize(untouched, &persistence_error) &&
+          untouched == "NENGINE_ACTION_MAP 1\n" &&
+          persistence_error.empty(),
+          "valid empty map remains serializable");
     ActionMap excessive_export;
     for (char key = 'A'; key <= 'Q'; ++key)
         excessive_export.bind("Jump", static_cast<Key>(
             static_cast<int>(Key::A) + key - 'A'));
-    check(
-        !excessive_export.serialize(untouched) &&
-        untouched == "existing export contents",
-        "oversized action binding lists cannot be exported");
+    check(excessive_export.bindings("Jump") &&
+          excessive_export.bindings("Jump")->size() == 16u &&
+          excessive_export.serialize(untouched) &&
+          untouched.find("NENGINE_ACTION_MAP 1\n") == 0u,
+          "runtime key cap maintains exportable state");
 
     const auto io_root = std::filesystem::temp_directory_path() /
         "nengine_input_map_io_tests";
