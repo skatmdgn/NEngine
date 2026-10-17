@@ -233,6 +233,26 @@ int main() {
             "every serialized key maps back to its original enum value");
     }
 
+    ActionMap strict;
+    check(!strict.bind("Bad Space", Key::A) &&
+          !strict.bind(std::string(65, 'a'), Key::B) &&
+          !strict.bind("", Key::Space) &&
+          strict.action_count() == 0,
+          "invalid names cannot be inserted into runtime input actions");
+    for (int i = 0; i < 128; ++i)
+        check(strict.bind("A" + std::to_string(i), Key::A),
+              "up to 128 named input actions can be created");
+    check(!strict.bind("Overflow", Key::A) && strict.action_count() == 128,
+          "a 129th action cannot be created");
+    ActionMap too_many_live_keys;
+    for (int k = 0; k < 16; ++k)
+        check(too_many_live_keys.bind("Jump", static_cast<Key>(
+                  static_cast<int>(Key::A) + k)), "first 16 keys accepted");
+    check(!too_many_live_keys.bind("Jump", Key::Space) &&
+          too_many_live_keys.bind("Jump", Key::A) &&
+          too_many_live_keys.bindings("Jump")->size() == 16u,
+          "17th key rejected without breaking idempotent bind");
+
     ActionMap invalid_for_export;
     invalid_for_export.bind("Invalid Action", Key::A);
     std::string untouched = "existing export contents";
