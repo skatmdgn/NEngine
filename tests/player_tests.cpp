@@ -15,6 +15,7 @@
 #include "nengine/player/managed_properties.hpp"
 #include "nengine/core/scene.hpp"
 #include "nengine/render/components.hpp"
+#include "nengine/render/model_importer.hpp"
 #include "nengine/render/registration.hpp"
 #include "nengine/audio/components.hpp"
 #include "nengine/audio/registration.hpp"
@@ -113,7 +114,10 @@ int main() {
            << "\nIMPORTER \"NEngine.Material\"\nEND_META\n"; }
     std::filesystem::create_directories(project / "Assets" / "Models");
     { std::ofstream file(project / "Assets" / "Models" / "triangle.obj");
-      file << "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"; }
+      file << "mtllib triangle.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\n"
+              "usemtl Color\nf 1 2 3\n"; }
+    { std::ofstream mtl(project / "Assets" / "Models" / "triangle.mtl");
+      mtl << "newmtl Color\nKd 0.2 0.4 0.8\nd 1.0\n"; }
     { std::ofstream meta(project / "Assets" / "Models" / "triangle.obj.meta");
       meta << "NENGINE_META 1\nGUID " << model_guid.to_string()
            << "\nIMPORTER \"NEngine.Model\"\nEND_META\n"; }
@@ -188,6 +192,8 @@ int main() {
         report.cooked_textures < 1u ||
         report.cooked_materials != 1u ||
         report.cooked_models != 1u ||
+        report.generated_materials != 1u ||
+        report.generated_textures != 1u ||
         !std::filesystem::exists(
             report.bundle_root / "Content" / "Assets" / "Textures" / "hero.png") ||
         std::filesystem::exists(
