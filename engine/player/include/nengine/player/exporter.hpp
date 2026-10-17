@@ -28,6 +28,8 @@ struct ExportReport {
     std::size_t cooked_materials{0};
     std::size_t cooked_models{0};
     std::size_t managed_files{0};
+    std::size_t generated_materials{0};
+    std::size_t generated_textures{0};
 };
 
 // Produces a validated DATA bundle. The Player executable will be bundled

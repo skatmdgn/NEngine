@@ -231,6 +231,8 @@ bool export_player_data(const ExportSettings& settings,
         }
     }
     std::size_t cooked_models = 0;
+    std::size_t generated_materials = 0;
+    std::size_t generated_textures = 0;
     if (settings.copy_supported_assets) {
         const auto packaged = staging / "Content" / "Assets";
         assets::AssetDatabase db(packaged);
@@ -253,6 +255,12 @@ bool export_player_data(const ExportSettings& settings,
             if (!write_model_subassets(folder, cooked.subassets, error)) {
                 cleanup();
                 return false;
+            }
+            for (const auto& subasset : cooked.subassets) {
+                if (subasset.importer_id == "NEngine.Material")
+                    ++generated_materials;
+                if (subasset.importer_id == "NEngine.Texture")
+                    ++generated_textures;
             }
             ++cooked_models;
         }
@@ -326,7 +334,8 @@ bool export_player_data(const ExportSettings& settings,
     std::filesystem::rename(staging, final_path, ec);
     if (ec) { cleanup(); return fail(error, "cannot atomically finish player bundle"); }
     report = {final_path, scene.objects.size(), copied_assets,
-              cooked_textures, cooked_materials, cooked_models, managed_files};
+              cooked_textures, cooked_materials, cooked_models, managed_files,
+              generated_materials, generated_textures};
     if (error) error->clear();
     return true;
 }
