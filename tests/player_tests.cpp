@@ -16,6 +16,9 @@
 #include "nengine/core/scene.hpp"
 #include "nengine/render/components.hpp"
 #include "nengine/render/model_importer.hpp"
+#include "nengine/render/material_asset.hpp"
+#include "nengine/render/asset_resources.hpp"
+#include "nengine/render/decoded_texture.hpp"
 #include "nengine/render/registration.hpp"
 #include "nengine/audio/components.hpp"
 #include "nengine/audio/registration.hpp"
@@ -896,6 +899,21 @@ int main() {
         !runtime.assets().source(derived_material) ||
         !runtime.assets().source(derived_texture))
         return test_failure(162, __LINE__);
+    const auto resolved_generated_material =
+        nengine::render::resolve_material_asset(
+            derived_material, *derived_material_assets, &error);
+    const auto resolved_generated_texture =
+        nengine::render::resolve_texture_asset(
+            derived_texture, *derived_texture_assets, &error);
+    nengine::render::DecodedTextureData generated_pixels;
+    if (!resolved_generated_material ||
+        resolved_generated_material->material.base_color_texture != derived_texture ||
+        !resolved_generated_texture ||
+        !nengine::render::decode_texture_rgba8(
+            *resolved_generated_texture, generated_pixels, &error) ||
+        generated_pixels.width != 1u || generated_pixels.height != 1u ||
+        !generated_pixels.valid())
+        return test_failure(164, __LINE__);
     const auto cooked_model = runtime.assets().cooked_artifacts(model_guid);
     const auto cooked_material = runtime.assets().cooked_artifacts(material_guid);
     nengine::render::CookedModelMaterialMap generated_mappings;
