@@ -416,6 +416,11 @@ int main() {
                 "Intensity", prop))
             return test_failure(112, __LINE__);
     }
+    // Keep bridge fixtures out of the later fixed-step integration tests:
+    // those assert exact entity counts and one simulated Rigidbody2D.
+    if (!runtime.world().destroy(bridge_entity) ||
+        !runtime.world().destroy(render_entity))
+        return test_failure(113, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto cooked_model = runtime.assets().cooked_artifacts(model_guid);
     const auto cooked_material = runtime.assets().cooked_artifacts(material_guid);
