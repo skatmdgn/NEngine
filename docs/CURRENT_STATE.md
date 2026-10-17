@@ -66,6 +66,15 @@ This is a **dependency overview**, not a complete generated dependency graph. Th
 - Added portable Player tests for all six types (read/write, invalid inputs, absent components) plus 2D physics raycast integration proving C# property changes affect collision query outcomes.
 - These are **source + proposed regressions awaiting Windows/Ubuntu CI**; actual .NET gameplay deployment, Vulkan GPU acceptance and Android builds remain outside this test scope.
 
+## 2026-10-17 continuation: 30 action-map/Player implementation slices
+
+- Added validated v1 action-map serialization (integrating work previously present in open PR #1), bounded runtime bindings, per-key unbinding and portable project `Input.ninput` reading/writing.
+- Player export stages a canonical validated input map at `Content/Input.ninput`, rejecting corrupt and symlink inputs. Player load resolves this map transactionally; legacy bundles without a map retain empty actions.
+- Standalone managed .NET gameplay now exposes `Input.GetButton(string)`, `Input.GetButtonDown(string)`, and `Input.GetButtonUp(string)`, backed by a new optional native input-action callback. Invalid action names and unavailable bindings report false.
+- Expanded portable input, Player bundle/CLI, script-generated API and (when dotnet is installed) managed gameplay callback regression coverage.
+- **New changes must pass Windows + Ubuntu final CI**; neither successful CTest nor .NET smoke checks constitute interactive Win32/Vulkan GPU, hardware audio or Android release acceptance.
+- The source branch depends on open PRs #16 → #15 → #14 → #13; `main` has not been updated.
+
 ## Highest-priority next work
 
 1. **Player completion:** exported glTF/OBJ generated material/texture subassets, managed action map/property parity, and genuine Windows GPU + .NET + input acceptance.
