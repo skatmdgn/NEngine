@@ -286,6 +286,32 @@ int main() {
           io_restored.contains("Jump") && io_restored.contains("Fire"),
           "bounded project action map loads back with all entries");
 
+    ActionMap kept;
+    kept.bind("Kept", Key::Enter);
+    const auto broken_file = io_root / "Broken.ninput";
+    { std::ofstream out(broken_file); out << "INVALID ACTION MAP"; }
+    check(!load_action_map_file(broken_file, kept, &persistence_error) &&
+          kept.contains("Kept") && !kept.contains("Jump"),
+          "invalid source action map does not mutate loaded bindings");
+    check(!load_action_map_file(io_root / "Missing.ninput", kept, &persistence_error) &&
+          kept.contains("Kept"), "absent map read fails without corrupting state");
+    const auto oversized_file = io_root / "Large.ninput";
+    { std::ofstream out(oversized_file, std::ios::binary);
+      out << std::string(65537, 'x'); }
+    check(!load_action_map_file(oversized_file, kept, &persistence_error) &&
+          kept.contains("Kept"), "oversized action map file rejected early");
+    const auto link = io_root / "InputLink.ninput";
+    std::error_code link_error;
+    std::filesystem::create_symlink(io_file, link, link_error);
+    if (!link_error)
+        check(!load_action_map_file(link, kept, &persistence_error),
+              "symlinked action map sources rejected");
+    ActionMap invalid_save;
+    invalid_save.bind("Broken", Key::A);
+    check(!save_action_map_file(io_file, invalid_save, &persistence_error),
+          "existing action map never silently overwritten on export");
+    std::filesystem::remove_all(io_root);
+
     if (failures != 0) {
         std::cerr << "NEngineInputTests: "
                   << failures
