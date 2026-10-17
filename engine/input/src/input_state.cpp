@@ -191,8 +191,9 @@ bool ActionMap::unbind_key(std::string_view action, Key key) {
     auto& list = it->second;
     const auto old_size = list.size();
     std::erase_if(list, [key](const ActionBinding& b) { return b.key == key; });
+    const bool removed = list.size() != old_size;
     if (list.empty()) bindings_.erase(it);
-    return list.size() != old_size;
+    return removed;
 }
 
 bool ActionMap::contains(
