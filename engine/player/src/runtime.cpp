@@ -155,6 +155,8 @@ PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
     }
     stats.controller_transitions =
         sprite_controllers_.evaluate(world_).transitions;
+    // A controller can assign a different state clip in this same frame.
+    ensure_referenced_assets();
     for (const auto entity : world_.entities()) {
         if (!world_.active(entity)) continue;
         auto* sprite = world_.get_component<render::SpriteAnimator>(

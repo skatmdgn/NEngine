@@ -217,6 +217,22 @@ int main() {
             !dynamic.audio_clip(dynamic_wav_guid) ||
             f.sprite_sampled < 1u || renderer->texture != texture_guid)
             return test_failure(120, __LINE__);
+        // A live C# Controller setter must install a state graph and its
+        // referenced clips; clearing it must stop graph-driven transitions.
+        animator->controller = controller_guid;
+        animator->bool_parameters["moving"] = true;
+        dynamic.advance(1.f / 60.f); // establish default state
+        const auto graph_step = dynamic.advance(1.f / 60.f);
+        if (!graph_step.controller_transitions ||
+            animator->speed != 2.0f || animator->clip != nanim_guid)
+            return test_failure(126, __LINE__);
+        animator->controller = {};
+        animator->clip = dynamic_sprite_guid;
+        animator->time_seconds = 0.0f;
+        const auto cleared_graph = dynamic.advance(1.f / 60.f);
+        if (cleared_graph.controller_transitions != 0u ||
+            animator->clip != dynamic_sprite_guid)
+            return test_failure(127, __LINE__);
         const auto missing_guid = nengine::assets::AssetGuid::generate();
         sound->clip = missing_guid;
         animator->clip = missing_guid;
