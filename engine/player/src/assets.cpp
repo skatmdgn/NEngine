@@ -31,6 +31,17 @@ bool PlayerAssets::open(const std::filesystem::path& bundle_root,
         if (error) *error = "Player asset catalog escapes bundle root";
         return false;
     }
+    // Neither the global cooked root nor an individual model cache may
+    // redirect packaged generated resources outside the exported bundle.
+    const auto cooked_root = content_path / "Cooked";
+    std::error_code cooked_ec;
+    const auto cooked_status = std::filesystem::symlink_status(cooked_root, cooked_ec);
+    if (cooked_ec == std::errc::no_such_file_or_directory)
+        cooked_ec.clear();
+    if (cooked_ec || std::filesystem::is_symlink(cooked_status)) {
+        if (error) *error = "unsafe cooked asset root";
+        return false;
+    }
     assets::AssetDatabase next(content);
     const auto result = next.scan(false);
     for (const auto& message : result.messages) {
@@ -45,6 +56,14 @@ bool PlayerAssets::open(const std::filesystem::path& bundle_root,
         const auto ext = record.source_path.extension();
         if (ext != ".glb" && ext != ".gltf" && ext != ".obj") continue;
         const auto folder = content_path / "Cooked" / record.guid.to_string();
+        std::error_code folder_ec;
+        const auto folder_status = std::filesystem::symlink_status(folder, folder_ec);
+        if (folder_ec == std::errc::no_such_file_or_directory)
+            folder_ec.clear();
+        if (folder_ec || std::filesystem::is_symlink(folder_status)) {
+            if (error) *error = "unsafe model cooked directory";
+            return false;
+        }
         std::vector<CookedSubasset> entries;
         if (!read_model_subassets(folder, entries, error)) return false;
         for (const auto& item : entries) {
@@ -78,8 +97,11 @@ std::optional<assets::CachedArtifactSet> PlayerAssets::cooked_artifacts(
     if (const auto found = generated_subassets_.find(guid);
         found != generated_subassets_.end()) {
         std::error_code ec;
+        const auto cooked_parent = root_.parent_path() / "Cooked";
+        if (std::filesystem::is_symlink(cooked_parent, ec) || ec)
+            return std::nullopt;
         const auto cooked_root =
-            std::filesystem::canonical(root_.parent_path() / "Cooked", ec);
+            std::filesystem::canonical(cooked_parent, ec);
         if (ec) return std::nullopt;
         for (const auto& artifact : found->second.artifacts) {
             if (std::filesystem::is_symlink(artifact.path, ec) || ec ||
