@@ -88,6 +88,9 @@ bool export_player_data(const ExportSettings& settings,
         std::filesystem::copy_options::none, ec);
     if (ec) { cleanup(); return fail(error, "cannot copy player startup Scene"); }
     const auto action_source = root / "Input.ninput";
+    if (std::filesystem::is_symlink(action_source, ec) || ec) {
+        cleanup(); return fail(error, "project action map symlink is forbidden");
+    }
     if (std::filesystem::exists(action_source, ec) && !ec) {
         input::ActionMap map;
         if (!input::load_action_map_file(action_source, map, error)) {
