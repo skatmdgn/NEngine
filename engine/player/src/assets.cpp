@@ -78,10 +78,18 @@ std::optional<assets::CachedArtifactSet> PlayerAssets::cooked_artifacts(
     if (const auto found = generated_subassets_.find(guid);
         found != generated_subassets_.end()) {
         std::error_code ec;
+        const auto cooked_root =
+            std::filesystem::canonical(root_.parent_path() / "Cooked", ec);
+        if (ec) return std::nullopt;
         for (const auto& artifact : found->second.artifacts) {
             if (std::filesystem::is_symlink(artifact.path, ec) || ec ||
                 !std::filesystem::is_regular_file(artifact.path, ec) || ec)
                 return std::nullopt;
+            const auto resolved = std::filesystem::canonical(artifact.path, ec);
+            if (ec) return std::nullopt;
+            const auto relative = resolved.lexically_relative(cooked_root);
+            if (relative.empty() || relative.is_absolute() ||
+                *relative.begin() == "..") return std::nullopt;
         }
         return found->second;
     }
