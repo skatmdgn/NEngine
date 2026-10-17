@@ -1070,6 +1070,15 @@ int main() {
         read_generated[1].guid != generated_texture_guid ||
         read_generated[1].artifacts.size() != 2u)
         return test_failure(154, __LINE__);
+    const auto generated_index = generated / "subassets.nasset";
+    { std::ofstream out(generated_index, std::ios::trunc); out << "INVALID\n"; }
+    const auto previous_generated = read_generated;
+    if (read_model_subassets(generated, read_generated, &error) ||
+        read_generated.size() != previous_generated.size() ||
+        read_generated[0].guid != previous_generated[0].guid)
+        return test_failure(155, __LINE__);
+    if (!write_model_subassets(generated, generated_subassets, &error))
+        return test_failure(156, __LINE__);
     // GENERATED_SUBASSET_TESTS
     std::filesystem::remove_all(root);
     std::cout << "player bundle export tests passed\n";
