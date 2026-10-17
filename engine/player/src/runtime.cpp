@@ -46,6 +46,7 @@ bool PlayerRuntime::initialize_managed(std::string* error) {
         return false;
     }
     managed_runtime_.bind_input(&input_);
+    managed_runtime_.bind_input_actions(&actions_);
     bind_player_physics_queries(managed_runtime_);
     bind_player_properties(managed_runtime_);
     script_system_.bind(&managed_runtime_);
