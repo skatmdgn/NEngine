@@ -671,6 +671,20 @@ int main() {
             !read("NEngine.CircleCollider2D", "Radius") ||
             std::get<double>(collider_value) != 0.75)
             return test_failure(140, __LINE__);
+// 2D capsule orientation must be horizontal/vertical and Z remains 0.
+        if (!write("NEngine.CapsuleCollider2D", "Size",
+                  nengine::core::Vec3{1.5f, 4.f, 22.f}) ||
+            !write("NEngine.CapsuleCollider2D", "Direction", std::int64_t{1}) ||
+            !read("NEngine.CapsuleCollider2D", "Size") ||
+            std::get<nengine::core::Vec3>(collider_value).z != 0.f ||
+            !read("NEngine.CapsuleCollider2D", "Direction") ||
+            std::get<std::int64_t>(collider_value) != 1 ||
+            write("NEngine.CapsuleCollider2D", "Direction", std::int64_t{2}) ||
+            write("NEngine.CapsuleCollider2D", "Size",
+                  nengine::core::Vec3{1.5f, 0.f, 0.f}) ||
+            !read("NEngine.CapsuleCollider2D", "Direction") ||
+            std::get<std::int64_t>(collider_value) != 1)
+            return test_failure(141, __LINE__);
         // COLLIDER_CASES
     }
     if (!runtime.world().destroy(collider_entity))
