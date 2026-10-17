@@ -76,6 +76,14 @@ This is a **dependency overview**, not a complete generated dependency graph. Th
 - **New changes must pass Windows + Ubuntu final CI**; neither successful CTest nor .NET smoke checks constitute interactive Win32/Vulkan GPU, hardware audio or Android release acceptance.
 - The source branch depends on open PRs #16 → #15 → #14 → #13; `main` has not been updated.
 
+## 2026-10-17 continuation: 30 Player model-subasset slices (CI acceptance pending)
+
+- Player export now uses the render-aware OBJ/glTF model importer rather than source-only staging, preserving generated Material/Texture assets and emitting per-model, bounded `subassets.nasset` indices.
+- PlayerAssets resolves generated material and texture AssetGuids, exposes them to the existing Vulkan material resolver, and publishes model `model-materials.nasset` with the correct `model-material-map` role.
+- Generated artifacts are validated against symlink/path traversal, size caps, duplicate GUIDs and importer/role mismatches; malformed index imports are rejected without replacing a valid asset catalog.
+- Added OBJ/MTL color-model export fixtures, generated .nmat/TGA resolution and CTest CLI checks.
+- **Status scope:** Source work and proposed tests require final Windows/Ubuntu CI. This does not establish device Vulkan acceptance, complete glTF/PBR coverage or ready-to-ship Windows/Android packages.
+
 ## Highest-priority next work
 
 1. **Player completion:** exported glTF/OBJ generated material/texture subassets, managed action map/property parity, and genuine Windows GPU + .NET + input acceptance.
