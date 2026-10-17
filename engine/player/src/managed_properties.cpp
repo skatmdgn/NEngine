@@ -1,6 +1,7 @@
 #include "nengine/player/managed_properties.hpp"
 #include "managed_render_properties.hpp"
 #include "managed_audio_properties.hpp"
+#include "managed_collider_properties.hpp"
 #include "nengine/scripting/managed_runtime.hpp"
 #include "nengine/physics/components.hpp"
 #include "nengine/audio/components.hpp"
@@ -109,6 +110,14 @@ bool read_player_transform_property(const core::World& world,
             entity, physics::rigidbody2d_type());
         return body && read_rigidbody_property(*body, property, value);
     }
+    if (component == "NEngine.BoxCollider" ||
+        component == "NEngine.SphereCollider" ||
+        component == "NEngine.CapsuleCollider" ||
+        component == "NEngine.BoxCollider2D" ||
+        component == "NEngine.CircleCollider2D" ||
+        component == "NEngine.CapsuleCollider2D")
+        return read_player_collider_property(world, entity, component,
+                                             property, value);
     if (component != "NEngine.Transform") {
         return read_player_render_property(world, entity, component,
                                            property, value);
@@ -139,6 +148,14 @@ bool write_player_transform_property(core::World& world,
             entity, physics::rigidbody2d_type());
         return body && write_rigidbody_property(*body, property, value);
     }
+    if (component == "NEngine.BoxCollider" ||
+        component == "NEngine.SphereCollider" ||
+        component == "NEngine.CapsuleCollider" ||
+        component == "NEngine.BoxCollider2D" ||
+        component == "NEngine.CircleCollider2D" ||
+        component == "NEngine.CapsuleCollider2D")
+        return write_player_collider_property(world, entity, component,
+                                              property, value);
     if (component != "NEngine.Transform") {
         return write_player_render_property(world, entity, component,
                                             property, value);

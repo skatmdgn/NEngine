@@ -17,6 +17,7 @@
 #include "nengine/audio/components.hpp"
 #include "nengine/audio/registration.hpp"
 #include "nengine/physics/components.hpp"
+#include "nengine/physics/collision.hpp"
 #include "nengine/physics/registration.hpp"
 #include "nengine/scripting/components.hpp"
 #include "nengine/scripting/registration.hpp"
@@ -559,6 +560,190 @@ int main() {
             w("Clip", 1.0) || w("Enabled", 1.0) || r("Unknown"))
             return test_failure(124, __LINE__);
     }
+    // Native C# property bridge for exported 3D/2D physics colliders.
+    // Keep the fixtures out of the subsequent exact-entity-count tests.
+    const auto collider_entity = runtime.world().create("Managed Collider bridge");
+    if (!runtime.world().add_component<nengine::physics::BoxCollider>(
+            collider_entity, nengine::physics::box_collider_type()) ||
+        !runtime.world().add_component<nengine::physics::SphereCollider>(
+            collider_entity, nengine::physics::sphere_collider_type()) ||
+        !runtime.world().add_component<nengine::physics::CapsuleCollider>(
+            collider_entity, nengine::physics::capsule_collider_type()) ||
+        !runtime.world().add_component<nengine::physics::BoxCollider2D>(
+            collider_entity, nengine::physics::box_collider2d_type()) ||
+        !runtime.world().add_component<nengine::physics::CircleCollider2D>(
+            collider_entity, nengine::physics::circle_collider2d_type()) ||
+        !runtime.world().add_component<nengine::physics::CapsuleCollider2D>(
+            collider_entity, nengine::physics::capsule_collider2d_type()))
+        return test_failure(133, __LINE__);
+    {
+        nengine::core::PropertyValue collider_value;
+        const auto read = [&](std::string_view component, std::string_view property) {
+            return read_player_transform_property(
+                runtime.world(), collider_entity, component, property,
+                collider_value);
+        };
+        const auto write = [&](std::string_view component, std::string_view property,
+                               const nengine::core::PropertyValue& value) {
+            return write_player_transform_property(
+                runtime.world(), collider_entity, component, property, value);
+        };
+// 3D box geometry and collision filtering must roundtrip to native.
+        if (!write("NEngine.BoxCollider", "Enabled", false) ||
+            !write("NEngine.BoxCollider", "Is Trigger", true) ||
+            !write("NEngine.BoxCollider", "Layer", std::int64_t{31}) ||
+            !write("NEngine.BoxCollider", "Collision Mask", std::int64_t{4294967295LL}) ||
+            !write("NEngine.BoxCollider", "Friction", 0.25) ||
+            !write("NEngine.BoxCollider", "Restitution", 0.75) ||
+            !write("NEngine.BoxCollider", "Center", nengine::core::Vec3{1, 2, 3}) ||
+            !write("NEngine.BoxCollider", "Size", nengine::core::Vec3{4, 5, 6}) ||
+            !read("NEngine.BoxCollider", "Size") ||
+            std::get<nengine::core::Vec3>(collider_value).z != 6.f ||
+            !read("NEngine.BoxCollider", "Layer") ||
+            std::get<std::int64_t>(collider_value) != 31 ||
+            !read("NEngine.BoxCollider", "Collision Mask") ||
+            std::get<std::int64_t>(collider_value) != 4294967295LL ||
+            !read("NEngine.BoxCollider", "Is Trigger") ||
+            !std::get<bool>(collider_value))
+            return test_failure(135, __LINE__);
+        if (write("NEngine.BoxCollider", "Size", nengine::core::Vec3{0, 5, 6}) ||
+            write("NEngine.BoxCollider", "Layer", std::int64_t{32}) ||
+            write("NEngine.BoxCollider", "Collision Mask", std::int64_t{-1}) ||
+            write("NEngine.BoxCollider", "Friction", 1.25) ||
+            !read("NEngine.BoxCollider", "Size") ||
+            std::get<nengine::core::Vec3>(collider_value).x != 4.f)
+            return test_failure(136, __LINE__);
+// 3D sphere's center, contact flags and radius cannot accept NaN/zero.
+        if (!write("NEngine.SphereCollider", "Radius", 3.0) ||
+            !write("NEngine.SphereCollider", "Center", nengine::core::Vec3{2, -4, 1}) ||
+            !write("NEngine.SphereCollider", "Friction", 1.0) ||
+            !read("NEngine.SphereCollider", "Radius") ||
+            std::get<double>(collider_value) != 3.0 ||
+            write("NEngine.SphereCollider", "Radius", 0.0) ||
+            write("NEngine.SphereCollider", "Radius", -5.0) ||
+            write("NEngine.SphereCollider", "Radius",
+                  std::numeric_limits<double>::quiet_NaN()) ||
+            write("NEngine.SphereCollider", "Center", nengine::core::Vec3{
+                  std::numeric_limits<float>::infinity(), 0, 0}) ||
+            !read("NEngine.SphereCollider", "Radius") ||
+            std::get<double>(collider_value) != 3.0)
+            return test_failure(137, __LINE__);
+// 3D capsule cannot be set shorter than twice its radius.
+        if (!write("NEngine.CapsuleCollider", "Height", 8.0) ||
+            !write("NEngine.CapsuleCollider", "Radius", 2.0) ||
+            !write("NEngine.CapsuleCollider", "Direction", std::int64_t{2}) ||
+            !read("NEngine.CapsuleCollider", "Direction") ||
+            std::get<std::int64_t>(collider_value) != 2 ||
+            write("NEngine.CapsuleCollider", "Radius", 5.0) ||
+            write("NEngine.CapsuleCollider", "Height", 3.0) ||
+            write("NEngine.CapsuleCollider", "Direction", std::int64_t{3}) ||
+            write("NEngine.CapsuleCollider", "Radius",
+                  std::numeric_limits<double>::infinity()) ||
+            !read("NEngine.CapsuleCollider", "Radius") ||
+            std::get<double>(collider_value) != 2.0 ||
+            !read("NEngine.CapsuleCollider", "Height") ||
+            std::get<double>(collider_value) != 8.0)
+            return test_failure(138, __LINE__);
+// 2D native center and box dimensions must discard the unused Z axis.
+        if (!write("NEngine.BoxCollider2D", "Center",
+                  nengine::core::Vec3{4, 6, 99}) ||
+            !write("NEngine.BoxCollider2D", "Size",
+                  nengine::core::Vec3{2, 3, 17}) ||
+            !read("NEngine.BoxCollider2D", "Center") ||
+            std::get<nengine::core::Vec3>(collider_value).z != 0.f ||
+            !read("NEngine.BoxCollider2D", "Size") ||
+            std::get<nengine::core::Vec3>(collider_value).z != 0.f ||
+            write("NEngine.BoxCollider2D", "Size",
+                  nengine::core::Vec3{2, -1, 0}) ||
+            write("NEngine.BoxCollider2D", "Center",
+                  nengine::core::Vec3{1.0e9f, 0, 0}) ||
+            !read("NEngine.BoxCollider2D", "Size") ||
+            std::get<nengine::core::Vec3>(collider_value).y != 3.f)
+            return test_failure(139, __LINE__);
+// Circular 2D primitive supports contact coefficients and radius.
+        if (!write("NEngine.CircleCollider2D", "Radius", 0.75) ||
+            !write("NEngine.CircleCollider2D", "Is Trigger", true) ||
+            !write("NEngine.CircleCollider2D", "Restitution", 0.5) ||
+            !read("NEngine.CircleCollider2D", "Radius") ||
+            std::get<double>(collider_value) != 0.75 ||
+            write("NEngine.CircleCollider2D", "Radius", 0.0) ||
+            write("NEngine.CircleCollider2D", "Radius", 1.0e20) ||
+            write("NEngine.CircleCollider2D", "Restitution", -0.1) ||
+            !read("NEngine.CircleCollider2D", "Radius") ||
+            std::get<double>(collider_value) != 0.75)
+            return test_failure(140, __LINE__);
+// 2D capsule orientation must be horizontal/vertical and Z remains 0.
+        if (!write("NEngine.CapsuleCollider2D", "Size",
+                  nengine::core::Vec3{1.5f, 4.f, 22.f}) ||
+            !write("NEngine.CapsuleCollider2D", "Direction", std::int64_t{1}) ||
+            !read("NEngine.CapsuleCollider2D", "Size") ||
+            std::get<nengine::core::Vec3>(collider_value).z != 0.f ||
+            !read("NEngine.CapsuleCollider2D", "Direction") ||
+            std::get<std::int64_t>(collider_value) != 1 ||
+            write("NEngine.CapsuleCollider2D", "Direction", std::int64_t{2}) ||
+            write("NEngine.CapsuleCollider2D", "Size",
+                  nengine::core::Vec3{1.5f, 0.f, 0.f}) ||
+            !read("NEngine.CapsuleCollider2D", "Direction") ||
+            std::get<std::int64_t>(collider_value) != 1)
+            return test_failure(141, __LINE__);
+// Unknown properties and absent components must fail closed,
+        // while invalid writes cannot replace any accepted native state.
+        const auto absent_collider = runtime.world().create("No Collider");
+        const auto missing_read = read_player_transform_property(
+            runtime.world(), absent_collider, "NEngine.CapsuleCollider2D",
+            "Direction", collider_value);
+        const auto missing_write = write_player_transform_property(
+            runtime.world(), absent_collider, "NEngine.BoxCollider", "Enabled", false);
+        if (missing_read || missing_write ||
+            !runtime.world().destroy(absent_collider))
+            return test_failure(142, __LINE__);
+        for (const auto* type : {
+            "NEngine.BoxCollider", "NEngine.SphereCollider",
+            "NEngine.CapsuleCollider", "NEngine.BoxCollider2D",
+            "NEngine.CircleCollider2D", "NEngine.CapsuleCollider2D"}) {
+            if (!write(type, "Enabled", true) ||
+                !write(type, "Layer", std::int64_t{3}) ||
+                !read(type, "Layer") ||
+                std::get<std::int64_t>(collider_value) != 3 ||
+                write(type, "Layer", 3.0) ||
+                write(type, "Collision Mask", std::int64_t{4294967296LL}) ||
+                write(type, "Enabled", std::int64_t{1}) ||
+                write(type, "Friction", std::numeric_limits<double>::infinity()) ||
+                write(type, "Center", nengine::core::Vec3{
+                    0, std::numeric_limits<float>::quiet_NaN(), 0}) ||
+                write(type, "Imaginary Field", true) ||
+                read(type, "Imaginary Field") ||
+                !read(type, "Layer") ||
+                std::get<std::int64_t>(collider_value) != 3)
+                return test_failure(143, __LINE__);
+        }
+        // COLLIDER_CASES
+    }
+    if (!runtime.world().destroy(collider_entity))
+        return test_failure(134, __LINE__);
+    // The managed Player collider bridge must also affect actual physics
+    // queries, not merely return changed values through a property getter.
+    const auto ray_entity = runtime.world().create("Managed 2D ray target");
+    if (!runtime.world().add_component<nengine::physics::BoxCollider2D>(
+            ray_entity, nengine::physics::box_collider2d_type()) ||
+        !write_player_transform_property(runtime.world(), ray_entity,
+            "NEngine.BoxCollider2D", "Layer", std::int64_t{3}) ||
+        !write_player_transform_property(runtime.world(), ray_entity,
+            "NEngine.BoxCollider2D", "Is Trigger", true))
+        return test_failure(144, __LINE__);
+    const auto ray = [&](bool triggers, std::uint32_t layers) {
+        return nengine::physics::raycast_2d(
+            runtime.world(), {-5.f, 0.f}, {1.f, 0.f},
+            10.f, triggers, layers);
+    };
+    if (ray(false, 1u << 3) || ray(true, 1u << 2) ||
+        !ray(true, 1u << 3) ||
+        ray(true, 1u << 3)->entity != ray_entity ||
+        !write_player_transform_property(runtime.world(), ray_entity,
+            "NEngine.BoxCollider2D", "Enabled", false) ||
+        ray(true, 1u << 3) ||
+        !runtime.world().destroy(ray_entity))
+        return test_failure(145, __LINE__);
     // Audio C# property parity in a packaged Player: clip changes must
     // reset playback and bad inputs must not mutate accepted state.
     const auto audio_entity = runtime.world().create("Managed audio bridge");

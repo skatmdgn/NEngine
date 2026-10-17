@@ -299,6 +299,8 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Standalone managed SpriteAnimator bindings (Clip/Controller/Speed/Time/Loop/Playing/SetBool), validated by Player regressions
 - [x] Dynamic controller replacement/unbinding, graph state-clip prefetch and transition tests
 - [x] Standalone nonloop playback termination, high-speed time stabilization, disabled-renderer guard and bounded negative GUID caches
+- [x] Player C# native BoxCollider/SphereCollider/CapsuleCollider and 2D Box/Circle/Capsule collider property parity (geometry, trigger/layer/mask/material), bounded validation and portable regression tests
+- [x] Packaged Player collider property integration with 2D raycast layer/trigger/enabled filtering regression
 - [ ] Full Player input action map and parity for all managed component properties
 
 - [x] Standalone Windows Player bootstrap target and project export CLI (foundation only)
