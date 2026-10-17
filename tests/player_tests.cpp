@@ -685,6 +685,37 @@ int main() {
             !read("NEngine.CapsuleCollider2D", "Direction") ||
             std::get<std::int64_t>(collider_value) != 1)
             return test_failure(141, __LINE__);
+// Unknown properties and absent components must fail closed,
+        // while invalid writes cannot replace any accepted native state.
+        const auto absent_collider = runtime.world().create("No Collider");
+        const auto missing_read = read_player_transform_property(
+            runtime.world(), absent_collider, "NEngine.CapsuleCollider2D",
+            "Direction", collider_value);
+        const auto missing_write = write_player_transform_property(
+            runtime.world(), absent_collider, "NEngine.BoxCollider", "Enabled", false);
+        if (missing_read || missing_write ||
+            !runtime.world().destroy(absent_collider))
+            return test_failure(142, __LINE__);
+        for (const auto* type : {
+            "NEngine.BoxCollider", "NEngine.SphereCollider",
+            "NEngine.CapsuleCollider", "NEngine.BoxCollider2D",
+            "NEngine.CircleCollider2D", "NEngine.CapsuleCollider2D"}) {
+            if (!write(type, "Enabled", true) ||
+                !write(type, "Layer", std::int64_t{3}) ||
+                !read(type, "Layer") ||
+                std::get<std::int64_t>(collider_value) != 3 ||
+                write(type, "Layer", 3.0) ||
+                write(type, "Collision Mask", std::int64_t{4294967296LL}) ||
+                write(type, "Enabled", std::int64_t{1}) ||
+                write(type, "Friction", std::numeric_limits<double>::infinity()) ||
+                write(type, "Center", nengine::core::Vec3{
+                    0, std::numeric_limits<float>::quiet_NaN(), 0}) ||
+                write(type, "Imaginary Field", true) ||
+                read(type, "Imaginary Field") ||
+                !read(type, "Layer") ||
+                std::get<std::int64_t>(collider_value) != 3)
+                return test_failure(143, __LINE__);
+        }
         // COLLIDER_CASES
     }
     if (!runtime.world().destroy(collider_entity))
