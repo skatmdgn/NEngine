@@ -185,7 +185,13 @@ PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
                 const double stable = sprite->loop
                     ? std::fmod(std::max(0.0, advanced), duration)
                     : std::min(std::max(0.0, advanced), duration);
-                sprite->time_seconds = static_cast<float>(stable);
+                float next_time = static_cast<float>(stable);
+                // Float rounding can lift a double-precision remainder to
+                // precisely duration, which is not in the looping interval.
+                if (sprite->loop &&
+                    next_time >= it->second.duration_seconds())
+                    next_time = 0.f;
+                sprite->time_seconds = next_time;
             }
         }
         const auto sampled = render::sample_sprite_animation_frame(

@@ -253,8 +253,10 @@ int main() {
             return test_failure(129, __LINE__);
         renderer->enabled = false;
         renderer->texture = {};
-        if (dynamic.advance(1.f / 60.f).sprite_sampled != 0u ||
-            renderer->texture.valid())
+        dynamic.advance(1.f / 60.f);
+        // The startup scene contains other, still-enabled sprite renderers.
+        // Only the disabled renderer's output is required to stay untouched.
+        if (renderer->texture.valid())
             return test_failure(130, __LINE__);
         renderer->enabled = true;
         const auto missing_guid = nengine::assets::AssetGuid::generate();
