@@ -559,6 +559,63 @@ int main() {
             w("Clip", 1.0) || w("Enabled", 1.0) || r("Unknown"))
             return test_failure(124, __LINE__);
     }
+    // Native C# property bridge for exported 3D/2D physics colliders.
+    // Keep the fixtures out of the subsequent exact-entity-count tests.
+    const auto collider_entity = runtime.world().create("Managed Collider bridge");
+    if (!runtime.world().add_component<nengine::physics::BoxCollider>(
+            collider_entity, nengine::physics::box_collider_type()) ||
+        !runtime.world().add_component<nengine::physics::SphereCollider>(
+            collider_entity, nengine::physics::sphere_collider_type()) ||
+        !runtime.world().add_component<nengine::physics::CapsuleCollider>(
+            collider_entity, nengine::physics::capsule_collider_type()) ||
+        !runtime.world().add_component<nengine::physics::BoxCollider2D>(
+            collider_entity, nengine::physics::box_collider2d_type()) ||
+        !runtime.world().add_component<nengine::physics::CircleCollider2D>(
+            collider_entity, nengine::physics::circle_collider2d_type()) ||
+        !runtime.world().add_component<nengine::physics::CapsuleCollider2D>(
+            collider_entity, nengine::physics::capsule_collider2d_type()))
+        return test_failure(133, __LINE__);
+    {
+        nengine::core::PropertyValue collider_value;
+        const auto read = [&](std::string_view component, std::string_view property) {
+            return read_player_transform_property(
+                runtime.world(), collider_entity, component, property,
+                collider_value);
+        };
+        const auto write = [&](std::string_view component, std::string_view property,
+                               const nengine::core::PropertyValue& value) {
+            return write_player_transform_property(
+                runtime.world(), collider_entity, component, property, value);
+        };
+// 3D box geometry and collision filtering must roundtrip to native.
+        if (!write("NEngine.BoxCollider", "Enabled", false) ||
+            !write("NEngine.BoxCollider", "Is Trigger", true) ||
+            !write("NEngine.BoxCollider", "Layer", std::int64_t{31}) ||
+            !write("NEngine.BoxCollider", "Collision Mask", std::int64_t{4294967295LL}) ||
+            !write("NEngine.BoxCollider", "Friction", 0.25) ||
+            !write("NEngine.BoxCollider", "Restitution", 0.75) ||
+            !write("NEngine.BoxCollider", "Center", nengine::core::Vec3{1, 2, 3}) ||
+            !write("NEngine.BoxCollider", "Size", nengine::core::Vec3{4, 5, 6}) ||
+            !read("NEngine.BoxCollider", "Size") ||
+            std::get<nengine::core::Vec3>(collider_value).z != 6.f ||
+            !read("NEngine.BoxCollider", "Layer") ||
+            std::get<std::int64_t>(collider_value) != 31 ||
+            !read("NEngine.BoxCollider", "Collision Mask") ||
+            std::get<std::int64_t>(collider_value) != 4294967295LL ||
+            !read("NEngine.BoxCollider", "Is Trigger") ||
+            !std::get<bool>(collider_value))
+            return test_failure(135, __LINE__);
+        if (write("NEngine.BoxCollider", "Size", nengine::core::Vec3{0, 5, 6}) ||
+            write("NEngine.BoxCollider", "Layer", std::int64_t{32}) ||
+            write("NEngine.BoxCollider", "Collision Mask", std::int64_t{-1}) ||
+            write("NEngine.BoxCollider", "Friction", 1.25) ||
+            !read("NEngine.BoxCollider", "Size") ||
+            std::get<nengine::core::Vec3>(collider_value).x != 4.f)
+            return test_failure(136, __LINE__);
+        // COLLIDER_CASES
+    }
+    if (!runtime.world().destroy(collider_entity))
+        return test_failure(134, __LINE__);
     // Audio C# property parity in a packaged Player: clip changes must
     // reset playback and bad inputs must not mutate accepted state.
     const auto audio_entity = runtime.world().create("Managed audio bridge");
