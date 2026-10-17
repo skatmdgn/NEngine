@@ -133,6 +133,13 @@ bool read_player_collider_property(const core::World& world,
         return true;
         return false;
     }
+    if (component == "NEngine.BoxCollider2D") {
+        const auto* c = world.get_component<physics::BoxCollider2D>(entity, physics::box_collider2d_type());
+        if (!c) return false;
+        if (common_name(property)) return read_common(*c, property, value);
+        if (property == "Size") { value = c->size; return true; }
+        return false;
+    }
     return false;
 }
 
@@ -181,6 +188,18 @@ bool write_player_collider_property(core::World& world,
             const auto* n = std::get_if<std::int64_t>(&value);
             if (!n || *n < 0 || *n > 2) return false;
             c->direction = static_cast<std::uint32_t>(*n);
+            return true;
+        }
+        return false;
+    }
+    if (component == "NEngine.BoxCollider2D") {
+        auto* c = world.get_component<physics::BoxCollider2D>(entity, physics::box_collider2d_type());
+        if (!c) return false;
+        if (common_name(property)) return write_common(*c, property, value, true);
+        if (property == "Size") {
+            core::Vec3 next{};
+            if (!vector_field(value, next, true, true)) return false;
+            c->size = next;
             return true;
         }
         return false;
