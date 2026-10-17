@@ -45,6 +45,8 @@ This is a **dependency overview**, not a complete generated dependency graph. Th
 
 - **Rigidbody parity update:** Standalone Player managed native property bridge supports both 3D and 2D Rigidbody, including Use Gravity, Is Kinematic, Allow Sleep, Sleeping, Mass, Gravity Scale, Sleep Threshold, Linear Velocity and Angular Velocity. Invalid types/nonfinite values are rejected, and velocity edits wake sleeping bodies. These are focused regression-tested code paths; interactive .NET Player hardware acceptance is still pending.
 
+- **Render property bridge:** Player C# native property calls can now read/write Camera, Light, SpriteRenderer and MeshRenderer attributes and AssetGuid references, with finite/range/type checks and portable tests. This does not imply production Vulkan Game View or real driver acceptance.
+
 ## Highest-priority next work
 
 1. **Player completion:** exported glTF/OBJ generated material/texture subassets, managed action map/property parity, and genuine Windows GPU + .NET + input acceptance.

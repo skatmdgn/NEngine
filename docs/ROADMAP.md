@@ -293,6 +293,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [ ] Full imported model generated material and texture subasset cooking
 - [ ] Production Windows GPU + .NET runtime + game input hardware acceptance
 - [x] Full native Player 3D/2D Rigidbody C# property bridge with sleeping/wake semantics and invalid-value regressions
+- [x] Player managed Camera, Light, SpriteRenderer and MeshRenderer native property/AssetGuid bridge with type, range and malformed-GUID regression tests
 - [ ] Full Player input action map and parity for all managed component properties
 
 - [x] Standalone Windows Player bootstrap target and project export CLI (foundation only)

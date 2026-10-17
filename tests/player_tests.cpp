@@ -337,6 +337,85 @@ int main() {
             runtime.world(), first_entity, "NEngine.Rigidbody",
             "Mass", 2.0))
         return test_failure(106, __LINE__);
+    // Exported managed Camera/Light/SpriteRenderer/MeshRenderer must not
+    // silently fall back to generated C# defaults when the Player is running.
+    const auto render_entity = runtime.world().create("Player render bridge");
+    if (!runtime.world().add_component<nengine::render::Camera>(
+            render_entity, nengine::render::camera_type()) ||
+        !runtime.world().add_component<nengine::render::Light>(
+            render_entity, nengine::render::light_type()) ||
+        !runtime.world().add_component<nengine::render::SpriteRenderer>(
+            render_entity, nengine::render::sprite_renderer_type()) ||
+        !runtime.world().add_component<nengine::render::MeshRenderer>(
+            render_entity, nengine::render::mesh_renderer_type()))
+        return test_failure(107, __LINE__);
+    {
+        nengine::core::PropertyValue prop;
+        const auto read = [&](std::string_view comp, std::string_view name) {
+            return read_player_transform_property(
+                runtime.world(), render_entity, comp, name, prop);
+        };
+        const auto write = [&](std::string_view comp, std::string_view name,
+                               const nengine::core::PropertyValue& input) {
+            return write_player_transform_property(
+                runtime.world(), render_entity, comp, name, input);
+        };
+        if (!write("NEngine.Camera", "Projection", std::int64_t{1}) ||
+            !read("NEngine.Camera", "Projection") ||
+            std::get<std::int64_t>(prop) != 1 ||
+            !write("NEngine.Camera", "Vertical FOV", 80.0) ||
+            !write("NEngine.Camera", "Near Clip", 0.5) ||
+            !write("NEngine.Camera", "Far Clip", 250.0) ||
+            !read("NEngine.Camera", "Far Clip") ||
+            std::get<double>(prop) != 250.0 ||
+            write("NEngine.Camera", "Projection", std::int64_t{2}) ||
+            write("NEngine.Camera", "Far Clip", 0.1) ||
+            write("NEngine.Camera", "Near Clip", 500.0) ||
+            write("NEngine.Camera", "Vertical FOV",
+                std::numeric_limits<double>::infinity()))
+            return test_failure(108, __LINE__);
+        if (!write("NEngine.Light", "Type", std::int64_t{2}) ||
+            !write("NEngine.Light", "Color", nengine::core::Vec3{2.f, 1.f, 0.5f}) ||
+            !write("NEngine.Light", "Intensity", 4.0) ||
+            !read("NEngine.Light", "Color") ||
+            std::get<nengine::core::Vec3>(prop).x != 2.f ||
+            !write("NEngine.Light", "Cast Shadows", false) ||
+            write("NEngine.Light", "Type", std::int64_t{8}) ||
+            write("NEngine.Light", "Color", nengine::core::Vec3{-1.f, 0.f, 0.f}) ||
+            write("NEngine.Light", "Intensity",
+                std::numeric_limits<double>::quiet_NaN()))
+            return test_failure(109, __LINE__);
+        if (!write("NEngine.SpriteRenderer", "Texture",
+                texture_guid.to_string()) ||
+            !read("NEngine.SpriteRenderer", "Texture") ||
+            std::get<std::string>(prop) != texture_guid.to_string() ||
+            !write("NEngine.SpriteRenderer", "Pixels Per Unit", 75.0) ||
+            !write("NEngine.SpriteRenderer", "Sort Order", std::int64_t{-42}) ||
+            !write("NEngine.SpriteRenderer", "Flip X", true) ||
+            !read("NEngine.SpriteRenderer", "Flip X") ||
+            !std::get<bool>(prop) ||
+            write("NEngine.SpriteRenderer", "Texture", std::string{"bad-guid"}) ||
+            write("NEngine.SpriteRenderer", "Pixels Per Unit", 0.0) ||
+            write("NEngine.SpriteRenderer", "Sort Order", 7.0))
+            return test_failure(110, __LINE__);
+        if (!write("NEngine.MeshRenderer", "Material",
+                material_guid.to_string()) ||
+            !read("NEngine.MeshRenderer", "Material") ||
+            std::get<std::string>(prop) != material_guid.to_string() ||
+            !write("NEngine.MeshRenderer", "Cast Shadows", false) ||
+            !write("NEngine.MeshRenderer", "Mesh", std::string{}) ||
+            !read("NEngine.MeshRenderer", "Mesh") ||
+            !std::get<std::string>(prop).empty() ||
+            write("NEngine.MeshRenderer", "Material", std::string{"../invalid"}) ||
+            write("NEngine.MeshRenderer", "Enabled", 1.0) ||
+            read("NEngine.MeshRenderer", "Unknown") ||
+            write("NEngine.MeshRenderer", "Unknown", true))
+            return test_failure(111, __LINE__);
+        if (read_player_transform_property(
+                runtime.world(), first_entity, "NEngine.Light",
+                "Intensity", prop))
+            return test_failure(112, __LINE__);
+    }
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto cooked_model = runtime.assets().cooked_artifacts(model_guid);
     const auto cooked_material = runtime.assets().cooked_artifacts(material_guid);

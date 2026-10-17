@@ -1,4 +1,5 @@
 #include "nengine/player/managed_properties.hpp"
+#include "managed_render_properties.hpp"
 #include "nengine/scripting/managed_runtime.hpp"
 #include "nengine/physics/components.hpp"
 #include "nengine/audio/components.hpp"
@@ -114,7 +115,10 @@ bool read_player_transform_property(const core::World& world,
             entity, physics::rigidbody2d_type());
         return body && read_rigidbody_property(*body, property, value);
     }
-    if (component != "NEngine.Transform") return false;
+    if (component != "NEngine.Transform") {
+        return read_player_render_property(world, entity, component,
+                                           property, value);
+    }
     const auto* transform = world.transform(entity);
     if (!transform) return false;
     if (property == "Local Position") value = transform->local_position;
@@ -156,7 +160,10 @@ bool write_player_transform_property(core::World& world,
             entity, physics::rigidbody2d_type());
         return body && write_rigidbody_property(*body, property, value);
     }
-    if (component != "NEngine.Transform") return false;
+    if (component != "NEngine.Transform") {
+        return write_player_render_property(world, entity, component,
+                                            property, value);
+    }
     auto* transform = world.transform(entity);
     if (!transform) return false;
     if (property == "Local Rotation") {
