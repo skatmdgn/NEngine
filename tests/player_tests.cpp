@@ -217,6 +217,48 @@ int main() {
             !dynamic.audio_clip(dynamic_wav_guid) ||
             f.sprite_sampled < 1u || renderer->texture != texture_guid)
             return test_failure(120, __LINE__);
+        // A live C# Controller setter must install a state graph and its
+        // referenced clips; clearing it must stop graph-driven transitions.
+        animator->controller = controller_guid;
+        animator->bool_parameters["moving"] = true;
+        dynamic.advance(1.f / 60.f); // establish default state
+        const auto graph_step = dynamic.advance(1.f / 60.f);
+        if (!graph_step.controller_transitions ||
+            animator->speed != 2.0f || animator->clip != nanim_guid)
+            return test_failure(126, __LINE__);
+        animator->controller = {};
+        animator->clip = dynamic_sprite_guid;
+        animator->time_seconds = 0.0f;
+        const auto cleared_graph = dynamic.advance(1.f / 60.f);
+        if (cleared_graph.controller_transitions != 0u ||
+            animator->clip != dynamic_sprite_guid)
+            return test_failure(127, __LINE__);
+        animator->playing = true;
+        animator->loop = false;
+        animator->speed = 1.0f;
+        animator->time_seconds = 0.0f;
+        dynamic.advance(0.2f);
+        if (animator->playing ||
+            std::abs(animator->time_seconds - 0.1f) > 0.0001f)
+            return test_failure(128, __LINE__);
+        animator->playing = true;
+        animator->loop = true;
+        animator->speed = 1.0e9f;
+        animator->time_seconds = 3.0e38f;
+        const auto extreme = dynamic.advance(0.25f);
+        if (!std::isfinite(animator->time_seconds) ||
+            animator->time_seconds < 0.0f ||
+            animator->time_seconds >= 0.1f ||
+            extreme.sprite_sampled == 0u)
+            return test_failure(129, __LINE__);
+        renderer->enabled = false;
+        renderer->texture = {};
+        dynamic.advance(1.f / 60.f);
+        // The startup scene contains other, still-enabled sprite renderers.
+        // Only the disabled renderer's output is required to stay untouched.
+        if (renderer->texture.valid())
+            return test_failure(130, __LINE__);
+        renderer->enabled = true;
         const auto missing_guid = nengine::assets::AssetGuid::generate();
         sound->clip = missing_guid;
         animator->clip = missing_guid;
@@ -224,6 +266,12 @@ int main() {
         dynamic.advance(1.f / 60.f);
         if (dynamic.audio_clip(missing_guid) != nullptr)
             return test_failure(121, __LINE__);
+        if (!dynamic.load(report.bundle_root, &error) ||
+            dynamic.entity_count() != 2u ||
+            dynamic.audio_clip(dynamic_wav_guid) != nullptr)
+            return test_failure(131, __LINE__);
+        if (!dynamic.advance(1.f / 60.f).controller_transitions)
+            return test_failure(132, __LINE__);
         dynamic.unload();
     }
     runtime.begin_input_frame();
@@ -464,6 +512,52 @@ int main() {
                 runtime.world(), first_entity, "NEngine.Light",
                 "Intensity", prop))
             return test_failure(112, __LINE__);
+    }
+    // Managed sprite animation is a separate component from SpriteRenderer.
+    auto* managed_animator = runtime.world().add_component<
+        nengine::render::SpriteAnimator>(
+            render_entity, nengine::render::sprite_animator_type());
+    if (!managed_animator) return test_failure(122, __LINE__);
+    {
+        nengine::core::PropertyValue property;
+        const auto r = [&](std::string_view key) {
+            return read_player_transform_property(runtime.world(), render_entity,
+                "NEngine.SpriteAnimator", key, property);
+        };
+        const auto w = [&](std::string_view key,
+                           const nengine::core::PropertyValue& value) {
+            return write_player_transform_property(runtime.world(), render_entity,
+                "NEngine.SpriteAnimator", key, value);
+        };
+        if (!w("Enabled", false) || !r("Enabled") || std::get<bool>(property) ||
+            !w("Playing", false) || !r("Playing") || std::get<bool>(property) ||
+            !w("Loop", false) || !r("Loop") || std::get<bool>(property) ||
+            !w("Clip", nanim_guid.to_string()) ||
+            !r("Clip") || std::get<std::string>(property) != nanim_guid.to_string() ||
+            !w("Controller", controller_guid.to_string()) ||
+            !r("Controller") || std::get<std::string>(property) != controller_guid.to_string() ||
+            !w("Speed", 2.0) || !r("Speed") || std::get<double>(property) != 2.0 ||
+            !w("Time", 3.5) || !r("Time") || std::get<double>(property) != 3.5 ||
+            !w("Clip", nanim_guid.to_string()) || !r("Time") ||
+            std::get<double>(property) != 3.5)
+            return test_failure(123, __LINE__);
+        if (!w("Bool Parameter", std::string{"moving=1"}) ||
+            !r("Bool Parameter") ||
+            std::get<std::string>(property) != "moving=1" ||
+            !managed_animator->bool_parameters.at("moving") ||
+            !w("Bool Parameter", std::string{"moving=0"}) ||
+            managed_animator->bool_parameters.at("moving") ||
+            w("Bool Parameter", std::string{"bad space=1"}) ||
+            w("Bool Parameter", std::string{"foo=yes"}) ||
+            w("Bool Parameter", std::string{"=1"}) ||
+            w("Bool Parameter", std::string{"foo=2"}) ||
+            w("Bool Parameter", std::string(129, 'a') + "=1"))
+            return test_failure(125, __LINE__);
+        if (w("Speed", -1.0) || w("Time", std::numeric_limits<double>::infinity()) ||
+            w("Speed", std::numeric_limits<double>::quiet_NaN()) ||
+            w("Controller", std::string{"../bad"}) ||
+            w("Clip", 1.0) || w("Enabled", 1.0) || r("Unknown"))
+            return test_failure(124, __LINE__);
     }
     // Audio C# property parity in a packaged Player: clip changes must
     // reset playback and bad inputs must not mutate accepted state.

@@ -51,6 +51,14 @@ This is a **dependency overview**, not a complete generated dependency graph. Th
 
 - **Runtime asset reassignment:** Standalone Player now scans referenced AudioSource/SpriteAnimator clips during frame advance and caches newly selected bundled WAV/.nanim assets; missing GUIDs are negatively cached until Scene reload. Regression fixtures verify previously unreferenced clips load and missing references fail safely. Dynamic controller-graph rebinding and non-WAV streaming remain future work.
 
+## 2026-10-17 continuation: 15 bounded Player-animation development slices
+
+- Implemented native managed SpriteAnimator Clip/Controller/playback/speed/time and boolean-parameter property access with type, GUID, finite and bounded ASCII validation.
+- Updated the standalone runtime so a changed controller GUID rebinds its state graph, released/destroyed controller assignments are unbound, and graph state clips are preloaded from packaged assets.
+- Ensured controller transitions resolve new clips during the same frame; nonlooping animations stop at their final frame, huge playback times are reduced with double-precision arithmetic and disabled sprite renderers do not receive sampled output.
+- Bounded negative caches for invalid asset GUIDs, added sprite property/controller/overflow/Scene reload regressions.
+- These are code changes submitted for CI; interactive Windows Vulkan, real managed DLL execution and Android export require separate acceptance.
+
 ## Highest-priority next work
 
 1. **Player completion:** exported glTF/OBJ generated material/texture subassets, managed action map/property parity, and genuine Windows GPU + .NET + input acceptance.

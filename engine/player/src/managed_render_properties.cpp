@@ -184,6 +184,69 @@ bool write_sprite(render::SpriteRenderer& v, std::string_view key,
     return false;
 }
 
+
+bool read_animator(const render::SpriteAnimator& a, std::string_view key,
+                   core::PropertyValue& out) {
+    if (key == "Enabled") out = a.enabled;
+    else if (key == "Playing") out = a.playing;
+    else if (key == "Loop") out = a.loop;
+    else if (key == "Clip") out = asset_text(a.clip);
+    else if (key == "Controller") out = asset_text(a.controller);
+    else if (key == "Speed") out = static_cast<double>(a.speed);
+    else if (key == "Time") out = static_cast<double>(a.time_seconds);
+    else if (key == "Bool Parameter") out = a.last_bool_parameter;
+    else return false;
+    return true;
+}
+
+bool write_animator(render::SpriteAnimator& a, std::string_view key,
+                    const core::PropertyValue& value) {
+    if (key == "Enabled") return bool_value(value, a, &render::SpriteAnimator::enabled);
+    if (key == "Playing") return bool_value(value, a, &render::SpriteAnimator::playing);
+    if (key == "Loop") return bool_value(value, a, &render::SpriteAnimator::loop);
+    if (key == "Bool Parameter") {
+        const auto* command = std::get_if<std::string>(&value);
+        if (!command || command->size() < 3u || command->size() > 130u)
+            return false;
+        const auto sep = command->find('=');
+        if (sep == std::string::npos || sep == 0u || sep > 128u ||
+            sep + 2u != command->size() ||
+            ((*command)[sep + 1u] != '0' && (*command)[sep + 1u] != '1'))
+            return false;
+        const std::string name = command->substr(0u, sep);
+        for (const unsigned char ch : name)
+            if (!((ch >= 'a' && ch <= 'z') ||
+                  (ch >= 'A' && ch <= 'Z') ||
+                  (ch >= '0' && ch <= '9') ||
+                  ch == '_' || ch == '.' || ch == '-'))
+                return false;
+        if (!a.bool_parameters.contains(name) &&
+            a.bool_parameters.size() >= 64u)
+            return false;
+        a.bool_parameters[name] = (*command)[sep + 1u] == '1';
+        a.last_bool_parameter = *command;
+        return true;
+    }
+    if (key == "Clip" || key == "Controller") {
+        assets::AssetGuid next;
+        if (!asset_value(value, next)) return false;
+        auto& assigned = key == "Clip" ? a.clip : a.controller;
+        if (assigned != next) {
+            assigned = next;
+            a.time_seconds = 0.f;
+        }
+        return true;
+    }
+    float f{};
+    if (key == "Speed" || key == "Time") {
+        if (!bounded_float(value, f, 0.0, 1.0e6)) return false;
+        if (key == "Speed") a.speed = f;
+        else a.time_seconds = f;
+        return true;
+    }
+    return false;
+}
+
 bool read_mesh(const render::MeshRenderer& v, std::string_view key,
                core::PropertyValue& out) {
     if (key == "Enabled") out = v.enabled;
@@ -232,6 +295,11 @@ bool read_player_render_property(const core::World& world,
             entity, render::sprite_renderer_type());
         return c && read_sprite(*c, property, value);
     }
+    if (component == "NEngine.SpriteAnimator") {
+        const auto* animator = world.get_component<render::SpriteAnimator>(
+            entity, render::sprite_animator_type());
+        return animator && read_animator(*animator, property, value);
+    }
     if (component == "NEngine.MeshRenderer") {
         const auto* c = world.get_component<render::MeshRenderer>(
             entity, render::mesh_renderer_type());
@@ -257,6 +325,11 @@ bool write_player_render_property(core::World& world,
         auto* c = world.get_component<render::SpriteRenderer>(
             entity, render::sprite_renderer_type());
         return c && write_sprite(*c, property, value);
+    }
+    if (component == "NEngine.SpriteAnimator") {
+        auto* animator = world.get_component<render::SpriteAnimator>(
+            entity, render::sprite_animator_type());
+        return animator && write_animator(*animator, property, value);
     }
     if (component == "NEngine.MeshRenderer") {
         auto* c = world.get_component<render::MeshRenderer>(

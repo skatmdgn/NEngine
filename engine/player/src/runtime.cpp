@@ -69,6 +69,12 @@ std::size_t PlayerRuntime::pending_script_count() const noexcept {
 }
 
 void PlayerRuntime::ensure_referenced_assets() {
+    // Bound negative caches against streams of unique invalid GUIDs from C#.
+    const auto cache_miss = [](auto& cache, assets::AssetGuid guid) {
+        constexpr std::size_t max_misses = 512;
+        if (cache.size() >= max_misses) cache.clear();
+        cache.insert(guid);
+    };
     // Editor scene import preloads only the clips referenced at load time.
     // Scripts may assign a different, already bundled AssetGuid at runtime.
     for (const auto entity : world_.entities()) {
@@ -80,20 +86,57 @@ void PlayerRuntime::ensure_referenced_assets() {
                 if (auto clip = assets_.load_wav(guid))
                     audio_clips_.emplace(guid, std::move(*clip));
                 else
-                    missing_audio_clips_.insert(guid);
+                    cache_miss(missing_audio_clips_, guid);
             }
         }
         if (const auto* animator = world_.get_component<render::SpriteAnimator>(
                 entity, render::sprite_animator_type())) {
+            const auto existing = controller_bindings_.find(entity.value);
+            if (existing != controller_bindings_.end() &&
+                existing->second != animator->controller) {
+                sprite_controllers_.unbind(entity);
+                controller_bindings_.erase(existing);
+            }
+            if (animator->controller.valid() &&
+                !controller_bindings_.contains(entity.value) &&
+                !missing_controller_guids_.contains(animator->controller)) {
+                auto definition = assets_.load_controller(animator->controller);
+                if (definition) {
+                    // Controller states can reference clips absent from the
+                    // startup scene. Prefetch before transition evaluation.
+                    for (const auto& state : definition->states) {
+                        if (!sprite_clips_.contains(state.clip) &&
+                            !missing_sprite_clips_.contains(state.clip)) {
+                            if (auto clip = assets_.load_sprite_clip(state.clip))
+                                sprite_clips_.emplace(state.clip, std::move(*clip));
+                            else cache_miss(missing_sprite_clips_, state.clip);
+                        }
+                    }
+                }
+                if (definition && sprite_controllers_.bind(entity, std::move(*definition)))
+                    controller_bindings_[entity.value] = animator->controller;
+                else
+                    cache_miss(missing_controller_guids_, animator->controller);
+            }
             const auto guid = animator->clip;
             if (guid.valid() && !sprite_clips_.contains(guid) &&
                 !missing_sprite_clips_.contains(guid)) {
                 if (auto clip = assets_.load_sprite_clip(guid))
                     sprite_clips_.emplace(guid, std::move(*clip));
                 else
-                    missing_sprite_clips_.insert(guid);
+                    cache_miss(missing_sprite_clips_, guid);
             }
         }
+    }
+    // Removing/destroying an animator must also release its controller state.
+    for (auto it = controller_bindings_.begin();
+         it != controller_bindings_.end();) {
+        const core::Entity entity{it->first};
+        if (!world_.is_alive(entity) ||
+            !world_.has_component(entity, render::sprite_animator_type())) {
+            sprite_controllers_.unbind(entity);
+            it = controller_bindings_.erase(it);
+        } else ++it;
     }
 }
 
@@ -118,6 +161,8 @@ PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
     }
     stats.controller_transitions =
         sprite_controllers_.evaluate(world_).transitions;
+    // A controller can assign a different state clip in this same frame.
+    ensure_referenced_assets();
     for (const auto entity : world_.entities()) {
         if (!world_.active(entity)) continue;
         auto* sprite = world_.get_component<render::SpriteAnimator>(
@@ -128,13 +173,38 @@ PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
             ++stats.sprite_unresolved;
             continue;
         }
-        if (std::isfinite(sprite->speed) && sprite->speed > 0.f)
-            sprite->time_seconds += static_cast<float>(frame) * sprite->speed;
+        if (std::isfinite(sprite->speed) && sprite->speed > 0.f) {
+            const double advanced =
+                static_cast<double>(sprite->time_seconds) +
+                frame * static_cast<double>(sprite->speed);
+            const double duration = static_cast<double>(
+                it->second.duration_seconds());
+            if (std::isfinite(advanced) && duration > 0.0 &&
+                std::isfinite(duration)) {
+                // Keep looping/non-looping playback bounded across long sessions.
+                const double stable = sprite->loop
+                    ? std::fmod(std::max(0.0, advanced), duration)
+                    : std::min(std::max(0.0, advanced), duration);
+                float next_time = static_cast<float>(stable);
+                // Float rounding can lift a double-precision remainder to
+                // precisely duration, which is not in the looping interval.
+                if (sprite->loop &&
+                    next_time >= it->second.duration_seconds())
+                    next_time = 0.f;
+                sprite->time_seconds = next_time;
+            }
+        }
         const auto sampled = render::sample_sprite_animation_frame(
             it->second, sprite->time_seconds, sprite->loop);
         if (!sampled) { ++stats.sprite_unresolved; continue; }
+        if (!sprite->loop && sprite->playing &&
+            sprite->time_seconds >= it->second.duration_seconds()) {
+            sprite->time_seconds = it->second.duration_seconds();
+            sprite->playing = false;
+        }
         if (auto* renderer = world_.get_component<render::SpriteRenderer>(
-                entity, render::sprite_renderer_type())) {
+                entity, render::sprite_renderer_type());
+            renderer && renderer->enabled) {
             renderer->texture = it->second.frames[*sampled].texture;
             ++stats.sprite_sampled;
         }
@@ -206,6 +276,8 @@ void PlayerRuntime::unload() noexcept {
     missing_audio_clips_.clear();
     missing_sprite_clips_.clear();
     sprite_controllers_.clear();
+    controller_bindings_.clear();
+    missing_controller_guids_.clear();
     audio_playback_.reset();
     physics_cache_.clear();
     contact_tracker_.clear();
@@ -260,6 +332,7 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
             next_sprites.emplace(animator->clip, std::move(*clip));
     }
     render::SpriteControllerRuntime next_controllers;
+    std::unordered_map<std::uint64_t, assets::AssetGuid> next_bindings;
     for (const auto entity : next_world.entities()) {
         const auto* animator = next_world.get_component<render::SpriteAnimator>(
             entity, render::sprite_animator_type());
@@ -271,7 +344,8 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
             if (auto clip = catalog.load_sprite_clip(state.clip))
                 next_sprites.emplace(state.clip, std::move(*clip));
         }
-        next_controllers.bind(entity, std::move(*definition));
+        if (next_controllers.bind(entity, std::move(*definition)))
+            next_bindings.emplace(entity.value, animator->controller);
     }
     script_system_.clear(&world_);
     managed_runtime_.shutdown();
@@ -284,6 +358,8 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
     missing_audio_clips_.clear();
     missing_sprite_clips_.clear();
     sprite_controllers_ = std::move(next_controllers);
+    controller_bindings_ = std::move(next_bindings);
+    missing_controller_guids_.clear();
     audio_playback_.reset();
     physics_cache_.clear();
     contact_tracker_.clear();
