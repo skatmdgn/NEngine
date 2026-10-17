@@ -315,6 +315,26 @@ int main() {
         runtime.actions().held("Jump", runtime.input()) ||
         runtime.actions().pressed("NoSuchAction", runtime.input()))
         return test_failure(49, __LINE__);
+    // Invalid action map reload must never replace a running Scene or its actions.
+    const auto staged_actions = report.bundle_root / "Content" / "Input.ninput";
+    {
+        std::ofstream malformed(staged_actions, std::ios::trunc);
+        malformed << "NENGINE_ACTION_MAP 9\n";
+    }
+    if (runtime.load(report.bundle_root, &error) ||
+        !runtime.ready() || runtime.entity_count() != 2u ||
+        !runtime.actions().contains("Jump"))
+        return test_failure(149, __LINE__);
+    std::string recovered_actions;
+    if (!exported_actions.serialize(recovered_actions, &error))
+        return test_failure(150, __LINE__);
+    {
+        std::ofstream restored_map(staged_actions, std::ios::trunc);
+        restored_map << recovered_actions;
+    }
+    if (!runtime.load(report.bundle_root, &error) ||
+        !runtime.ready() || !runtime.actions().contains("Jump"))
+        return test_failure(151, __LINE__);
     if (runtime.managed_ready() ||
         runtime.initialize_managed(&error) ||
         !runtime.ready() || runtime.entity_count() != 2u ||
