@@ -2077,6 +2077,7 @@ int main() {
                 << "    private void Update() {\n"
                 << "        if (frame == 0) {\n"
                 << "            if (!Input.GetKey(KeyCode.A) || !Input.GetKeyDown(KeyCode.A) || Input.GetKeyUp(KeyCode.A)) throw new System.Exception(\"input press mismatch\");\n"
+                << "            if (!Input.GetButton(\"Jump\") || !Input.GetButtonDown(\"Jump\") || Input.GetButtonUp(\"Jump\")) throw new System.Exception(\"action press mismatch\");\n"
                 << "            Vector2 p = Input.mousePosition; Vector2 d = Input.mouseDelta; Vector2 w = Input.mouseScrollDelta;\n"
                 << "            if (p.x != 104 || p.y != 97 || d.x != 4 || d.y != -3 || w.y != 1.5f) throw new System.Exception(\"pointer mismatch\");\n"
                 << "            transform.localPosition = new Vector3(d.x, d.y, w.y);\n"
@@ -3811,6 +3812,10 @@ int main() {
 
                             managed_runtime.bind_input(
                                 &managed_input);
+                            nengine::input::ActionMap script_actions;
+                            script_actions.bind("Jump", nengine::input::Key::A);
+                            script_actions.bind("Fire", nengine::input::Key::MouseLeft);
+                            managed_runtime.bind_input_actions(&script_actions);
 
                             const auto input_entity =
                                 script_world.create(
