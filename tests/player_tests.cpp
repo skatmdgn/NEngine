@@ -491,6 +491,18 @@ int main() {
             !w("Speed", 2.0) || !r("Speed") || std::get<double>(property) != 2.0 ||
             !w("Time", 3.5) || !r("Time") || std::get<double>(property) != 3.5)
             return test_failure(123, __LINE__);
+        if (!w("Bool Parameter", std::string{"moving=1"}) ||
+            !r("Bool Parameter") ||
+            std::get<std::string>(property) != "moving=1" ||
+            !managed_animator->bool_parameters.at("moving") ||
+            !w("Bool Parameter", std::string{"moving=0"}) ||
+            managed_animator->bool_parameters.at("moving") ||
+            w("Bool Parameter", std::string{"bad space=1"}) ||
+            w("Bool Parameter", std::string{"foo=yes"}) ||
+            w("Bool Parameter", std::string{"=1"}) ||
+            w("Bool Parameter", std::string{"foo=2"}) ||
+            w("Bool Parameter", std::string(129, 'a') + "=1"))
+            return test_failure(125, __LINE__);
         if (w("Speed", -1.0) || w("Time", std::numeric_limits<double>::infinity()) ||
             w("Speed", std::numeric_limits<double>::quiet_NaN()) ||
             w("Controller", std::string{"../bad"}) ||
