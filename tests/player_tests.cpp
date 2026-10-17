@@ -297,15 +297,23 @@ int main() {
     runtime.begin_input_frame();
     runtime.input().set_key(nengine::input::Key::A, true);
     if (!runtime.input().held(nengine::input::Key::A) ||
-        !runtime.input().pressed(nengine::input::Key::A))
+        !runtime.input().pressed(nengine::input::Key::A) ||
+        !runtime.actions().held("Jump", runtime.input()) ||
+        !runtime.actions().pressed("Jump", runtime.input()) ||
+        runtime.actions().held("Fire", runtime.input()))
         return test_failure(47, __LINE__);
     runtime.begin_input_frame();
     runtime.input().set_key(nengine::input::Key::A, true);
-    if (runtime.input().pressed(nengine::input::Key::A))
+    if (runtime.input().pressed(nengine::input::Key::A) ||
+        runtime.actions().pressed("Jump", runtime.input()) ||
+        !runtime.actions().held("Jump", runtime.input()))
         return test_failure(48, __LINE__);
     runtime.begin_input_frame();
     runtime.input().set_key(nengine::input::Key::A, false);
-    if (!runtime.input().released(nengine::input::Key::A))
+    if (!runtime.input().released(nengine::input::Key::A) ||
+        !runtime.actions().released("Jump", runtime.input()) ||
+        runtime.actions().held("Jump", runtime.input()) ||
+        runtime.actions().pressed("NoSuchAction", runtime.input()))
         return test_failure(49, __LINE__);
     if (runtime.managed_ready() ||
         runtime.initialize_managed(&error) ||
