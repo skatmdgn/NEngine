@@ -1,4 +1,5 @@
 #include "nengine/player/assets.hpp"
+#include "nengine/player/subassets.hpp"
 #include <filesystem>
 #include <fstream>
 #include <vector>
@@ -38,8 +39,36 @@ bool PlayerAssets::open(const std::filesystem::path& bundle_root,
             return false;
         }
     }
+    std::unordered_map<assets::AssetGuid, assets::CachedArtifactSet,
+        assets::AssetGuidHash> next_subassets;
+    for (const auto& record : next.records()) {
+        const auto ext = record.source_path.extension();
+        if (ext != ".glb" && ext != ".gltf" && ext != ".obj") continue;
+        const auto folder = content_path / "Cooked" / record.guid.to_string();
+        std::vector<CookedSubasset> entries;
+        if (!read_model_subassets(folder, entries, error)) return false;
+        for (const auto& item : entries) {
+            if (next.find(item.guid) || next_subassets.contains(item.guid)) {
+                if (error) *error = "generated subasset GUID collides with source or another model";
+                return false;
+            }
+            assets::CachedArtifactSet artifacts;
+            artifacts.importer_id = item.importer_id;
+            artifacts.importer_version = 1;
+            artifacts.fingerprint =
+                "Player-Generated-v1-" + record.guid.to_string() + "-" +
+                item.guid.to_string();
+            artifacts.artifacts = item.artifacts;
+            next_subassets.emplace(item.guid, std::move(artifacts));
+            if (next_subassets.size() > 8192u) {
+                if (error) *error = "too many generated model subassets";
+                return false;
+            }
+        }
+    }
     root_ = content;
     database_ = std::move(next);
+    generated_subassets_ = std::move(next_subassets);
     if (error) error->clear();
     return true;
 }
