@@ -121,6 +121,18 @@ bool read_player_collider_property(const core::World& world,
         }
         return false;
     }
+    if (component == "NEngine.CapsuleCollider") {
+        const auto* c = world.get_component<physics::CapsuleCollider>(entity, physics::capsule_collider_type());
+        if (!c) return false;
+        if (common_name(property)) return read_common(*c, property, value);
+        if (property == "Radius") value = static_cast<double>(c->radius);
+        else if (property == "Height") value = static_cast<double>(c->height);
+        else if (property == "Direction")
+            value = static_cast<std::int64_t>(c->direction);
+        else return false;
+        return true;
+        return false;
+    }
     return false;
 }
 
@@ -147,6 +159,28 @@ bool write_player_collider_property(core::World& world,
             float next{};
             if (!float_field(value, next, 0.0, max_extent, true)) return false;
             c->radius = next;
+            return true;
+        }
+        return false;
+    }
+    if (component == "NEngine.CapsuleCollider") {
+        auto* c = world.get_component<physics::CapsuleCollider>(entity, physics::capsule_collider_type());
+        if (!c) return false;
+        if (common_name(property)) return write_common(*c, property, value, false);
+        if (property == "Radius" || property == "Height") {
+            float next{};
+            if (!float_field(value, next, 0.0, max_extent, true)) return false;
+            const float radius = property == "Radius" ? next : c->radius;
+            const float height = property == "Height" ? next : c->height;
+            if (height < 2.0f * radius) return false;
+            if (property == "Radius") c->radius = next;
+            else c->height = next;
+            return true;
+        }
+        if (property == "Direction") {
+            const auto* n = std::get_if<std::int64_t>(&value);
+            if (!n || *n < 0 || *n > 2) return false;
+            c->direction = static_cast<std::uint32_t>(*n);
             return true;
         }
         return false;
