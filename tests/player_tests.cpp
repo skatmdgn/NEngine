@@ -1079,6 +1079,14 @@ int main() {
         return test_failure(155, __LINE__);
     if (!write_model_subassets(generated, generated_subassets, &error))
         return test_failure(156, __LINE__);
+    auto bad_generated = generated_subassets;
+    bad_generated[1].artifacts[0].path = generated / ".." / "escape.tga";
+    if (write_model_subassets(generated, bad_generated, &error))
+        return test_failure(157, __LINE__);
+    bad_generated = generated_subassets;
+    bad_generated[1].artifacts[0].path = generated_material_path;
+    if (write_model_subassets(generated, bad_generated, &error))
+        return test_failure(158, __LINE__);
     // GENERATED_SUBASSET_TESTS
     std::filesystem::remove_all(root);
     std::cout << "player bundle export tests passed\n";
