@@ -1748,6 +1748,24 @@ std::string api_stub(
         internal static bool GetKeyUp(uint key) =>
             _released?.Invoke(_context, key) > 0;
 
+        internal static bool GetButton(string actionName, uint mode)
+        {
+            if (_action == null || string.IsNullOrEmpty(actionName) ||
+                actionName.Length > 64 || mode > 2) return false;
+            byte[] encoded = Encoding.UTF8.GetBytes(actionName + "\0");
+            if (encoded.Length > 65) return false;
+            nint pointer = Marshal.AllocHGlobal(encoded.Length);
+            try
+            {
+                Marshal.Copy(encoded, 0, pointer, encoded.Length);
+                return _action(_context, pointer, mode) > 0;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(pointer);
+            }
+        }
+
         internal static bool TryGetPointer(out NativePointerState state)
         {
             state = new NativePointerState();
@@ -4271,6 +4289,15 @@ std::string api_stub(
 
         public static bool GetKeyUp(KeyCode key) =>
             NativeInput.GetKeyUp((uint)key);
+
+        public static bool GetButton(string name) =>
+            NativeInput.GetButton(name, 0);
+
+        public static bool GetButtonDown(string name) =>
+            NativeInput.GetButton(name, 1);
+
+        public static bool GetButtonUp(string name) =>
+            NativeInput.GetButton(name, 2);
 
         private static NativePointerState Pointer
         {
