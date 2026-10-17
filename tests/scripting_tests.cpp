@@ -2083,6 +2083,7 @@ int main() {
                 << "            transform.localPosition = new Vector3(d.x, d.y, w.y);\n"
                 << "        } else {\n"
                 << "            if (Input.GetKey(KeyCode.A) || Input.GetKeyDown(KeyCode.A) || !Input.GetKeyUp(KeyCode.A)) throw new System.Exception(\"input release mismatch\");\n"
+                << "            if (Input.GetButton(\"Jump\") || Input.GetButtonDown(\"Jump\") || !Input.GetButtonUp(\"Jump\")) throw new System.Exception(\"action release mismatch\");\n"
                 << "            gameObject.name = \"Input Passed\";\n"
                 << "        }\n"
                 << "        frame++;\n"
