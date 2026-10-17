@@ -879,6 +879,13 @@ void ManagedRuntime::bind_input(
         input_state;
 }
 
+void ManagedRuntime::bind_input_actions(
+    const input::ActionMap* action_map) noexcept {
+    if (!world_context_)
+        world_context_ = std::make_unique<NativeWorldContext>();
+    world_context_->action_map = action_map;
+}
+
 void ManagedRuntime::bind_ui(
     void* context, UiFindFn find, UiQueryFn query,
     UiWriteFn write, UiTextFn text,
@@ -1887,6 +1894,8 @@ bool ManagedRuntime::initialize(
         &ManagedRuntime::callback_input_released;
     input_callbacks.pointer =
         &ManagedRuntime::callback_input_pointer;
+    input_callbacks.action =
+        &ManagedRuntime::callback_input_action;
 
     if (configure_input_callbacks_(
             &input_callbacks) <= 0) {
