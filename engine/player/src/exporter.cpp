@@ -250,6 +250,10 @@ bool export_player_data(const ExportSettings& settings,
             if (!cooked.success) {
                 cleanup(); return fail(error, "cannot cook Player model: " + cooked.message);
             }
+            if (!write_model_subassets(folder, cooked.subassets, error)) {
+                cleanup();
+                return false;
+            }
             ++cooked_models;
         }
     }
