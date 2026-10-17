@@ -1752,6 +1752,11 @@ int main() {
         bridge.find(
             "ConfigureNativeUiCallbacks") !=
                 std::string::npos &&
+        api.find("public static class Input") != std::string::npos &&
+        api.find("GetButtonDown(string name)") != std::string::npos &&
+        api.find("GetButtonUp(string name)") != std::string::npos &&
+        api.find("GetButton(string name)") != std::string::npos &&
+        api.find("private delegate int ActionFn") != std::string::npos &&
         api.find("public static class UI") != std::string::npos &&
         api.find("WasClicked") != std::string::npos &&
         api.find("SetInteractable") != std::string::npos &&
@@ -2078,6 +2083,7 @@ int main() {
                 << "        if (frame == 0) {\n"
                 << "            if (!Input.GetKey(KeyCode.A) || !Input.GetKeyDown(KeyCode.A) || Input.GetKeyUp(KeyCode.A)) throw new System.Exception(\"input press mismatch\");\n"
                 << "            if (!Input.GetButton(\"Jump\") || !Input.GetButtonDown(\"Jump\") || Input.GetButtonUp(\"Jump\")) throw new System.Exception(\"action press mismatch\");\n"
+                << "            if (Input.GetButton(\"Unknown\") || Input.GetButtonDown(\"\") || Input.GetButtonUp(new string('x', 100))) throw new System.Exception(\"unsafe action accepted\");\n"
                 << "            Vector2 p = Input.mousePosition; Vector2 d = Input.mouseDelta; Vector2 w = Input.mouseScrollDelta;\n"
                 << "            if (p.x != 104 || p.y != 97 || d.x != 4 || d.y != -3 || w.y != 1.5f) throw new System.Exception(\"pointer mismatch\");\n"
                 << "            transform.localPosition = new Vector3(d.x, d.y, w.y);\n"
