@@ -167,8 +167,21 @@ PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
             ++stats.sprite_unresolved;
             continue;
         }
-        if (std::isfinite(sprite->speed) && sprite->speed > 0.f)
-            sprite->time_seconds += static_cast<float>(frame) * sprite->speed;
+        if (std::isfinite(sprite->speed) && sprite->speed > 0.f) {
+            const double advanced =
+                static_cast<double>(sprite->time_seconds) +
+                frame * static_cast<double>(sprite->speed);
+            const double duration = static_cast<double>(
+                it->second.duration_seconds());
+            if (std::isfinite(advanced) && duration > 0.0 &&
+                std::isfinite(duration)) {
+                // Keep looping/non-looping playback bounded across long sessions.
+                const double stable = sprite->loop
+                    ? std::fmod(std::max(0.0, advanced), duration)
+                    : std::min(std::max(0.0, advanced), duration);
+                sprite->time_seconds = static_cast<float>(stable);
+            }
+        }
         const auto sampled = render::sample_sprite_animation_frame(
             it->second, sprite->time_seconds, sprite->loop);
         if (!sampled) { ++stats.sprite_unresolved; continue; }

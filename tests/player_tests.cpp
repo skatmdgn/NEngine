@@ -241,6 +241,16 @@ int main() {
         if (animator->playing ||
             std::abs(animator->time_seconds - 0.1f) > 0.0001f)
             return test_failure(128, __LINE__);
+        animator->playing = true;
+        animator->loop = true;
+        animator->speed = 1.0e9f;
+        animator->time_seconds = 3.0e38f;
+        const auto extreme = dynamic.advance(0.25f);
+        if (!std::isfinite(animator->time_seconds) ||
+            animator->time_seconds < 0.0f ||
+            animator->time_seconds >= 0.1f ||
+            extreme.sprite_sampled == 0u)
+            return test_failure(129, __LINE__);
         const auto missing_guid = nengine::assets::AssetGuid::generate();
         sound->clip = missing_guid;
         animator->clip = missing_guid;
