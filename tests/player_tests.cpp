@@ -877,6 +877,25 @@ int main() {
         !runtime.world().destroy(render_entity))
         return test_failure(113, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
+    const auto derived_material =
+        nengine::assets::derive_subasset_guid(model_guid, "obj-material", 0u);
+    const auto derived_texture =
+        nengine::assets::derive_subasset_guid(model_guid, "obj-base-color", 0u);
+    const auto derived_material_assets =
+        runtime.assets().cooked_artifacts(derived_material);
+    const auto derived_texture_assets =
+        runtime.assets().cooked_artifacts(derived_texture);
+    if (runtime.assets().generated_subasset_count() != 2u ||
+        !derived_material_assets ||
+        derived_material_assets->importer_id != "NEngine.Material" ||
+        derived_material_assets->artifacts.size() != 1u ||
+        !derived_texture_assets ||
+        derived_texture_assets->importer_id != "NEngine.Texture" ||
+        derived_texture_assets->artifacts.size() != 2u ||
+        derived_texture_assets->artifacts[1].role != "texture-descriptor" ||
+        !runtime.assets().source(derived_material) ||
+        !runtime.assets().source(derived_texture))
+        return test_failure(162, __LINE__);
     const auto cooked_model = runtime.assets().cooked_artifacts(model_guid);
     const auto cooked_material = runtime.assets().cooked_artifacts(material_guid);
     if (!cooked_model || cooked_model->importer_id != "NEngine.Model" ||
