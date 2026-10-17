@@ -4,6 +4,8 @@
 #include "nengine/core/scene.hpp"
 #include "nengine/assets/asset_database.hpp"
 #include "nengine/assets/builtin_processors.hpp"
+#include "nengine/render/model_importer.hpp"
+#include "nengine/player/subassets.hpp"
 #include "nengine/assets/asset_importer.hpp"
 #include <chrono>
 #include <fstream>
@@ -229,6 +231,8 @@ bool export_player_data(const ExportSettings& settings,
         }
     }
     std::size_t cooked_models = 0;
+    std::size_t generated_materials = 0;
+    std::size_t generated_textures = 0;
     if (settings.copy_supported_assets) {
         const auto packaged = staging / "Content" / "Assets";
         assets::AssetDatabase db(packaged);
@@ -244,9 +248,26 @@ bool export_player_data(const ExportSettings& settings,
             std::filesystem::create_directories(folder, ec);
             if (ec) { cleanup(); return fail(error, "cannot create model cook directory"); }
             const assets::ImportContext context{&record, &descriptor, folder};
-            const auto cooked = assets::model_source_importer(context);
+            const auto cooked = render::model_asset_importer(context);
             if (!cooked.success) {
                 cleanup(); return fail(error, "cannot cook Player model: " + cooked.message);
+            }
+            if (!write_model_subassets(folder, cooked.subassets, error)) {
+                cleanup();
+                return false;
+            }
+            if (generated_materials > 8192u || generated_textures > 8192u ||
+                cooked.subassets.size() > 1024u) {
+                cleanup(); return fail(error, "too many generated Player subassets");
+            }
+            for (const auto& subasset : cooked.subassets) {
+                if (subasset.importer_id == "NEngine.Material")
+                    ++generated_materials;
+                if (subasset.importer_id == "NEngine.Texture")
+                    ++generated_textures;
+                if (generated_materials > 8192u || generated_textures > 8192u) {
+                    cleanup(); return fail(error, "too many generated Player subassets");
+                }
             }
             ++cooked_models;
         }
@@ -320,7 +341,8 @@ bool export_player_data(const ExportSettings& settings,
     std::filesystem::rename(staging, final_path, ec);
     if (ec) { cleanup(); return fail(error, "cannot atomically finish player bundle"); }
     report = {final_path, scene.objects.size(), copied_assets,
-              cooked_textures, cooked_materials, cooked_models, managed_files};
+              cooked_textures, cooked_materials, cooked_models, managed_files,
+              generated_materials, generated_textures};
     if (error) error->clear();
     return true;
 }

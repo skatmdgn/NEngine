@@ -10,10 +10,15 @@
 #include "nengine/player/bundle.hpp"
 #include "nengine/player/exporter.hpp"
 #include "nengine/player/runtime.hpp"
+#include "nengine/player/subassets.hpp"
 #include "nengine/input/action_map_io.hpp"
 #include "nengine/player/managed_properties.hpp"
 #include "nengine/core/scene.hpp"
 #include "nengine/render/components.hpp"
+#include "nengine/render/model_importer.hpp"
+#include "nengine/render/material_asset.hpp"
+#include "nengine/render/asset_resources.hpp"
+#include "nengine/render/decoded_texture.hpp"
 #include "nengine/render/registration.hpp"
 #include "nengine/audio/components.hpp"
 #include "nengine/audio/registration.hpp"
@@ -112,7 +117,10 @@ int main() {
            << "\nIMPORTER \"NEngine.Material\"\nEND_META\n"; }
     std::filesystem::create_directories(project / "Assets" / "Models");
     { std::ofstream file(project / "Assets" / "Models" / "triangle.obj");
-      file << "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"; }
+      file << "mtllib triangle.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\n"
+              "usemtl Color\nf 1 2 3\n"; }
+    { std::ofstream mtl(project / "Assets" / "Models" / "triangle.mtl");
+      mtl << "newmtl Color\nKd 0.2 0.4 0.8\nd 1.0\n"; }
     { std::ofstream meta(project / "Assets" / "Models" / "triangle.obj.meta");
       meta << "NENGINE_META 1\nGUID " << model_guid.to_string()
            << "\nIMPORTER \"NEngine.Model\"\nEND_META\n"; }
@@ -187,6 +195,8 @@ int main() {
         report.cooked_textures < 1u ||
         report.cooked_materials != 1u ||
         report.cooked_models != 1u ||
+        report.generated_materials != 1u ||
+        report.generated_textures != 1u ||
         !std::filesystem::exists(
             report.bundle_root / "Content" / "Assets" / "Textures" / "hero.png") ||
         std::filesystem::exists(
@@ -870,8 +880,68 @@ int main() {
         !runtime.world().destroy(render_entity))
         return test_failure(113, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
+    const auto derived_material =
+        nengine::assets::derive_subasset_guid(model_guid, "obj-material", 0u);
+    const auto derived_texture =
+        nengine::assets::derive_subasset_guid(model_guid, "obj-base-color", 0u);
+    const auto derived_material_assets =
+        runtime.assets().cooked_artifacts(derived_material);
+    const auto derived_texture_assets =
+        runtime.assets().cooked_artifacts(derived_texture);
+    if (runtime.assets().generated_subasset_count() != 2u ||
+        !derived_material_assets ||
+        derived_material_assets->importer_id != "NEngine.Material" ||
+        derived_material_assets->artifacts.size() != 1u ||
+        !derived_texture_assets ||
+        derived_texture_assets->importer_id != "NEngine.Texture" ||
+        derived_texture_assets->artifacts.size() != 2u ||
+        derived_texture_assets->artifacts[1].role != "texture-descriptor" ||
+        !runtime.assets().source(derived_material) ||
+        !runtime.assets().source(derived_texture))
+        return test_failure(162, __LINE__);
+    const auto resolved_generated_material =
+        nengine::render::resolve_material_asset(
+            derived_material, *derived_material_assets, &error);
+    const auto resolved_generated_texture =
+        nengine::render::resolve_texture_asset(
+            derived_texture, *derived_texture_assets, &error);
+    nengine::render::DecodedTextureData generated_pixels;
+    if (!resolved_generated_material ||
+        resolved_generated_material->material.base_color_texture != derived_texture ||
+        !resolved_generated_texture ||
+        !nengine::render::decode_texture_rgba8(
+            *resolved_generated_texture, generated_pixels, &error) ||
+        generated_pixels.width != 1u || generated_pixels.height != 1u ||
+        !generated_pixels.valid())
+        return test_failure(164, __LINE__);
+    // Corrupting one exported index must fail a new catalog bootstrap
+    // without silently dropping the offending material.
+    const auto real_index = report.bundle_root / "Content" / "Cooked" /
+        model_guid.to_string() / "subassets.nasset";
+    std::string saved_index;
+    { std::ifstream in(real_index, std::ios::binary);
+      saved_index.assign(std::istreambuf_iterator<char>(in),
+                         std::istreambuf_iterator<char>()); }
+    if (saved_index.empty()) return test_failure(165, __LINE__);
+    { std::ofstream out(real_index, std::ios::binary | std::ios::trunc);
+      out << "NENGINE_PLAYER_SUBASSETS 99\n"; }
+    PlayerAssets tampered_catalog;
+    if (tampered_catalog.open(report.bundle_root, &error) ||
+        tampered_catalog.generated_subasset_count() != 0u)
+        return test_failure(166, __LINE__);
+    { std::ofstream out(real_index, std::ios::binary | std::ios::trunc);
+      out << saved_index; }
+    if (!tampered_catalog.open(report.bundle_root, &error) ||
+        tampered_catalog.generated_subasset_count() != 2u)
+        return test_failure(167, __LINE__);
     const auto cooked_model = runtime.assets().cooked_artifacts(model_guid);
     const auto cooked_material = runtime.assets().cooked_artifacts(material_guid);
+    nengine::render::CookedModelMaterialMap generated_mappings;
+    if (!cooked_model || !nengine::render::read_cooked_model_material_map(
+            *cooked_model, generated_mappings) ||
+        generated_mappings.size() != 1u ||
+        generated_mappings.at(0u) != derived_material)
+        return test_failure(163, __LINE__);
     if (!cooked_model || cooked_model->importer_id != "NEngine.Model" ||
         cooked_model->artifacts.size() < 2u ||
         cooked_model->artifacts[1].role != "model-descriptor" ||
@@ -1038,6 +1108,67 @@ int main() {
       invalid << "INVALID_SCENE\n"; }
     if (export_player_data(settings, report, &error) ||
         std::filesystem::exists(settings.destination)) return test_failure(27, __LINE__);
+    // Generated model subasset inventories are never parsed as arbitrary paths.
+    const auto generated = root / "GeneratedSubassetTests";
+    const auto generated_slot = generated / "subassets" / "material_0";
+    std::filesystem::create_directories(generated_slot);
+    const auto generated_material_guid = nengine::assets::AssetGuid::generate();
+    const auto generated_texture_guid = nengine::assets::AssetGuid::generate();
+    const auto generated_material_path = generated_slot / "material.nmat";
+    const auto generated_texture_path = generated_slot / "base_color.tga";
+    const auto generated_descriptor_path = generated_slot / "base_color.nasset";
+    { std::ofstream out(generated_material_path); out << "NENGINE_MATERIAL 1\n"; }
+    { std::ofstream out(generated_texture_path); out << "fixture"; }
+    { std::ofstream out(generated_descriptor_path); out << "NENGINE_TEXTURE 1\n"; }
+    nengine::assets::GeneratedSubasset generated_material;
+    generated_material.guid = generated_material_guid;
+    generated_material.importer_id = "NEngine.Material";
+    generated_material.artifacts.push_back({generated_material_path, "source"});
+    nengine::assets::GeneratedSubasset generated_texture;
+    generated_texture.guid = generated_texture_guid;
+    generated_texture.importer_id = "NEngine.Texture";
+    generated_texture.artifacts.push_back({generated_texture_path, "source"});
+    generated_texture.artifacts.push_back({generated_descriptor_path, "texture-descriptor"});
+    std::vector<nengine::assets::GeneratedSubasset> generated_subassets{
+        generated_material, generated_texture};
+    std::vector<CookedSubasset> read_generated;
+    if (!write_model_subassets(generated, generated_subassets, &error) ||
+        !read_model_subassets(generated, read_generated, &error) ||
+        read_generated.size() != 2u ||
+        read_generated[0].guid != generated_material_guid ||
+        read_generated[1].guid != generated_texture_guid ||
+        read_generated[1].artifacts.size() != 2u)
+        return test_failure(154, __LINE__);
+    const auto generated_index = generated / "subassets.nasset";
+    { std::ofstream out(generated_index, std::ios::trunc); out << "INVALID\n"; }
+    const auto previous_generated = read_generated;
+    if (read_model_subassets(generated, read_generated, &error) ||
+        read_generated.size() != previous_generated.size() ||
+        read_generated[0].guid != previous_generated[0].guid)
+        return test_failure(155, __LINE__);
+    if (!write_model_subassets(generated, generated_subassets, &error))
+        return test_failure(156, __LINE__);
+    auto bad_generated = generated_subassets;
+    bad_generated[1].artifacts[0].path = generated / ".." / "escape.tga";
+    if (write_model_subassets(generated, bad_generated, &error))
+        return test_failure(157, __LINE__);
+    bad_generated = generated_subassets;
+    bad_generated[1].artifacts[0].path = generated_material_path;
+    if (write_model_subassets(generated, bad_generated, &error))
+        return test_failure(158, __LINE__);
+    bad_generated = generated_subassets;
+    bad_generated[1].guid = generated_material_guid;
+    if (write_model_subassets(generated, bad_generated, &error))
+        return test_failure(159, __LINE__);
+    bad_generated = generated_subassets;
+    bad_generated[1].importer_id = "NEngine.GameCode";
+    if (write_model_subassets(generated, bad_generated, &error))
+        return test_failure(160, __LINE__);
+    bad_generated = generated_subassets;
+    bad_generated[1].artifacts[1].role = "source";
+    if (write_model_subassets(generated, bad_generated, &error))
+        return test_failure(161, __LINE__);
+    // GENERATED_SUBASSET_TESTS
     std::filesystem::remove_all(root);
     std::cout << "player bundle export tests passed\n";
     return 0;

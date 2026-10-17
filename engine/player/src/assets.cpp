@@ -1,4 +1,5 @@
 #include "nengine/player/assets.hpp"
+#include "nengine/player/subassets.hpp"
 #include <filesystem>
 #include <fstream>
 #include <vector>
@@ -30,6 +31,17 @@ bool PlayerAssets::open(const std::filesystem::path& bundle_root,
         if (error) *error = "Player asset catalog escapes bundle root";
         return false;
     }
+    // Neither the global cooked root nor an individual model cache may
+    // redirect packaged generated resources outside the exported bundle.
+    const auto cooked_root = content_path / "Cooked";
+    std::error_code cooked_ec;
+    const auto cooked_status = std::filesystem::symlink_status(cooked_root, cooked_ec);
+    if (cooked_ec == std::errc::no_such_file_or_directory)
+        cooked_ec.clear();
+    if (cooked_ec || std::filesystem::is_symlink(cooked_status)) {
+        if (error) *error = "unsafe cooked asset root";
+        return false;
+    }
     assets::AssetDatabase next(content);
     const auto result = next.scan(false);
     for (const auto& message : result.messages) {
@@ -38,13 +50,71 @@ bool PlayerAssets::open(const std::filesystem::path& bundle_root,
             return false;
         }
     }
+    std::unordered_map<assets::AssetGuid, assets::CachedArtifactSet,
+        assets::AssetGuidHash> next_subassets;
+    for (const auto& record : next.records()) {
+        const auto ext = record.source_path.extension();
+        if (ext != ".glb" && ext != ".gltf" && ext != ".obj") continue;
+        const auto folder = content_path / "Cooked" / record.guid.to_string();
+        std::error_code folder_ec;
+        const auto folder_status = std::filesystem::symlink_status(folder, folder_ec);
+        if (folder_ec == std::errc::no_such_file_or_directory)
+            folder_ec.clear();
+        if (folder_ec || std::filesystem::is_symlink(folder_status)) {
+            if (error) *error = "unsafe model cooked directory";
+            return false;
+        }
+        std::vector<CookedSubasset> entries;
+        if (!read_model_subassets(folder, entries, error)) return false;
+        for (const auto& item : entries) {
+            if (next.find(item.guid) || next_subassets.contains(item.guid)) {
+                if (error) *error = "generated subasset GUID collides with source or another model";
+                return false;
+            }
+            assets::CachedArtifactSet artifacts;
+            artifacts.importer_id = item.importer_id;
+            artifacts.importer_version = 1;
+            artifacts.fingerprint =
+                "Player-Generated-v1-" + record.guid.to_string() + "-" +
+                item.guid.to_string();
+            artifacts.artifacts = item.artifacts;
+            next_subassets.emplace(item.guid, std::move(artifacts));
+            if (next_subassets.size() > 8192u) {
+                if (error) *error = "too many generated model subassets";
+                return false;
+            }
+        }
+    }
     root_ = content;
     database_ = std::move(next);
+    generated_subassets_ = std::move(next_subassets);
     if (error) error->clear();
     return true;
 }
 std::optional<assets::CachedArtifactSet> PlayerAssets::cooked_artifacts(
     assets::AssetGuid guid) const {
+    if (!guid.valid() || root_.empty()) return std::nullopt;
+    if (const auto found = generated_subassets_.find(guid);
+        found != generated_subassets_.end()) {
+        std::error_code ec;
+        const auto cooked_parent = root_.parent_path() / "Cooked";
+        if (std::filesystem::is_symlink(cooked_parent, ec) || ec)
+            return std::nullopt;
+        const auto cooked_root =
+            std::filesystem::canonical(cooked_parent, ec);
+        if (ec) return std::nullopt;
+        for (const auto& artifact : found->second.artifacts) {
+            if (std::filesystem::is_symlink(artifact.path, ec) || ec ||
+                !std::filesystem::is_regular_file(artifact.path, ec) || ec)
+                return std::nullopt;
+            const auto resolved = std::filesystem::canonical(artifact.path, ec);
+            if (ec) return std::nullopt;
+            const auto relative = resolved.lexically_relative(cooked_root);
+            if (relative.empty() || relative.is_absolute() ||
+                *relative.begin() == "..") return std::nullopt;
+        }
+        return found->second;
+    }
     const auto* record = database_.find(guid);
     if (!record || !guid.valid() || root_.empty()) return std::nullopt;
     const auto folder = root_.parent_path() / "Cooked" / guid.to_string();
@@ -84,13 +154,22 @@ std::optional<assets::CachedArtifactSet> PlayerAssets::cooked_artifacts(
         for (std::filesystem::recursive_directory_iterator it(folder, ec), end;
              it != end && !ec; it.increment(ec)) {
             if (it->is_symlink(ec) || ec) return std::nullopt;
-            if (it->is_directory(ec)) continue;
+            if (it->is_directory(ec)) {
+                if (it->path().filename() == "subassets")
+                    it.disable_recursion_pending();
+                continue;
+            }
             if (ec || !it->is_regular_file(ec)) return std::nullopt;
             const auto asset = it->path();
-            if (asset == staged || asset == descriptor) continue;
+            if (asset == staged || asset == descriptor ||
+                asset.filename() == "subassets.nasset") continue;
             const auto relative = asset.lexically_relative(folder);
             if (relative.empty() || relative.is_absolute() ||
                 *relative.begin() == "..") return std::nullopt;
+            if (asset.filename() == "model-materials.nasset") {
+                artifacts.artifacts.push_back({asset, "model-material-map"});
+                continue;
+            }
             const auto role = extension == ".obj"
                 ? (asset.extension() == ".mtl"
                     ? "obj-mtl-sidecar" : "obj-texture-sidecar")
@@ -104,6 +183,7 @@ std::optional<assets::CachedArtifactSet> PlayerAssets::cooked_artifacts(
 }
 
 void PlayerAssets::clear() {
+    generated_subassets_.clear();
     database_.clear();
     root_.clear();
 }
@@ -111,7 +191,17 @@ std::optional<std::filesystem::path> PlayerAssets::source(
     assets::AssetGuid guid, std::string* error) const {
     if (root_.empty() || !guid.valid()) return std::nullopt;
     const auto* record = database_.find(guid);
-    if (!record) return std::nullopt;
+    if (!record) {
+        const auto generated = cooked_artifacts(guid);
+        if (!generated) return std::nullopt;
+        for (const auto& artifact : generated->artifacts) {
+            if (artifact.role == "source") {
+                if (error) error->clear();
+                return artifact.path;
+            }
+        }
+        return std::nullopt;
+    }
     std::error_code ec;
     if (std::filesystem::is_symlink(record->source_path, ec) || ec)
         return std::nullopt;

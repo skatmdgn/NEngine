@@ -301,7 +301,10 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Native Player Win32 keyboard and mouse input state with managed binding
 - [x] Managed 2D/3D raycast, overlap, box cast callbacks in independent Player
 - [x] Managed Transform, Rigidbody2D and AudioSource property bridge with finite validation
-- [ ] Full imported model generated material and texture subasset cooking
+- [x] Player export invokes render-aware model importer and packages generated OBJ/glTF material/texture GUID artifacts
+- [x] Standalone Player catalog loads bounded per-model subasset index and resolves material/texture GUIDs for Vulkan material-slot maps
+- [x] Export and CLI regressions verify OBJ-generated material mapping, .nmat dependency, decoded texture and malformed-index rollback
+- [ ] Full imported model generated material and texture subasset cooking (production image-format/driver QA and fallback policy still pending)
 - [ ] Production Windows GPU + .NET runtime + game input hardware acceptance
 - [x] Full native Player 3D/2D Rigidbody C# property bridge with sleeping/wake semantics and invalid-value regressions
 - [x] Player managed Camera, Light, SpriteRenderer and MeshRenderer native property/AssetGuid bridge with type, range and malformed-GUID regression tests
