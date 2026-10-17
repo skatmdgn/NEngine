@@ -172,6 +172,11 @@ PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
         const auto sampled = render::sample_sprite_animation_frame(
             it->second, sprite->time_seconds, sprite->loop);
         if (!sampled) { ++stats.sprite_unresolved; continue; }
+        if (!sprite->loop && sprite->playing &&
+            sprite->time_seconds >= it->second.duration_seconds()) {
+            sprite->time_seconds = it->second.duration_seconds();
+            sprite->playing = false;
+        }
         if (auto* renderer = world_.get_component<render::SpriteRenderer>(
                 entity, render::sprite_renderer_type())) {
             renderer->texture = it->second.frames[*sampled].texture;

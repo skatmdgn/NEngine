@@ -233,6 +233,14 @@ int main() {
         if (cleared_graph.controller_transitions != 0u ||
             animator->clip != dynamic_sprite_guid)
             return test_failure(127, __LINE__);
+        animator->playing = true;
+        animator->loop = false;
+        animator->speed = 1.0f;
+        animator->time_seconds = 0.0f;
+        dynamic.advance(0.2f);
+        if (animator->playing ||
+            std::abs(animator->time_seconds - 0.1f) > 0.0001f)
+            return test_failure(128, __LINE__);
         const auto missing_guid = nengine::assets::AssetGuid::generate();
         sound->clip = missing_guid;
         animator->clip = missing_guid;
