@@ -137,10 +137,27 @@ bool ActionMap::bind(
 
     if (action.empty() ||
         key == Key::Unknown ||
-        key == Key::Count) {
+        key == Key::Count ||
+        action.size() > 64u ||
+        !std::all_of(action.begin(), action.end(), [](unsigned char ch) {
+            return (ch >= 'a' && ch <= 'z') ||
+                   (ch >= 'A' && ch <= 'Z') ||
+                   (ch >= '0' && ch <= '9') ||
+                   ch == '_' || ch == '-' || ch == '.';
+        })) {
         return false;
     }
 
+    const auto existing_action = bindings_.find(action);
+    if (existing_action == bindings_.end() && bindings_.size() >= 128u)
+        return false;
+    if (existing_action != bindings_.end() &&
+        existing_action->second.size() >= 16u) {
+        const auto exists = std::find_if(existing_action->second.begin(),
+            existing_action->second.end(),
+            [key](const auto& entry) { return entry.key == key; });
+        return exists != existing_action->second.end();
+    }
     auto& list =
         bindings_[std::move(action)];
 
