@@ -643,6 +643,22 @@ int main() {
             !read("NEngine.CapsuleCollider", "Height") ||
             std::get<double>(collider_value) != 8.0)
             return test_failure(138, __LINE__);
+// 2D native center and box dimensions must discard the unused Z axis.
+        if (!write("NEngine.BoxCollider2D", "Center",
+                  nengine::core::Vec3{4, 6, 99}) ||
+            !write("NEngine.BoxCollider2D", "Size",
+                  nengine::core::Vec3{2, 3, 17}) ||
+            !read("NEngine.BoxCollider2D", "Center") ||
+            std::get<nengine::core::Vec3>(collider_value).z != 0.f ||
+            !read("NEngine.BoxCollider2D", "Size") ||
+            std::get<nengine::core::Vec3>(collider_value).z != 0.f ||
+            write("NEngine.BoxCollider2D", "Size",
+                  nengine::core::Vec3{2, -1, 0}) ||
+            write("NEngine.BoxCollider2D", "Center",
+                  nengine::core::Vec3{1.0e9f, 0, 0}) ||
+            !read("NEngine.BoxCollider2D", "Size") ||
+            std::get<nengine::core::Vec3>(collider_value).y != 3.f)
+            return test_failure(139, __LINE__);
         // COLLIDER_CASES
     }
     if (!runtime.world().destroy(collider_entity))
