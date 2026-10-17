@@ -335,6 +335,18 @@ int main() {
     if (!runtime.load(report.bundle_root, &error) ||
         !runtime.ready() || !runtime.actions().contains("Jump"))
         return test_failure(151, __LINE__);
+    // Older player bundles without an Input.ninput remain supported.
+    std::filesystem::remove(staged_actions);
+    if (!runtime.load(report.bundle_root, &error) ||
+        runtime.actions().action_count() != 0u)
+        return test_failure(152, __LINE__);
+    {
+        std::ofstream restored_map(staged_actions, std::ios::trunc);
+        restored_map << recovered_actions;
+    }
+    if (!runtime.load(report.bundle_root, &error) ||
+        !runtime.actions().contains("Jump"))
+        return test_failure(153, __LINE__);
     if (runtime.managed_ready() ||
         runtime.initialize_managed(&error) ||
         !runtime.ready() || runtime.entity_count() != 2u ||
