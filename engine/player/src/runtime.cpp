@@ -69,6 +69,12 @@ std::size_t PlayerRuntime::pending_script_count() const noexcept {
 }
 
 void PlayerRuntime::ensure_referenced_assets() {
+    // Bound negative caches against streams of unique invalid GUIDs from C#.
+    const auto cache_miss = [](auto& cache, assets::AssetGuid guid) {
+        constexpr std::size_t max_misses = 512;
+        if (cache.size() >= max_misses) cache.clear();
+        cache.insert(guid);
+    };
     // Editor scene import preloads only the clips referenced at load time.
     // Scripts may assign a different, already bundled AssetGuid at runtime.
     for (const auto entity : world_.entities()) {
@@ -80,7 +86,7 @@ void PlayerRuntime::ensure_referenced_assets() {
                 if (auto clip = assets_.load_wav(guid))
                     audio_clips_.emplace(guid, std::move(*clip));
                 else
-                    missing_audio_clips_.insert(guid);
+                    cache_miss(missing_audio_clips_, guid);
             }
         }
         if (const auto* animator = world_.get_component<render::SpriteAnimator>(
@@ -103,14 +109,14 @@ void PlayerRuntime::ensure_referenced_assets() {
                             !missing_sprite_clips_.contains(state.clip)) {
                             if (auto clip = assets_.load_sprite_clip(state.clip))
                                 sprite_clips_.emplace(state.clip, std::move(*clip));
-                            else missing_sprite_clips_.insert(state.clip);
+                            else cache_miss(missing_sprite_clips_, state.clip);
                         }
                     }
                 }
                 if (definition && sprite_controllers_.bind(entity, std::move(*definition)))
                     controller_bindings_[entity.value] = animator->controller;
                 else
-                    missing_controller_guids_.insert(animator->controller);
+                    cache_miss(missing_controller_guids_, animator->controller);
             }
             const auto guid = animator->clip;
             if (guid.valid() && !sprite_clips_.contains(guid) &&
@@ -118,7 +124,7 @@ void PlayerRuntime::ensure_referenced_assets() {
                 if (auto clip = assets_.load_sprite_clip(guid))
                     sprite_clips_.emplace(guid, std::move(*clip));
                 else
-                    missing_sprite_clips_.insert(guid);
+                    cache_miss(missing_sprite_clips_, guid);
             }
         }
     }
