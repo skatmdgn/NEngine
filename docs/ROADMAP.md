@@ -296,6 +296,9 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Player managed Camera, Light, SpriteRenderer and MeshRenderer native property/AssetGuid bridge with type, range and malformed-GUID regression tests
 - [x] Player managed AudioSource/AudioListener native property bridge, GUID clip resets, finite/bounds validation and standalone regressions
 - [x] Player runtime lazily resolves C#-assigned bundled WAV and sprite clip GUIDs with missing-asset retry suppression and regressions
+- [x] Standalone managed SpriteAnimator bindings (Clip/Controller/Speed/Time/Loop/Playing/SetBool), validated by Player regressions
+- [x] Dynamic controller replacement/unbinding, graph state-clip prefetch and transition tests
+- [x] Standalone nonloop playback termination, high-speed time stabilization, disabled-renderer guard and bounded negative GUID caches
 - [ ] Full Player input action map and parity for all managed component properties
 
 - [x] Standalone Windows Player bootstrap target and project export CLI (foundation only)

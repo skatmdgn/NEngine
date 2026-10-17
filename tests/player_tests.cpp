@@ -264,6 +264,12 @@ int main() {
         dynamic.advance(1.f / 60.f);
         if (dynamic.audio_clip(missing_guid) != nullptr)
             return test_failure(121, __LINE__);
+        if (!dynamic.load(report.bundle_root, &error) ||
+            dynamic.entity_count() != 2u ||
+            dynamic.audio_clip(dynamic_wav_guid) != nullptr)
+            return test_failure(131, __LINE__);
+        if (!dynamic.advance(1.f / 60.f).controller_transitions)
+            return test_failure(132, __LINE__);
         dynamic.unload();
     }
     runtime.begin_input_frame();
