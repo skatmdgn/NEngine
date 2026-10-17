@@ -129,6 +129,17 @@ public:
     bindings(
         std::string_view action) const;
 
+    // Versioned, portable text for project action-map assets.
+    // On failure neither output nor the destination map is modified.
+    bool serialize(
+        std::string& output,
+        std::string* error = nullptr) const;
+
+    static bool deserialize(
+        std::string_view source,
+        ActionMap& output,
+        std::string* error = nullptr);
+
 private:
     std::unordered_map<
         std::string,
