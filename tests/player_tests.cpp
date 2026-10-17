@@ -489,7 +489,9 @@ int main() {
             !w("Controller", controller_guid.to_string()) ||
             !r("Controller") || std::get<std::string>(property) != controller_guid.to_string() ||
             !w("Speed", 2.0) || !r("Speed") || std::get<double>(property) != 2.0 ||
-            !w("Time", 3.5) || !r("Time") || std::get<double>(property) != 3.5)
+            !w("Time", 3.5) || !r("Time") || std::get<double>(property) != 3.5 ||
+            !w("Clip", nanim_guid.to_string()) || !r("Time") ||
+            std::get<double>(property) != 3.5)
             return test_failure(123, __LINE__);
         if (!w("Bool Parameter", std::string{"moving=1"}) ||
             !r("Bool Parameter") ||

@@ -230,9 +230,11 @@ bool write_animator(render::SpriteAnimator& a, std::string_view key,
     if (key == "Clip" || key == "Controller") {
         assets::AssetGuid next;
         if (!asset_value(value, next)) return false;
-        if (key == "Clip") a.clip = next;
-        else a.controller = next;
-        a.time_seconds = 0.f;
+        auto& assigned = key == "Clip" ? a.clip : a.controller;
+        if (assigned != next) {
+            assigned = next;
+            a.time_seconds = 0.f;
+        }
         return true;
     }
     float f{};
