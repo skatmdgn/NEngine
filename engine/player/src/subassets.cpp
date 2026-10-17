@@ -66,7 +66,34 @@ bool valid_role(const CookedSubasset& item) {
 bool write_model_subassets(const std::filesystem::path& model_folder,
     const std::vector<assets::GeneratedSubasset>& subassets,
     std::string* error) {
-    if (!subassets.empty()) return fail(error, "subasset writer not yet initialized");
+    if (subassets.size() > max_subassets)
+        return fail(error, "too many generated model subassets");
+    if (subassets.empty()) { if (error) error->clear(); return true; }
+    std::set<std::string> seen;
+    std::ostringstream encoded;
+    encoded << "NENGINE_PLAYER_SUBASSETS 1\nCOUNT " << subassets.size() << "\n";
+    for (const auto& original : subassets) {
+        CookedSubasset item{original.guid, original.importer_id, original.artifacts};
+        if (!valid_role(item) || !seen.insert(item.guid.to_string()).second)
+            return fail(error, "invalid or duplicate generated subasset");
+        encoded << "ITEM " << std::quoted(item.guid.to_string()) << " "
+                << std::quoted(item.importer_id) << " "
+                << item.artifacts.size() << "\n";
+        for (const auto& artifact : item.artifacts) {
+            const auto rel = artifact.path.lexically_relative(model_folder);
+            if (!contained_file(model_folder, rel))
+                return fail(error, "unsafe generated artifact path");
+            encoded << "ARTIFACT " << std::quoted(rel.generic_string()) << " "
+                    << std::quoted(artifact.role) << "\n";
+        }
+        encoded << "END_ITEM\n";
+    }
+    encoded << "END_SUBASSETS\n";
+    if (encoded.str().size() > max_manifest_size)
+        return fail(error, "generated model subasset index exceeds size limit");
+    std::ofstream stream(model_folder / "subassets.nasset", std::ios::binary);
+    if (!stream || !(stream << encoded.str()) || !stream.flush())
+        return fail(error, "failed to publish model subasset index");
     if (error) error->clear();
     return true;
 }
