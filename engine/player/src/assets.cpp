@@ -144,6 +144,7 @@ std::optional<assets::CachedArtifactSet> PlayerAssets::cooked_artifacts(
 }
 
 void PlayerAssets::clear() {
+    generated_subassets_.clear();
     database_.clear();
     root_.clear();
 }
