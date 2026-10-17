@@ -151,7 +151,17 @@ std::optional<std::filesystem::path> PlayerAssets::source(
     assets::AssetGuid guid, std::string* error) const {
     if (root_.empty() || !guid.valid()) return std::nullopt;
     const auto* record = database_.find(guid);
-    if (!record) return std::nullopt;
+    if (!record) {
+        const auto generated = cooked_artifacts(guid);
+        if (!generated) return std::nullopt;
+        for (const auto& artifact : generated->artifacts) {
+            if (artifact.role == "source") {
+                if (error) error->clear();
+                return artifact.path;
+            }
+        }
+        return std::nullopt;
+    }
     std::error_code ec;
     if (std::filesystem::is_symlink(record->source_path, ec) || ec)
         return std::nullopt;
