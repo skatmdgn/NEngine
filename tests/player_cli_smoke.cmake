@@ -27,6 +27,13 @@ file(READ "${TEST_ROOT}/Dist/Game/Content/Input.ninput" input_map)
 if(NOT input_map MATCHES "action Jump Space")
   message(FATAL_ERROR "Player CLI export has wrong action map bindings")
 endif()
+file(GLOB_RECURSE cooked_materials
+    "${TEST_ROOT}/Dist/Game/Content/Cooked/*/subassets/material.nmat")
+file(GLOB model_subasset_indices
+    "${TEST_ROOT}/Dist/Game/Content/Cooked/*/subassets.nasset")
+if(NOT model_subasset_indices)
+  message(FATAL_ERROR "Player CLI did not cook OBJ generated material inventory")
+endif()
 if(WIN32)
   if(NOT EXISTS "${TEST_ROOT}/Dist/Game/NEnginePlayer.exe")
     message(FATAL_ERROR "Windows Player executable missing")
