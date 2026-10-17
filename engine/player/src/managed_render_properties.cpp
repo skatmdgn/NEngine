@@ -204,6 +204,29 @@ bool write_animator(render::SpriteAnimator& a, std::string_view key,
     if (key == "Enabled") return bool_value(value, a, &render::SpriteAnimator::enabled);
     if (key == "Playing") return bool_value(value, a, &render::SpriteAnimator::playing);
     if (key == "Loop") return bool_value(value, a, &render::SpriteAnimator::loop);
+    if (key == "Bool Parameter") {
+        const auto* command = std::get_if<std::string>(&value);
+        if (!command || command->size() < 3u || command->size() > 130u)
+            return false;
+        const auto sep = command->find('=');
+        if (sep == std::string::npos || sep == 0u || sep > 128u ||
+            sep + 2u != command->size() ||
+            ((*command)[sep + 1u] != '0' && (*command)[sep + 1u] != '1'))
+            return false;
+        const std::string name = command->substr(0u, sep);
+        for (const unsigned char ch : name)
+            if (!((ch >= 'a' && ch <= 'z') ||
+                  (ch >= 'A' && ch <= 'Z') ||
+                  (ch >= '0' && ch <= '9') ||
+                  ch == '_' || ch == '.' || ch == '-'))
+                return false;
+        if (!a.bool_parameters.contains(name) &&
+            a.bool_parameters.size() >= 64u)
+            return false;
+        a.bool_parameters[name] = (*command)[sep + 1u] == '1';
+        a.last_bool_parameter = *command;
+        return true;
+    }
     if (key == "Clip" || key == "Controller") {
         assets::AssetGuid next;
         if (!asset_value(value, next)) return false;
