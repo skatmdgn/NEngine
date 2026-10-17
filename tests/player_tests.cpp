@@ -10,6 +10,7 @@
 #include "nengine/player/bundle.hpp"
 #include "nengine/player/exporter.hpp"
 #include "nengine/player/runtime.hpp"
+#include "nengine/input/action_map_io.hpp"
 #include "nengine/player/managed_properties.hpp"
 #include "nengine/core/scene.hpp"
 #include "nengine/render/components.hpp"
@@ -166,6 +167,14 @@ int main() {
            << "\nIMPORTER \"NEngine.SpriteAnimation\"\nEND_META\n"; }
     { std::ofstream file(project / "Assets" / "Textures" / "ignore.cs");
       file << "do not ship source code"; }
+    nengine::input::ActionMap exported_actions;
+    if (!exported_actions.bind("Jump", nengine::input::Key::Space) ||
+        !exported_actions.bind("Jump", nengine::input::Key::A) ||
+        !exported_actions.bind("Fire", nengine::input::Key::MouseLeft) ||
+        !nengine::input::save_action_map_file(
+            project / "Input.ninput", exported_actions, &error))
+        return test_failure(146, __LINE__);
+
     ExportSettings settings;
     settings.project_root = project;
     settings.startup_scene = "Assets/Scenes/Main.nscene";
@@ -185,6 +194,12 @@ int main() {
         !std::filesystem::exists(
             report.bundle_root / "Content" / "Main.nscene"))
         return test_failure(8, __LINE__);
+    nengine::input::ActionMap bundled_actions;
+    if (!nengine::input::load_action_map_file(
+            report.bundle_root / "Content" / "Input.ninput", bundled_actions, &error) ||
+        bundled_actions.action_count() != 2u ||
+        !bundled_actions.contains("Jump") || !bundled_actions.contains("Fire"))
+        return test_failure(147, __LINE__);
     BundleManifest built;
     if (!load_bundle(report.bundle_root / "NEngine.player", built, &error) ||
         built.title != settings.title ||
