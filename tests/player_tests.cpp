@@ -465,6 +465,38 @@ int main() {
                 "Intensity", prop))
             return test_failure(112, __LINE__);
     }
+    // Managed sprite animation is a separate component from SpriteRenderer.
+    auto* managed_animator = runtime.world().add_component<
+        nengine::render::SpriteAnimator>(
+            render_entity, nengine::render::sprite_animator_type());
+    if (!managed_animator) return test_failure(122, __LINE__);
+    {
+        nengine::core::PropertyValue property;
+        const auto r = [&](std::string_view key) {
+            return read_player_transform_property(runtime.world(), render_entity,
+                "NEngine.SpriteAnimator", key, property);
+        };
+        const auto w = [&](std::string_view key,
+                           const nengine::core::PropertyValue& value) {
+            return write_player_transform_property(runtime.world(), render_entity,
+                "NEngine.SpriteAnimator", key, value);
+        };
+        if (!w("Enabled", false) || !r("Enabled") || std::get<bool>(property) ||
+            !w("Playing", false) || !r("Playing") || std::get<bool>(property) ||
+            !w("Loop", false) || !r("Loop") || std::get<bool>(property) ||
+            !w("Clip", nanim_guid.to_string()) ||
+            !r("Clip") || std::get<std::string>(property) != nanim_guid.to_string() ||
+            !w("Controller", controller_guid.to_string()) ||
+            !r("Controller") || std::get<std::string>(property) != controller_guid.to_string() ||
+            !w("Speed", 2.0) || !r("Speed") || std::get<double>(property) != 2.0 ||
+            !w("Time", 3.5) || !r("Time") || std::get<double>(property) != 3.5)
+            return test_failure(123, __LINE__);
+        if (w("Speed", -1.0) || w("Time", std::numeric_limits<double>::infinity()) ||
+            w("Speed", std::numeric_limits<double>::quiet_NaN()) ||
+            w("Controller", std::string{"../bad"}) ||
+            w("Clip", 1.0) || w("Enabled", 1.0) || r("Unknown"))
+            return test_failure(124, __LINE__);
+    }
     // Audio C# property parity in a packaged Player: clip changes must
     // reset playback and bad inputs must not mutate accepted state.
     const auto audio_entity = runtime.world().create("Managed audio bridge");
