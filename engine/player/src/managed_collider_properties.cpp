@@ -140,6 +140,16 @@ bool read_player_collider_property(const core::World& world,
         if (property == "Size") { value = c->size; return true; }
         return false;
     }
+    if (component == "NEngine.CircleCollider2D") {
+        const auto* c = world.get_component<physics::CircleCollider2D>(entity, physics::circle_collider2d_type());
+        if (!c) return false;
+        if (common_name(property)) return read_common(*c, property, value);
+        if (property == "Radius") {
+            value = static_cast<double>(c->radius);
+            return true;
+        }
+        return false;
+    }
     return false;
 }
 
@@ -200,6 +210,18 @@ bool write_player_collider_property(core::World& world,
             core::Vec3 next{};
             if (!vector_field(value, next, true, true)) return false;
             c->size = next;
+            return true;
+        }
+        return false;
+    }
+    if (component == "NEngine.CircleCollider2D") {
+        auto* c = world.get_component<physics::CircleCollider2D>(entity, physics::circle_collider2d_type());
+        if (!c) return false;
+        if (common_name(property)) return write_common(*c, property, value, true);
+        if (property == "Radius") {
+            float next{};
+            if (!float_field(value, next, 0.0, max_extent, true)) return false;
+            c->radius = next;
             return true;
         }
         return false;
