@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include "nengine/assets/asset_database.hpp"
 #include "nengine/audio/audio_clip.hpp"
 #include "nengine/assets/import_pipeline.hpp"
@@ -18,6 +19,9 @@ public:
     std::optional<std::filesystem::path> source(
         assets::AssetGuid guid, std::string* error = nullptr) const;
     std::size_t size() const noexcept { return database_.size(); }
+    std::size_t generated_subasset_count() const noexcept {
+        return generated_subassets_.size();
+    }
     std::optional<assets::CachedArtifactSet> cooked_artifacts(
         assets::AssetGuid guid) const;
     std::optional<render::AnimationController> load_controller(
@@ -29,5 +33,7 @@ public:
 private:
     std::filesystem::path root_{};
     assets::AssetDatabase database_{};
+    std::unordered_map<assets::AssetGuid, assets::CachedArtifactSet,
+        assets::AssetGuidHash> generated_subassets_{};
 };
 } // namespace nengine::player
