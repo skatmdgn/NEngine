@@ -57,9 +57,20 @@ bool valid_role(const CookedSubasset& item) {
     for (const auto& a : item.artifacts)
         if (!roles.insert(a.role).second) return false;
     if (item.importer_id == "NEngine.Material")
-        return roles.size() == 1 && roles.contains("source");
-    return roles.size() == 2 &&
-           roles.contains("source") && roles.contains("texture-descriptor");
+        return roles.size() == 1 && roles.contains("source") &&
+            std::any_of(item.artifacts.begin(), item.artifacts.end(),
+                [](const auto& a) { return a.role == "source" &&
+                                          a.path.extension() == ".nmat"; });
+    if (!(roles.size() == 2 && roles.contains("source") &&
+          roles.contains("texture-descriptor"))) return false;
+    return std::any_of(item.artifacts.begin(), item.artifacts.end(),
+        [](const auto& a) {
+            return a.role == "texture-descriptor" &&
+                   a.path.extension() == ".nasset";
+        }) && std::any_of(item.artifacts.begin(), item.artifacts.end(),
+        [](const auto& a) {
+            return a.role == "source" && a.path.extension() == ".tga";
+        });
 }
 } // namespace
 
