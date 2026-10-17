@@ -92,10 +92,13 @@ void PlayerRuntime::ensure_referenced_assets() {
                 controller_bindings_.erase(existing);
             }
             if (animator->controller.valid() &&
-                !controller_bindings_.contains(entity.value)) {
+                !controller_bindings_.contains(entity.value) &&
+                !missing_controller_guids_.contains(animator->controller)) {
                 auto definition = assets_.load_controller(animator->controller);
                 if (definition && sprite_controllers_.bind(entity, std::move(*definition)))
                     controller_bindings_[entity.value] = animator->controller;
+                else
+                    missing_controller_guids_.insert(animator->controller);
             }
             const auto guid = animator->clip;
             if (guid.valid() && !sprite_clips_.contains(guid) &&
@@ -106,6 +109,16 @@ void PlayerRuntime::ensure_referenced_assets() {
                     missing_sprite_clips_.insert(guid);
             }
         }
+    }
+    // Removing/destroying an animator must also release its controller state.
+    for (auto it = controller_bindings_.begin();
+         it != controller_bindings_.end();) {
+        const core::Entity entity{it->first};
+        if (!world_.is_alive(entity) ||
+            !world_.has_component(entity, render::sprite_animator_type())) {
+            sprite_controllers_.unbind(entity);
+            it = controller_bindings_.erase(it);
+        } else ++it;
     }
 }
 
@@ -219,6 +232,7 @@ void PlayerRuntime::unload() noexcept {
     missing_sprite_clips_.clear();
     sprite_controllers_.clear();
     controller_bindings_.clear();
+    missing_controller_guids_.clear();
     audio_playback_.reset();
     physics_cache_.clear();
     contact_tracker_.clear();
@@ -300,6 +314,7 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
     missing_sprite_clips_.clear();
     sprite_controllers_ = std::move(next_controllers);
     controller_bindings_ = std::move(next_bindings);
+    missing_controller_guids_.clear();
     audio_playback_.reset();
     physics_cache_.clear();
     contact_tracker_.clear();

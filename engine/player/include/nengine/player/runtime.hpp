@@ -72,6 +72,8 @@ private:
         missing_sprite_clips_{};
     // Tracks which controller GUID is currently bound for each full Entity.
     std::unordered_map<std::uint64_t, assets::AssetGuid> controller_bindings_{};
+    std::unordered_set<assets::AssetGuid, assets::AssetGuidHash>
+        missing_controller_guids_{};
 
     core::World world_{};
     std::filesystem::path bundle_root_{};
