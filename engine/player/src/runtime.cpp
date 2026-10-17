@@ -206,6 +206,7 @@ void PlayerRuntime::unload() noexcept {
     missing_audio_clips_.clear();
     missing_sprite_clips_.clear();
     sprite_controllers_.clear();
+    controller_bindings_.clear();
     audio_playback_.reset();
     physics_cache_.clear();
     contact_tracker_.clear();
@@ -260,6 +261,7 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
             next_sprites.emplace(animator->clip, std::move(*clip));
     }
     render::SpriteControllerRuntime next_controllers;
+    std::unordered_map<std::uint64_t, assets::AssetGuid> next_bindings;
     for (const auto entity : next_world.entities()) {
         const auto* animator = next_world.get_component<render::SpriteAnimator>(
             entity, render::sprite_animator_type());
@@ -271,7 +273,8 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
             if (auto clip = catalog.load_sprite_clip(state.clip))
                 next_sprites.emplace(state.clip, std::move(*clip));
         }
-        next_controllers.bind(entity, std::move(*definition));
+        if (next_controllers.bind(entity, std::move(*definition)))
+            next_bindings.emplace(entity.value, animator->controller);
     }
     script_system_.clear(&world_);
     managed_runtime_.shutdown();
@@ -284,6 +287,7 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
     missing_audio_clips_.clear();
     missing_sprite_clips_.clear();
     sprite_controllers_ = std::move(next_controllers);
+    controller_bindings_ = std::move(next_bindings);
     audio_playback_.reset();
     physics_cache_.clear();
     contact_tracker_.clear();
