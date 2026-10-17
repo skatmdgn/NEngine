@@ -80,6 +80,7 @@ private:
     scripting::ManagedRuntime managed_runtime_{};
     scripting::ManagedScriptSystem script_system_{};
     input::InputState input_{};
+    input::ActionMap actions_{};
     PlayerAssets assets_{};
     BundleManifest manifest_{};
     bool ready_{false};

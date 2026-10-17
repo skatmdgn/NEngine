@@ -1,6 +1,7 @@
 #include "nengine/player/runtime.hpp"
 #include "nengine/player/managed_queries.hpp"
 #include "nengine/player/managed_properties.hpp"
+#include "nengine/input/action_map_io.hpp"
 
 #include "nengine/audio/registration.hpp"
 #include "nengine/audio/components.hpp"
@@ -269,6 +270,7 @@ void PlayerRuntime::unload() noexcept {
     managed_runtime_.shutdown();
     world_.clear();
     input_.release_all();
+    actions_ = {};
     bundle_root_.clear();
     assets_.clear();
     audio_clips_.clear();
@@ -293,6 +295,20 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
     if (!load_bundle(root / "NEngine.player", manifest, error)) return false;
     const auto scene_path = resolve_bundle_scene(root, manifest, error);
     if (!scene_path) return false;
+    input::ActionMap next_actions;
+    const auto action_file = root / "Content" / "Input.ninput";
+    std::error_code action_ec;
+    if (std::filesystem::is_symlink(action_file, action_ec) || action_ec) {
+        if (error) *error = "Player action map symlink forbidden";
+        return false;
+    }
+    if (std::filesystem::exists(action_file, action_ec)) {
+        if (!input::load_action_map_file(action_file, next_actions, error))
+            return false;
+    } else if (action_ec) {
+        if (error) *error = "Cannot inspect bundled action map";
+        return false;
+    }
     core::SceneData source;
     if (!core::SceneSerializer::load_file(*scene_path, source, error))
         return false;
@@ -352,6 +368,7 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
     world_ = std::move(next_world);
     bundle_root_ = root;
     input_ = {};
+    actions_ = std::move(next_actions);
     assets_ = std::move(catalog);
     audio_clips_ = std::move(next_clips);
     sprite_clips_ = std::move(next_sprites);
