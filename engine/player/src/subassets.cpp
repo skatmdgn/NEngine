@@ -27,6 +27,25 @@ bool safe_relative(const std::filesystem::path& path) {
     return text.find(':') == std::string::npos &&
            text.find('\\') == std::string::npos;
 }
+bool contained_file(const std::filesystem::path& folder,
+                    const std::filesystem::path& relative) {
+    if (!safe_relative(relative) ||
+        *relative.begin() != "subassets") return false;
+    std::error_code ec;
+    const auto root = std::filesystem::canonical(folder, ec);
+    if (ec) return false;
+    auto next = folder;
+    for (const auto& part : relative) {
+        next /= part;
+        if (std::filesystem::is_symlink(next, ec) || ec) return false;
+    }
+    const auto path = std::filesystem::canonical(next, ec);
+    if (ec || !std::filesystem::is_regular_file(path, ec) || ec) return false;
+    const auto rel = path.lexically_relative(root);
+    if (rel.empty() || rel.is_absolute() || *rel.begin() == "..") return false;
+    const auto bytes = std::filesystem::file_size(path, ec);
+    return !ec && bytes <= 512ull * 1024ull * 1024ull;
+}
 bool valid_importer(const std::string& id) {
     return id == "NEngine.Texture" || id == "NEngine.Material";
 }
