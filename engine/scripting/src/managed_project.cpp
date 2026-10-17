@@ -260,6 +260,7 @@ namespace NEngine.Internal
             public nint pressed;
             public nint released;
             public nint pointer;
+            public nint action;
         }
 
         [UnmanagedCallersOnly]
@@ -281,7 +282,8 @@ namespace NEngine.Internal
                     callbacks.held,
                     callbacks.pressed,
                     callbacks.released,
-                    callbacks.pointer);
+                    callbacks.pointer,
+                    callbacks.action);
 
                 return 1;
             }
@@ -1699,24 +1701,32 @@ std::string api_stub(
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate int PointerFn(nint context, ref NativePointerState state);
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int ActionFn(nint context, nint utf8Name, uint mode);
+
         private static nint _context;
         private static KeyFn? _held;
         private static KeyFn? _pressed;
         private static KeyFn? _released;
         private static PointerFn? _pointer;
+        private static ActionFn? _action;
 
         internal static void Configure(
             nint context,
             nint held,
             nint pressed,
             nint released,
-            nint pointer)
+            nint pointer,
+            nint action)
         {
             _context = context;
             _held = Marshal.GetDelegateForFunctionPointer<KeyFn>(held);
             _pressed = Marshal.GetDelegateForFunctionPointer<KeyFn>(pressed);
             _released = Marshal.GetDelegateForFunctionPointer<KeyFn>(released);
             _pointer = Marshal.GetDelegateForFunctionPointer<PointerFn>(pointer);
+            _action = action == 0
+                ? null
+                : Marshal.GetDelegateForFunctionPointer<ActionFn>(action);
         }
 
         internal static void Clear()
@@ -1726,6 +1736,7 @@ std::string api_stub(
             _pressed = null;
             _released = null;
             _pointer = null;
+            _action = null;
         }
 
         internal static bool GetKey(uint key) =>
