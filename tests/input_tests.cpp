@@ -120,6 +120,15 @@ int main() {
 
     // Action bindings are project data: stable text, deterministic ordering,
     // transactional reads and fixed bounds prevent corrupted asset imports.
+    ActionMap removable;
+    check(removable.bind("Jump", Key::Space) &&
+          removable.bind("Jump", Key::Enter) &&
+          removable.unbind_key("Jump", Key::Space) &&
+          removable.contains("Jump") &&
+          !removable.unbind_key("Jump", Key::A) &&
+          removable.unbind_key("Jump", Key::Enter) &&
+          !removable.contains("Jump"), "remove one bound key and prune empty actions");
+
     ActionMap persistent;
     check(
         persistent.bind("Jump", Key::Space) &&

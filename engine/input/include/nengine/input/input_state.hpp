@@ -110,6 +110,8 @@ public:
     bool unbind(
         std::string_view action);
 
+    bool unbind_key(std::string_view action, Key key);
+
     bool contains(
         std::string_view action) const;
 

@@ -184,6 +184,17 @@ bool ActionMap::unbind(
         std::string{action}) != 0u;
 }
 
+bool ActionMap::unbind_key(std::string_view action, Key key) {
+    auto it = bindings_.find(std::string{action});
+    if (it == bindings_.end() || key == Key::Unknown || key == Key::Count)
+        return false;
+    auto& list = it->second;
+    const auto old_size = list.size();
+    std::erase_if(list, [key](const ActionBinding& b) { return b.key == key; });
+    if (list.empty()) bindings_.erase(it);
+    return list.size() != old_size;
+}
+
 bool ActionMap::contains(
     std::string_view action) const {
 
