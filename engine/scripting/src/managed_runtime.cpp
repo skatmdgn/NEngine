@@ -1207,6 +1207,23 @@ int ManagedRuntime::callback_input_released(
         : 0;
 }
 
+int ManagedRuntime::callback_input_action(
+    void* context, const char* name, std::uint32_t mode) {
+    const auto* ctx = static_cast<NativeWorldContext*>(context);
+    if (!ctx || !ctx->input || !name || mode > 2u) return -1;
+    // Byte-bounded scan prevents C# passing a runaway action identifier.
+    std::size_t length = 0;
+    while (length <= 64u && name[length] != '\0') ++length;
+    if (length == 0u || length > 64u) return -1;
+    const std::string_view action{name, length};
+    if (!ctx->action_map) return 0;
+    bool result = false;
+    if (mode == 0u) result = ctx->action_map->held(action, *ctx->input);
+    else if (mode == 1u) result = ctx->action_map->pressed(action, *ctx->input);
+    else result = ctx->action_map->released(action, *ctx->input);
+    return result ? 1 : 0;
+}
+
 int ManagedRuntime::callback_input_pointer(
     void* context,
     NativePointerState* output) {
