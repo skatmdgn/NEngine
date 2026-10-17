@@ -299,16 +299,17 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
     input::ActionMap next_actions;
     const auto action_file = root / "Content" / "Input.ninput";
     std::error_code action_ec;
-    if (std::filesystem::is_symlink(action_file, action_ec) || action_ec) {
-        if (error) *error = "Player action map symlink forbidden";
+    const auto action_status =
+        std::filesystem::symlink_status(action_file, action_ec);
+    if (action_ec == std::errc::no_such_file_or_directory)
+        action_ec.clear();
+    if (action_ec || std::filesystem::is_symlink(action_status)) {
+        if (error) *error = "Player action map path is unsafe";
         return false;
     }
-    if (std::filesystem::exists(action_file, action_ec)) {
+    if (std::filesystem::exists(action_status)) {
         if (!input::load_action_map_file(action_file, next_actions, error))
             return false;
-    } else if (action_ec) {
-        if (error) *error = "Cannot inspect bundled action map";
-        return false;
     }
     core::SceneData source;
     if (!core::SceneSerializer::load_file(*scene_path, source, error))

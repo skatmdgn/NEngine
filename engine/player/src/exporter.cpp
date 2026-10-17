@@ -88,10 +88,13 @@ bool export_player_data(const ExportSettings& settings,
         std::filesystem::copy_options::none, ec);
     if (ec) { cleanup(); return fail(error, "cannot copy player startup Scene"); }
     const auto action_source = root / "Input.ninput";
-    if (std::filesystem::is_symlink(action_source, ec) || ec) {
-        cleanup(); return fail(error, "project action map symlink is forbidden");
+    const auto action_status =
+        std::filesystem::symlink_status(action_source, ec);
+    if (ec == std::errc::no_such_file_or_directory) ec.clear();
+    if (ec || std::filesystem::is_symlink(action_status)) {
+        cleanup(); return fail(error, "project action map path is unsafe");
     }
-    if (std::filesystem::exists(action_source, ec) && !ec) {
+    if (std::filesystem::exists(action_status)) {
         input::ActionMap map;
         if (!input::load_action_map_file(action_source, map, error)) {
             cleanup();
@@ -104,8 +107,6 @@ bool export_player_data(const ExportSettings& settings,
             cleanup(); return fail(error, "cannot stage canonical action map");
         }
         output.close();
-    } else if (ec) {
-        cleanup(); return fail(error, "cannot inspect project Input.ninput");
     }
     std::size_t copied_assets = 0;
     if (settings.copy_supported_assets) {

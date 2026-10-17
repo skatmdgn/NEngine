@@ -40,12 +40,16 @@ bool save_action_map_file(const std::filesystem::path& file, const ActionMap& ma
     if (!map.serialize(encoded, error)) return false;
     std::error_code ec;
     if (file.empty() || file.filename().empty() ||
-        std::filesystem::is_symlink(file, ec) || ec ||
         !std::filesystem::is_directory(file.parent_path(), ec) || ec)
         return fail(error, "invalid action map output path");
-    // Never rename over an existing file: POSIX rename replaces it, while
-    // Windows rename refuses it. Enforce one portable non-overwrite policy.
-    if (std::filesystem::exists(file, ec) || ec)
+    // symlink_status() distinguishes missing destinations from symlinks.
+    // is_symlink(path, ec) alone reports ENOENT for a NEW file on Linux.
+    const auto status = std::filesystem::symlink_status(file, ec);
+    if (ec == std::errc::no_such_file_or_directory) ec.clear();
+    if (ec || std::filesystem::is_symlink(status))
+        return fail(error, "invalid or symlinked action map destination");
+    // Never replace an existing file, including on POSIX.
+    if (std::filesystem::exists(status))
         return fail(error, "action map target already exists");
     auto temporary = file;
     temporary += ".nengine-" + std::to_string(
