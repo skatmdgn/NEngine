@@ -146,6 +146,23 @@ int main() {
       meta << "NENGINE_META 1\nGUID " << wav_guid.to_string()
            << "\nIMPORTER " << std::quoted(std::string("NEngine.Audio"))
            << "\nEND_META\n"; }
+    // Additional bundled sources deliberately unreferenced by the saved
+    // Scene exercise Player clip loading after a managed property change.
+    const auto dynamic_wav_guid = nengine::assets::AssetGuid::generate();
+    std::filesystem::copy_file(
+        project / "Assets" / "Sounds" / "ping.wav",
+        project / "Assets" / "Sounds" / "extra.wav");
+    { std::ofstream meta(project / "Assets" / "Sounds" / "extra.wav.meta");
+      meta << "NENGINE_META 1\nGUID " << dynamic_wav_guid.to_string()
+           << "\nIMPORTER \"NEngine.Audio\"\nEND_META\n"; }
+    const auto dynamic_sprite_guid = nengine::assets::AssetGuid::generate();
+    { std::ofstream file(project / "Assets" / "Animations" / "extra.nanim");
+      file << "NENGINE_SPRITE_ANIMATION 1\nFRAMES 1\n"
+           << "FRAME " << std::quoted(texture_guid.to_string()) << " 0.1\n"
+           << "END_SPRITE_ANIMATION\n"; }
+    { std::ofstream meta(project / "Assets" / "Animations" / "extra.nanim.meta");
+      meta << "NENGINE_META 1\nGUID " << dynamic_sprite_guid.to_string()
+           << "\nIMPORTER \"NEngine.SpriteAnimation\"\nEND_META\n"; }
     { std::ofstream file(project / "Assets" / "Textures" / "ignore.cs");
       file << "do not ship source code"; }
     ExportSettings settings;
@@ -177,6 +194,38 @@ int main() {
         !runtime.ready() || runtime.entity_count() != 2u ||
         runtime.pending_script_count() != 1u ||
         !runtime.assets().source(texture_guid)) return test_failure(13, __LINE__);
+    {
+        PlayerRuntime dynamic;
+        if (!dynamic.load(report.bundle_root, &error) ||
+            dynamic.audio_clip(dynamic_wav_guid))
+            return test_failure(118, __LINE__);
+        const auto entity = dynamic.world().create("Runtime asset reassignment");
+        auto* sound = dynamic.world().add_component<nengine::audio::AudioSource>(
+            entity, nengine::audio::audio_source_type());
+        auto* animator = dynamic.world().add_component<
+            nengine::render::SpriteAnimator>(
+            entity, nengine::render::sprite_animator_type());
+        auto* renderer = dynamic.world().add_component<
+            nengine::render::SpriteRenderer>(
+            entity, nengine::render::sprite_renderer_type());
+        if (!sound || !animator || !renderer) return test_failure(119, __LINE__);
+        sound->clip = dynamic_wav_guid;
+        sound->playing = true;
+        animator->clip = dynamic_sprite_guid;
+        animator->playing = true;
+        if (const auto f = dynamic.advance(1.f / 60.f);
+            !dynamic.audio_clip(dynamic_wav_guid) ||
+            f.sprite_sampled < 1u || renderer->texture != texture_guid)
+            return test_failure(120, __LINE__);
+        const auto missing_guid = nengine::assets::AssetGuid::generate();
+        sound->clip = missing_guid;
+        animator->clip = missing_guid;
+        dynamic.advance(1.f / 60.f);
+        dynamic.advance(1.f / 60.f);
+        if (dynamic.audio_clip(missing_guid) != nullptr)
+            return test_failure(121, __LINE__);
+        dynamic.unload();
+    }
     runtime.begin_input_frame();
     runtime.input().set_key(nengine::input::Key::A, true);
     if (!runtime.input().held(nengine::input::Key::A) ||
@@ -269,6 +318,219 @@ int main() {
             std::get<double>(volume) > 0.5;
     }
     if (!audio_property_ok) return test_failure(54, __LINE__);
+    // Exported Player has to expose the same native 3D/2D Rigidbody
+    // properties used by generated C# gameplay, including wake semantics.
+    const auto bridge_entity = runtime.world().create("Player Rigidbody bridge");
+    if (!runtime.world().add_component<nengine::physics::Rigidbody>(
+            bridge_entity, nengine::physics::rigidbody_type()) ||
+        !runtime.world().add_component<nengine::physics::Rigidbody2D>(
+            bridge_entity, nengine::physics::rigidbody2d_type()))
+        return test_failure(101, __LINE__);
+    for (const auto* kind : {"NEngine.Rigidbody", "NEngine.Rigidbody2D"}) {
+        nengine::core::PropertyValue value;
+        const auto read = [&](std::string_view name) {
+            return read_player_transform_property(
+                runtime.world(), bridge_entity, kind, name, value);
+        };
+        const auto write = [&](std::string_view name,
+                               const nengine::core::PropertyValue& input) {
+            return write_player_transform_property(
+                runtime.world(), bridge_entity, kind, name, input);
+        };
+        if (!write("Use Gravity", false) || !read("Use Gravity") ||
+            std::get<bool>(value) ||
+            !write("Is Kinematic", true) || !read("Is Kinematic") ||
+            !std::get<bool>(value) ||
+            !write("Mass", 7.25) || !read("Mass") ||
+            std::get<double>(value) != 7.25 ||
+            !write("Gravity Scale", 0.0) || !read("Gravity Scale") ||
+            std::get<double>(value) != 0.0 ||
+            !write("Sleep Threshold", 0.125) ||
+            !read("Sleep Threshold") ||
+            std::get<double>(value) != 0.125)
+            return test_failure(102, __LINE__);
+        if (!write("Linear Velocity", nengine::core::Vec3{1, 2, 3}) ||
+            !write("Angular Velocity", nengine::core::Vec3{4, 5, 6}) ||
+            !read("Angular Velocity") ||
+            std::get<nengine::core::Vec3>(value).z != 6.f ||
+            !write("Sleeping", true) || !read("Sleeping") ||
+            !std::get<bool>(value) ||
+            !read("Linear Velocity") ||
+            std::get<nengine::core::Vec3>(value).x != 0.f)
+            return test_failure(103, __LINE__);
+        if (!write("Linear Velocity", nengine::core::Vec3{2, 0, 0}) ||
+            !read("Sleeping") || std::get<bool>(value) ||
+            !write("Sleeping", true) ||
+            !write("Allow Sleep", false) || !read("Sleeping") ||
+            std::get<bool>(value) ||
+            !write("Sleeping", true) || !read("Sleeping") ||
+            std::get<bool>(value))
+            return test_failure(104, __LINE__);
+        if (write("Mass", -1.0) || write("Mass", 0.0) ||
+            write("Mass", 1.0e-300) ||
+            write("Gravity Scale", -0.5) ||
+            write("Mass", std::numeric_limits<double>::infinity()) ||
+            write("Sleep Threshold", std::numeric_limits<double>::quiet_NaN()) ||
+            write("Linear Velocity", nengine::core::Vec3{
+                std::numeric_limits<float>::infinity(), 0, 0}) ||
+            write("Angular Velocity", nengine::core::Vec3{
+                0, std::numeric_limits<float>::quiet_NaN(), 0}) ||
+            write("Enabled", 1.0) ||
+            write("Made Up", true) || read("Made Up"))
+            return test_failure(105, __LINE__);
+    }
+    if (read_player_transform_property(
+            runtime.world(), first_entity, "NEngine.Rigidbody",
+            "Mass", property) ||
+        write_player_transform_property(
+            runtime.world(), first_entity, "NEngine.Rigidbody",
+            "Mass", 2.0))
+        return test_failure(106, __LINE__);
+    // Exported managed Camera/Light/SpriteRenderer/MeshRenderer must not
+    // silently fall back to generated C# defaults when the Player is running.
+    const auto render_entity = runtime.world().create("Player render bridge");
+    if (!runtime.world().add_component<nengine::render::Camera>(
+            render_entity, nengine::render::camera_type()) ||
+        !runtime.world().add_component<nengine::render::Light>(
+            render_entity, nengine::render::light_type()) ||
+        !runtime.world().add_component<nengine::render::SpriteRenderer>(
+            render_entity, nengine::render::sprite_renderer_type()) ||
+        !runtime.world().add_component<nengine::render::MeshRenderer>(
+            render_entity, nengine::render::mesh_renderer_type()))
+        return test_failure(107, __LINE__);
+    {
+        nengine::core::PropertyValue prop;
+        const auto read = [&](std::string_view comp, std::string_view name) {
+            return read_player_transform_property(
+                runtime.world(), render_entity, comp, name, prop);
+        };
+        const auto write = [&](std::string_view comp, std::string_view name,
+                               const nengine::core::PropertyValue& input) {
+            return write_player_transform_property(
+                runtime.world(), render_entity, comp, name, input);
+        };
+        if (!write("NEngine.Camera", "Projection", std::int64_t{1}) ||
+            !read("NEngine.Camera", "Projection") ||
+            std::get<std::int64_t>(prop) != 1 ||
+            !write("NEngine.Camera", "Vertical FOV", 80.0) ||
+            !write("NEngine.Camera", "Near Clip", 0.5) ||
+            !write("NEngine.Camera", "Far Clip", 250.0) ||
+            !read("NEngine.Camera", "Far Clip") ||
+            std::get<double>(prop) != 250.0 ||
+            write("NEngine.Camera", "Projection", std::int64_t{2}) ||
+            write("NEngine.Camera", "Far Clip", 0.1) ||
+            write("NEngine.Camera", "Near Clip", 500.0) ||
+            write("NEngine.Camera", "Vertical FOV",
+                std::numeric_limits<double>::infinity()))
+            return test_failure(108, __LINE__);
+        if (!write("NEngine.Light", "Type", std::int64_t{2}) ||
+            !write("NEngine.Light", "Color", nengine::core::Vec3{2.f, 1.f, 0.5f}) ||
+            !write("NEngine.Light", "Intensity", 4.0) ||
+            !read("NEngine.Light", "Color") ||
+            std::get<nengine::core::Vec3>(prop).x != 2.f ||
+            !write("NEngine.Light", "Cast Shadows", false) ||
+            write("NEngine.Light", "Type", std::int64_t{8}) ||
+            write("NEngine.Light", "Color", nengine::core::Vec3{-1.f, 0.f, 0.f}) ||
+            write("NEngine.Light", "Intensity",
+                std::numeric_limits<double>::quiet_NaN()))
+            return test_failure(109, __LINE__);
+        if (!write("NEngine.SpriteRenderer", "Texture",
+                texture_guid.to_string()) ||
+            !read("NEngine.SpriteRenderer", "Texture") ||
+            std::get<std::string>(prop) != texture_guid.to_string() ||
+            !write("NEngine.SpriteRenderer", "Pixels Per Unit", 75.0) ||
+            !write("NEngine.SpriteRenderer", "Sort Order", std::int64_t{-42}) ||
+            !write("NEngine.SpriteRenderer", "Flip X", true) ||
+            !read("NEngine.SpriteRenderer", "Flip X") ||
+            !std::get<bool>(prop) ||
+            write("NEngine.SpriteRenderer", "Texture", std::string{"bad-guid"}) ||
+            write("NEngine.SpriteRenderer", "Pixels Per Unit", 0.0) ||
+            write("NEngine.SpriteRenderer", "Sort Order", 7.0))
+            return test_failure(110, __LINE__);
+        if (!write("NEngine.MeshRenderer", "Material",
+                material_guid.to_string()) ||
+            !read("NEngine.MeshRenderer", "Material") ||
+            std::get<std::string>(prop) != material_guid.to_string() ||
+            !write("NEngine.MeshRenderer", "Cast Shadows", false) ||
+            !write("NEngine.MeshRenderer", "Mesh", std::string{}) ||
+            !read("NEngine.MeshRenderer", "Mesh") ||
+            !std::get<std::string>(prop).empty() ||
+            write("NEngine.MeshRenderer", "Material", std::string{"../invalid"}) ||
+            write("NEngine.MeshRenderer", "Enabled", 1.0) ||
+            read("NEngine.MeshRenderer", "Unknown") ||
+            write("NEngine.MeshRenderer", "Unknown", true))
+            return test_failure(111, __LINE__);
+        if (read_player_transform_property(
+                runtime.world(), first_entity, "NEngine.Light",
+                "Intensity", prop))
+            return test_failure(112, __LINE__);
+    }
+    // Audio C# property parity in a packaged Player: clip changes must
+    // reset playback and bad inputs must not mutate accepted state.
+    const auto audio_entity = runtime.world().create("Managed audio bridge");
+    if (!runtime.world().add_component<nengine::audio::AudioSource>(
+            audio_entity, nengine::audio::audio_source_type()) ||
+        !runtime.world().add_component<nengine::audio::AudioListener>(
+            audio_entity, nengine::audio::audio_listener_type()))
+        return test_failure(114, __LINE__);
+    {
+        nengine::core::PropertyValue prop;
+        const auto read = [&](std::string_view comp, std::string_view name) {
+            return read_player_transform_property(
+                runtime.world(), audio_entity, comp, name, prop);
+        };
+        const auto write = [&](std::string_view comp, std::string_view name,
+                               const nengine::core::PropertyValue& value) {
+            return write_player_transform_property(
+                runtime.world(), audio_entity, comp, name, value);
+        };
+        if (!write("NEngine.AudioSource", "Clip", wav_guid.to_string()) ||
+            !read("NEngine.AudioSource", "Clip") ||
+            std::get<std::string>(prop) != wav_guid.to_string() ||
+            !write("NEngine.AudioSource", "Play On Awake", false) ||
+            !write("NEngine.AudioSource", "Spatialize", true) ||
+            !write("NEngine.AudioSource", "Volume", 0.75) ||
+            !write("NEngine.AudioSource", "Pitch", 2.0) ||
+            !write("NEngine.AudioSource", "Pan Stereo", -0.25) ||
+            !write("NEngine.AudioSource", "Min Distance", 3.0) ||
+            !write("NEngine.AudioSource", "Max Distance", 20.0) ||
+            !write("NEngine.AudioSource", "Time", 4.0) ||
+            !write("NEngine.AudioSource", "Playing", true) ||
+            !read("NEngine.AudioSource", "Time") ||
+            std::get<double>(prop) != 4.0)
+            return test_failure(115, __LINE__);
+        if (write("NEngine.AudioSource", "Clip", std::string{"bad"}) ||
+            write("NEngine.AudioSource", "Volume", 2.0) ||
+            write("NEngine.AudioSource", "Pitch", -1.0) ||
+            write("NEngine.AudioSource", "Pan Stereo",
+                std::numeric_limits<double>::infinity()) ||
+            write("NEngine.AudioSource", "Min Distance", 25.0) ||
+            write("NEngine.AudioSource", "Max Distance", 1.0) ||
+            write("NEngine.AudioSource", "Time",
+                std::numeric_limits<double>::quiet_NaN()) ||
+            !read("NEngine.AudioSource", "Clip") ||
+            std::get<std::string>(prop) != wav_guid.to_string())
+            return test_failure(116, __LINE__);
+        const auto replacement = nengine::assets::AssetGuid::generate();
+        if (!write("NEngine.AudioSource", "Clip", replacement.to_string()) ||
+            !read("NEngine.AudioSource", "Playing") || std::get<bool>(prop) ||
+            !read("NEngine.AudioSource", "Time") ||
+            std::get<double>(prop) != 0.0 ||
+            !write("NEngine.AudioListener", "Enabled", false) ||
+            !write("NEngine.AudioListener", "Volume", 0.25) ||
+            !read("NEngine.AudioListener", "Volume") ||
+            std::get<double>(prop) != 0.25 ||
+            write("NEngine.AudioListener", "Volume", -0.1) ||
+            write("NEngine.AudioListener", "Enabled", 1.0) ||
+            read("NEngine.AudioListener", "Playing") ||
+            !runtime.world().destroy(audio_entity))
+            return test_failure(117, __LINE__);
+    }
+    // Keep bridge fixtures out of the later fixed-step integration tests:
+    // those assert exact entity counts and one simulated Rigidbody2D.
+    if (!runtime.world().destroy(bridge_entity) ||
+        !runtime.world().destroy(render_entity))
+        return test_failure(113, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto cooked_model = runtime.assets().cooked_artifacts(model_guid);
     const auto cooked_material = runtime.assets().cooked_artifacts(material_guid);
