@@ -124,13 +124,22 @@ std::optional<assets::CachedArtifactSet> PlayerAssets::cooked_artifacts(
         for (std::filesystem::recursive_directory_iterator it(folder, ec), end;
              it != end && !ec; it.increment(ec)) {
             if (it->is_symlink(ec) || ec) return std::nullopt;
-            if (it->is_directory(ec)) continue;
+            if (it->is_directory(ec)) {
+                if (it->path().filename() == "subassets")
+                    it.disable_recursion_pending();
+                continue;
+            }
             if (ec || !it->is_regular_file(ec)) return std::nullopt;
             const auto asset = it->path();
-            if (asset == staged || asset == descriptor) continue;
+            if (asset == staged || asset == descriptor ||
+                asset.filename() == "subassets.nasset") continue;
             const auto relative = asset.lexically_relative(folder);
             if (relative.empty() || relative.is_absolute() ||
                 *relative.begin() == "..") return std::nullopt;
+            if (asset.filename() == "model-materials.nasset") {
+                artifacts.artifacts.push_back({asset, "model-material-map"});
+                continue;
+            }
             const auto role = extension == ".obj"
                 ? (asset.extension() == ".mtl"
                     ? "obj-mtl-sidecar" : "obj-texture-sidecar")
