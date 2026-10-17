@@ -10,6 +10,7 @@
 #include "nengine/player/bundle.hpp"
 #include "nengine/player/exporter.hpp"
 #include "nengine/player/runtime.hpp"
+#include "nengine/player/subassets.hpp"
 #include "nengine/input/action_map_io.hpp"
 #include "nengine/player/managed_properties.hpp"
 #include "nengine/core/scene.hpp"
@@ -1038,6 +1039,38 @@ int main() {
       invalid << "INVALID_SCENE\n"; }
     if (export_player_data(settings, report, &error) ||
         std::filesystem::exists(settings.destination)) return test_failure(27, __LINE__);
+    // Generated model subasset inventories are never parsed as arbitrary paths.
+    const auto generated = root / "GeneratedSubassetTests";
+    const auto generated_slot = generated / "subassets" / "material_0";
+    std::filesystem::create_directories(generated_slot);
+    const auto generated_material_guid = nengine::assets::AssetGuid::generate();
+    const auto generated_texture_guid = nengine::assets::AssetGuid::generate();
+    const auto generated_material_path = generated_slot / "material.nmat";
+    const auto generated_texture_path = generated_slot / "base_color.tga";
+    const auto generated_descriptor_path = generated_slot / "base_color.nasset";
+    { std::ofstream out(generated_material_path); out << "NENGINE_MATERIAL 1\n"; }
+    { std::ofstream out(generated_texture_path); out << "fixture"; }
+    { std::ofstream out(generated_descriptor_path); out << "NENGINE_TEXTURE 1\n"; }
+    nengine::assets::GeneratedSubasset generated_material;
+    generated_material.guid = generated_material_guid;
+    generated_material.importer_id = "NEngine.Material";
+    generated_material.artifacts.push_back({generated_material_path, "source"});
+    nengine::assets::GeneratedSubasset generated_texture;
+    generated_texture.guid = generated_texture_guid;
+    generated_texture.importer_id = "NEngine.Texture";
+    generated_texture.artifacts.push_back({generated_texture_path, "source"});
+    generated_texture.artifacts.push_back({generated_descriptor_path, "texture-descriptor"});
+    std::vector<nengine::assets::GeneratedSubasset> generated_subassets{
+        generated_material, generated_texture};
+    std::vector<CookedSubasset> read_generated;
+    if (!write_model_subassets(generated, generated_subassets, &error) ||
+        !read_model_subassets(generated, read_generated, &error) ||
+        read_generated.size() != 2u ||
+        read_generated[0].guid != generated_material_guid ||
+        read_generated[1].guid != generated_texture_guid ||
+        read_generated[1].artifacts.size() != 2u)
+        return test_failure(154, __LINE__);
+    // GENERATED_SUBASSET_TESTS
     std::filesystem::remove_all(root);
     std::cout << "player bundle export tests passed\n";
     return 0;
