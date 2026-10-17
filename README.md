@@ -76,4 +76,6 @@ ctest --test-dir build -C Release --output-on-failure
 
 On single-config generators such as Ninja/Unix Makefiles, the `-C Release` argument to `ctest` is optional.
 
+Player gameplay supports a versioned project-root `Input.ninput` file (optional for legacy projects). Export preserves a canonical action map, and C# scripts can query actions through `Input.GetButton/GetButtonDown/GetButtonUp`. The Editor configuration UI for action maps is still planned.
+
 Start with `docs/MASTER_PLAN.md`, then read `docs/CURRENT_STATE.md`, `docs/ROADMAP.md` and `docs/DEVELOPMENT_WORKFLOW.md`. **For user-requested 8/10/15-덩어리 development, follow [BATCH_DEVELOPMENT.md](docs/BATCH_DEVELOPMENT.md): checkpoint code on a branch without an open PR, then run GitHub CI at the final PR gate.** Old status-log detail is archived under `docs/history/`.

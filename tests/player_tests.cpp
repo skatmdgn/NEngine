@@ -10,6 +10,7 @@
 #include "nengine/player/bundle.hpp"
 #include "nengine/player/exporter.hpp"
 #include "nengine/player/runtime.hpp"
+#include "nengine/input/action_map_io.hpp"
 #include "nengine/player/managed_properties.hpp"
 #include "nengine/core/scene.hpp"
 #include "nengine/render/components.hpp"
@@ -166,6 +167,14 @@ int main() {
            << "\nIMPORTER \"NEngine.SpriteAnimation\"\nEND_META\n"; }
     { std::ofstream file(project / "Assets" / "Textures" / "ignore.cs");
       file << "do not ship source code"; }
+    nengine::input::ActionMap exported_actions;
+    if (!exported_actions.bind("Jump", nengine::input::Key::Space) ||
+        !exported_actions.bind("Jump", nengine::input::Key::A) ||
+        !exported_actions.bind("Fire", nengine::input::Key::MouseLeft) ||
+        !nengine::input::save_action_map_file(
+            project / "Input.ninput", exported_actions, &error))
+        return test_failure(146, __LINE__);
+
     ExportSettings settings;
     settings.project_root = project;
     settings.startup_scene = "Assets/Scenes/Main.nscene";
@@ -185,6 +194,12 @@ int main() {
         !std::filesystem::exists(
             report.bundle_root / "Content" / "Main.nscene"))
         return test_failure(8, __LINE__);
+    nengine::input::ActionMap bundled_actions;
+    if (!nengine::input::load_action_map_file(
+            report.bundle_root / "Content" / "Input.ninput", bundled_actions, &error) ||
+        bundled_actions.action_count() != 2u ||
+        !bundled_actions.contains("Jump") || !bundled_actions.contains("Fire"))
+        return test_failure(147, __LINE__);
     BundleManifest built;
     if (!load_bundle(report.bundle_root / "NEngine.player", built, &error) ||
         built.title != settings.title ||
@@ -275,19 +290,63 @@ int main() {
             return test_failure(132, __LINE__);
         dynamic.unload();
     }
+    if (!runtime.actions().contains("Jump") ||
+        !runtime.actions().contains("Fire") ||
+        runtime.actions().action_count() != 2u)
+        return test_failure(148, __LINE__);
     runtime.begin_input_frame();
     runtime.input().set_key(nengine::input::Key::A, true);
     if (!runtime.input().held(nengine::input::Key::A) ||
-        !runtime.input().pressed(nengine::input::Key::A))
+        !runtime.input().pressed(nengine::input::Key::A) ||
+        !runtime.actions().held("Jump", runtime.input()) ||
+        !runtime.actions().pressed("Jump", runtime.input()) ||
+        runtime.actions().held("Fire", runtime.input()))
         return test_failure(47, __LINE__);
     runtime.begin_input_frame();
     runtime.input().set_key(nengine::input::Key::A, true);
-    if (runtime.input().pressed(nengine::input::Key::A))
+    if (runtime.input().pressed(nengine::input::Key::A) ||
+        runtime.actions().pressed("Jump", runtime.input()) ||
+        !runtime.actions().held("Jump", runtime.input()))
         return test_failure(48, __LINE__);
     runtime.begin_input_frame();
     runtime.input().set_key(nengine::input::Key::A, false);
-    if (!runtime.input().released(nengine::input::Key::A))
+    if (!runtime.input().released(nengine::input::Key::A) ||
+        !runtime.actions().released("Jump", runtime.input()) ||
+        runtime.actions().held("Jump", runtime.input()) ||
+        runtime.actions().pressed("NoSuchAction", runtime.input()))
         return test_failure(49, __LINE__);
+    // Invalid action map reload must never replace a running Scene or its actions.
+    const auto staged_actions = report.bundle_root / "Content" / "Input.ninput";
+    {
+        std::ofstream malformed(staged_actions, std::ios::trunc);
+        malformed << "NENGINE_ACTION_MAP 9\n";
+    }
+    if (runtime.load(report.bundle_root, &error) ||
+        !runtime.ready() || runtime.entity_count() != 2u ||
+        !runtime.actions().contains("Jump"))
+        return test_failure(149, __LINE__);
+    std::string recovered_actions;
+    if (!exported_actions.serialize(recovered_actions, &error))
+        return test_failure(150, __LINE__);
+    {
+        std::ofstream restored_map(staged_actions, std::ios::trunc);
+        restored_map << recovered_actions;
+    }
+    if (!runtime.load(report.bundle_root, &error) ||
+        !runtime.ready() || !runtime.actions().contains("Jump"))
+        return test_failure(151, __LINE__);
+    // Older player bundles without an Input.ninput remain supported.
+    std::filesystem::remove(staged_actions);
+    if (!runtime.load(report.bundle_root, &error) ||
+        runtime.actions().action_count() != 0u)
+        return test_failure(152, __LINE__);
+    {
+        std::ofstream restored_map(staged_actions, std::ios::trunc);
+        restored_map << recovered_actions;
+    }
+    if (!runtime.load(report.bundle_root, &error) ||
+        !runtime.actions().contains("Jump"))
+        return test_failure(153, __LINE__);
     if (runtime.managed_ready() ||
         runtime.initialize_managed(&error) ||
         !runtime.ready() || runtime.entity_count() != 2u ||

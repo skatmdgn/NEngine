@@ -19,6 +19,7 @@ class World;
 
 namespace nengine::input {
 class InputState;
+class ActionMap;
 }
 
 namespace nengine::scripting {
@@ -216,6 +217,9 @@ public:
     void bind_input(
         const input::InputState* input_state) noexcept;
 
+    void bind_input_actions(
+        const input::ActionMap* action_map) noexcept;
+
     // Domain-neutral callback boundary: Scripting never depends on NEngineUI.
     // Query op: 0=visible, 1=interactable, 2=clicked in current runtime frame.
     using UiFindFn = std::uint64_t (*)(void*, std::string_view);
@@ -361,6 +365,7 @@ private:
     struct NativeWorldContext {
         core::World* world{nullptr};
         const input::InputState* input{nullptr};
+        const input::ActionMap* action_map{nullptr};
         void* property_context{nullptr};
         PropertyReadFn property_read{nullptr};
         PropertyWriteFn property_write{nullptr};
@@ -705,12 +710,16 @@ private:
             void*,
             NativePointerState*);
 
+    // 0=held, 1=pressed, 2=released; nullptr map => unavailable.
+    using InputActionFn = int (*)(void*, const char*, std::uint32_t);
+
     struct NativeInputCallbacks {
         void* context{nullptr};
         InputKeyFn held{nullptr};
         InputKeyFn pressed{nullptr};
         InputKeyFn released{nullptr};
         InputPointerFn pointer{nullptr};
+        InputActionFn action{nullptr};
     };
 
     using ConfigureInputCallbacksFn =
@@ -732,6 +741,9 @@ private:
     static int callback_input_pointer(
         void* context,
         NativePointerState* state);
+
+    static int callback_input_action(
+        void* context, const char* name, std::uint32_t mode);
 
     using UiFindCallbackFn = std::uint64_t (*)(void*, const char*);
     using UiQueryCallbackFn = int (*)(void*, std::uint64_t, int);

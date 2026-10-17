@@ -879,6 +879,13 @@ void ManagedRuntime::bind_input(
         input_state;
 }
 
+void ManagedRuntime::bind_input_actions(
+    const input::ActionMap* action_map) noexcept {
+    if (!world_context_)
+        world_context_ = std::make_unique<NativeWorldContext>();
+    world_context_->action_map = action_map;
+}
+
 void ManagedRuntime::bind_ui(
     void* context, UiFindFn find, UiQueryFn query,
     UiWriteFn write, UiTextFn text,
@@ -1198,6 +1205,23 @@ int ManagedRuntime::callback_input_released(
             key))
         ? 1
         : 0;
+}
+
+int ManagedRuntime::callback_input_action(
+    void* context, const char* name, std::uint32_t mode) {
+    const auto* ctx = static_cast<NativeWorldContext*>(context);
+    if (!ctx || !ctx->input || !name || mode > 2u) return -1;
+    // Byte-bounded scan prevents C# passing a runaway action identifier.
+    std::size_t length = 0;
+    while (length <= 64u && name[length] != '\0') ++length;
+    if (length == 0u || length > 64u) return -1;
+    const std::string_view action{name, length};
+    if (!ctx->action_map) return 0;
+    bool result = false;
+    if (mode == 0u) result = ctx->action_map->held(action, *ctx->input);
+    else if (mode == 1u) result = ctx->action_map->pressed(action, *ctx->input);
+    else result = ctx->action_map->released(action, *ctx->input);
+    return result ? 1 : 0;
 }
 
 int ManagedRuntime::callback_input_pointer(
@@ -1584,9 +1608,9 @@ bool ManagedRuntime::initialize(
     const int abi_version =
         abi();
 
-    if (abi_version != 16) {
+    if (abi_version != 17) {
         diagnostic_ =
-            "managed bridge ABI mismatch: expected 16, got " +
+            "managed bridge ABI mismatch: expected 17, got " +
             std::to_string(
                 abi_version);
         shutdown();
@@ -1887,6 +1911,8 @@ bool ManagedRuntime::initialize(
         &ManagedRuntime::callback_input_released;
     input_callbacks.pointer =
         &ManagedRuntime::callback_input_pointer;
+    input_callbacks.action =
+        &ManagedRuntime::callback_input_action;
 
     if (configure_input_callbacks_(
             &input_callbacks) <= 0) {

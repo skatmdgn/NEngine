@@ -1,6 +1,9 @@
 #include <iostream>
 
 #include "nengine/input/input_state.hpp"
+#include "nengine/input/action_map_io.hpp"
+#include <filesystem>
+#include <fstream>
 
 namespace {
 int failures = 0;
@@ -116,6 +119,202 @@ int main() {
         !actions.contains("Jump") &&
         !actions.held("Jump", input),
         "action bindings can be removed deterministically");
+
+
+    // Action bindings are project data: stable text, deterministic ordering,
+    // transactional reads and fixed bounds prevent corrupted asset imports.
+    ActionMap removable;
+    check(removable.bind("Jump", Key::Space) &&
+          removable.bind("Jump", Key::Enter) &&
+          removable.unbind_key("Jump", Key::Space) &&
+          removable.contains("Jump") &&
+          !removable.unbind_key("Jump", Key::A) &&
+          removable.unbind_key("Jump", Key::Enter) &&
+          !removable.contains("Jump"), "remove one bound key and prune empty actions");
+
+    ActionMap persistent;
+    check(
+        persistent.bind("Jump", Key::Space) &&
+        persistent.bind("Jump", Key::A) &&
+        persistent.bind("Fire", Key::MouseLeft),
+        "versioned action map fixture binds supported keys");
+    std::string saved;
+    std::string persistence_error;
+    check(
+        persistent.serialize(saved, &persistence_error) &&
+        saved == "NENGINE_ACTION_MAP 1\naction Fire MouseLeft\naction Jump Space A\n" &&
+        persistence_error.empty(),
+        "serialization is deterministic and uses stable human-readable key names");
+    ActionMap restored;
+    check(
+        ActionMap::deserialize(saved, restored, &persistence_error) &&
+        persistence_error.empty() &&
+        restored.contains("Fire") &&
+        restored.bindings("Jump") &&
+        restored.bindings("Jump")->size() == 2u,
+        "versioned action bindings round-trip without changing key order");
+
+    input.begin_frame();
+    input.set_key(Key::Space, true);
+    check(
+        restored.pressed("Jump", input) &&
+        restored.held("Jump", input),
+        "restored bindings drive input action transitions");
+
+    ActionMap windows_lines;
+    check(
+        ActionMap::deserialize(
+            "NENGINE_ACTION_MAP 1\r\naction Jump Space A\r\n",
+            windows_lines, &persistence_error) &&
+        windows_lines.contains("Jump"),
+        "action map imports CRLF project files");
+
+    const auto reject = [&](std::string_view invalid, const char* message) {
+        ActionMap destination;
+        destination.bind("Existing", Key::Enter);
+        persistence_error.clear();
+        check(
+            !ActionMap::deserialize(invalid, destination, &persistence_error) &&
+            !persistence_error.empty() &&
+            destination.contains("Existing") &&
+            !destination.contains("Jump") &&
+            destination.held("Existing", input) == input.held(Key::Enter),
+            message);
+    };
+    reject("", "empty action map is rejected transactionally");
+    reject("NENGINE_ACTION_MAP 2\n", "future action map version is rejected");
+    reject("NENGINE_ACTION_MAP 1\naction Jump\n",
+        "action record without key is rejected");
+    reject("NENGINE_ACTION_MAP 1\naction Jump Bogus\n",
+        "unknown key token is rejected");
+    reject("NENGINE_ACTION_MAP 1\naction Jump Space Space\n",
+        "duplicate key binding is rejected");
+    reject("NENGINE_ACTION_MAP 1\naction Jump Space\naction Jump A\n",
+        "duplicate action name is rejected");
+    reject("NENGINE_ACTION_MAP 1\naction Bad/Name Space\n",
+        "unsafe action identifiers are rejected");
+    reject("NENGINE_ACTION_MAP 1\naction Jump Space extra_data\n",
+        "unexpected trailing tokens are rejected");
+    reject("NENGINE_ACTION_MAP 1\n\naction Jump Space\n",
+        "empty intermediate record is rejected");
+    reject(std::string(65537u, 'x'),
+        "oversized action map is rejected before parsing");
+    std::string too_many_keys = "NENGINE_ACTION_MAP 1\naction Jump";
+    for (char key = 'A'; key <= 'Q'; ++key) {
+        too_many_keys += ' ';
+        too_many_keys += key;
+    }
+    too_many_keys += '\n';
+    reject(too_many_keys, "more than sixteen keys per action is rejected");
+    std::string too_many_actions = "NENGINE_ACTION_MAP 1\n";
+    for (int i = 0; i < 129; ++i)
+        too_many_actions += "action A" + std::to_string(i) + " Space\n";
+    reject(too_many_actions, "more than 128 actions is rejected");
+
+    check(restored.action_count() == 2u && removable.action_count() == 0u,
+          "bounded action count reflects load and precise removal");
+
+    ActionMap every_key;
+    for (int index = 1; index < static_cast<int>(Key::Count); ++index)
+        check(
+            every_key.bind("Key" + std::to_string(index),
+                static_cast<Key>(index)),
+            "all recognized key enum values can be bound");
+    std::string every_key_serialized;
+    ActionMap every_key_restored;
+    check(
+        every_key.serialize(every_key_serialized, &persistence_error) &&
+        ActionMap::deserialize(
+            every_key_serialized, every_key_restored, &persistence_error),
+        "all keyboard and mouse key names round-trip");
+    for (int index = 1; index < static_cast<int>(Key::Count); ++index) {
+        const auto* mappings =
+            every_key_restored.bindings("Key" + std::to_string(index));
+        check(
+            mappings && mappings->size() == 1 &&
+            mappings->front().key == static_cast<Key>(index),
+            "every serialized key maps back to its original enum value");
+    }
+
+    ActionMap strict;
+    check(!strict.bind("Bad Space", Key::A) &&
+          !strict.bind(std::string(65, 'a'), Key::B) &&
+          !strict.bind("", Key::Space) &&
+          strict.action_count() == 0,
+          "invalid names cannot be inserted into runtime input actions");
+    for (int i = 0; i < 128; ++i)
+        check(strict.bind("A" + std::to_string(i), Key::A),
+              "up to 128 named input actions can be created");
+    check(!strict.bind("Overflow", Key::A) && strict.action_count() == 128,
+          "a 129th action cannot be created");
+    ActionMap too_many_live_keys;
+    for (int k = 0; k < 16; ++k)
+        check(too_many_live_keys.bind("Jump", static_cast<Key>(
+                  static_cast<int>(Key::A) + k)), "first 16 keys accepted");
+    check(!too_many_live_keys.bind("Jump", Key::Space) &&
+          too_many_live_keys.bind("Jump", Key::A) &&
+          too_many_live_keys.bindings("Jump")->size() == 16u,
+          "17th key rejected without breaking idempotent bind");
+
+    // Invalid authoring data is rejected at bind time now, rather than
+    // existing as an unserializable in-memory map as in the old tests.
+    ActionMap invalid_for_export;
+    check(!invalid_for_export.bind("Invalid Action", Key::A) &&
+          invalid_for_export.action_count() == 0u,
+          "unsafe authoring action names rejected before serialization");
+    std::string untouched = "existing export contents";
+    persistence_error.clear();
+    check(invalid_for_export.serialize(untouched, &persistence_error) &&
+          untouched == "NENGINE_ACTION_MAP 1\n" &&
+          persistence_error.empty(),
+          "valid empty map remains serializable");
+    ActionMap excessive_export;
+    for (char key = 'A'; key <= 'Q'; ++key)
+        excessive_export.bind("Jump", static_cast<Key>(
+            static_cast<int>(Key::A) + key - 'A'));
+    check(excessive_export.bindings("Jump") &&
+          excessive_export.bindings("Jump")->size() == 16u &&
+          excessive_export.serialize(untouched) &&
+          untouched.find("NENGINE_ACTION_MAP 1\n") == 0u,
+          "runtime key cap maintains exportable state");
+
+    const auto io_root = std::filesystem::temp_directory_path() /
+        "nengine_input_map_io_tests";
+    std::filesystem::remove_all(io_root);
+    std::filesystem::create_directories(io_root);
+    const auto io_file = io_root / "Input.ninput";
+    check(save_action_map_file(io_file, persistent, &persistence_error),
+          "project action map persists to a standalone source file");
+    ActionMap io_restored;
+    check(load_action_map_file(io_file, io_restored, &persistence_error) &&
+          io_restored.contains("Jump") && io_restored.contains("Fire"),
+          "bounded project action map loads back with all entries");
+
+    ActionMap kept;
+    kept.bind("Kept", Key::Enter);
+    const auto broken_file = io_root / "Broken.ninput";
+    { std::ofstream out(broken_file); out << "INVALID ACTION MAP"; }
+    check(!load_action_map_file(broken_file, kept, &persistence_error) &&
+          kept.contains("Kept") && !kept.contains("Jump"),
+          "invalid source action map does not mutate loaded bindings");
+    check(!load_action_map_file(io_root / "Missing.ninput", kept, &persistence_error) &&
+          kept.contains("Kept"), "absent map read fails without corrupting state");
+    const auto oversized_file = io_root / "Large.ninput";
+    { std::ofstream out(oversized_file, std::ios::binary);
+      out << std::string(65537, 'x'); }
+    check(!load_action_map_file(oversized_file, kept, &persistence_error) &&
+          kept.contains("Kept"), "oversized action map file rejected early");
+    const auto link = io_root / "InputLink.ninput";
+    std::error_code link_error;
+    std::filesystem::create_symlink(io_file, link, link_error);
+    if (!link_error)
+        check(!load_action_map_file(link, kept, &persistence_error),
+              "symlinked action map sources rejected");
+    ActionMap invalid_save;
+    invalid_save.bind("Broken", Key::A);
+    check(!save_action_map_file(io_file, invalid_save, &persistence_error),
+          "existing action map never silently overwritten on export");
+    std::filesystem::remove_all(io_root);
 
     if (failures != 0) {
         std::cerr << "NEngineInputTests: "

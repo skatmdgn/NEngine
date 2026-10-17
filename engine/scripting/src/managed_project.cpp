@@ -168,7 +168,7 @@ namespace NEngine.Internal
 
     public static class NativeBridge
     {
-        public const int AbiVersion = 16;
+        public const int AbiVersion = 17;
 
         private static readonly Dictionary<long, NEngine.Behaviour> Instances = new();
         private static long _nextHandle = 1;
@@ -260,6 +260,7 @@ namespace NEngine.Internal
             public nint pressed;
             public nint released;
             public nint pointer;
+            public nint action;
         }
 
         [UnmanagedCallersOnly]
@@ -281,7 +282,8 @@ namespace NEngine.Internal
                     callbacks.held,
                     callbacks.pressed,
                     callbacks.released,
-                    callbacks.pointer);
+                    callbacks.pointer,
+                    callbacks.action);
 
                 return 1;
             }
@@ -1699,24 +1701,32 @@ std::string api_stub(
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate int PointerFn(nint context, ref NativePointerState state);
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int ActionFn(nint context, nint utf8Name, uint mode);
+
         private static nint _context;
         private static KeyFn? _held;
         private static KeyFn? _pressed;
         private static KeyFn? _released;
         private static PointerFn? _pointer;
+        private static ActionFn? _action;
 
         internal static void Configure(
             nint context,
             nint held,
             nint pressed,
             nint released,
-            nint pointer)
+            nint pointer,
+            nint action)
         {
             _context = context;
             _held = Marshal.GetDelegateForFunctionPointer<KeyFn>(held);
             _pressed = Marshal.GetDelegateForFunctionPointer<KeyFn>(pressed);
             _released = Marshal.GetDelegateForFunctionPointer<KeyFn>(released);
             _pointer = Marshal.GetDelegateForFunctionPointer<PointerFn>(pointer);
+            _action = action == 0
+                ? null
+                : Marshal.GetDelegateForFunctionPointer<ActionFn>(action);
         }
 
         internal static void Clear()
@@ -1726,6 +1736,7 @@ std::string api_stub(
             _pressed = null;
             _released = null;
             _pointer = null;
+            _action = null;
         }
 
         internal static bool GetKey(uint key) =>
@@ -1736,6 +1747,24 @@ std::string api_stub(
 
         internal static bool GetKeyUp(uint key) =>
             _released?.Invoke(_context, key) > 0;
+
+        internal static bool GetButton(string actionName, uint mode)
+        {
+            if (_action == null || string.IsNullOrEmpty(actionName) ||
+                actionName.Length > 64 || mode > 2) return false;
+            byte[] encoded = Encoding.UTF8.GetBytes(actionName + "\0");
+            if (encoded.Length > 65) return false;
+            nint pointer = Marshal.AllocHGlobal(encoded.Length);
+            try
+            {
+                Marshal.Copy(encoded, 0, pointer, encoded.Length);
+                return _action(_context, pointer, mode) > 0;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(pointer);
+            }
+        }
 
         internal static bool TryGetPointer(out NativePointerState state)
         {
@@ -4260,6 +4289,15 @@ std::string api_stub(
 
         public static bool GetKeyUp(KeyCode key) =>
             NativeInput.GetKeyUp((uint)key);
+
+        public static bool GetButton(string name) =>
+            NativeInput.GetButton(name, 0);
+
+        public static bool GetButtonDown(string name) =>
+            NativeInput.GetButton(name, 1);
+
+        public static bool GetButtonUp(string name) =>
+            NativeInput.GetButton(name, 2);
 
         private static NativePointerState Pointer
         {

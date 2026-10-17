@@ -53,6 +53,8 @@ public:
     input::InputState& input() noexcept { return input_; }
     const input::InputState& input() const noexcept { return input_; }
     void begin_input_frame() noexcept { input_.begin_frame(); }
+    input::ActionMap& actions() noexcept { return actions_; }
+    const input::ActionMap& actions() const noexcept { return actions_; }
     bool paused() const noexcept { return paused_; }
     float fixed_delta_seconds() const noexcept { return 1.0f / 60.0f; }
     const PlayerAssets& assets() const noexcept { return assets_; }
@@ -80,6 +82,7 @@ private:
     scripting::ManagedRuntime managed_runtime_{};
     scripting::ManagedScriptSystem script_system_{};
     input::InputState input_{};
+    input::ActionMap actions_{};
     PlayerAssets assets_{};
     BundleManifest manifest_{};
     bool ready_{false};

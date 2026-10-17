@@ -284,6 +284,17 @@ Roadmap entries are implementation order, not promises tied to dates.
 
 ### Active Player slice: exported geometry and managed gameplay access
 
+#### User-defined gameplay action maps (30 bounded development slices)
+
+- [x] Integrate deterministic versioned `ActionMap` text serializer from existing input PR and enforce action/key/name limits at runtime
+- [x] Add transactional source `Input.ninput` load and safe staged saving with corruption, missing, symlink and size-limit tests
+- [x] Export validated, canonical `Input.ninput` to Player Content; cover source/CLI bundle fixtures
+- [x] Load Player action map transactionally alongside Scene and expose native held/pressed/released state
+- [x] Forward named action states through native C# Input callback ABI and expose `Input.GetButton`, `GetButtonDown`, `GetButtonUp`
+- [x] Add generated API, managed gameplay and Player runtime tests for press/release, invalid names and optional legacy bundles
+- [ ] Editor action-map configuration UI and a fully packaged C# end-to-end physical-device acceptance test
+
+
 - [x] Export-time raw model + metadata cooking for GLB, glTF, OBJ with collected sidecars
 - [x] GUID-based Vulkan model descriptor/source/sidecar and .nmat material resolver
 - [x] Reject missing glTF sidecars before atomic export publishes game bundle
