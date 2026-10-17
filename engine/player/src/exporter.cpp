@@ -6,6 +6,7 @@
 #include "nengine/assets/builtin_processors.hpp"
 #include "nengine/assets/asset_importer.hpp"
 #include <chrono>
+#include <fstream>
 #include <array>
 #include <algorithm>
 #include <filesystem>
@@ -93,9 +94,13 @@ bool export_player_data(const ExportSettings& settings,
             cleanup();
             return false;
         }
-        std::filesystem::copy_file(action_source, staging / "Content" / "Input.ninput",
-            std::filesystem::copy_options::none, ec);
-        if (ec) { cleanup(); return fail(error, "cannot export action map"); }
+        std::string canonical;
+        if (!map.serialize(canonical, error)) { cleanup(); return false; }
+        std::ofstream output(staging / "Content" / "Input.ninput", std::ios::binary);
+        if (!output || !(output << canonical) || !output.flush()) {
+            cleanup(); return fail(error, "cannot stage canonical action map");
+        }
+        output.close();
     } else if (ec) {
         cleanup(); return fail(error, "cannot inspect project Input.ninput");
     }
