@@ -74,6 +74,17 @@ bool PlayerAssets::open(const std::filesystem::path& bundle_root,
 }
 std::optional<assets::CachedArtifactSet> PlayerAssets::cooked_artifacts(
     assets::AssetGuid guid) const {
+    if (!guid.valid() || root_.empty()) return std::nullopt;
+    if (const auto found = generated_subassets_.find(guid);
+        found != generated_subassets_.end()) {
+        std::error_code ec;
+        for (const auto& artifact : found->second.artifacts) {
+            if (std::filesystem::is_symlink(artifact.path, ec) || ec ||
+                !std::filesystem::is_regular_file(artifact.path, ec) || ec)
+                return std::nullopt;
+        }
+        return found->second;
+    }
     const auto* record = database_.find(guid);
     if (!record || !guid.valid() || root_.empty()) return std::nullopt;
     const auto folder = root_.parent_path() / "Cooked" / guid.to_string();
