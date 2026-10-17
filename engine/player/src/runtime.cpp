@@ -95,6 +95,18 @@ void PlayerRuntime::ensure_referenced_assets() {
                 !controller_bindings_.contains(entity.value) &&
                 !missing_controller_guids_.contains(animator->controller)) {
                 auto definition = assets_.load_controller(animator->controller);
+                if (definition) {
+                    // Controller states can reference clips absent from the
+                    // startup scene. Prefetch before transition evaluation.
+                    for (const auto& state : definition->states) {
+                        if (!sprite_clips_.contains(state.clip) &&
+                            !missing_sprite_clips_.contains(state.clip)) {
+                            if (auto clip = assets_.load_sprite_clip(state.clip))
+                                sprite_clips_.emplace(state.clip, std::move(*clip));
+                            else missing_sprite_clips_.insert(state.clip);
+                        }
+                    }
+                }
                 if (definition && sprite_controllers_.bind(entity, std::move(*definition)))
                     controller_bindings_[entity.value] = animator->controller;
                 else
