@@ -898,6 +898,12 @@ int main() {
         return test_failure(162, __LINE__);
     const auto cooked_model = runtime.assets().cooked_artifacts(model_guid);
     const auto cooked_material = runtime.assets().cooked_artifacts(material_guid);
+    nengine::render::CookedModelMaterialMap generated_mappings;
+    if (!cooked_model || !nengine::render::read_cooked_model_material_map(
+            *cooked_model, generated_mappings) ||
+        generated_mappings.size() != 1u ||
+        generated_mappings.at(0u) != derived_material)
+        return test_failure(163, __LINE__);
     if (!cooked_model || cooked_model->importer_id != "NEngine.Model" ||
         cooked_model->artifacts.size() < 2u ||
         cooked_model->artifacts[1].role != "model-descriptor" ||
