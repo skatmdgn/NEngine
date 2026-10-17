@@ -1,5 +1,6 @@
 add_library(NEngineInput STATIC
   src/input_state.cpp
+  src/action_map_io.cpp
 )
 
 target_include_directories(NEngineInput
