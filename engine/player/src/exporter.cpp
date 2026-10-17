@@ -4,6 +4,8 @@
 #include "nengine/core/scene.hpp"
 #include "nengine/assets/asset_database.hpp"
 #include "nengine/assets/builtin_processors.hpp"
+#include "nengine/render/model_importer.hpp"
+#include "nengine/player/subassets.hpp"
 #include "nengine/assets/asset_importer.hpp"
 #include <chrono>
 #include <fstream>
@@ -244,7 +246,7 @@ bool export_player_data(const ExportSettings& settings,
             std::filesystem::create_directories(folder, ec);
             if (ec) { cleanup(); return fail(error, "cannot create model cook directory"); }
             const assets::ImportContext context{&record, &descriptor, folder};
-            const auto cooked = assets::model_source_importer(context);
+            const auto cooked = render::model_asset_importer(context);
             if (!cooked.success) {
                 cleanup(); return fail(error, "cannot cook Player model: " + cooked.message);
             }
