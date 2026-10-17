@@ -612,6 +612,21 @@ int main() {
             !read("NEngine.BoxCollider", "Size") ||
             std::get<nengine::core::Vec3>(collider_value).x != 4.f)
             return test_failure(136, __LINE__);
+// 3D sphere's center, contact flags and radius cannot accept NaN/zero.
+        if (!write("NEngine.SphereCollider", "Radius", 3.0) ||
+            !write("NEngine.SphereCollider", "Center", nengine::core::Vec3{2, -4, 1}) ||
+            !write("NEngine.SphereCollider", "Friction", 1.0) ||
+            !read("NEngine.SphereCollider", "Radius") ||
+            std::get<double>(collider_value) != 3.0 ||
+            write("NEngine.SphereCollider", "Radius", 0.0) ||
+            write("NEngine.SphereCollider", "Radius", -5.0) ||
+            write("NEngine.SphereCollider", "Radius",
+                  std::numeric_limits<double>::quiet_NaN()) ||
+            write("NEngine.SphereCollider", "Center", nengine::core::Vec3{
+                  std::numeric_limits<float>::infinity(), 0, 0}) ||
+            !read("NEngine.SphereCollider", "Radius") ||
+            std::get<double>(collider_value) != 3.0)
+            return test_failure(137, __LINE__);
         // COLLIDER_CASES
     }
     if (!runtime.world().destroy(collider_entity))
