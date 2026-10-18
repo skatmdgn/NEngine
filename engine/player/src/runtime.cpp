@@ -274,6 +274,7 @@ void PlayerRuntime::unload() noexcept {
     actions_ = {};
     bundle_root_.clear();
     assets_.clear();
+    ui_.reset();
     audio_clips_.clear();
     sprite_clips_.clear();
     missing_audio_clips_.clear();
@@ -329,6 +330,8 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
         return false;
     PlayerAssets catalog;
     if (!catalog.open(root, error)) return false;
+    PlayerUiRuntime next_ui;
+    if (!next_ui.load(root, error)) return false;
     std::unordered_map<assets::AssetGuid, audio::AudioClipData,
                        assets::AssetGuidHash> next_clips;
     for (const auto entity : next_world.entities()) {
@@ -372,6 +375,7 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
     input_ = {};
     actions_ = std::move(next_actions);
     assets_ = std::move(catalog);
+    ui_ = std::move(next_ui);
     audio_clips_ = std::move(next_clips);
     sprite_clips_ = std::move(next_sprites);
     missing_audio_clips_.clear();

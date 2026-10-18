@@ -7,6 +7,7 @@
 #include "nengine/core/scene.hpp"
 #include "nengine/player/bundle.hpp"
 #include "nengine/player/assets.hpp"
+#include "nengine/player/ui_runtime.hpp"
 #include "nengine/audio/playback.hpp"
 #include <unordered_map>
 #include <unordered_set>
@@ -58,6 +59,8 @@ public:
     bool paused() const noexcept { return paused_; }
     float fixed_delta_seconds() const noexcept { return 1.0f / 60.0f; }
     const PlayerAssets& assets() const noexcept { return assets_; }
+    PlayerUiRuntime& ui() noexcept { return ui_; }
+    const PlayerUiRuntime& ui() const noexcept { return ui_; }
     const audio::AudioClipData* audio_clip(assets::AssetGuid guid) const noexcept;
     double elapsed_seconds() const noexcept { return elapsed_seconds_; }
     std::size_t entity_count() const noexcept { return world_.size(); }
@@ -84,6 +87,7 @@ private:
     input::InputState input_{};
     input::ActionMap actions_{};
     PlayerAssets assets_{};
+    PlayerUiRuntime ui_{};
     BundleManifest manifest_{};
     bool ready_{false};
     bool paused_{false};
