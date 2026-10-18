@@ -230,6 +230,9 @@ int main() {
         built.title != settings.title ||
         !resolve_bundle_scene(report.bundle_root, built, &error))
         return test_failure(9, __LINE__);
+    if (!std::filesystem::is_regular_file(
+            report.bundle_root / "Content" / "Assets" / "UI" / "Main.ncanvas"))
+        return test_failure(172, __LINE__);
     PlayerRuntime runtime;
     if (!runtime.load(report.bundle_root, &error) ||
         !runtime.ready() || runtime.entity_count() != 2u ||
