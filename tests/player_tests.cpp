@@ -1007,6 +1007,11 @@ int main() {
       restored << saved_canvas; }
     if (!runtime.load(report.bundle_root, &error) || !runtime.ui().ready())
         return test_failure(186, __LINE__);
+    const auto rendered_ui = runtime.ui().rasterize(32u, 32u);
+    if (rendered_ui.width != 32u || rendered_ui.height != 32u ||
+        rendered_ui.pixels.size() != 32u * 32u * 4u ||
+        rendered_ui.pixels[3] != 255u)
+        return test_failure(187, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto derived_material =
         nengine::assets::derive_subasset_guid(model_guid, "obj-material", 0u);
