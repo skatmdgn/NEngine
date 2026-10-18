@@ -47,6 +47,23 @@ bool PlayerRuntime::initialize_managed(std::string* error) {
     }
     managed_runtime_.bind_input(&input_);
     managed_runtime_.bind_input_actions(&actions_);
+    managed_runtime_.bind_ui(
+        &ui_,
+        [](void* ctx, std::string_view label) -> std::uint64_t {
+            return static_cast<PlayerUiRuntime*>(ctx)->find(label);
+        },
+        [](void* ctx, std::uint64_t id, int op) -> int {
+            return static_cast<PlayerUiRuntime*>(ctx)->query(id, op);
+        },
+        [](void* ctx, std::uint64_t id, int op, int value) -> int {
+            return static_cast<PlayerUiRuntime*>(ctx)->write(id, op, value);
+        },
+        [](void* ctx, std::uint64_t id) -> std::optional<std::string> {
+            return static_cast<PlayerUiRuntime*>(ctx)->get_text(id);
+        },
+        [](void* ctx, std::uint64_t id, std::string_view value) -> bool {
+            return static_cast<PlayerUiRuntime*>(ctx)->set_text(id, value);
+        });
     bind_player_physics_queries(managed_runtime_);
     bind_player_properties(managed_runtime_);
     script_system_.bind(&managed_runtime_);
