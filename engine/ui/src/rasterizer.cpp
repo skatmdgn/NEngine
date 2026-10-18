@@ -19,12 +19,15 @@ std::vector<UiDrawQuad> build_ui_draw_list(const UiLayout& layout) {
     std::vector<UiDrawQuad> commands;
     commands.reserve(layout.items.size());
     for (const auto& item : layout.items) {
-        if (item.kind == WidgetKind::Text ||
-            item.clipped_rect.width <= 0.0f ||
+        if (item.clipped_rect.width <= 0.0f ||
             item.clipped_rect.height <= 0.0f ||
             channel(item.color.a) == 0.0f)
             continue;
-        commands.push_back({item.id, item.clipped_rect, item.color});
+        if (item.kind == WidgetKind::Text && item.text.empty())
+            continue;
+        const bool background = item.kind != WidgetKind::Text;
+        commands.push_back({item.id, item.clipped_rect, item.color,
+                            item.text, background});
     }
     return commands;
 }

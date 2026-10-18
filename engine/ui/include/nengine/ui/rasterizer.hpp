@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "nengine/ui/canvas.hpp"
@@ -11,6 +12,8 @@ struct UiDrawQuad {
     WidgetId widget{invalid_widget};
     UiRect rect{};
     UiColor color{};
+    std::string text{};
+    bool paint_background{true};
 };
 
 // The draw list is in painter's order and its rectangles are clipped to
