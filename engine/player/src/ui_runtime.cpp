@@ -11,12 +11,21 @@ bool PlayerUiRuntime::load(const std::filesystem::path& bundle_root, std::string
     std::error_code ec;
     const auto status = std::filesystem::symlink_status(canvas_path, ec);
     if (ec == std::errc::no_such_file_or_directory) ec.clear();
+    // Unlike is_symlink(path, ec), symlink_status lets a nonexistent
+    // optional UI directory remain valid on Linux and Windows alike.
+    const auto safe_directory = [](const std::filesystem::path& path) {
+        std::error_code directory_error;
+        const auto directory_status =
+            std::filesystem::symlink_status(path, directory_error);
+        if (directory_error == std::errc::no_such_file_or_directory)
+            directory_error.clear();
+        return !directory_error &&
+               !std::filesystem::is_symlink(directory_status);
+    };
     const auto assets_dir = content / "Assets";
     const auto ui_dir = assets_dir / "UI";
-    if (std::filesystem::is_symlink(content, ec) ||
-        std::filesystem::is_symlink(assets_dir, ec) ||
-        std::filesystem::is_symlink(ui_dir, ec) ||
-        ec || std::filesystem::is_symlink(status)) {
+    if (!safe_directory(content) || !safe_directory(assets_dir) ||
+        !safe_directory(ui_dir) || std::filesystem::is_symlink(status)) {
         if (error) *error = "Player Canvas source is unsafe";
         return false;
     }
