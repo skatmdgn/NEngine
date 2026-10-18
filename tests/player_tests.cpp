@@ -944,6 +944,19 @@ int main() {
     runtime.update_ui(640.f, 480.f);
     if (runtime.ui().query(ui_button, 2) != 1)
         return test_failure(178, __LINE__);
+    // Managed ABI operations update only the Player's in-memory Canvas,
+    // never the bundled authoring file.
+    if (runtime.ui().write(ui_button, 0, 0) != 1 ||
+        runtime.ui().query(ui_button, 0) != 0 ||
+        runtime.ui().write(ui_button, 1, 0) != 1 ||
+        runtime.ui().query(ui_button, 1) != 0 ||
+        runtime.ui().write(ui_button, 1, 7) != -1 ||
+        runtime.ui().write(ui_button, 22, 1) != -1 ||
+        !runtime.ui().set_text(ui_button, "Start!") ||
+        runtime.ui().get_text(ui_button) != std::optional<std::string>{"Start!"} ||
+        runtime.ui().set_text(ui_button, std::string(4097, 'x')) ||
+        runtime.ui().find("missing") != nengine::ui::invalid_widget)
+        return test_failure(179, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto derived_material =
         nengine::assets::derive_subasset_guid(model_guid, "obj-material", 0u);
