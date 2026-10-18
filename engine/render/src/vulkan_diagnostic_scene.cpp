@@ -402,9 +402,30 @@ bool VulkanDiagnosticScene::present_world(
             world);
 
     if (snapshot.cameras.empty()) {
+        // UI-only menus should remain visible before any Camera is authored.
+        if (canvas && canvas->valid()) {
+            bool ui_visible = false;
+            if (!prepare_canvas(context, *canvas, ui_visible)) return false;
+            if (ui_visible) {
+                const auto* screen_quad =
+                    mesh_cache_.find(builtin_unit_quad_mesh_guid());
+                if (!screen_quad) return false;
+                auto screen = Mat4::identity();
+                screen.at(0, 0) = 2.f;
+                screen.at(1, 1) = 2.f;
+                const VulkanMeshDraw only_ui{
+                    &sprite_pipeline_, screen_quad, screen, &canvas_material_};
+                if (!context.present_meshes(
+                        std::span<const VulkanMeshDraw>{&only_ui, 1u})) {
+                    diagnostic_ = context.diagnostic();
+                    return false;
+                }
+                diagnostic_ = "Vulkan Canvas-only menu presented";
+                return true;
+            }
+        }
         diagnostic_ =
             "World contains no active Camera; using diagnostic fallback";
-
         return present(context);
     }
 
