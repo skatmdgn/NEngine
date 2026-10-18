@@ -80,7 +80,17 @@ ui::WidgetId PlayerUiRuntime::find(std::string_view name) const noexcept {
     if (named != ui::invalid_widget) return named;
     return canvas_->find_by_text(name);
 }
-int PlayerUiRuntime::query(ui::WidgetId, int) const noexcept { return -1; }
+int PlayerUiRuntime::query(ui::WidgetId id, int operation) const noexcept {
+    if (!canvas_) return -1;
+    const auto* widget = canvas_->find(id);
+    if (!widget) return -1;
+    switch (operation) {
+        case 0: return widget->visible ? 1 : 0;
+        case 1: return widget->interactable ? 1 : 0;
+        case 2: return clicked_.contains(id) ? 1 : 0;
+        default: return -1;
+    }
+}
 int PlayerUiRuntime::write(ui::WidgetId, int, int) noexcept { return -1; }
 std::optional<std::string> PlayerUiRuntime::get_text(ui::WidgetId) const {
     return std::nullopt;
