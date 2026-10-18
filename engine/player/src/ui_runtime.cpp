@@ -73,8 +73,12 @@ void PlayerUiRuntime::update(float, float, const input::InputState&, bool) {
     clicked_.clear();
     events_.clear();
 }
-ui::WidgetId PlayerUiRuntime::find(std::string_view) const noexcept {
-    return ui::invalid_widget;
+ui::WidgetId PlayerUiRuntime::find(std::string_view name) const noexcept {
+    if (!canvas_ || name.empty() || name.size() > 256u)
+        return ui::invalid_widget;
+    const auto named = canvas_->find_by_name(name);
+    if (named != ui::invalid_widget) return named;
+    return canvas_->find_by_text(name);
 }
 int PlayerUiRuntime::query(ui::WidgetId, int) const noexcept { return -1; }
 int PlayerUiRuntime::write(ui::WidgetId, int, int) noexcept { return -1; }
