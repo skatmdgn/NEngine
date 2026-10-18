@@ -39,7 +39,14 @@ bool PlayerUiRuntime::load(const std::filesystem::path& bundle_root, std::string
         if (error) *error = "Player Canvas escapes bundle root";
         return false;
     }
-    reset();
+    ui::UiCanvas next;
+    std::ifstream in(canvas_path, std::ios::binary);
+    if (!in || !ui::read_canvas(in, next, error)) return false;
+    canvas_ = std::move(next);
+    pointer_.reset();
+    keyboard_.reset();
+    events_.clear();
+    clicked_.clear();
     if (error) error->clear();
     return true;
 }
