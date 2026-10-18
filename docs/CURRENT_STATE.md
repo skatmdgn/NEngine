@@ -84,6 +84,14 @@ This is a **dependency overview**, not a complete generated dependency graph. Th
 - Added OBJ/MTL color-model export fixtures, generated .nmat/TGA resolution and CTest CLI checks.
 - **Status scope:** Source work and proposed tests require final Windows/Ubuntu CI. This does not establish device Vulkan acceptance, complete glTF/PBR coverage or ready-to-ship Windows/Android packages.
 
+## 2026-10-18 continuation: 30 standalone Player Canvas development slices
+
+- The Windows standalone Player now loads an optional project `Assets/UI/Main.ncanvas` convention directly from exported `Content/Assets/UI/Main.ncanvas`. Absent Canvas is supported for older games. Loading is transactional, bounded to 4 MiB, and rejects symlinks, corrupt files, and paths escaping the bundle.
+- `PlayerUiRuntime` owns a mutable play-only Canvas, clipped hit testing, per-frame click snapshots, keyboard Tab/Shift+Tab and Enter/Space focus activation, with pointer capture cancelled on focus loss.
+- The existing generated C# UI API (Find/visible/interactable/WasClicked/GetText/SetText) is wired to the standalone managed Player via the same native callback contract used by Editor Play Mode. Win32 Player updates its UI interaction frame before script Update.
+- Portable Player integration fixtures exercise mouse and keyboard clicks, runtime mutations, invalid name and operation handling, corrupted/oversized/symlink file rejection, legacy no-Canvas reload and lossless recovery.
+- **Acceptance boundary:** These are code and automated integration checks. The Player's Canvas is not yet drawn as Vulkan UI geometry/text/images; this does **not** demonstrate visibly usable UI buttons, keyboard behavior on physical hardware, or a shippable GUI game. Windows/Ubuntu CI is required and separate from interactive device QA.
+
 ## Highest-priority next work
 
 1. **Player completion:** exported glTF/OBJ generated material/texture subassets, managed action map/property parity, and genuine Windows GPU + .NET + input acceptance.

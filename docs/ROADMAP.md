@@ -268,7 +268,8 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Windows Canvas parent dropdown + Reparent button (safe hierarchy authoring)
 - [x] Atomic multi-selection subtree deletion with Undo restoration
 - [x] Nested selection/drag, invalid parent and anchor preset regression coverage
-- [ ] runtime Canvas-style UI
+- [x] Packaged Windows Player Canvas asset loading, clipped pointer/keyboard interactions, and C# UI Find/Query/Write/Text callbacks (without Vulkan UI draw)
+- [ ] runtime Canvas-style UI (Vulkan text/image/button presentation and device acceptance remain)
 - [ ] NavMesh agent/obstacle/link subset
 - [ ] particle system
 
