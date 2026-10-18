@@ -959,6 +959,11 @@ bool VulkanDiagnosticScene::present_world(
 }
 
 void VulkanDiagnosticScene::shutdown() noexcept {
+    canvas_material_.destroy();
+    canvas_texture_.destroy();
+    last_canvas_pixels_.clear();
+    last_canvas_width_ = 0;
+    last_canvas_height_ = 0;
     sprite_pipeline_.destroy();
     blend_double_sided_pipeline_.destroy();
     blend_pipeline_.destroy();

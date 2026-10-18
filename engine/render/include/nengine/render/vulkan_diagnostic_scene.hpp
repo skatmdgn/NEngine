@@ -90,6 +90,8 @@ public:
     }
 
 private:
+    bool prepare_canvas(VulkanContext& context, const VulkanCanvasFrame& frame,
+                        bool& visible);
     struct CookedMaterialMapCacheEntry {
         std::string fingerprint{};
         CookedModelMaterialMap materials{};
