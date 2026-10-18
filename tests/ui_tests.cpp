@@ -255,6 +255,15 @@ int main() {
           image_readback.find(textured_widget)->image_texture ==
               unchanged_image.find(textured_widget)->image_texture,
           "malformed v3 image GUID cannot replace existing Canvas");
+    std::stringstream legacy_v2(
+        "NENGINE_CANVAS 2\nWIDGETS 1\n"
+        "WIDGET 13 0 2 1 1 0 \"LegacyIcon\" \"Icon\" "
+        "0 0 0 0 0 0 20 20 1 1 1 1\nEND_CANVAS\n");
+    UiCanvas legacy_image;
+    check(read_canvas(legacy_v2, legacy_image) &&
+          legacy_image.find(13u)->kind == WidgetKind::Image &&
+          !legacy_image.find(13u)->image_texture.valid(),
+          "old Canvas v2 image nodes keep their solid-color fallback");
     auto clone_named = named.duplicate_subtree(named_button);
     check(clone_named != invalid_widget &&
           named.find(clone_named)->name.empty(),
