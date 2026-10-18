@@ -128,20 +128,48 @@ UiRgbaImage rasterize_ui(
         const float src_g = channel(draw.color.g);
         const float src_b = channel(draw.color.b);
         if (src_a == 0.0f) continue;
+        const UiRgbaImage* sampled = nullptr;
+        if (draw.image_texture.valid() && images)
+            sampled = images(draw.image_texture);
+        if (sampled && (sampled->width == 0u || sampled->height == 0u ||
+            sampled->width > 4096u || sampled->height > 4096u ||
+            sampled->pixels.size() !=
+                static_cast<std::size_t>(sampled->width) * sampled->height * 4u))
+            sampled = nullptr;
+        const auto uv_rect = draw.source_rect.width > 0.f &&
+            draw.source_rect.height > 0.f ? draw.source_rect : draw.rect;
         if (draw.paint_background) for (auto y = y0; y < y1; ++y) {
             for (auto x = x0; x < x1; ++x) {
                 auto* pixel = image.pixels.data() +
                     (static_cast<std::size_t>(y) * width + x) * 4u;
+                float paint_a = src_a;
+                float paint_r = src_r, paint_g = src_g, paint_b = src_b;
+                if (sampled) {
+                    const auto u = std::clamp(
+                        (static_cast<float>(x) + 0.5f - uv_rect.x) /
+                            uv_rect.width, 0.f, 0.999999f);
+                    const auto v = std::clamp(
+                        (static_cast<float>(y) + 0.5f - uv_rect.y) /
+                            uv_rect.height, 0.f, 0.999999f);
+                    const auto tx = static_cast<std::uint32_t>(u * sampled->width);
+                    const auto ty = static_cast<std::uint32_t>(v * sampled->height);
+                    const auto offset =
+                        (static_cast<std::size_t>(ty) * sampled->width + tx) * 4u;
+                    paint_r *= sampled->pixels[offset] / 255.f;
+                    paint_g *= sampled->pixels[offset + 1u] / 255.f;
+                    paint_b *= sampled->pixels[offset + 2u] / 255.f;
+                    paint_a *= sampled->pixels[offset + 3u] / 255.f;
+                }
                 const float dst_a = pixel[3] / 255.0f;
-                const float out_a = src_a + dst_a * (1.0f - src_a);
+                const float out_a = paint_a + dst_a * (1.0f - paint_a);
                 const auto blend = [&](float src, unsigned channel_index) {
                     const float dst = pixel[channel_index] / 255.0f;
                     return out_a <= 0.0f ? 0.0f :
-                        (src * src_a + dst * dst_a * (1.0f - src_a)) / out_a;
+                        (src * paint_a + dst * dst_a * (1.0f - paint_a)) / out_a;
                 };
-                pixel[0] = byte(blend(src_r, 0));
-                pixel[1] = byte(blend(src_g, 1));
-                pixel[2] = byte(blend(src_b, 2));
+                pixel[0] = byte(blend(paint_r, 0));
+                pixel[1] = byte(blend(paint_g, 1));
+                pixel[2] = byte(blend(paint_b, 2));
                 pixel[3] = byte(out_a);
             }
         }
