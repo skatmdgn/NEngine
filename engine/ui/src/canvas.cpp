@@ -145,6 +145,7 @@ bool UiCanvas::restore(Widget widget) {
         widget.id == UINT64_MAX || find(widget.id) ||
         (widget.parent != invalid_widget && !find(widget.parent)) ||
         !valid_widget_name(widget.name) ||
+        (widget.kind != WidgetKind::Image && widget.image_texture.valid()) ||
         widget.text.size() > 4096u)
         return false;
     if (!widget.name.empty())

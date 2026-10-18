@@ -264,6 +264,13 @@ int main() {
           legacy_image.find(13u)->kind == WidgetKind::Image &&
           !legacy_image.find(13u)->image_texture.valid(),
           "old Canvas v2 image nodes keep their solid-color fallback");
+    Widget invalid_image_owner;
+    invalid_image_owner.id = 9876u;
+    invalid_image_owner.kind = WidgetKind::Text;
+    invalid_image_owner.image_texture = texture_id;
+    check(!image_readback.restore(invalid_image_owner) &&
+          !image_readback.find(9876u),
+          "Canvas restore disallows image references on non-Image widgets");
     auto clone_named = named.duplicate_subtree(named_button);
     check(clone_named != invalid_widget &&
           named.find(clone_named)->name.empty(),
