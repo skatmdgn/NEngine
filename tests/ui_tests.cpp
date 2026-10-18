@@ -415,6 +415,18 @@ int main() {
         });
     check(lit > 20u && letters.pixels.size() == 60u * 18u * 4u,
           "text-only Canvas widgets render visible glyphs without background");
+    UiLayout button_label_layout;
+    button_label_layout.items.push_back({
+        124, WidgetKind::Button, {0.f, 0.f, 72.f, 20.f},
+        {0.f, 0.f, 72.f, 20.f}, "START", true,
+        {0.f, 0.f, 0.f, 1.f}
+    });
+    const auto button_label = rasterize_ui(
+        build_ui_draw_list(button_label_layout), 72u, 20u);
+    const auto bright_ink = std::count_if(button_label.pixels.begin(),
+        button_label.pixels.end(), [](std::uint8_t v) { return v > 200u; });
+    check(bright_ink > 10u && button_label.pixels[3] == 255u,
+          "dark Canvas button keeps its panel while drawing contrasting label ink");
     check(rasterize_ui({}, 5000u, 1u).pixels.empty(),
           "rasterizer guards oversized render targets");
 
