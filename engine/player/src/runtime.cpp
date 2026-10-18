@@ -6,6 +6,8 @@
 #include "nengine/audio/registration.hpp"
 #include "nengine/audio/components.hpp"
 #include "nengine/render/components.hpp"
+#include "nengine/render/asset_resources.hpp"
+#include "nengine/render/decoded_texture.hpp"
 #include "nengine/physics/registration.hpp"
 #include "nengine/render/registration.hpp"
 #include "nengine/scripting/registration.hpp"
@@ -69,6 +71,32 @@ bool PlayerRuntime::initialize_managed(std::string* error) {
     script_system_.bind(&managed_runtime_);
     if (error) error->clear();
     return true;
+}
+
+const ui::UiRgbaImage* PlayerRuntime::resolve_ui_image(
+    assets::AssetGuid guid) {
+    if (!guid.valid() || !ui_.ready() ||
+        missing_ui_images_.contains(guid)) return nullptr;
+    if (const auto it = ui_images_.find(guid); it != ui_images_.end())
+        return &it->second;
+    auto artifacts = assets_.cooked_artifacts(guid);
+    if (!artifacts || artifacts->importer_id != "NEngine.Texture") {
+        if (missing_ui_images_.size() >= 128u) missing_ui_images_.clear();
+        missing_ui_images_.insert(guid);
+        return nullptr;
+    }
+    auto source = render::resolve_texture_asset(guid, *artifacts);
+    render::DecodedTextureData decoded;
+    if (!source || !render::decode_texture_rgba8(*source, decoded) ||
+        !decoded.valid() || decoded.width > 2048u ||
+        decoded.height > 2048u || decoded.rgba8.size() > 16u * 1024u * 1024u) {
+        if (missing_ui_images_.size() >= 128u) missing_ui_images_.clear();
+        missing_ui_images_.insert(guid);
+        return nullptr;
+    }
+    if (ui_images_.size() >= 32u) ui_images_.clear();
+    ui::UiRgbaImage image{decoded.width, decoded.height, std::move(decoded.rgba8)};
+    return &ui_images_.emplace(guid, std::move(image)).first->second;
 }
 
 const audio::AudioClipData* PlayerRuntime::audio_clip(
