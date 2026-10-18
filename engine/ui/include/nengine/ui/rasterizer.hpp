@@ -31,10 +31,14 @@ struct UiRgbaImage {
     std::vector<std::uint8_t> pixels{};
 };
 
-// Deterministic CPU reference path for testing/debugging UI geometry.
-// Text glyphs and external image textures are intentionally not implemented.
+using UiImageResolver = std::function<const UiRgbaImage*(assets::AssetGuid)>;
+
+// Deterministic CPU Canvas compositor. Missing image GUIDs retain solid-color
+// fallback; loaded textures use nearest sampling, clipping, tint and alpha.
+// The caller owns referenced images until rasterize_ui returns.
 UiRgbaImage rasterize_ui(
     const std::vector<UiDrawQuad>& commands,
-    std::uint32_t width, std::uint32_t height);
+    std::uint32_t width, std::uint32_t height,
+    const UiImageResolver& images = {});
 
 } // namespace nengine::ui

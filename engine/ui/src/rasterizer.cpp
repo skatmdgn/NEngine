@@ -93,7 +93,8 @@ std::vector<UiDrawQuad> build_ui_draw_list(const UiLayout& layout) {
 
 UiRgbaImage rasterize_ui(
     const std::vector<UiDrawQuad>& commands,
-    std::uint32_t width, std::uint32_t height) {
+    std::uint32_t width, std::uint32_t height,
+    const UiImageResolver& images) {
 
     UiRgbaImage image;
     constexpr std::uint32_t max_dimension = 4096;
