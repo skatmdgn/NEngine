@@ -1019,6 +1019,8 @@ bool VulkanDiagnosticScene::prepare_canvas(
         }
     }
     if (!visible) return true;
+    // UI GPU uploads are content-addressed: static menus and repeated
+    // gameplay frames reuse descriptors rather than recreating textures.
     if (canvas_texture_.valid() && canvas_material_.valid() &&
         last_canvas_width_ == frame.width &&
         last_canvas_height_ == frame.height &&
