@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -14,6 +15,9 @@ struct UiDrawQuad {
     UiColor color{};
     std::string text{};
     bool paint_background{true};
+    assets::AssetGuid image_texture{};
+    // Unclipped rect used to retain correct texture UV after child clipping.
+    UiRect source_rect{};
 };
 
 // The draw list is in painter's order and its rectangles are clipped to

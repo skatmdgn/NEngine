@@ -85,7 +85,8 @@ std::vector<UiDrawQuad> build_ui_draw_list(const UiLayout& layout) {
             continue;
         const bool background = item.kind != WidgetKind::Text;
         commands.push_back({item.id, item.clipped_rect, item.color,
-                            item.text, background});
+                            item.text, background,
+                            item.image_texture, item.rect});
     }
     return commands;
 }
