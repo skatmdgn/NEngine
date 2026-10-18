@@ -1114,6 +1114,18 @@ int main() {
         runtime.cached_ui_images() != 0u ||
         !runtime.ui().ready())
         return test_failure(201, __LINE__);
+    if (!runtime.ui().canvas()->set_image_texture(
+            canvas_image, nengine::assets::AssetGuid::generate()) ||
+        !runtime.ui().write(canvas_image, 0, 1))
+        return test_failure(202, __LINE__);
+    const auto unresolved_image = runtime.ui().rasterize(44u, 3u);
+    if (unresolved_image.pixels.empty() ||
+        unresolved_image.pixels[(40u * 4u) + 0u] != 255u ||
+        runtime.cached_ui_images() != 0u)
+        return test_failure(203, __LINE__);
+    if (!runtime.ui().canvas()->set_image_texture(canvas_image, canvas_texture_guid) ||
+        runtime.ui().write(canvas_image, 0, 0) != 1)
+        return test_failure(204, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto derived_material =
         nengine::assets::derive_subasset_guid(model_guid, "obj-material", 0u);
