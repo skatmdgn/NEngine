@@ -931,6 +931,19 @@ int main() {
     runtime.update_ui(640.f, 480.f);
     if (runtime.ui().query(ui_button, 2) != 0)
         return test_failure(177, __LINE__);
+    // Tab focus followed by Enter release activates the focused UI button.
+    runtime.input().begin_frame();
+    runtime.input().set_key(nengine::input::Key::Tab, true);
+    runtime.update_ui(640.f, 480.f);
+    runtime.input().begin_frame();
+    runtime.input().set_key(nengine::input::Key::Tab, false);
+    runtime.input().set_key(nengine::input::Key::Enter, true);
+    runtime.update_ui(640.f, 480.f);
+    runtime.input().begin_frame();
+    runtime.input().set_key(nengine::input::Key::Enter, false);
+    runtime.update_ui(640.f, 480.f);
+    if (runtime.ui().query(ui_button, 2) != 1)
+        return test_failure(178, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto derived_material =
         nengine::assets::derive_subasset_guid(model_guid, "obj-material", 0u);
