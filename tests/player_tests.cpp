@@ -904,6 +904,23 @@ int main() {
         runtime.ui().get_text(ui_button) != std::optional<std::string>{"Play"} ||
         runtime.ui().find("Play") != canvas_button)
         return test_failure(173, __LINE__);
+    // Native input to Canvas click transition: only the released frame clicks.
+    runtime.input().begin_frame();
+    runtime.input().set_pointer_position(10.f, 10.f);
+    runtime.input().set_key(nengine::input::Key::MouseLeft, true);
+    runtime.update_ui(640.f, 480.f);
+    if (runtime.ui().query(ui_button, 2) != 0 ||
+        runtime.ui().click_count() != 0u)
+        return test_failure(174, __LINE__);
+    runtime.input().begin_frame();
+    runtime.input().set_key(nengine::input::Key::MouseLeft, false);
+    runtime.update_ui(640.f, 480.f);
+    if (runtime.ui().query(ui_button, 2) != 1 ||
+        runtime.ui().click_count() != 1u)
+        return test_failure(175, __LINE__);
+    runtime.update_ui(640.f, 480.f);
+    if (runtime.ui().query(ui_button, 2) != 0)
+        return test_failure(176, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto derived_material =
         nengine::assets::derive_subasset_guid(model_guid, "obj-material", 0u);
