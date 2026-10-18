@@ -1027,8 +1027,19 @@ bool VulkanDiagnosticScene::prepare_canvas(
         std::equal(frame.rgba.begin(), frame.rgba.end(),
                    last_canvas_pixels_.begin(), last_canvas_pixels_.end()))
         return true;
-    // Imported UI texture changes may happen every game frame. Rebuild only
-    // on different pixels or dimensions; destroy dependent descriptor first.
+    // Vulkan draw submissions can still reference the old descriptor set
+    // until their frame fence signals. Do not free the texture or descriptor
+    // while a previous UI frame is in flight. Dynamic UI uploads therefore
+    // use a safe full-device barrier; future triple buffering can optimize it.
+    if (canvas_material_.valid() || canvas_texture_.valid()) {
+        using WaitIdle = std::int32_t (*)(void*);
+        const auto wait = reinterpret_cast<WaitIdle>(
+            context.device().get_proc_address("vkDeviceWaitIdle"));
+        if (!wait || wait(context.device().native_device()) != 0) {
+            diagnostic_ = "Vulkan Canvas upload cannot synchronize in-flight GPU usage";
+            return false;
+        }
+    }
     canvas_material_.destroy();
     canvas_texture_.destroy();
     last_canvas_pixels_.clear();
