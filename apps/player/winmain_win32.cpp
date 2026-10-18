@@ -144,11 +144,20 @@ int run() {
             old_height = height;
             if (width && height) renderer.resize(width, height);
         }
+        // Rasterize the current mutable runtime Canvas after C# Update.
+        // The CPU RGBA image is composited in the same Vulkan render pass
+        // after World geometry rather than overlaid with a Win32 child window.
+        const auto overlay = runtime.ui().rasterize(width, height);
+        const nengine::render::VulkanCanvasFrame overlay_view{
+            overlay.width, overlay.height, overlay.pixels
+        };
+        const auto* overlay_ptr =
+            overlay_view.valid() ? &overlay_view : nullptr;
         if (width && height && !scene.present_world(
                 renderer, runtime.world(),
                 [&runtime](nengine::assets::AssetGuid guid) {
                     return runtime.assets().cooked_artifacts(guid);
-                })) {
+                }, overlay_ptr)) {
             message(scene.diagnostic());
             return 7;
         }
