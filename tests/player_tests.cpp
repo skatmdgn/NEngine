@@ -1015,6 +1015,10 @@ int main() {
     if (!runtime.ui().rasterize(5000u, 100u).pixels.empty() ||
         !runtime.ui().rasterize(0u, 100u).pixels.empty())
         return test_failure(188, __LINE__);
+    if (runtime.ui().write(ui_button, 0, 0) != 1 ||
+        runtime.ui().rasterize(32u, 32u).pixels[3] != 0u ||
+        runtime.ui().write(ui_button, 0, 1) != 1)
+        return test_failure(189, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto derived_material =
         nengine::assets::derive_subasset_guid(model_guid, "obj-material", 0u);
