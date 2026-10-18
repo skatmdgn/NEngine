@@ -427,6 +427,22 @@ int main() {
         button_label.pixels.end(), [](std::uint8_t v) { return v > 200u; });
     check(bright_ink > 10u && button_label.pixels[3] == 255u,
           "dark Canvas button keeps its panel while drawing contrasting label ink");
+    UiLayout clipped_label;
+    clipped_label.items.push_back({
+        125, WidgetKind::Text, {0.f, 0.f, 60.f, 20.f},
+        {0.f, 0.f, 6.f, 10.f}, "LONG CAPTION", true,
+        {1.f, 1.f, 1.f, 1.f}
+    });
+    const auto clip_glyphs = rasterize_ui(
+        build_ui_draw_list(clipped_label), 20u, 20u);
+    bool glyph_escaped = false;
+    for (std::uint32_t y = 0; y < 20u; ++y)
+        for (std::uint32_t x = 0; x < 20u; ++x)
+            if ((x >= 6u || y >= 10u) &&
+                clip_glyphs.pixels[(y * 20u + x) * 4u + 3u] != 0u)
+                glyph_escaped = true;
+    check(!glyph_escaped,
+          "ASCII Canvas text glyphs cannot escape clipped UI widget bounds");
     check(rasterize_ui({}, 5000u, 1u).pixels.empty(),
           "rasterizer guards oversized render targets");
 
