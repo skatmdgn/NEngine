@@ -383,6 +383,13 @@ bool UiCanvas::set_anchors(WidgetId id, RectAnchors anchors) noexcept {
     return true;
 }
 
+bool UiCanvas::set_image_texture(WidgetId id, assets::AssetGuid guid) noexcept {
+    auto* widget = find(id);
+    if (!widget || widget->kind != WidgetKind::Image) return false;
+    widget->image_texture = guid;
+    return true;
+}
+
 bool UiCanvas::set_color(WidgetId id, UiColor color) noexcept {
     auto* widget = find(id);
     const auto valid_channel = [](float value) {
