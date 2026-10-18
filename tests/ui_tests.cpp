@@ -486,6 +486,21 @@ int main() {
           clipped_texels.pixels[4u + 1u] == 255u &&
           clipped_texels.pixels[12u + 0u] == 255u,
           "clipped Image samples correct UV from full untrimmed widget rectangle");
+    UiLayout alpha_stack;
+    alpha_stack.items.push_back({128u, WidgetKind::Panel,
+        {0.f,0.f,2.f,2.f}, {0.f,0.f,2.f,2.f}, "", true,
+        {0.f,0.f,1.f,1.f}});
+    alpha_stack.items.push_back({129u, WidgetKind::Image,
+        {0.f,0.f,2.f,2.f}, {0.f,0.f,2.f,2.f}, "", true,
+        {1.f,1.f,1.f,.5f}, test_texture_guid});
+    const auto merged = rasterize_ui(build_ui_draw_list(alpha_stack), 2u, 2u,
+        [&](nengine::assets::AssetGuid) -> const UiRgbaImage* {
+            return &checker;
+        });
+    check(merged.pixels[0] >= 126u && merged.pixels[0] <= 129u &&
+          merged.pixels[2] >= 126u && merged.pixels[2] <= 129u &&
+          merged.pixels[3] == 255u,
+          "alpha-blended textured Canvas Image composites over opaque Panel");
     UiLayout ascii_layout;
     ascii_layout.items.push_back({
         123, WidgetKind::Text, {0.f, 0.f, 60.f, 18.f},
