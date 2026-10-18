@@ -5,7 +5,21 @@
 #include <system_error>
 
 namespace nengine::player {
-bool PlayerUiRuntime::load(const std::filesystem::path&, std::string* error) {
+bool PlayerUiRuntime::load(const std::filesystem::path& bundle_root, std::string* error) {
+    const auto content = bundle_root / "Content";
+    const auto canvas_path = content / "Assets" / "UI" / "Main.ncanvas";
+    std::error_code ec;
+    const auto status = std::filesystem::symlink_status(canvas_path, ec);
+    if (ec == std::errc::no_such_file_or_directory) ec.clear();
+    if (ec || std::filesystem::is_symlink(status)) {
+        if (error) *error = "Player Canvas source is unsafe";
+        return false;
+    }
+    if (!std::filesystem::exists(status)) {
+        reset();
+        if (error) error->clear();
+        return true;
+    }
     reset();
     if (error) error->clear();
     return true;
