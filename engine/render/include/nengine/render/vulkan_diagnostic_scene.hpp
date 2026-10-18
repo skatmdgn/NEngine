@@ -107,6 +107,11 @@ private:
         assets::AssetGuidHash>
         cooked_model_material_maps_{};
 
+    VulkanTextureResource canvas_texture_{};
+    VulkanMaterialResource canvas_material_{};
+    std::vector<std::uint8_t> last_canvas_pixels_{};
+    std::uint32_t last_canvas_width_{0u};
+    std::uint32_t last_canvas_height_{0u};
     VulkanTextureResource texture_{};
     VulkanMaterialResource material_{};
     VulkanGraphicsPipeline pipeline_{};
