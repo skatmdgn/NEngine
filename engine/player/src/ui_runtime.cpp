@@ -74,10 +74,11 @@ ui::UiRgbaImage PlayerUiRuntime::rasterize(
     std::uint32_t width, std::uint32_t height) const {
     if (!canvas_ || width == 0u || height == 0u ||
         width > 4096u || height > 4096u) return {};
-    return ui::rasterize_ui(
-        ui::build_ui_draw_list(canvas_->layout(
-            static_cast<float>(width), static_cast<float>(height))),
-        width, height);
+    const auto draw_commands = ui::build_ui_draw_list(
+        canvas_->layout(static_cast<float>(width),
+                        static_cast<float>(height)));
+    if (draw_commands.empty()) return {};
+    return ui::rasterize_ui(draw_commands, width, height);
 }
 void PlayerUiRuntime::update(float width, float height,
                              const input::InputState& input, bool focused) {
