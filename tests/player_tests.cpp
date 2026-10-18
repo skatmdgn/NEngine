@@ -1044,6 +1044,16 @@ int main() {
         transparent_ui.pixels[3] != 0u ||
         runtime.ui().write(ui_button, 0, 1) != 1)
         return test_failure(193, __LINE__);
+    // After the Canvas's C#-style text edit, the same GPU-bound RGBA
+    // surface includes dark text ink over the bright Button panel.
+    const auto labeled_ui = runtime.ui().rasterize(80u, 30u);
+    std::size_t dark_ink = 0u;
+    for (std::size_t i = 0; i + 3u < labeled_ui.pixels.size(); i += 4u) {
+        if (labeled_ui.pixels[i + 3u] == 255u &&
+            labeled_ui.pixels[i] < 80u) ++dark_ink;
+    }
+    if (labeled_ui.pixels.empty() || dark_ink < 5u)
+        return test_failure(194, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto derived_material =
         nengine::assets::derive_subasset_guid(model_guid, "obj-material", 0u);
