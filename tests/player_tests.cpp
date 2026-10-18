@@ -1017,7 +1017,7 @@ int main() {
         !runtime.ui().rasterize(0u, 100u).pixels.empty())
         return test_failure(188, __LINE__);
     if (runtime.ui().write(ui_button, 0, 0) != 1 ||
-        runtime.ui().rasterize(32u, 32u).pixels[3] != 0u ||
+        !runtime.ui().rasterize(32u, 32u).pixels.empty() ||
         runtime.ui().write(ui_button, 0, 1) != 1)
         return test_failure(189, __LINE__);
     // GPU-side frame contract can be validated even on headless CI runners.
@@ -1040,9 +1040,9 @@ int main() {
         runtime.ui().write(ui_button, 0, 0) != 1)
         return test_failure(192, __LINE__);
     const auto transparent_ui = runtime.ui().rasterize(16u, 16u);
-    if (transparent_ui.pixels.size() != baseline_ui.pixels.size() ||
-        transparent_ui.pixels[3] != 0u ||
-        runtime.ui().write(ui_button, 0, 1) != 1)
+    if (!transparent_ui.pixels.empty() ||
+        runtime.ui().write(ui_button, 0, 1) != 1 ||
+        runtime.ui().rasterize(16u, 16u).pixels != baseline_ui.pixels)
         return test_failure(193, __LINE__);
     // After the Canvas's C#-style text edit, the same GPU-bound RGBA
     // surface includes dark text ink over the bright Button panel.
