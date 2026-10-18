@@ -320,6 +320,8 @@ void PlayerRuntime::unload() noexcept {
     bundle_root_.clear();
     assets_.clear();
     ui_.reset();
+    ui_images_.clear();
+    missing_ui_images_.clear();
     audio_clips_.clear();
     sprite_clips_.clear();
     missing_audio_clips_.clear();
