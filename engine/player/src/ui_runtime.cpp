@@ -1,5 +1,6 @@
 #include "nengine/player/ui_runtime.hpp"
 #include "nengine/ui/canvas_serialization.hpp"
+#include "nengine/ui/rasterizer.hpp"
 #include <cmath>
 #include <fstream>
 #include <system_error>
@@ -68,6 +69,14 @@ void PlayerUiRuntime::reset() noexcept {
 }
 ui::UiLayout PlayerUiRuntime::layout(float width, float height) const {
     return canvas_ ? canvas_->layout(width, height) : ui::UiLayout{};
+}
+ui::UiRgbaImage PlayerUiRuntime::rasterize(
+    std::uint32_t width, std::uint32_t height) const {
+    if (!canvas_) return {};
+    return ui::rasterize_ui(
+        ui::build_ui_draw_list(canvas_->layout(
+            static_cast<float>(width), static_cast<float>(height))),
+        width, height);
 }
 void PlayerUiRuntime::update(float width, float height,
                              const input::InputState& input, bool focused) {
