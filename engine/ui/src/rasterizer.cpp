@@ -5,6 +5,7 @@
 #include <cctype>
 #include <cmath>
 #include <limits>
+#include <string_view>
 
 namespace nengine::ui {
 namespace {
@@ -17,6 +18,29 @@ std::uint8_t byte(float value) noexcept {
 }
 // Small built-in 5x7 fallback glyphs. Supports the ASCII set without
 // allocating OS font handles in the headless Vulkan/CTest build.
+// Decode one Unicode scalar, consuming malformed sequences safely. The
+// compact 5x7 font still substitutes '?' for glyphs it does not contain.
+std::uint32_t next_codepoint(std::string_view text, std::size_t& index) {
+    const auto first = static_cast<unsigned char>(text[index++]);
+    if (first < 0x80u) return first;
+    const auto need = first >= 0xC2u && first <= 0xDFu ? 1u :
+        (first >= 0xE0u && first <= 0xEFu ? 2u :
+        (first >= 0xF0u && first <= 0xF4u ? 3u : 0u));
+    if (need == 0u || index + need > text.size()) return 0xFFFDu;
+    std::uint32_t result = first & (need == 1u ? 0x1Fu : need == 2u ? 0x0Fu : 0x07u);
+    for (std::size_t n = 0; n < need; ++n) {
+        const auto ch = static_cast<unsigned char>(text[index + n]);
+        if ((ch & 0xC0u) != 0x80u) return 0xFFFDu;
+        result = (result << 6u) | (ch & 0x3Fu);
+    }
+    if ((need == 2u && result < 0x800u) ||
+        (need == 3u && result < 0x10000u) ||
+        result > 0x10FFFFu ||
+        (result >= 0xD800u && result <= 0xDFFFu))
+        return 0xFFFDu;
+    index += need;
+    return result;
+}
 std::array<std::uint8_t, 7> glyph(unsigned char raw) noexcept {
     const char c = static_cast<char>(std::toupper(raw));
     switch (c) {
@@ -187,10 +211,12 @@ UiRgbaImage rasterize_ui(
             const auto start_y = y0 + (y1 - y0 > static_cast<std::uint32_t>(7 * scale)
                 ? (y1 - y0 - static_cast<std::uint32_t>(7 * scale)) / 2u : 0u);
             auto cursor = start_x;
-            for (std::size_t i = 0; i < draw.text.size() && i < 256u; ++i) {
+            std::size_t character = 0u;
+            for (std::size_t i = 0; i < draw.text.size() && character < 256u; ++character) {
                 if (cursor >= x1 || letter_width > x1 - cursor) break;
+                const auto scalar = next_codepoint(draw.text, i);
                 const auto glyph_bits = glyph(
-                    static_cast<unsigned char>(draw.text[i]));
+                    static_cast<unsigned char>(scalar <= 0x7Fu ? scalar : '?'));
                 for (int gy = 0; gy < 7; ++gy) {
                     for (int gx = 0; gx < 5; ++gx) {
                         if (!(glyph_bits[gy] & (1u << (4 - gx)))) continue;
