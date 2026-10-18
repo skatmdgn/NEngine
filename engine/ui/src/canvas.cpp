@@ -468,7 +468,8 @@ UiLayout UiCanvas::layout(float width, float height) const {
         result.items.push_back({
             node.id, node.kind, rect, clipped, node.text,
             node.kind == WidgetKind::Button && node.interactable,
-            node.color
+            node.color,
+            node.image_texture
         });
         // When clip_children=false, descendants inherit the parent's
         // effective clipping from ancestors, not the parent's own bounds.
