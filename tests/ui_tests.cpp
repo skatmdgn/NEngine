@@ -428,6 +428,22 @@ int main() {
         });
     check(colored_pixels.pixels == checker.pixels,
           "Image GUID resolver samples nearest RGBA8 pixels preserving UV order");
+    const auto fallback_pixels = rasterize_ui(
+        build_ui_draw_list(texture_paint.layout(2.f, 2.f)), 2u, 2u);
+    check(fallback_pixels.pixels[0] == 255u &&
+          fallback_pixels.pixels[1] == 255u &&
+          fallback_pixels.pixels[3] == 255u,
+          "unresolved image GUID keeps legacy solid white placeholder");
+    texture_paint.find(tex_item)->color = {1.f, .5f, 1.f, .5f};
+    const auto tinted_pixels = rasterize_ui(
+        build_ui_draw_list(texture_paint.layout(2.f, 2.f)), 2u, 2u,
+        [&](nengine::assets::AssetGuid) -> const UiRgbaImage* {
+            return &checker;
+        });
+    check(tinted_pixels.pixels[3] == 128u &&
+          tinted_pixels.pixels[4+1] >= 126u &&
+          tinted_pixels.pixels[4+1] <= 129u,
+          "Canvas image sampling multiplies asset color and alpha by Image tint");
     UiLayout ascii_layout;
     ascii_layout.items.push_back({
         123, WidgetKind::Text, {0.f, 0.f, 60.f, 18.f},
