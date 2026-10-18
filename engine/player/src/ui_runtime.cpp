@@ -87,6 +87,18 @@ void PlayerUiRuntime::update(float width, float height,
         if (event.type == ui::UiPointerEventType::Click)
             clicked_.insert(event.target);
     }
+    auto keys = keyboard_.update(
+        visible, input.held(input::Key::Tab),
+        input.held(input::Key::Enter),
+        input.held(input::Key::LeftShift) ||
+            input.held(input::Key::RightShift),
+        input.held(input::Key::Space),
+        input.held(input::Key::Escape));
+    for (const auto& event : keys)
+        if (event.type == ui::UiPointerEventType::Click)
+            clicked_.insert(event.target);
+    events_.insert(events_.end(), keys.begin(), keys.end());
+    if (events_.size() > 128u) events_.resize(128u);
 }
 ui::WidgetId PlayerUiRuntime::find(std::string_view name) const noexcept {
     if (!canvas_ || name.empty() || name.size() > 256u)
