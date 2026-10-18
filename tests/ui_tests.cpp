@@ -413,6 +413,21 @@ int main() {
           rgba(4, 4, 0) >= 126u && rgba(4, 4, 2) >= 126u &&
           rgba(6, 6, 3) == 0u,
           "CPU UI renderer blends ordered quads and respects child clipping");
+    UiCanvas texture_paint;
+    const auto tex_item = texture_paint.add(WidgetKind::Image);
+    const auto test_texture_guid = nengine::assets::AssetGuid::generate();
+    texture_paint.set_image_texture(tex_item, test_texture_guid);
+    texture_paint.find(tex_item)->anchors.offset_max = {2.f, 2.f};
+    UiRgbaImage checker{2u, 2u, {
+        255u,0u,0u,255u, 0u,255u,0u,255u,
+        0u,0u,255u,255u, 255u,255u,255u,255u}};
+    const auto colored_pixels = rasterize_ui(
+        build_ui_draw_list(texture_paint.layout(2.f, 2.f)), 2u, 2u,
+        [&](nengine::assets::AssetGuid id) -> const UiRgbaImage* {
+            return id == test_texture_guid ? &checker : nullptr;
+        });
+    check(colored_pixels.pixels == checker.pixels,
+          "Image GUID resolver samples nearest RGBA8 pixels preserving UV order");
     UiLayout ascii_layout;
     ascii_layout.items.push_back({
         123, WidgetKind::Text, {0.f, 0.f, 60.f, 18.f},
