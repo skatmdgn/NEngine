@@ -126,7 +126,7 @@ UiRgbaImage rasterize_ui(
         const float src_g = channel(draw.color.g);
         const float src_b = channel(draw.color.b);
         if (src_a == 0.0f) continue;
-        for (auto y = y0; y < y1; ++y) {
+        if (draw.paint_background) for (auto y = y0; y < y1; ++y) {
             for (auto x = x0; x < x1; ++x) {
                 auto* pixel = image.pixels.data() +
                     (static_cast<std::size_t>(y) * width + x) * 4u;
@@ -141,6 +141,50 @@ UiRgbaImage rasterize_ui(
                 pixel[1] = byte(blend(src_g, 1));
                 pixel[2] = byte(blend(src_b, 2));
                 pixel[3] = byte(out_a);
+            }
+        }
+        if (!draw.text.empty()) {
+            const bool label_only = !draw.paint_background;
+            const float lum = 0.2126f * src_r + 0.7152f * src_g + 0.0722f * src_b;
+            const float ink = label_only ? 1.0f : (lum > 0.53f ? 0.04f : 1.0f);
+            const float ink_r = label_only ? src_r : ink;
+            const float ink_g = label_only ? src_g : ink;
+            const float ink_b = label_only ? src_b : ink;
+            const float ink_a = label_only ? src_a : 1.0f;
+            const int scale = (x1 - x0 >= 100u && y1 - y0 >= 20u) ? 2 : 1;
+            const auto letter_width = static_cast<std::uint32_t>(6 * scale);
+            const auto start_x = x0 + static_cast<std::uint32_t>(2 * scale);
+            const auto start_y = y0 + (y1 - y0 > static_cast<std::uint32_t>(7 * scale)
+                ? (y1 - y0 - static_cast<std::uint32_t>(7 * scale)) / 2u : 0u);
+            auto cursor = start_x;
+            for (std::size_t i = 0; i < draw.text.size() && i < 256u; ++i) {
+                if (cursor >= x1 || letter_width > x1 - cursor) break;
+                const auto glyph_bits = glyph(
+                    static_cast<unsigned char>(draw.text[i]));
+                for (int gy = 0; gy < 7; ++gy) {
+                    for (int gx = 0; gx < 5; ++gx) {
+                        if (!(glyph_bits[gy] & (1u << (4 - gx)))) continue;
+                        for (int sy = 0; sy < scale; ++sy) {
+                            for (int sx = 0; sx < scale; ++sx) {
+                                const auto x = cursor + static_cast<std::uint32_t>(gx * scale + sx);
+                                const auto y = start_y + static_cast<std::uint32_t>(gy * scale + sy);
+                                if (x >= x1 || y >= y1) continue;
+                                auto* pixel = image.pixels.data() +
+                                    (static_cast<std::size_t>(y) * width + x) * 4u;
+                                const float dst_a = pixel[3] / 255.0f;
+                                const float out_a = ink_a + dst_a * (1.0f - ink_a);
+                                for (int ch = 0; ch < 3; ++ch) {
+                                    const float dst = pixel[ch] / 255.0f;
+                                    const float source = ch == 0 ? ink_r : (ch == 1 ? ink_g : ink_b);
+                                    pixel[ch] = byte(out_a == 0.f ? 0.f :
+                                        (source * ink_a + dst * dst_a * (1.f - ink_a)) / out_a);
+                                }
+                                pixel[3] = byte(out_a);
+                            }
+                        }
+                    }
+                }
+                cursor += letter_width;
             }
         }
     }
