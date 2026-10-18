@@ -114,6 +114,10 @@ int run() {
             input.set_pointer_position(
                 static_cast<float>(pointer.x),
                 static_cast<float>(pointer.y));
+        // Route UI before managed gameplay Update so UI.WasClicked observes
+        // the current input-frame snapshot. No Canvas is valid as a no-op.
+        runtime.update_ui(static_cast<float>(window.client_width()),
+                          static_cast<float>(window.client_height()), focused);
         // The stand-alone Player World advances independently of Editor Play.
         // PlayerRuntime limits large frame stalls to eight fixed steps.
         runtime.advance(delta);
