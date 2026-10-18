@@ -66,6 +66,7 @@ void PlayerUiRuntime::reset() noexcept {
     keyboard_.reset();
     clicked_.clear();
     events_.clear();
+    images_ = {};
 }
 ui::UiLayout PlayerUiRuntime::layout(float width, float height) const {
     return canvas_ ? canvas_->layout(width, height) : ui::UiLayout{};
@@ -78,7 +79,7 @@ ui::UiRgbaImage PlayerUiRuntime::rasterize(
         canvas_->layout(static_cast<float>(width),
                         static_cast<float>(height)));
     if (draw_commands.empty()) return {};
-    return ui::rasterize_ui(draw_commands, width, height);
+    return ui::rasterize_ui(draw_commands, width, height, images_);
 }
 void PlayerUiRuntime::update(float width, float height,
                              const input::InputState& input, bool focused) {

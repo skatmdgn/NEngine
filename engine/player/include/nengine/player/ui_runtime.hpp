@@ -1,5 +1,6 @@
 #pragma once
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -28,6 +29,9 @@ public:
     ui::UiLayout layout(float width, float height) const;
     // Alpha-transparent overlay; caller composites after opaque World meshes.
     ui::UiRgbaImage rasterize(std::uint32_t width, std::uint32_t height) const;
+    void bind_image_resolver(ui::UiImageResolver resolver) {
+        images_ = std::move(resolver);
+    }
     void update(float width, float height, const input::InputState& input,
                 bool focused = true);
     ui::WidgetId find(std::string_view name) const noexcept;
@@ -41,6 +45,7 @@ public:
     }
 private:
     std::optional<ui::UiCanvas> canvas_{};
+    ui::UiImageResolver images_{};
     ui::UiPointerRouter pointer_{};
     ui::UiKeyboardRouter keyboard_{};
     std::unordered_set<ui::WidgetId> clicked_{};
