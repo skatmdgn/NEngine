@@ -399,6 +399,22 @@ int main() {
           rgba(4, 4, 0) >= 126u && rgba(4, 4, 2) >= 126u &&
           rgba(6, 6, 3) == 0u,
           "CPU UI renderer blends ordered quads and respects child clipping");
+    UiLayout ascii_layout;
+    ascii_layout.items.push_back({
+        123, WidgetKind::Text, {0.f, 0.f, 60.f, 18.f},
+        {0.f, 0.f, 60.f, 18.f}, "PLAY", true,
+        {1.f, 1.f, 1.f, 1.f}
+    });
+    const auto letters = rasterize_ui(build_ui_draw_list(ascii_layout), 60u, 18u);
+    const auto lit = std::count_if(letters.pixels.begin() + 3,
+        letters.pixels.end(),
+        [i = std::size_t{3}](std::uint8_t v) mutable {
+            const bool alpha = (i % 4u) == 3u;
+            ++i;
+            return alpha && v != 0u;
+        });
+    check(lit > 20u && letters.pixels.size() == 60u * 18u * 4u,
+          "text-only Canvas widgets render visible glyphs without background");
     check(rasterize_ui({}, 5000u, 1u).pixels.empty(),
           "rasterizer guards oversized render targets");
 
