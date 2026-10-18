@@ -147,7 +147,9 @@ int run() {
         // Rasterize the current mutable runtime Canvas after C# Update.
         // The CPU RGBA image is composited in the same Vulkan render pass
         // after World geometry rather than overlaid with a Win32 child window.
-        const auto overlay = runtime.ui().rasterize(width, height);
+        const auto overlay = runtime.ui().ready()
+            ? runtime.ui().rasterize(width, height)
+            : nengine::ui::UiRgbaImage{};
         const nengine::render::VulkanCanvasFrame overlay_view{
             overlay.width, overlay.height, overlay.pixels
         };
