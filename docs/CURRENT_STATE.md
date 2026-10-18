@@ -92,6 +92,16 @@ This is a **dependency overview**, not a complete generated dependency graph. Th
 - Portable Player integration fixtures exercise mouse and keyboard clicks, runtime mutations, invalid name and operation handling, corrupted/oversized/symlink file rejection, legacy no-Canvas reload and lossless recovery.
 - **Acceptance boundary:** These are code and automated integration checks. The Player's Canvas is not yet drawn as Vulkan UI geometry/text/images; this does **not** demonstrate visibly usable UI buttons, keyboard behavior on physical hardware, or a shippable GUI game. Windows/Ubuntu CI is required and separate from interactive device QA.
 
+## 2026-10-18 continuation: 30 Vulkan Canvas presentation slices
+
+- Added standalone Player Canvas RGBA raster frames, strict dimension/size checks and display-state regression coverage.
+- `VulkanDiagnosticScene::present_world` now accepts an optional backend-neutral RGBA Canvas overlay, uploads it as a sRGB Vulkan texture, and composites a fullscreen alpha-blended, depth-disabled quad *after* existing World MeshRenderer and SpriteRenderer draws. Camera-less UI-only scenes are also supported.
+- Static Canvas images reuse the same Vulkan texture/material descriptors when pixels and extent have not changed. Dynamic changes synchronize previous GPU use before descriptor/texture replacement. These are safe but not yet optimal for high-frequency text animation.
+- Added compact headless 5×7 **ASCII** UI font for Button labels and Text widgets, painter-ordered with clipping, contrasting label ink and no OS font dependency.
+- Added deterministic CTest checks for RGBA size contracts, visibility-to-pixels, clipped glyphs and runtime text pixels. The actual GPU present path requires manual Windows Vulkan device validation; CI cannot prove rendered appearance, swapchain behavior or performance.
+- **Limits:** Korean/CJK typography, full Unicode shaping, external font assets, actual Image widget sprites, editable fonts/layout widgets and optimized per-frame GPU upload remain separate milestones.
+- Work is on stacked PR branches; nothing is merged into `main` until explicit verified integration.
+
 ## Highest-priority next work
 
 1. **Player completion:** exported glTF/OBJ generated material/texture subassets, managed action map/property parity, and genuine Windows GPU + .NET + input acceptance.

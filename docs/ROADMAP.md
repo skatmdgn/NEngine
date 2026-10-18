@@ -269,7 +269,8 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Atomic multi-selection subtree deletion with Undo restoration
 - [x] Nested selection/drag, invalid parent and anchor preset regression coverage
 - [x] Packaged Windows Player Canvas asset loading, clipped pointer/keyboard interactions, and C# UI Find/Query/Write/Text callbacks (without Vulkan UI draw)
-- [ ] runtime Canvas-style UI (Vulkan text/image/button presentation and device acceptance remain)
+- [x] Windows Player Canvas colored panel/button UI composited over Vulkan World (including camera-less menus), with basic ASCII font labels and headless pixel regressions
+- [ ] runtime Canvas-style UI (Unicode fonts, Image widget textures, hardware Vulkan acceptance and advanced layout remain)
 - [ ] NavMesh agent/obstacle/link subset
 - [ ] particle system
 
