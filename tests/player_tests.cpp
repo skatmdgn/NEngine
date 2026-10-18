@@ -108,7 +108,7 @@ int main() {
       meta << "NENGINE_META 1\nGUID " << texture_guid.to_string()
            << "\nIMPORTER " << std::quoted(std::string("NEngine.Texture"))
            << "\nEND_META\n"; }
-    // Independent valid 2x2 top-down RGB BMP for real Canvas texture decoding.
+    // Independent valid 2x2 bottom-up RGB BMP for real Canvas texture decoding.
     const auto canvas_texture_guid = nengine::assets::AssetGuid::generate();
     {
         std::array<std::uint8_t, 70> bmp{};
@@ -118,11 +118,13 @@ int main() {
                 bmp[offset + i] = static_cast<std::uint8_t>(v >> (i * 8));
         };
         put32(2, 70); put32(10, 54); put32(14, 40);
-        put32(18, 2); put32(22, static_cast<std::uint32_t>(-2));
+        put32(18, 2); put32(22, 2);
         bmp[26] = 1; bmp[28] = 24; put32(34, 16);
         const std::array<std::uint8_t, 16> pixels{
-             0, 0,255,  0,255, 0, 0,0,
-           255, 0, 0, 255,255,255, 0,0};
+           // BMP positive-height rows are stored bottom-up, padded to 8B.
+           255, 0, 0, 255,255,255, 0,0, // bottom blue and white
+             0, 0,255,   0,255, 0, 0,0  // top red and green
+        };
         std::copy(pixels.begin(), pixels.end(), bmp.begin() + 54);
         std::ofstream file(project / "Assets" / "Textures" / "ui_color.bmp",
                            std::ios::binary);
