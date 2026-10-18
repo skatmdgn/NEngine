@@ -1026,6 +1026,12 @@ int main() {
     if (!valid_frame.valid() ||
         nengine::render::VulkanCanvasFrame{32u, 32u, {}}.valid())
         return test_failure(190, __LINE__);
+    const nengine::render::VulkanCanvasFrame invalid_extent{
+        4097u, 1u, rendered_ui.pixels};
+    const nengine::render::VulkanCanvasFrame invalid_zero{
+        0u, 0u, rendered_ui.pixels};
+    if (invalid_extent.valid() || invalid_zero.valid())
+        return test_failure(191, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto derived_material =
         nengine::assets::derive_subasset_guid(model_guid, "obj-material", 0u);
