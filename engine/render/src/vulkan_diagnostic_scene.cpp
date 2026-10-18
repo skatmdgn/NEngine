@@ -371,7 +371,8 @@ bool VulkanDiagnosticScene::present_world(
     VulkanContext& context,
     const core::World& world,
     const CachedArtifactResolver&
-        asset_resolver) {
+        asset_resolver,
+    const VulkanCanvasFrame* canvas) {
 
     if (!ready() ||
         !context.ready()) {
