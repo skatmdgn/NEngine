@@ -97,8 +97,13 @@ int PlayerUiRuntime::write(ui::WidgetId id, int operation, int value) noexcept {
     if (operation == 1) return canvas_->set_interactable(id, value != 0) ? 1 : 0;
     return -1;
 }
-std::optional<std::string> PlayerUiRuntime::get_text(ui::WidgetId) const {
-    return std::nullopt;
+std::optional<std::string> PlayerUiRuntime::get_text(ui::WidgetId id) const {
+    if (!canvas_) return std::nullopt;
+    const auto* widget = canvas_->find(id);
+    return widget ? std::optional<std::string>{widget->text} : std::nullopt;
 }
-bool PlayerUiRuntime::set_text(ui::WidgetId, std::string_view) { return false; }
+bool PlayerUiRuntime::set_text(ui::WidgetId id, std::string_view value) {
+    if (!canvas_ || value.size() > 4096u) return false;
+    return canvas_->set_text(id, std::string(value));
+}
 } // namespace nengine::player
