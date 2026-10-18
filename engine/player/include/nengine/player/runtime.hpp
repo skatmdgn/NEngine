@@ -8,6 +8,7 @@
 #include "nengine/player/bundle.hpp"
 #include "nengine/player/assets.hpp"
 #include "nengine/player/ui_runtime.hpp"
+#include "nengine/render/decoded_texture.hpp"
 #include "nengine/audio/playback.hpp"
 #include <unordered_map>
 #include <unordered_set>
@@ -64,6 +65,7 @@ public:
     const PlayerAssets& assets() const noexcept { return assets_; }
     PlayerUiRuntime& ui() noexcept { return ui_; }
     const PlayerUiRuntime& ui() const noexcept { return ui_; }
+    std::size_t cached_ui_images() const noexcept { return ui_images_.size(); }
     const audio::AudioClipData* audio_clip(assets::AssetGuid guid) const noexcept;
     double elapsed_seconds() const noexcept { return elapsed_seconds_; }
     std::size_t entity_count() const noexcept { return world_.size(); }
@@ -74,6 +76,7 @@ private:
     // Resolve newly assigned C# clip GUIDs from the immutable export bundle
     // without repeatedly attempting to decode invalid/missing assets.
     void ensure_referenced_assets();
+    const ui::UiRgbaImage* resolve_ui_image(assets::AssetGuid guid);
     std::unordered_set<assets::AssetGuid, assets::AssetGuidHash>
         missing_audio_clips_{};
     std::unordered_set<assets::AssetGuid, assets::AssetGuidHash>
@@ -91,6 +94,10 @@ private:
     input::ActionMap actions_{};
     PlayerAssets assets_{};
     PlayerUiRuntime ui_{};
+    std::unordered_map<assets::AssetGuid, ui::UiRgbaImage,
+        assets::AssetGuidHash> ui_images_{};
+    std::unordered_set<assets::AssetGuid, assets::AssetGuidHash>
+        missing_ui_images_{};
     BundleManifest manifest_{};
     bool ready_{false};
     bool paused_{false};
