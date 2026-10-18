@@ -79,6 +79,8 @@ void PlayerUiRuntime::update(float width, float height,
         keyboard_.reset();
         return;
     }
+    // The same clipped/visibility-aware hit test is shared with Editor
+    // Play Mode. UI clicks are ephemeral; a held button never repeats clicks.
     const auto visible = canvas_->layout(width, height);
     events_ = pointer_.update(visible, input);
     for (const auto& event : events_) {
