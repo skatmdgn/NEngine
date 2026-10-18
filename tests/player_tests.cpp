@@ -16,6 +16,7 @@
 #include "nengine/core/scene.hpp"
 #include "nengine/render/components.hpp"
 #include "nengine/render/model_importer.hpp"
+#include "nengine/ui/canvas_serialization.hpp"
 #include "nengine/render/material_asset.hpp"
 #include "nengine/render/asset_resources.hpp"
 #include "nengine/render/decoded_texture.hpp"
@@ -175,6 +176,20 @@ int main() {
            << "\nIMPORTER \"NEngine.SpriteAnimation\"\nEND_META\n"; }
     { std::ofstream file(project / "Assets" / "Textures" / "ignore.cs");
       file << "do not ship source code"; }
+    // A conventional Canvas source becomes part of the Player bundle.
+    std::filesystem::create_directories(project / "Assets" / "UI");
+    nengine::ui::UiCanvas canvas_fixture;
+    const auto canvas_button = canvas_fixture.add(nengine::ui::WidgetKind::Button);
+    if (canvas_button == nengine::ui::invalid_widget ||
+        !canvas_fixture.set_name(canvas_button, "PlayButton") ||
+        !canvas_fixture.set_text(canvas_button, "Play")) return test_failure(170, __LINE__);
+    { std::ofstream out(project / "Assets" / "UI" / "Main.ncanvas");
+      if (!nengine::ui::write_canvas(out, canvas_fixture, &error))
+          return test_failure(171, __LINE__); }
+    const auto canvas_guid = nengine::assets::AssetGuid::generate();
+    { std::ofstream meta(project / "Assets" / "UI" / "Main.ncanvas.meta");
+      meta << "NENGINE_META 1\nGUID " << canvas_guid.to_string()
+           << "\nIMPORTER \"NEngine.Canvas\"\nEND_META\n"; }
     nengine::input::ActionMap exported_actions;
     if (!exported_actions.bind("Jump", nengine::input::Key::Space) ||
         !exported_actions.bind("Jump", nengine::input::Key::A) ||
