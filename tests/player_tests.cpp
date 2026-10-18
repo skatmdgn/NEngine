@@ -921,6 +921,16 @@ int main() {
     runtime.update_ui(640.f, 480.f);
     if (runtime.ui().query(ui_button, 2) != 0)
         return test_failure(176, __LINE__);
+    // Press while focused, then lose focus: a stale capture must never Click.
+    runtime.input().begin_frame();
+    runtime.input().set_key(nengine::input::Key::MouseLeft, true);
+    runtime.update_ui(640.f, 480.f);
+    runtime.update_ui(640.f, 480.f, false);
+    runtime.input().begin_frame();
+    runtime.input().set_key(nengine::input::Key::MouseLeft, false);
+    runtime.update_ui(640.f, 480.f);
+    if (runtime.ui().query(ui_button, 2) != 0)
+        return test_failure(177, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto derived_material =
         nengine::assets::derive_subasset_guid(model_guid, "obj-material", 0u);
