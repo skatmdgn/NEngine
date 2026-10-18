@@ -1089,6 +1089,11 @@ int main() {
         !runtime.ui().rasterize(128u, 128u).pixels.empty() ||
         runtime.ui().write(ui_button, 0, 1) != 1)
         return test_failure(195, __LINE__);
+    if (runtime.ui().find("Logo") != canvas_image ||
+        !runtime.ui().canvas()->find(canvas_image)->image_texture.valid() ||
+        runtime.ui().canvas()->find(canvas_image)->image_texture !=
+            canvas_texture_guid)
+        return test_failure(197, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto derived_material =
         nengine::assets::derive_subasset_guid(model_guid, "obj-material", 0u);
