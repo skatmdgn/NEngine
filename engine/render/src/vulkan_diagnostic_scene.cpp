@@ -881,6 +881,28 @@ bool VulkanDiagnosticScene::present_world(
         }
     }
 
+    // UI is screen space and must draw after all opaque and transparent
+    // World meshes/sprites, using the pre-existing depth-disabled alpha
+    // pipeline. The fullscreen textured quad covers the swapchain extent.
+    if (canvas) {
+        bool ui_visible = false;
+        if (!prepare_canvas(context, *canvas, ui_visible)) return false;
+        if (ui_visible) {
+            const auto* screen_quad =
+                mesh_cache_.find(builtin_unit_quad_mesh_guid());
+            if (!screen_quad) {
+                diagnostic_ = "Fullscreen Canvas quad is unavailable";
+                return false;
+            }
+            auto screen = Mat4::identity();
+            screen.at(0, 0) = 2.f;
+            screen.at(1, 1) = 2.f;
+            draws.push_back({
+                &sprite_pipeline_, screen_quad, screen,
+                &canvas_material_, 0u, 0u
+            });
+        }
+    }
     if (draws.empty()) {
         if (!context.present_clear(
                 0.08f,
