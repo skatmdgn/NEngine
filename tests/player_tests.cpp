@@ -207,6 +207,14 @@ int main() {
     if (canvas_button == nengine::ui::invalid_widget ||
         !canvas_fixture.set_name(canvas_button, "PlayButton") ||
         !canvas_fixture.set_text(canvas_button, "Play")) return test_failure(170, __LINE__);
+    const auto canvas_image = canvas_fixture.add(nengine::ui::WidgetKind::Image);
+    if (!canvas_fixture.set_name(canvas_image, "Logo") ||
+        !canvas_fixture.set_image_texture(canvas_image, canvas_texture_guid) ||
+        !canvas_fixture.set_visible(canvas_image, false))
+        return test_failure(196, __LINE__);
+    auto* logo_node = canvas_fixture.find(canvas_image);
+    logo_node->anchors.offset_min = {40.f, 0.f};
+    logo_node->anchors.offset_max = {42.f, 2.f};
     { std::ofstream out(project / "Assets" / "UI" / "Main.ncanvas");
       if (!nengine::ui::write_canvas(out, canvas_fixture, &error))
           return test_failure(171, __LINE__); }
