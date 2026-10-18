@@ -423,6 +423,11 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
     actions_ = std::move(next_actions);
     assets_ = std::move(catalog);
     ui_ = std::move(next_ui);
+    ui_images_.clear();
+    missing_ui_images_.clear();
+    ui_.bind_image_resolver([this](assets::AssetGuid id) {
+        return resolve_ui_image(id);
+    });
     audio_clips_ = std::move(next_clips);
     sprite_clips_ = std::move(next_sprites);
     missing_audio_clips_.clear();
