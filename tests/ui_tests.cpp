@@ -243,6 +243,18 @@ int main() {
           image_readback.find(textured_widget)->image_texture == texture_id &&
           image_readback.layout(200.f, 200.f).items[0].image_texture == texture_id,
           "versioned Canvas v3 roundtrips image GUID through layout");
+    const auto v3 = image_v3.str();
+    const auto image_entry = texture_id.to_string();
+    const auto malformed_offset = v3.find(image_entry);
+    auto malformed_v3 = v3;
+    if (malformed_offset != std::string::npos)
+        malformed_v3.replace(malformed_offset, image_entry.size(), "../unsafe");
+    std::stringstream broken_image(malformed_v3);
+    UiCanvas unchanged_image = image_readback;
+    check(!read_canvas(broken_image, image_readback) &&
+          image_readback.find(textured_widget)->image_texture ==
+              unchanged_image.find(textured_widget)->image_texture,
+          "malformed v3 image GUID cannot replace existing Canvas");
     auto clone_named = named.duplicate_subtree(named_button);
     check(clone_named != invalid_widget &&
           named.find(clone_named)->name.empty(),
