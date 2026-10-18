@@ -523,6 +523,24 @@ int main() {
                 glyph_escaped = true;
     check(!glyph_escaped,
           "ASCII Canvas text glyphs cannot escape clipped UI widget bounds");
+    UiLayout utf8_layout;
+    utf8_layout.items.push_back({
+        127u, WidgetKind::Text, {0.f, 0.f, 18.f, 10.f},
+        {0.f, 0.f, 18.f, 10.f}, "\xED\x95\x9C", true,
+        {1.f, 1.f, 1.f, 1.f}
+    });
+    const auto korean_fallback = rasterize_ui(
+        build_ui_draw_list(utf8_layout), 18u, 10u);
+    utf8_layout.items[0].text = "?";
+    const auto question = rasterize_ui(
+        build_ui_draw_list(utf8_layout), 18u, 10u);
+    check(korean_fallback.pixels == question.pixels,
+          "missing Korean glyph substitutes one visible placeholder per codepoint");
+    utf8_layout.items[0].text = std::string("\xC0\xAF", 2);
+    const auto invalid_utf8 = rasterize_ui(
+        build_ui_draw_list(utf8_layout), 18u, 10u);
+    check(invalid_utf8.pixels.size() == 18u * 10u * 4u,
+          "malformed UTF-8 safely renders bounded replacement glyphs");
     check(rasterize_ui({}, 5000u, 1u).pixels.empty(),
           "rasterizer guards oversized render targets");
 
