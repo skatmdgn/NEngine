@@ -897,6 +897,13 @@ int main() {
     if (!runtime.world().destroy(bridge_entity) ||
         !runtime.world().destroy(render_entity))
         return test_failure(113, __LINE__);
+    const auto ui_button = runtime.ui().find("PlayButton");
+    if (!runtime.ui().ready() || ui_button != canvas_button ||
+        runtime.ui().query(ui_button, 0) != 1 ||
+        runtime.ui().query(ui_button, 1) != 1 ||
+        runtime.ui().get_text(ui_button) != std::optional<std::string>{"Play"} ||
+        runtime.ui().find("Play") != canvas_button)
+        return test_failure(173, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto derived_material =
         nengine::assets::derive_subasset_guid(model_guid, "obj-material", 0u);
