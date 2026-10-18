@@ -79,7 +79,7 @@ bool read_canvas(
     unsigned version = 0u;
     std::size_t count = 0u;
     if (!(input >> tag >> version) || tag != "NENGINE_CANVAS" ||
-        (version != 1u && version != 2u) ||
+        (version != 1u && version != 2u && version != 3u) ||
         !(input >> tag >> count) ||
         tag != "WIDGETS" || count > 8192u)
         return fail(error, "invalid Canvas header or widget count");
@@ -112,6 +112,19 @@ bool read_canvas(
             return fail(error, "malformed Canvas WIDGET record");
         if (version >= 2u && !(fields >> std::quoted(node.name)))
             return fail(error, "malformed Canvas widget name");
+        if (version >= 3u) {
+            std::string image_guid;
+            if (!(fields >> std::quoted(image_guid)) ||
+                (kind != static_cast<unsigned>(WidgetKind::Image) &&
+                 !image_guid.empty()))
+                return fail(error, "invalid Canvas image texture field");
+            if (!image_guid.empty()) {
+                const auto parsed = assets::AssetGuid::parse(image_guid);
+                if (!parsed || !parsed->valid())
+                    return fail(error, "invalid Canvas image GUID");
+                node.image_texture = *parsed;
+            }
+        }
         if (!(fields >> a.anchor_min.x >> a.anchor_min.y >>
                 a.anchor_max.x >> a.anchor_max.y >>
                 a.offset_min.x >> a.offset_min.y >>
