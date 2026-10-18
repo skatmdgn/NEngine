@@ -957,6 +957,25 @@ int main() {
         runtime.ui().set_text(ui_button, std::string(4097, 'x')) ||
         runtime.ui().find("missing") != nengine::ui::invalid_widget)
         return test_failure(179, __LINE__);
+    // A malformed source may not replace an already-running Canvas or World.
+    const auto player_canvas_path = report.bundle_root /
+        "Content" / "Assets" / "UI" / "Main.ncanvas";
+    std::string saved_canvas;
+    { std::ifstream in(player_canvas_path, std::ios::binary);
+      saved_canvas.assign(std::istreambuf_iterator<char>(in),
+                          std::istreambuf_iterator<char>()); }
+    { std::ofstream out(player_canvas_path, std::ios::binary | std::ios::trunc);
+      out << "NENGINE_CANVAS 99\n"; }
+    if (runtime.load(report.bundle_root, &error) ||
+        runtime.ui().get_text(ui_button) != std::optional<std::string>{"Start!"} ||
+        runtime.entity_count() != 2u)
+        return test_failure(180, __LINE__);
+    { std::ofstream out(player_canvas_path, std::ios::binary | std::ios::trunc);
+      out << saved_canvas; }
+    if (!runtime.load(report.bundle_root, &error) ||
+        !runtime.ui().ready() ||
+        runtime.ui().get_text(ui_button) != std::optional<std::string>{"Play"})
+        return test_failure(181, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto derived_material =
         nengine::assets::derive_subasset_guid(model_guid, "obj-material", 0u);
