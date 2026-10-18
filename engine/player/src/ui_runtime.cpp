@@ -105,6 +105,7 @@ void PlayerUiRuntime::update(float width, float height,
 ui::WidgetId PlayerUiRuntime::find(std::string_view name) const noexcept {
     if (!canvas_ || name.empty() || name.size() > 256u)
         return ui::invalid_widget;
+    if (name.find('\0') != std::string_view::npos) return ui::invalid_widget;
     const auto named = canvas_->find_by_name(name);
     if (named != ui::invalid_widget) return named;
     return canvas_->find_by_text(name);
