@@ -216,10 +216,10 @@ int main() {
     std::stringstream named_stream;
     UiCanvas named_restore;
     check(write_canvas(named_stream, named) &&
-          named_stream.str().find("NENGINE_CANVAS 2") == 0 &&
+          named_stream.str().find("NENGINE_CANVAS 3") == 0 &&
           read_canvas(named_stream, named_restore) &&
           named_restore.find(named_button)->name == "Main.Start",
-          "Canvas v2 serializes stable script names separately from visible text");
+          "Canvas v3 retains stable script names alongside optional image identity");
     std::stringstream legacy_source(
         "NENGINE_CANVAS 1\nWIDGETS 1\n"
         "WIDGET 7 0 3 1 1 0 \"Legacy\" 0 0 0 0 0 0 100 30 1 1 1 1\n"
@@ -229,6 +229,20 @@ int main() {
           legacy_restore.find(7u)->name.empty() &&
           legacy_restore.find(7u)->text == "Legacy",
           "Canvas v1 sources remain readable without names");
+    UiCanvas image_authoring;
+    const auto textured_widget = image_authoring.add(WidgetKind::Image);
+    const auto non_image_widget = image_authoring.add(WidgetKind::Button);
+    const auto texture_id = nengine::assets::AssetGuid::generate();
+    check(image_authoring.set_image_texture(textured_widget, texture_id) &&
+          !image_authoring.set_image_texture(non_image_widget, texture_id),
+          "Canvas Image assets cannot be assigned to other widget kinds");
+    std::stringstream image_v3;
+    UiCanvas image_readback;
+    check(write_canvas(image_v3, image_authoring) &&
+          read_canvas(image_v3, image_readback) &&
+          image_readback.find(textured_widget)->image_texture == texture_id &&
+          image_readback.layout(200.f, 200.f).items[0].image_texture == texture_id,
+          "versioned Canvas v3 roundtrips image GUID through layout");
     auto clone_named = named.duplicate_subtree(named_button);
     check(clone_named != invalid_widget &&
           named.find(clone_named)->name.empty(),
