@@ -465,6 +465,20 @@ int main() {
           tinted_pixels.pixels[4+1] >= 126u &&
           tinted_pixels.pixels[4+1] <= 129u,
           "Canvas image sampling multiplies asset color and alpha by Image tint");
+    UiDrawQuad clipped_texture_quad{};
+    clipped_texture_quad.widget = 126u;
+    clipped_texture_quad.rect = {1.f, 0.f, 1.f, 2.f};
+    clipped_texture_quad.source_rect = {0.f, 0.f, 2.f, 2.f};
+    clipped_texture_quad.color = {1.f, 1.f, 1.f, 1.f};
+    clipped_texture_quad.image_texture = test_texture_guid;
+    const auto clipped_texels = rasterize_ui({clipped_texture_quad}, 2u, 2u,
+        [&](nengine::assets::AssetGuid) -> const UiRgbaImage* {
+            return &checker;
+        });
+    check(clipped_texels.pixels[3] == 0u &&
+          clipped_texels.pixels[4u + 1u] == 255u &&
+          clipped_texels.pixels[12u + 0u] == 255u,
+          "clipped Image samples correct UV from full untrimmed widget rectangle");
     UiLayout ascii_layout;
     ascii_layout.items.push_back({
         123, WidgetKind::Text, {0.f, 0.f, 60.f, 18.f},
