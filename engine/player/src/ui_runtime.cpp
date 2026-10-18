@@ -91,7 +91,12 @@ int PlayerUiRuntime::query(ui::WidgetId id, int operation) const noexcept {
         default: return -1;
     }
 }
-int PlayerUiRuntime::write(ui::WidgetId, int, int) noexcept { return -1; }
+int PlayerUiRuntime::write(ui::WidgetId id, int operation, int value) noexcept {
+    if (!canvas_ || value < 0 || value > 1 || !canvas_->find(id)) return -1;
+    if (operation == 0) return canvas_->set_visible(id, value != 0) ? 1 : 0;
+    if (operation == 1) return canvas_->set_interactable(id, value != 0) ? 1 : 0;
+    return -1;
+}
 std::optional<std::string> PlayerUiRuntime::get_text(ui::WidgetId) const {
     return std::nullopt;
 }
