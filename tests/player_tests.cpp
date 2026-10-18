@@ -16,6 +16,7 @@
 #include "nengine/core/scene.hpp"
 #include "nengine/render/components.hpp"
 #include "nengine/render/model_importer.hpp"
+#include "nengine/render/vulkan_diagnostic_scene.hpp"
 #include "nengine/ui/canvas_serialization.hpp"
 #include "nengine/render/material_asset.hpp"
 #include "nengine/render/asset_resources.hpp"
@@ -1019,6 +1020,12 @@ int main() {
         runtime.ui().rasterize(32u, 32u).pixels[3] != 0u ||
         runtime.ui().write(ui_button, 0, 1) != 1)
         return test_failure(189, __LINE__);
+    // GPU-side frame contract can be validated even on headless CI runners.
+    const nengine::render::VulkanCanvasFrame valid_frame{
+        rendered_ui.width, rendered_ui.height, rendered_ui.pixels};
+    if (!valid_frame.valid() ||
+        nengine::render::VulkanCanvasFrame{32u, 32u, {}}.valid())
+        return test_failure(190, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto derived_material =
         nengine::assets::derive_subasset_guid(model_guid, "obj-material", 0u);
