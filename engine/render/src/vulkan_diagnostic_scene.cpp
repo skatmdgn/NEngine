@@ -1010,10 +1010,14 @@ bool VulkanDiagnosticScene::prepare_canvas(
         diagnostic_ = "Canvas overlay frame has invalid dimensions or RGBA byte count";
         return false;
     }
-    visible = std::any_of(frame.rgba.begin(), frame.rgba.end(),
-        [index = std::size_t{0}](std::uint8_t value) mutable {
-            return (index++ & 3u) == 3u && value != 0u;
-        });
+    // Only nonzero alpha makes overlay visible; zero-alpha RGB garbage
+    // must not cause a descriptor upload or occlude the World.
+    for (std::size_t i = 3u; i < frame.rgba.size(); i += 4u) {
+        if (frame.rgba[i] != 0u) {
+            visible = true;
+            break;
+        }
+    }
     if (!visible) return true;
     if (canvas_texture_.valid() && canvas_material_.valid() &&
         last_canvas_width_ == frame.width &&
