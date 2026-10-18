@@ -501,6 +501,16 @@ int main() {
           merged.pixels[2] >= 126u && merged.pixels[2] <= 129u &&
           merged.pixels[3] == 255u,
           "alpha-blended textured Canvas Image composites over opaque Panel");
+    UiRgbaImage broken_texture{2049u,1u,{255u,0u,0u,255u}};
+    const auto safe_placeholder = rasterize_ui(
+        build_ui_draw_list(texture_paint.layout(2.f,2.f)), 2u,2u,
+        [&](nengine::assets::AssetGuid) -> const UiRgbaImage* {
+            return &broken_texture;
+        });
+    const auto untinted_placeholder = rasterize_ui(
+        build_ui_draw_list(texture_paint.layout(2.f,2.f)), 2u,2u);
+    check(safe_placeholder.pixels == untinted_placeholder.pixels,
+          "malformed or oversized RGBA resource cannot cause out-of-bounds sample");
     UiLayout ascii_layout;
     ascii_layout.items.push_back({
         123, WidgetKind::Text, {0.f, 0.f, 60.f, 18.f},
