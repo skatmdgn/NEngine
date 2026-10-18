@@ -11,7 +11,12 @@ bool PlayerUiRuntime::load(const std::filesystem::path& bundle_root, std::string
     std::error_code ec;
     const auto status = std::filesystem::symlink_status(canvas_path, ec);
     if (ec == std::errc::no_such_file_or_directory) ec.clear();
-    if (ec || std::filesystem::is_symlink(status)) {
+    const auto assets_dir = content / "Assets";
+    const auto ui_dir = assets_dir / "UI";
+    if (std::filesystem::is_symlink(content, ec) ||
+        std::filesystem::is_symlink(assets_dir, ec) ||
+        std::filesystem::is_symlink(ui_dir, ec) ||
+        ec || std::filesystem::is_symlink(status)) {
         if (error) *error = "Player Canvas source is unsafe";
         return false;
     }
@@ -19,6 +24,20 @@ bool PlayerUiRuntime::load(const std::filesystem::path& bundle_root, std::string
         reset();
         if (error) error->clear();
         return true;
+    }
+    if (!std::filesystem::is_regular_file(canvas_path, ec) || ec ||
+        std::filesystem::file_size(canvas_path, ec) > 4u * 1024u * 1024u || ec) {
+        if (error) *error = "Player Canvas exceeds 4MiB or is not a regular file";
+        return false;
+    }
+    const auto bundle = std::filesystem::canonical(bundle_root, ec);
+    if (ec) return false;
+    const auto file = std::filesystem::canonical(canvas_path, ec);
+    const auto relative = file.lexically_relative(bundle);
+    if (ec || relative.empty() || relative.is_absolute() ||
+        *relative.begin() == "..") {
+        if (error) *error = "Player Canvas escapes bundle root";
+        return false;
     }
     reset();
     if (error) error->clear();
