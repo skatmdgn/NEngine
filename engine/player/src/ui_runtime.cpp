@@ -69,9 +69,24 @@ void PlayerUiRuntime::reset() noexcept {
 ui::UiLayout PlayerUiRuntime::layout(float width, float height) const {
     return canvas_ ? canvas_->layout(width, height) : ui::UiLayout{};
 }
-void PlayerUiRuntime::update(float, float, const input::InputState&, bool) {
+void PlayerUiRuntime::update(float width, float height,
+                             const input::InputState& input, bool focused) {
     clicked_.clear();
     events_.clear();
+    if (!canvas_ || !std::isfinite(width) || !std::isfinite(height) ||
+        width <= 0.f || height <= 0.f || !focused) {
+        pointer_.cancel_capture();
+        keyboard_.reset();
+        return;
+    }
+    const auto visible = canvas_->layout(width, height);
+    events_ = pointer_.update(visible, input);
+    for (const auto& event : events_) {
+        if (event.type == ui::UiPointerEventType::Down)
+            keyboard_.set_focus(visible, event.target);
+        if (event.type == ui::UiPointerEventType::Click)
+            clicked_.insert(event.target);
+    }
 }
 ui::WidgetId PlayerUiRuntime::find(std::string_view name) const noexcept {
     if (!canvas_ || name.empty() || name.size() > 256u)
