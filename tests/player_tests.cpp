@@ -1032,6 +1032,18 @@ int main() {
         0u, 0u, rendered_ui.pixels};
     if (invalid_extent.valid() || invalid_zero.valid())
         return test_failure(191, __LINE__);
+    // The same game Canvas state is the source for input and presentation;
+    // moving or hiding widgets must deterministically change output pixels.
+    const auto baseline_ui = runtime.ui().rasterize(16u, 16u);
+    if (baseline_ui.pixels.size() != 16u * 16u * 4u ||
+        baseline_ui.pixels[3] != 255u ||
+        runtime.ui().write(ui_button, 0, 0) != 1)
+        return test_failure(192, __LINE__);
+    const auto transparent_ui = runtime.ui().rasterize(16u, 16u);
+    if (transparent_ui.pixels.size() != baseline_ui.pixels.size() ||
+        transparent_ui.pixels[3] != 0u ||
+        runtime.ui().write(ui_button, 0, 1) != 1)
+        return test_failure(193, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto derived_material =
         nengine::assets::derive_subasset_guid(model_guid, "obj-material", 0u);
