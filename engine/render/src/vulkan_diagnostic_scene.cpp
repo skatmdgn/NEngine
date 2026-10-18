@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <span>
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -43,6 +44,13 @@ select_material_pipeline(
 }
 
 } // namespace
+
+bool VulkanCanvasFrame::valid() const noexcept {
+    constexpr std::uint32_t max_dimension = 4096u;
+    return width > 0u && height > 0u &&
+        width <= max_dimension && height <= max_dimension &&
+        rgba.size() == static_cast<std::size_t>(width) * height * 4u;
+}
 
 VulkanDiagnosticScene::~VulkanDiagnosticScene() {
     shutdown();
