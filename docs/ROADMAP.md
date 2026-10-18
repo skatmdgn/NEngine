@@ -270,7 +270,9 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Nested selection/drag, invalid parent and anchor preset regression coverage
 - [x] Packaged Windows Player Canvas asset loading, clipped pointer/keyboard interactions, and C# UI Find/Query/Write/Text callbacks (without Vulkan UI draw)
 - [x] Windows Player Canvas colored panel/button UI composited over Vulkan World (including camera-less menus), with basic ASCII font labels and headless pixel regressions
-- [ ] runtime Canvas-style UI (Unicode fonts, Image widget textures, hardware Vulkan acceptance and advanced layout remain)
+- [x] Canvas v3 Image AssetGuid source serialization, Player PNG/JPEG/BMP/TGA texture resolver, UV clipping, alpha/tint CPU compositor and exported BMP integration tests
+- [x] UTF-8 scalar-safe built-in text fallback, without false claims of actual Korean glyph coverage
+- [ ] runtime Canvas-style UI (Korean/Unicode font glyphs and shaping, GPU hardware acceptance and advanced layout remain)
 - [ ] NavMesh agent/obstacle/link subset
 - [ ] particle system
 

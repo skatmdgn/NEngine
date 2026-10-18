@@ -102,6 +102,15 @@ This is a **dependency overview**, not a complete generated dependency graph. Th
 - **Limits:** Korean/CJK typography, full Unicode shaping, external font assets, actual Image widget sprites, editable fonts/layout widgets and optimized per-frame GPU upload remain separate milestones.
 - Work is on stacked PR branches; nothing is merged into `main` until explicit verified integration.
 
+## 2026-10-19 continuation: 30 Canvas Image asset and UTF-8 safety slices
+
+- Canvas format v3 persists optional `Image.image_texture` AssetGuid; old v1/v2 sources still load and untextured Image widgets retain solid-color fallback. Image GUIDs are accepted only on Image widgets, with transactional validation on read.
+- UI paint commands retain unclipped UV rectangles and texture GUIDs. CPU compositing nearest-samples RGBA8 from bundled images, respecting clipping, painter order, RGBA tint, transparency and solid placeholders for unsupported GUIDs.
+- Standalone Player now lazily resolves exported texture AssetGuids through `PlayerAssets`, the regular texture resolver and decoder, memoizing bounded successful and failed lookups and resetting caches on bundle reload/unload. Integration fixture exports a real 2×2 BMP and verifies the presented pixel colors.
+- Built-in 5×7 font walks UTF-8 by validated Unicode scalars instead of raw bytes, but **does not contain Korean glyphs**: non-ASCII characters currently draw one '?' fallback per codepoint. Real Korean typography requires font atlas/shaping development.
+- **Acceptance:** New source/tests require final Windows/Ubuntu CI. Neither CTest nor CPU RGBA verification constitutes a real Vulkan GPU/display/performance acceptance.
+- **Outstanding:** Editor Image GUID authoring inspector, runtime C# Image.texture setter/getter, Unicode font assets, configurable sampling/9-slice and physical GPU QA.
+
 ## Highest-priority next work
 
 1. **Player completion:** exported glTF/OBJ generated material/texture subassets, managed action map/property parity, and genuine Windows GPU + .NET + input acceptance.
