@@ -986,6 +986,18 @@ int main() {
     std::filesystem::rename(backup_canvas_path, player_canvas_path);
     if (!runtime.load(report.bundle_root, &error) || !runtime.ui().ready())
         return test_failure(183, __LINE__);
+    // A symlinked Canvas file cannot redirect Player UI reads outside Content.
+    std::filesystem::rename(player_canvas_path, backup_canvas_path);
+    std::error_code symlink_error;
+    std::filesystem::create_symlink(
+        backup_canvas_path, player_canvas_path, symlink_error);
+    if (!symlink_error) {
+        if (runtime.load(report.bundle_root, &error) ||
+            !runtime.ui().ready())
+            return test_failure(184, __LINE__);
+        std::filesystem::remove(player_canvas_path);
+    }
+    std::filesystem::rename(backup_canvas_path, player_canvas_path);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto derived_material =
         nengine::assets::derive_subasset_guid(model_guid, "obj-material", 0u);
