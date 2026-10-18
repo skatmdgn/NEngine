@@ -998,6 +998,15 @@ int main() {
         std::filesystem::remove(player_canvas_path);
     }
     std::filesystem::rename(backup_canvas_path, player_canvas_path);
+    // A source larger than 4MiB is refused before deserialization.
+    { std::ofstream large(player_canvas_path, std::ios::binary | std::ios::trunc);
+      large << std::string(4u * 1024u * 1024u + 1u, 'x'); }
+    if (runtime.load(report.bundle_root, &error) || !runtime.ui().ready())
+        return test_failure(185, __LINE__);
+    { std::ofstream restored(player_canvas_path, std::ios::binary | std::ios::trunc);
+      restored << saved_canvas; }
+    if (!runtime.load(report.bundle_root, &error) || !runtime.ui().ready())
+        return test_failure(186, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto derived_material =
         nengine::assets::derive_subasset_guid(model_guid, "obj-material", 0u);
