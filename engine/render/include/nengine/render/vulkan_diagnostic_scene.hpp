@@ -2,6 +2,9 @@
 
 #include <functional>
 #include <optional>
+#include <span>
+#include <vector>
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 
@@ -23,6 +26,15 @@ using CachedArtifactResolver =
     std::function<
         std::optional<assets::CachedArtifactSet>(
             assets::AssetGuid)>;
+
+// A straight-alpha CPU Canvas overlay, composited after World geometry.
+// Pixels are row-major RGBA8 in a top-left-origin viewport.
+struct VulkanCanvasFrame {
+    std::uint32_t width{0};
+    std::uint32_t height{0};
+    std::span<const std::uint8_t> rgba{};
+    bool valid() const noexcept;
+};
 
 class VulkanDiagnosticScene {
 public:
@@ -47,7 +59,8 @@ public:
         VulkanContext& context,
         const core::World& world,
         const CachedArtifactResolver&
-            asset_resolver = {});
+            asset_resolver = {},
+        const VulkanCanvasFrame* canvas = nullptr);
 
     void invalidate_imported_assets() noexcept {
         imported_mesh_cache_.clear();
