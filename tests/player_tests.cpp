@@ -976,6 +976,16 @@ int main() {
         !runtime.ui().ready() ||
         runtime.ui().get_text(ui_button) != std::optional<std::string>{"Play"})
         return test_failure(181, __LINE__);
+    // Legacy Player bundles intentionally omit Canvas. Removing the
+    // optional UI source must reset both interaction and clicked snapshots.
+    const auto backup_canvas_path = player_canvas_path.string() + ".backup";
+    std::filesystem::rename(player_canvas_path, backup_canvas_path);
+    if (!runtime.load(report.bundle_root, &error) || runtime.ui().ready() ||
+        runtime.ui().find("PlayButton") != nengine::ui::invalid_widget)
+        return test_failure(182, __LINE__);
+    std::filesystem::rename(backup_canvas_path, player_canvas_path);
+    if (!runtime.load(report.bundle_root, &error) || !runtime.ui().ready())
+        return test_failure(183, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto derived_material =
         nengine::assets::derive_subasset_guid(model_guid, "obj-material", 0u);
