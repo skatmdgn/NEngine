@@ -32,7 +32,7 @@ bool write_canvas(
 
     std::ostringstream staged;
     staged << std::setprecision(std::numeric_limits<float>::max_digits10);
-    staged << "NENGINE_CANVAS 2\nWIDGETS " << canvas.widgets().size() << '\n';
+    staged << "NENGINE_CANVAS 3\nWIDGETS " << canvas.widgets().size() << '\n';
     std::unordered_set<WidgetId> written;
     std::unordered_set<std::string> names;
     for (const auto& node : canvas.widgets()) {
@@ -44,6 +44,7 @@ bool write_canvas(
             !finite_widget(node) ||
             !valid_widget_name(node.name) ||
             node.text.size() > 4096u ||
+            (node.kind != WidgetKind::Image && node.image_texture.valid()) ||
             (!node.name.empty() && !names.insert(node.name).second))
             return fail(error, "cannot serialize invalid Canvas hierarchy");
 
@@ -56,6 +57,8 @@ bool write_canvas(
                << (node.clip_children ? 1 : 0) << ' '
                << std::quoted(node.text) << ' '
                << std::quoted(node.name) << ' '
+               << std::quoted(node.image_texture.valid()
+                    ? node.image_texture.to_string() : std::string{}) << ' '
                << a.anchor_min.x << ' ' << a.anchor_min.y << ' '
                << a.anchor_max.x << ' ' << a.anchor_max.y << ' '
                << a.offset_min.x << ' ' << a.offset_min.y << ' '
