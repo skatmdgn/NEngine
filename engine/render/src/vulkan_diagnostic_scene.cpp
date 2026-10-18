@@ -958,6 +958,50 @@ bool VulkanDiagnosticScene::present_world(
     return true;
 }
 
+bool VulkanDiagnosticScene::prepare_canvas(
+    VulkanContext& context, const VulkanCanvasFrame& frame,
+    bool& visible) {
+    visible = false;
+    if (!frame.valid()) {
+        diagnostic_ = "Canvas overlay frame has invalid dimensions or RGBA byte count";
+        return false;
+    }
+    visible = std::any_of(frame.rgba.begin(), frame.rgba.end(),
+        [index = std::size_t{0}](std::uint8_t value) mutable {
+            return (index++ & 3u) == 3u && value != 0u;
+        });
+    if (!visible) return true;
+    if (canvas_texture_.valid() && canvas_material_.valid() &&
+        last_canvas_width_ == frame.width &&
+        last_canvas_height_ == frame.height &&
+        std::equal(frame.rgba.begin(), frame.rgba.end(),
+                   last_canvas_pixels_.begin(), last_canvas_pixels_.end()))
+        return true;
+    // Imported UI texture changes may happen every game frame. Rebuild only
+    // on different pixels or dimensions; destroy dependent descriptor first.
+    canvas_material_.destroy();
+    canvas_texture_.destroy();
+    last_canvas_pixels_.clear();
+    if (!canvas_texture_.create_rgba8(
+            context.loader(), context.instance(), context.device(),
+            frame.width, frame.height, frame.rgba.data(), frame.rgba.size(),
+            VulkanTextureColorSpace::SRgb)) {
+        diagnostic_ = "Canvas Vulkan texture upload failed: " +
+                      canvas_texture_.diagnostic();
+        return false;
+    }
+    if (!canvas_material_.create_textured(context.device(), canvas_texture_)) {
+        diagnostic_ = "Canvas Vulkan material descriptor failed: " +
+                      canvas_material_.diagnostic();
+        canvas_texture_.destroy();
+        return false;
+    }
+    last_canvas_pixels_.assign(frame.rgba.begin(), frame.rgba.end());
+    last_canvas_width_ = frame.width;
+    last_canvas_height_ = frame.height;
+    return true;
+}
+
 void VulkanDiagnosticScene::shutdown() noexcept {
     canvas_material_.destroy();
     canvas_texture_.destroy();
