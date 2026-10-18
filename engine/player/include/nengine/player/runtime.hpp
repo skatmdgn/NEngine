@@ -67,8 +67,8 @@ public:
     const audio::AudioClipData* audio_clip(assets::AssetGuid guid) const noexcept;
     double elapsed_seconds() const noexcept { return elapsed_seconds_; }
     std::size_t entity_count() const noexcept { return world_.size(); }
-    // Managed gameplay isn't yet attached in this standalone bootstrap.
-    // Surface this explicitly rather than silently promising script execution.
+    // Managed runtime is supported with bundled GameScripts.dll; this count
+    // only describes ScriptBehaviour components awaiting an assembly.
     std::size_t pending_script_count() const noexcept;
 private:
     // Resolve newly assigned C# clip GUIDs from the immutable export bundle
