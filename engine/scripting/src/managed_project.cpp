@@ -304,6 +304,8 @@ namespace NEngine.Internal
             public nint write;
             public nint copyText;
             public nint setText;
+            public nint copyImage;
+            public nint setImage;
         }
 
         [UnmanagedCallersOnly]
@@ -326,7 +328,9 @@ namespace NEngine.Internal
                     callbacks.query,
                     callbacks.write,
                     callbacks.copyText,
-                    callbacks.setText);
+                    callbacks.setText,
+                    callbacks.copyImage,
+                    callbacks.setImage);
                 return 1;
             }
             catch
