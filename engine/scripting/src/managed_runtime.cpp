@@ -944,6 +944,30 @@ int ManagedRuntime::callback_ui_set_text(
     return state->ui_set_text(state->ui_context, id, text) ? 1 : 0;
 }
 
+int ManagedRuntime::callback_ui_copy_image(
+    void* context, std::uint64_t id, char* buffer, int capacity) {
+    auto* state = static_cast<NativeWorldContext*>(context);
+    if (!state || !state->ui_image) return 0;
+    const auto image = state->ui_image(state->ui_context, id);
+    if (!image || (image->size() != 0u && image->size() != 32u))
+        return 0;
+    const int required = static_cast<int>(image->size() + 1u);
+    if (!buffer || capacity < required) return -required;
+    if (!image->empty()) std::memcpy(buffer, image->data(), image->size());
+    buffer[image->size()] = '\0';
+    return required;
+}
+
+int ManagedRuntime::callback_ui_set_image(
+    void* context, std::uint64_t id, const char* guid) {
+    auto* state = static_cast<NativeWorldContext*>(context);
+    if (!state || !state->ui_set_image || !guid) return -1;
+    const auto size = std::char_traits<char>::length(guid);
+    if (size > 32u) return -1;
+    return state->ui_set_image(state->ui_context,
+        std::string_view{guid, size}) ? 1 : 0;
+}
+
 int ManagedRuntime::callback_physics_raycast(
     void* context,
     int is_2d,
