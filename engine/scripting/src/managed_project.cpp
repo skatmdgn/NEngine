@@ -1791,6 +1791,10 @@ std::string api_stub(
         private delegate int CopyTextFn(nint context, ulong id, nint buffer, int capacity);
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate int SetTextFn(nint context, ulong id, nint utf8);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int CopyImageFn(nint context, ulong id, nint buffer, int capacity);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int SetImageFn(nint context, ulong id, nint utf8);
 
         private static nint _context;
         private static FindFn? _find;
@@ -1798,10 +1802,13 @@ std::string api_stub(
         private static WriteFn? _write;
         private static CopyTextFn? _copyText;
         private static SetTextFn? _setText;
+        private static CopyImageFn? _copyImage;
+        private static SetImageFn? _setImage;
 
         internal static void Configure(
             nint context, nint find, nint query, nint write,
-            nint copyText, nint setText)
+            nint copyText, nint setText,
+            nint copyImage, nint setImage)
         {
             _context = context;
             _find = Marshal.GetDelegateForFunctionPointer<FindFn>(find);
@@ -1809,6 +1816,8 @@ std::string api_stub(
             _write = Marshal.GetDelegateForFunctionPointer<WriteFn>(write);
             _copyText = Marshal.GetDelegateForFunctionPointer<CopyTextFn>(copyText);
             _setText = Marshal.GetDelegateForFunctionPointer<SetTextFn>(setText);
+            _copyImage = Marshal.GetDelegateForFunctionPointer<CopyImageFn>(copyImage);
+            _setImage = Marshal.GetDelegateForFunctionPointer<SetImageFn>(setImage);
         }
 
         internal static void Clear()
@@ -1820,6 +1829,8 @@ std::string api_stub(
             _write = null;
             _copyText = null;
             _setText = null;
+            _copyImage = null;
+            _setImage = null;
         }
 
         private static T WithUtf8<T>(string? value, Func<nint, T> callback, T fallback)
