@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <array>
+#include <cstdint>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -440,8 +442,15 @@ int main() {
     // Image property authoring uses a genuinely imported Texture AssetGuid.
     const auto image_import_path = project_root / "Assets" / "UI" / "icon.bmp";
     {
+        std::array<std::uint8_t, 58> bmp_data{};
+        bmp_data[0] = 'B'; bmp_data[1] = 'M';
+        bmp_data[2] = 58; bmp_data[10] = 54; bmp_data[14] = 40;
+        bmp_data[18] = 1; bmp_data[22] = 1;
+        bmp_data[26] = 1; bmp_data[28] = 24; bmp_data[34] = 4;
+        bmp_data[54] = 30; bmp_data[55] = 80; bmp_data[56] = 200;
         std::ofstream bmp(image_import_path, std::ios::binary);
-        bmp << "BM" << std::string(64, '\0');
+        bmp.write(reinterpret_cast<const char*>(bmp_data.data()),
+                  static_cast<std::streamsize>(bmp_data.size()));
     }
     model.project().refresh_assets();
     model.project().import_supported_assets();

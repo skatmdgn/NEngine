@@ -1975,7 +1975,7 @@ struct Win32EditorShell::Impl {
         MoveWindow(canvas_edit_toggle, ix, iy, iw, 26, TRUE);
         iy += 32;
         const bool ui_authoring = canvas_mode && editor.has_ui_canvas_draft();
-        const std::array<HWND, 9> ui_controls{
+        const std::array<HWND, 13> ui_controls{
             canvas_name, canvas_text, canvas_apply, canvas_save,
             canvas_add_button, canvas_add_text, canvas_add_image,
             canvas_image_guid, canvas_assign_image, canvas_clear_image,
