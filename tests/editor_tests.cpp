@@ -444,6 +444,13 @@ int main() {
           !model.ui_edit_set_image_texture(bogus_image_guid) &&
           !model.ui_edit_image_texture().valid(),
           "Canvas image authoring rejects missing/unknown Texture AssetGuid");
+    const auto edit_image_before = model.ui_edit_image_texture();
+    check(!edit_image_before.valid() &&
+          model.ui_edit_set_image_texture({}) == false &&
+          model.ui_edit_undo() &&
+          model.ui_edit_redo() &&
+          !model.ui_edit_image_texture().valid(),
+          "Canvas Image clear/no-op and Undo/Redo retain correct asset reference");
     check(
         std::filesystem::exists(project_root / "Library" / "Cache"),
         "project creates Library/Cache");
