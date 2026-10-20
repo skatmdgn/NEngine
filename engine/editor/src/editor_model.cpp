@@ -852,6 +852,20 @@ bool EditorModel::ui_edit_set_anchors(ui::RectAnchors anchors) {
     return ui_edit_history_.commit(std::move(candidate));
 }
 
+bool EditorModel::ui_edit_set_image_texture(
+    assets::AssetGuid texture) {
+    if (!ui_edit_widget() || ui_edit_drag_active_ ||
+        ui_edit_widget()->kind != ui::WidgetKind::Image) return false;
+    if (texture.valid()) {
+        const auto* record = project_.assets().find(texture);
+        if (!record || record->importer_id != "NEngine.Texture")
+            return false;
+    }
+    auto candidate = ui_edit_history_.canvas();
+    if (!candidate.set_image_texture(ui_edit_selected_, texture)) return false;
+    return ui_edit_history_.commit(std::move(candidate));
+}
+
 bool EditorModel::ui_edit_set_color(ui::UiColor color) {
     if (!ui_edit_widget()) return false;
     auto candidate = ui_edit_history_.canvas();

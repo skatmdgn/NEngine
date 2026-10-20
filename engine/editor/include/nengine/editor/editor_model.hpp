@@ -205,6 +205,8 @@ public:
     bool ui_edit_set_interactable(bool interactable);
     bool ui_edit_set_anchors(ui::RectAnchors anchors);
     bool ui_edit_set_color(ui::UiColor color);
+    // Image-only, Undo/Redo-aware AssetGuid editing; zero GUID clears.
+    bool ui_edit_set_image_texture(assets::AssetGuid texture);
     bool ui_edit_apply_anchor_preset(
         ui::AnchorPreset preset, float viewport_width,
         float viewport_height);
