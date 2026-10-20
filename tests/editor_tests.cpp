@@ -470,7 +470,10 @@ int main() {
           model.ui_edit_redo() &&
           !model.ui_edit_image_texture().valid(),
           "Canvas Image clear/no-op and Undo/Redo retain correct asset reference");
+    // Undo/Redo correctly clears authoring selection for deleted widgets.
+    // Explicitly reselect the restored Image before editing its property.
     check(imported_image_guid.valid() &&
+          model.select_ui_widget(ui_image_widget) &&
           model.ui_edit_set_image_texture(imported_image_guid) &&
           model.ui_edit_image_texture() == imported_image_guid &&
           model.ui_edit_undo() &&
