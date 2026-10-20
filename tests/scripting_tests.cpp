@@ -2114,6 +2114,9 @@ int main() {
                 << "        if (UI.Find(\"Main.Start\") != button || UI.Find(\"Launch\") != 0 || UI.Find(\"시작\") != button) throw new System.Exception(\"UI stable name/legacy text lookup mismatch\");\n"
                 << "        if (!UI.SetVisible(button, false) || UI.IsVisible(button) || !UI.SetInteractable(button, false) || UI.IsInteractable(button)) throw new System.Exception(\"UI mutation mismatch\");\n"
                 << "        if (UI.SetText(9999, \"No\") || UI.GetText(9999) != null || UI.WasClicked(9999)) throw new System.Exception(\"invalid UI widget accepted\");\n"
+                << "        if (UI.GetImageTexture(18).valid || !AssetGuid.TryParse(\"aaaaaaaaaaaaaaaabbbbbbbbbbbbbbbb\", out AssetGuid icon)) throw new System.Exception(\"Image default state mismatch\");\n"
+                << "        if (!UI.SetImageTexture(18, icon) || UI.GetImageTexture(18) != icon) throw new System.Exception(\"Image GUID native roundtrip mismatch\");\n"
+                << "        if (UI.SetImageTexture(17, icon) || UI.SetImageTexture(9999, icon) || UI.GetImageTexture(9999).valid) throw new System.Exception(\"Image widget type safety mismatch\");\n"
                 << "        gameObject.name = \"UI Passed\";\n"
                 << "    }\n"
                 << "}\n"
@@ -2408,6 +2411,7 @@ int main() {
                                 ui_probe, probe_entity, probe_name, probe_active) &&
                             probe_name == "UI Passed" &&
                             ui_test.text == "시작" &&
+                            ui_test.image_guid == "aaaaaaaaaaaaaaaabbbbbbbbbbbbbbbb" &&
                             !ui_test.visible && !ui_test.interactable;
                         check(ui_passed,
                             "real .NET UI click subscriptions dispatch once, safely unsubscribe, preserve script IDs and roundtrip UTF-8");
