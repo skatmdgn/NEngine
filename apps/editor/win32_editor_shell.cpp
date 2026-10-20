@@ -1132,6 +1132,16 @@ struct Win32EditorShell::Impl {
             host, L"BUTTON", L"+ Button", BS_PUSHBUTTON, IdCanvasAddButton);
         canvas_add_text = create_control(
             host, L"BUTTON", L"+ Text", BS_PUSHBUTTON, IdCanvasAddText);
+        canvas_add_image = create_control(
+            host, L"BUTTON", L"+ Image", BS_PUSHBUTTON, IdCanvasAddImage);
+        canvas_image_guid = create_control(
+            host, L"EDIT", L"", WS_BORDER | ES_AUTOHSCROLL | ES_READONLY,
+            IdCanvasImageGuid);
+        canvas_assign_image = create_control(
+            host, L"BUTTON", L"Use Selected Texture",
+            BS_PUSHBUTTON, IdCanvasAssignImage);
+        canvas_clear_image = create_control(
+            host, L"BUTTON", L"Clear Image", BS_PUSHBUTTON, IdCanvasClearImage);
         canvas_delete = create_control(
             host, L"BUTTON", L"Delete UI", BS_PUSHBUTTON, IdCanvasDelete);
         canvas_undo = create_control(
@@ -1200,7 +1210,9 @@ struct Win32EditorShell::Impl {
                         [](HWND control) { return !control; }) ||
             !canvas_edit_toggle || !canvas_name || !canvas_text ||
             !canvas_apply || !canvas_save || !canvas_add_button ||
-            !canvas_add_text || !canvas_delete || !canvas_undo ||
+            !canvas_add_text || !canvas_add_image || !canvas_image_guid ||
+            !canvas_assign_image || !canvas_clear_image ||
+            !canvas_delete || !canvas_undo ||
             !canvas_redo) {
             shell_log("attach failed: Canvas authoring controls");
             return false;
