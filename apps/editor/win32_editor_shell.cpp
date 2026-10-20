@@ -1977,7 +1977,9 @@ struct Win32EditorShell::Impl {
         const bool ui_authoring = canvas_mode && editor.has_ui_canvas_draft();
         const std::array<HWND, 9> ui_controls{
             canvas_name, canvas_text, canvas_apply, canvas_save,
-            canvas_add_button, canvas_add_text, canvas_delete,
+            canvas_add_button, canvas_add_text, canvas_add_image,
+            canvas_image_guid, canvas_assign_image, canvas_clear_image,
+            canvas_delete,
             canvas_undo, canvas_redo};
         for (HWND control : ui_controls)
             ShowWindow(control, ui_authoring ? SW_SHOW : SW_HIDE);
@@ -2008,8 +2010,16 @@ struct Win32EditorShell::Impl {
             MoveWindow(canvas_apply, ix, iy, iw, 24, TRUE); iy += 28;
             MoveWindow(canvas_save, ix, iy, iw, 24, TRUE); iy += 29;
             const int half = (iw - 4) / 2;
-            MoveWindow(canvas_add_button, ix, iy, half, 24, TRUE);
-            MoveWindow(canvas_add_text, ix + half + 4, iy, half, 24, TRUE);
+            const int third = (iw - 8) / 3;
+            MoveWindow(canvas_add_button, ix, iy, third, 24, TRUE);
+            MoveWindow(canvas_add_text, ix + third + 4, iy, third, 24, TRUE);
+            MoveWindow(canvas_add_image, ix + (third + 4) * 2, iy,
+                       third, 24, TRUE);
+            iy += 28;
+            MoveWindow(canvas_image_guid, ix, iy, iw, 24, TRUE);
+            iy += 28;
+            MoveWindow(canvas_assign_image, ix, iy, half, 24, TRUE);
+            MoveWindow(canvas_clear_image, ix + half + 4, iy, half, 24, TRUE);
             iy += 28;
             const int third_width = (iw - 8) / 3;
             MoveWindow(canvas_duplicate, ix, iy, third_width, 24, TRUE);
