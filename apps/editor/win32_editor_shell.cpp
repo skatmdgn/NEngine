@@ -2696,6 +2696,12 @@ struct Win32EditorShell::Impl {
         SendMessageW(canvas_parent_combo, CB_SETCURSEL, parent_index, 0);
         set_text(canvas_name, widget ? widget->name : "");
         set_text(canvas_text, widget ? widget->text : "");
+        const bool is_image = widget && widget->kind == nengine::ui::WidgetKind::Image;
+        set_text(canvas_image_guid, is_image && widget->image_texture.valid()
+            ? widget->image_texture.to_string() : "");
+        EnableWindow(canvas_image_guid, is_image);
+        EnableWindow(canvas_assign_image, is_image);
+        EnableWindow(canvas_clear_image, is_image && widget->image_texture.valid());
         EnableWindow(canvas_name, widget != nullptr);
         EnableWindow(canvas_text, widget != nullptr);
         EnableWindow(canvas_apply, widget != nullptr);
@@ -2705,6 +2711,7 @@ struct Win32EditorShell::Impl {
         EnableWindow(canvas_redo, editor.ui_edit_redo_count() != 0);
         EnableWindow(canvas_add_button, true);
         EnableWindow(canvas_add_text, true);
+        EnableWindow(canvas_add_image, true);
         EnableWindow(canvas_duplicate, widget != nullptr);
         EnableWindow(canvas_to_back, widget != nullptr);
         EnableWindow(canvas_to_front, widget != nullptr);
