@@ -148,4 +148,20 @@ bool PlayerUiRuntime::set_text(ui::WidgetId id, std::string_view value) {
     if (!canvas_ || value.size() > 4096u) return false;
     return canvas_->set_text(id, std::string(value));
 }
+std::optional<std::string> PlayerUiRuntime::image_texture(
+    ui::WidgetId id) const {
+    if (!canvas_) return std::nullopt;
+    const auto* node = canvas_->find(id);
+    if (!node || node->kind != ui::WidgetKind::Image) return std::nullopt;
+    return node->image_texture.valid()
+        ? node->image_texture.to_string() : std::string{};
+}
+bool PlayerUiRuntime::set_image_texture(
+    ui::WidgetId id, std::string_view guid) {
+    if (!canvas_ || guid.size() > 32u) return false;
+    if (guid.empty()) return canvas_->set_image_texture(id, {});
+    const auto parsed = assets::AssetGuid::parse(guid);
+    return parsed && parsed->valid() &&
+           canvas_->set_image_texture(id, *parsed);
+}
 } // namespace nengine::player

@@ -39,6 +39,8 @@ public:
     int write(ui::WidgetId id, int operation, int value) noexcept;
     std::optional<std::string> get_text(ui::WidgetId id) const;
     bool set_text(ui::WidgetId id, std::string_view text);
+    std::optional<std::string> image_texture(ui::WidgetId id) const;
+    bool set_image_texture(ui::WidgetId id, std::string_view guid);
     std::size_t click_count() const noexcept { return clicked_.size(); }
     const std::vector<ui::UiPointerEvent>& events() const noexcept {
         return events_;
