@@ -756,6 +756,8 @@ private:
     using UiWriteCallbackFn = int (*)(void*, std::uint64_t, int, int);
     using UiCopyTextCallbackFn = int (*)(void*, std::uint64_t, char*, int);
     using UiSetTextCallbackFn = int (*)(void*, std::uint64_t, const char*);
+    using UiCopyImageCallbackFn = int (*)(void*, std::uint64_t, char*, int);
+    using UiSetImageCallbackFn = int (*)(void*, std::uint64_t, const char*);
     struct NativeUiCallbacks {
         void* context{nullptr};
         UiFindCallbackFn find{nullptr};
@@ -763,6 +765,8 @@ private:
         UiWriteCallbackFn write{nullptr};
         UiCopyTextCallbackFn copy_text{nullptr};
         UiSetTextCallbackFn set_text{nullptr};
+        UiCopyImageCallbackFn copy_image{nullptr};
+        UiSetImageCallbackFn set_image{nullptr};
     };
     using ConfigureUiCallbacksFn = int (*)(const NativeUiCallbacks*);
     static std::uint64_t callback_ui_find(void*, const char*);
@@ -770,6 +774,8 @@ private:
     static int callback_ui_write(void*, std::uint64_t, int, int);
     static int callback_ui_copy_text(void*, std::uint64_t, char*, int);
     static int callback_ui_set_text(void*, std::uint64_t, const char*);
+    static int callback_ui_copy_image(void*, std::uint64_t, char*, int);
+    static int callback_ui_set_image(void*, std::uint64_t, const char*);
 
     using LoadGameplayFn =
         int (*)(
