@@ -272,6 +272,8 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Windows Player Canvas colored panel/button UI composited over Vulkan World (including camera-less menus), with basic ASCII font labels and headless pixel regressions
 - [x] Canvas v3 Image AssetGuid source serialization, Player PNG/JPEG/BMP/TGA texture resolver, UV clipping, alpha/tint CPU compositor and exported BMP integration tests
 - [x] UTF-8 scalar-safe built-in text fallback, without false claims of actual Korean glyph coverage
+- [x] Canvas Image texture authoring via Windows Inspector: add Image, choose imported Texture from Assets, clear, Undo/Redo and Save
+- [x] ABI v18 C# UI.GetImageTexture / UI.SetImageTexture typed AssetGuid methods in Editor Play Mode and standalone Player
 - [ ] runtime Canvas-style UI (Korean/Unicode font glyphs and shaping, GPU hardware acceptance and advanced layout remain)
 - [ ] NavMesh agent/obstacle/link subset
 - [ ] particle system

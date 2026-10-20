@@ -111,6 +111,14 @@ This is a **dependency overview**, not a complete generated dependency graph. Th
 - **Acceptance:** New source/tests require final Windows/Ubuntu CI. Neither CTest nor CPU RGBA verification constitutes a real Vulkan GPU/display/performance acceptance.
 - **Outstanding:** Editor Image GUID authoring inspector, runtime C# Image.texture setter/getter, Unicode font assets, configurable sampling/9-slice and physical GPU QA.
 
+## 2026-10-20 continuation: 30 Canvas Image authoring and managed API slices
+
+- Windows Canvas Inspector now supports adding Image widgets, assigning the currently selected imported texture, clearing the Image AssetGuid and viewing the assigned GUID. Authoring validates the Texture importer and commits Undo/Redo/Save transactions.
+- Managed Bridge UI callback ABI bumped to **18** with typed Image get/set access exposed as `NEngine.UI.GetImageTexture(ulong)` and `UI.SetImageTexture(ulong, AssetGuid)`. Both Editor Play Mode and standalone Player connect these callbacks to mutable runtime Canvas only, preserving the serialized authoring asset. The generated managed DLLs must be rebuilt together; ABI 17 DLLs are rejected.
+- Added C# .NET runtime probe checks for GUID roundtrip and wrong-widget rejection, Player native Image mutation regressions, and editor imported-texture/Undo history checks.
+- **CI acceptance remains separate:** automated Windows/Ubuntu build and CTest cannot prove UI graphics quality or physical GPU rendering.
+- **Still pending:** Korean glyphs/Unicode font shaping, Editor Play View fully texture-accurate previews, advanced image sampling and actual Vulkan GPU acceptance, main branch merge of stacked PRs.
+
 ## Highest-priority next work
 
 1. **Player completion:** exported glTF/OBJ generated material/texture subassets, managed action map/property parity, and genuine Windows GPU + .NET + input acceptance.
