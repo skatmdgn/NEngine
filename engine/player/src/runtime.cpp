@@ -65,6 +65,12 @@ bool PlayerRuntime::initialize_managed(std::string* error) {
         },
         [](void* ctx, std::uint64_t id, std::string_view value) -> bool {
             return static_cast<PlayerUiRuntime*>(ctx)->set_text(id, value);
+        },
+        [](void* ctx, std::uint64_t id) -> std::optional<std::string> {
+            return static_cast<PlayerUiRuntime*>(ctx)->image_texture(id);
+        },
+        [](void* ctx, std::uint64_t id, std::string_view guid) -> bool {
+            return static_cast<PlayerUiRuntime*>(ctx)->set_image_texture(id, guid);
         });
     bind_player_physics_queries(managed_runtime_);
     bind_player_properties(managed_runtime_);
