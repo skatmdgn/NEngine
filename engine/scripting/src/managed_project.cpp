@@ -1864,6 +1864,26 @@ std::string api_stub(
             id != 0UL && _setText != null && WithUtf8(
                 text, ptr => _setText(_context, id, ptr) > 0, false);
 
+        internal static string? GetImage(ulong id)
+        {
+            if (id == 0UL || _copyImage == null) return null;
+            int required = -_copyImage(_context, id, 0, 0);
+            if (required <= 0 || required > 33) return null;
+            nint buffer = Marshal.AllocHGlobal(required);
+            try
+            {
+                if (_copyImage(_context, id, buffer, required) != required)
+                    return null;
+                return Marshal.PtrToStringUTF8(buffer);
+            }
+            finally { Marshal.FreeHGlobal(buffer); }
+        }
+
+        internal static bool SetImage(ulong id, AssetGuid guid) =>
+            id != 0UL && _setImage != null &&
+            WithUtf8(guid.valid ? guid.ToString() : "",
+                ptr => _setImage(_context, id, ptr) > 0, false);
+
         internal static string? GetText(ulong id)
         {
             if (id == 0UL || _copyText == null) return null;
