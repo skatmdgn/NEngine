@@ -227,9 +227,13 @@ public:
     using UiWriteFn = int (*)(void*, std::uint64_t, int, int);
     using UiTextFn = std::optional<std::string> (*)(void*, std::uint64_t);
     using UiSetTextFn = bool (*)(void*, std::uint64_t, std::string_view);
+    using UiImageFn = std::optional<std::string> (*)(void*, std::uint64_t);
+    using UiSetImageFn = bool (*)(void*, std::uint64_t, std::string_view);
     void bind_ui(void* context, UiFindFn find, UiQueryFn query,
                  UiWriteFn write, UiTextFn text,
-                 UiSetTextFn set_text) noexcept;
+                 UiSetTextFn set_text,
+                 UiImageFn image = nullptr,
+                 UiSetImageFn set_image = nullptr) noexcept;
 
     bool unload_gameplay();
 
@@ -379,6 +383,8 @@ private:
         UiWriteFn ui_write{nullptr};
         UiTextFn ui_text{nullptr};
         UiSetTextFn ui_set_text{nullptr};
+        UiImageFn ui_image{nullptr};
+        UiSetImageFn ui_set_image{nullptr};
         std::vector<core::Entity> pending_destroy{};
     };
 
