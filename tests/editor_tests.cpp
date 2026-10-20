@@ -437,6 +437,13 @@ int main() {
               "Canvas authoring save roundtrips v2 stable names and editable widget data");
     }
 
+    // Image property authoring uses a genuinely imported Texture AssetGuid.
+    const auto ui_image_widget = model.ui_edit_add_widget(ui::WidgetKind::Image);
+    const auto bogus_image_guid = assets::AssetGuid::generate();
+    check(ui_image_widget != ui::invalid_widget &&
+          !model.ui_edit_set_image_texture(bogus_image_guid) &&
+          !model.ui_edit_image_texture().valid(),
+          "Canvas image authoring rejects missing/unknown Texture AssetGuid");
     check(
         std::filesystem::exists(project_root / "Library" / "Cache"),
         "project creates Library/Cache");
