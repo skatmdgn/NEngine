@@ -856,6 +856,7 @@ bool EditorModel::ui_edit_set_image_texture(
     assets::AssetGuid texture) {
     if (!ui_edit_widget() || ui_edit_drag_active_ ||
         ui_edit_widget()->kind != ui::WidgetKind::Image) return false;
+    if (texture == ui_edit_image_texture()) return false;
     if (texture.valid()) {
         const auto* record = project_.assets().find(texture);
         if (!record || record->importer_id != "NEngine.Texture")
