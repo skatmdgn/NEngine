@@ -889,7 +889,8 @@ void ManagedRuntime::bind_input_actions(
 void ManagedRuntime::bind_ui(
     void* context, UiFindFn find, UiQueryFn query,
     UiWriteFn write, UiTextFn text,
-    UiSetTextFn set_text) noexcept {
+    UiSetTextFn set_text, UiImageFn image,
+    UiSetImageFn set_image) noexcept {
     if (!world_context_)
         world_context_ = std::make_unique<NativeWorldContext>();
     world_context_->ui_context = context;
@@ -898,6 +899,8 @@ void ManagedRuntime::bind_ui(
     world_context_->ui_write = write;
     world_context_->ui_text = text;
     world_context_->ui_set_text = set_text;
+    world_context_->ui_image = image;
+    world_context_->ui_set_image = set_image;
 }
 
 std::uint64_t ManagedRuntime::callback_ui_find(
