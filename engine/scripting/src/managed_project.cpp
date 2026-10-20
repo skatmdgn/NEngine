@@ -1963,6 +1963,15 @@ std::string api_stub(
             NativeUi.GetText(id);
         public static bool SetText(ulong id, string text) =>
             NativeUi.SetText(id, text);
+        // Only Image widgets support this property; AssetGuid.none clears.
+        public static AssetGuid GetImageTexture(ulong id)
+        {
+            var encoded = NativeUi.GetImage(id);
+            return AssetGuid.TryParse(encoded, out AssetGuid guid)
+                ? guid : AssetGuid.none;
+        }
+        public static bool SetImageTexture(ulong id, AssetGuid guid) =>
+            NativeUi.SetImage(id, guid);
     }
 
     public abstract class Component
