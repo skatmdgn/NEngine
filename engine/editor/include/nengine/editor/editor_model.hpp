@@ -207,6 +207,11 @@ public:
     bool ui_edit_set_color(ui::UiColor color);
     // Image-only, Undo/Redo-aware AssetGuid editing; zero GUID clears.
     bool ui_edit_set_image_texture(assets::AssetGuid texture);
+    assets::AssetGuid ui_edit_image_texture() const noexcept {
+        const auto* node = ui_edit_widget();
+        return node && node->kind == ui::WidgetKind::Image
+            ? node->image_texture : assets::AssetGuid{};
+    }
     bool ui_edit_apply_anchor_preset(
         ui::AnchorPreset preset, float viewport_width,
         float viewport_height);
