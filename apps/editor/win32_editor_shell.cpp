@@ -3967,13 +3967,37 @@ struct Win32EditorShell::Impl {
             handled = true;
             break;
         }
+        case IdCanvasAssignImage: {
+            if (notification != BN_CLICKED) return false;
+            if (canvas_mode && editor.ui_edit_widget()) {
+                const int index = static_cast<int>(
+                    SendMessageW(assets_list, LB_GETCURSEL, 0, 0));
+                if (index < 0 || static_cast<std::size_t>(index) >= asset_rows.size() ||
+                    asset_rows[static_cast<std::size_t>(index)].importer_id !=
+                        "NEngine.Texture" ||
+                    !editor.ui_edit_set_image_texture(
+                        asset_rows[static_cast<std::size_t>(index)].guid))
+                    editor.console().warning("UI",
+                        "Select an imported texture in Assets before assigning to Image");
+            }
+            handled = true;
+            break;
+        }
+        case IdCanvasClearImage:
+            if (notification != BN_CLICKED) return false;
+            if (canvas_mode) editor.ui_edit_set_image_texture({});
+            handled = true;
+            break;
         case IdCanvasAddButton:
-        case IdCanvasAddText: {
+        case IdCanvasAddText:
+        case IdCanvasAddImage: {
             if (notification != BN_CLICKED) return false;
             if (canvas_mode && editor.has_ui_canvas_draft()) {
                 const auto kind = id == IdCanvasAddButton
                     ? nengine::ui::WidgetKind::Button
-                    : nengine::ui::WidgetKind::Text;
+                    : (id == IdCanvasAddImage
+                        ? nengine::ui::WidgetKind::Image
+                        : nengine::ui::WidgetKind::Text);
                 editor.ui_edit_add_widget(kind);
             }
             handled = true;
