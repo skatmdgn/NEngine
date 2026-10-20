@@ -66,6 +66,10 @@ enum ControlId : int {
     IdCanvasSave,
     IdCanvasAddButton,
     IdCanvasAddText,
+    IdCanvasAddImage,
+    IdCanvasImageGuid,
+    IdCanvasAssignImage,
+    IdCanvasClearImage,
     IdCanvasDelete,
     IdCanvasUndo,
     IdCanvasRedo,
@@ -316,6 +320,10 @@ struct Win32EditorShell::Impl {
     HWND canvas_save{nullptr};
     HWND canvas_add_button{nullptr};
     HWND canvas_add_text{nullptr};
+    HWND canvas_add_image{nullptr};
+    HWND canvas_image_guid{nullptr};
+    HWND canvas_assign_image{nullptr};
+    HWND canvas_clear_image{nullptr};
     HWND canvas_delete{nullptr};
     HWND canvas_undo{nullptr};
     HWND canvas_redo{nullptr};
