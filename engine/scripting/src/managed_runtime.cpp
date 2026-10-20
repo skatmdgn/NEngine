@@ -962,7 +962,8 @@ int ManagedRuntime::callback_ui_set_image(
     void* context, std::uint64_t id, const char* guid) {
     auto* state = static_cast<NativeWorldContext*>(context);
     if (!state || !state->ui_set_image || !guid) return -1;
-    const auto size = std::char_traits<char>::length(guid);
+    std::size_t size = 0u;
+    while (size <= 32u && guid[size] != '\0') ++size;
     if (size > 32u) return -1;
     return state->ui_set_image(state->ui_context,
         std::string_view{guid, size}) ? 1 : 0;
