@@ -654,6 +654,27 @@ void EditorModel::bind_managed_ui() {
             if (!editor.play_session_.is_playing() || !editor.ui_canvas_)
                 return false;
             return editor.ui_canvas_->set_text(id, std::string(value));
+        },
+        [](void* context, std::uint64_t id) -> std::optional<std::string> {
+            auto& editor = *static_cast<EditorModel*>(context);
+            if (!editor.play_session_.is_playing() || !editor.ui_canvas_)
+                return std::nullopt;
+            const auto* widget = editor.ui_canvas_->find(id);
+            if (!widget || widget->kind != ui::WidgetKind::Image)
+                return std::nullopt;
+            return widget->image_texture.valid()
+                ? widget->image_texture.to_string() : std::string{};
+        },
+        [](void* context, std::uint64_t id, std::string_view guid) -> bool {
+            auto& editor = *static_cast<EditorModel*>(context);
+            if (!editor.play_session_.is_playing() || !editor.ui_canvas_)
+                return false;
+            if (guid.empty())
+                return editor.ui_canvas_->set_image_texture(id, {});
+            if (guid.size() != 32u) return false;
+            const auto parsed = assets::AssetGuid::parse(guid);
+            return parsed && parsed->valid() &&
+                   editor.ui_canvas_->set_image_texture(id, *parsed);
         });
 }
 
