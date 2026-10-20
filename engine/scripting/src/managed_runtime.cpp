@@ -965,7 +965,7 @@ int ManagedRuntime::callback_ui_set_image(
     std::size_t size = 0u;
     while (size <= 32u && guid[size] != '\0') ++size;
     if (size > 32u) return -1;
-    return state->ui_set_image(state->ui_context,
+    return state->ui_set_image(state->ui_context, id,
         std::string_view{guid, size}) ? 1 : 0;
 }
 
