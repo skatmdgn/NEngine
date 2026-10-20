@@ -1635,7 +1635,7 @@ bool ManagedRuntime::initialize(
     const int abi_version =
         abi();
 
-    if (abi_version != 17) {
+    if (abi_version != 18) {
         diagnostic_ =
             "managed bridge ABI mismatch: expected 17, got " +
             std::to_string(
@@ -1958,6 +1958,8 @@ bool ManagedRuntime::initialize(
     ui_callbacks.write = &ManagedRuntime::callback_ui_write;
     ui_callbacks.copy_text = &ManagedRuntime::callback_ui_copy_text;
     ui_callbacks.set_text = &ManagedRuntime::callback_ui_set_text;
+    ui_callbacks.copy_image = &ManagedRuntime::callback_ui_copy_image;
+    ui_callbacks.set_image = &ManagedRuntime::callback_ui_set_image;
     if (configure_ui_callbacks_(&ui_callbacks) <= 0) {
         diagnostic_ = "managed Bridge rejected native UI callback table";
         shutdown();
@@ -2630,6 +2632,8 @@ void ManagedRuntime::shutdown() noexcept {
         world_context_->ui_write = nullptr;
         world_context_->ui_text = nullptr;
         world_context_->ui_set_text = nullptr;
+        world_context_->ui_image = nullptr;
+        world_context_->ui_set_image = nullptr;
     }
 
     create_ = nullptr;
