@@ -2343,6 +2343,7 @@ int main() {
                             bool visible{true};
                             bool interactable{true};
                             bool clicked{true};
+                            std::string image_guid{};
                         } ui_test;
 
                         managed_runtime.bind_ui(
@@ -2376,6 +2377,18 @@ int main() {
                                 auto& ui = *static_cast<UiTestState*>(context);
                                 if (id != 17u || value.size() > 4096u) return false;
                                 ui.text = value;
+                                return true;
+                            },
+                            [](void* context, std::uint64_t id) -> std::optional<std::string> {
+                                const auto& ui = *static_cast<UiTestState*>(context);
+                                return id == 18u
+                                    ? std::optional<std::string>{ui.image_guid}
+                                    : std::nullopt;
+                            },
+                            [](void* context, std::uint64_t id, std::string_view guid) -> bool {
+                                auto& ui = *static_cast<UiTestState*>(context);
+                                if (id != 18u || guid.size() > 32u) return false;
+                                ui.image_guid = guid;
                                 return true;
                             });
 
