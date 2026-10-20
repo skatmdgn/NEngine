@@ -158,7 +158,8 @@ std::optional<std::string> PlayerUiRuntime::image_texture(
 }
 bool PlayerUiRuntime::set_image_texture(
     ui::WidgetId id, std::string_view guid) {
-    if (!canvas_ || guid.size() > 32u) return false;
+    if (!canvas_ || guid.size() > 32u ||
+        guid.find('\0') != std::string_view::npos) return false;
     if (guid.empty()) return canvas_->set_image_texture(id, {});
     const auto parsed = assets::AssetGuid::parse(guid);
     return parsed && parsed->valid() &&
