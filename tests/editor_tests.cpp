@@ -438,6 +438,16 @@ int main() {
     }
 
     // Image property authoring uses a genuinely imported Texture AssetGuid.
+    const auto image_import_path = project_root / "Assets" / "UI" / "icon.bmp";
+    {
+        std::ofstream bmp(image_import_path, std::ios::binary);
+        bmp << "BM" << std::string(64, '\0');
+    }
+    model.project().refresh_assets();
+    model.project().import_supported_assets();
+    const auto* image_record = model.project().assets().find_relative("UI/icon.bmp");
+    const auto imported_image_guid =
+        image_record ? image_record->guid : assets::AssetGuid{};
     const auto ui_image_widget = model.ui_edit_add_widget(ui::WidgetKind::Image);
     const auto bogus_image_guid = assets::AssetGuid::generate();
     check(ui_image_widget != ui::invalid_widget &&
@@ -451,6 +461,14 @@ int main() {
           model.ui_edit_redo() &&
           !model.ui_edit_image_texture().valid(),
           "Canvas Image clear/no-op and Undo/Redo retain correct asset reference");
+    check(imported_image_guid.valid() &&
+          model.ui_edit_set_image_texture(imported_image_guid) &&
+          model.ui_edit_image_texture() == imported_image_guid &&
+          model.ui_edit_undo() &&
+          !model.ui_edit_image_texture().valid() &&
+          model.ui_edit_redo() &&
+          model.ui_edit_image_texture() == imported_image_guid,
+          "Canvas Image Inspector assignment of real imported Texture is undoable");
     check(
         std::filesystem::exists(project_root / "Library" / "Cache"),
         "project creates Library/Cache");
