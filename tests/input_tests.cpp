@@ -1,4 +1,6 @@
 #include <iostream>
+#include <cmath>
+#include <limits>
 
 #include "nengine/input/input_state.hpp"
 #include "nengine/input/action_map_io.hpp"
@@ -88,6 +90,56 @@ int main() {
         input.pointer().delta_y == 0.0f &&
         input.pointer().wheel_y == 0.0f,
         "pointer delta and wheel reset at frame boundary");
+
+    // A lost focus discards transient pointer movement and makes the
+    // first post-focus sample a baseline rather than a synthetic drag.
+    input.set_pointer_position(20.0f, 30.0f);
+    input.add_wheel(2.0f);
+    input.release_all();
+    check(
+        input.pointer().delta_x == 0.0f &&
+        input.pointer().delta_y == 0.0f &&
+        input.pointer().wheel_y == 0.0f,
+        "focus loss clears stale pointer movement and wheel deltas");
+    input.set_pointer_position(400.0f, 500.0f);
+    check(
+        input.pointer().delta_x == 0.0f &&
+        input.pointer().delta_y == 0.0f &&
+        input.pointer().x == 400.0f &&
+        input.pointer().y == 500.0f,
+        "first pointer position after regained focus only establishes baseline");
+    input.set_pointer_position(401.0f, 505.0f);
+    check(
+        input.pointer().delta_x == 1.0f &&
+        input.pointer().delta_y == 5.0f,
+        "subsequent pointer movement after focus restore is measured normally");
+
+    // A finite input can produce a non-finite float delta on subtraction
+    // or repeated addition; input exposed to scripts must remain finite.
+    const float max_float = std::numeric_limits<float>::max();
+    input.release_all();
+    input.set_pointer_position(max_float, max_float);
+    input.set_pointer_position(-max_float, -max_float);
+    check(
+        std::isfinite(input.pointer().delta_x) &&
+        std::isfinite(input.pointer().delta_y) &&
+        input.pointer().delta_x == 0.0f &&
+        input.pointer().delta_y == 0.0f,
+        "opposite finite extreme pointer positions do not overflow frame delta");
+    input.begin_frame();
+    input.add_wheel(max_float);
+    input.add_wheel(max_float);
+    check(
+        std::isfinite(input.pointer().wheel_y) &&
+        input.pointer().wheel_y == max_float,
+        "large wheel accumulations reject overflowing input without poisoning state");
+    input.begin_frame();
+    input.set_key(static_cast<Key>(0xFFFFu), true);
+    check(
+        !input.held(Key::Unknown) &&
+        !input.pressed(Key::Unknown) &&
+        !input.held(Key::A),
+        "out-of-range keys are ignored rather than accepted as unknown state");
 
     ActionMap actions;
 
