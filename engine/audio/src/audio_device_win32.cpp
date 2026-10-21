@@ -217,9 +217,15 @@ AudioOutputDevice::AudioOutputDevice(
     default;
 
 AudioOutputDevice&
-AudioOutputDevice::operator=(
-    AudioOutputDevice&&) noexcept =
-    default;
+AudioOutputDevice::operator=(AudioOutputDevice&& other) noexcept {
+    if (this != &other) {
+        // Impl owns raw COM handles. Free the active endpoint before the
+        // unique_ptr would destroy its owner without release_wasapi().
+        close();
+        impl_ = std::move(other.impl_);
+    }
+    return *this;
+}
 
 bool AudioOutputDevice::open(
     std::string* error) {
