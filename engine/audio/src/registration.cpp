@@ -1,4 +1,5 @@
 #include "nengine/audio/registration.hpp"
+#include <cmath>
 
 #include <optional>
 #include <string>
@@ -153,21 +154,25 @@ T* ensure_component(
 bool valid_source(
     const AudioSource& value) noexcept {
 
-    return value.volume >= 0.0f &&
+    return std::isfinite(value.volume) &&
+           std::isfinite(value.pitch) &&
+           std::isfinite(value.pan_stereo) &&
+           std::isfinite(value.min_distance) &&
+           std::isfinite(value.max_distance) &&
+           value.volume >= 0.0f &&
            value.volume <= 1.0f &&
            value.pitch >= 0.0f &&
            value.pan_stereo >= -1.0f &&
            value.pan_stereo <= 1.0f &&
            value.min_distance > 0.0f &&
-           value.max_distance >=
-               value.min_distance;
+           value.max_distance >= value.min_distance;
 }
 
 bool valid_listener(
     const AudioListener& value) noexcept {
 
-    return value.volume >= 0.0f &&
-           value.volume <= 1.0f;
+    return std::isfinite(value.volume) &&
+           value.volume >= 0.0f && value.volume <= 1.0f;
 }
 
 } // namespace

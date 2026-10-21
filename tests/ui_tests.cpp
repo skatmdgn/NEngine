@@ -322,6 +322,13 @@ int main() {
     check(!read_canvas(oversized_source, named_restore) &&
           named_restore.widgets().size() == retained_widgets,
           "Canvas importer bounds oversized source records transactionally");
+    std::stringstream oversized_header(
+        "NENGINE_CANVAS 2\nWIDGETS 0" + std::string(100000, ' ') +
+        "\nEND_CANVAS\n");
+    check(!read_canvas(oversized_header, named_restore) &&
+          named_restore.widgets().size() == retained_widgets,
+          "Canvas importer bounds oversized header lines transactionally");
+
 
     const auto next = canvas.add(WidgetKind::Text);
     check(next > overflow && canvas.layout(0.0f, 600.0f).items.empty(),

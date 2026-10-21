@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -313,6 +314,14 @@ int main() {
             "AudioSource codec rejects max distance below min distance");
     }
 
+    if (captured_source) {
+        auto invalid = *captured_source;
+        set_property(invalid, "Pitch",
+            core::PropertyValue{std::numeric_limits<double>::infinity()});
+        check(!serialization.restore(restored, restored_entity, invalid, &error),
+              "AudioSource codec rejects infinite pitch");
+    }
+
     if (captured_listener) {
         auto invalid =
             *captured_listener;
@@ -586,6 +595,20 @@ int main() {
             playback_source->time_seconds -
             0.5f) < 0.0001f,
         "audio playback starts play-on-awake sources and advances time by pitch");
+
+    if (playback_source) {
+        playback_source->pitch = std::numeric_limits<float>::infinity();
+        playback_source->playing = true;
+        const auto invalid_update = playback_system.update(
+            playback_world, 0.25f, duration_resolver);
+        check(invalid_update.unresolved > 0 &&
+                  !playback_source->playing &&
+                  std::isfinite(playback_source->time_seconds),
+              "runtime playback rejects nonfinite pitch without NaN time");
+        playback_source->pitch = 2.0f;
+        playback_source->playing = true;
+        playback_source->time_seconds = 0.5f;
+    }
 
     const auto playback_second =
         playback_system.update(

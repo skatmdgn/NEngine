@@ -1,6 +1,7 @@
 #include "nengine/audio/playback.hpp"
 
 #include <cmath>
+#include <limits>
 #include <unordered_set>
 
 #include "nengine/audio/components.hpp"
@@ -70,16 +71,28 @@ AudioPlaybackStats AudioPlaybackSystem::update(
             continue;
         }
 
-        if (!source->playing ||
-            source->pitch <= 0.0f ||
-            delta_seconds <= 0.0f) {
+        if (!std::isfinite(source->time_seconds) ||
+            source->time_seconds < 0.0f)
+            source->time_seconds = 0.0f;
+
+        if (!std::isfinite(source->pitch)) {
+            source->playing = false;
+            ++stats.unresolved;
             continue;
         }
+        if (!source->playing || source->pitch <= 0.0f ||
+            delta_seconds <= 0.0f) continue;
 
-        source->time_seconds +=
-            delta_seconds *
-            source->pitch;
-
+        const double advanced = static_cast<double>(source->time_seconds) +
+            static_cast<double>(delta_seconds) * source->pitch;
+        if (!std::isfinite(advanced) ||
+            advanced > static_cast<double>(std::numeric_limits<float>::max())) {
+            source->playing = false;
+            source->time_seconds = 0.0f;
+            ++stats.unresolved;
+            continue;
+        }
+        source->time_seconds = static_cast<float>(advanced);
         ++stats.advanced;
 
         std::optional<float>

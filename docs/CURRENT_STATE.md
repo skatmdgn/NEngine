@@ -1,3 +1,16 @@
+## Integration snapshot — 2026-10-21
+
+- The October audit consolidation (#12: bounded Scene IO, asset path/manifest guards,
+  durable World handles, non-lossy Scene capture, safe managed process launch, Win32
+  Vulkan swapchain recovery, Player asset-export fail-closed rules, and regression tests)
+  is integrated with the later Player/Canvas development lineage (#13–#23).
+- The original action-map persistence PR (#1) was incorporated in the later
+  action-map branch (#17). The latest Player runtime covers the parallel changes
+  on the previous main (Rigidbody/AudioSource property parity and lazily resolved
+  audio clips), using the more comprehensive C# bridge and missing-GUID cache.
+- CI compilation and portable tests are not substitutes for Windows Vulkan,
+  physical input/audio devices, .NET Player, or Android acceptance testing.
+
 # NEngine current state
 
 Status snapshot: **2026-10-17 (KST)**, reviewed against `main` commit [`51db15f`](https://github.com/skatmdgn/NEngine/commit/51db15f79eaa443368e956cada956884aa7dec48).

@@ -72,6 +72,8 @@ bool read_manifest(
         return false;
     }
 
+    if (artifact_count > 8192u) return false;
+
     manifest.artifacts.clear();
     manifest.artifacts.reserve(artifact_count);
 
@@ -286,110 +288,52 @@ bool write_manifest(
     return output.good();
 }
 
-bool artifacts_exist(
-    const std::filesystem::path& cache_directory,
-    const CachedManifest& manifest) {
-
-    std::error_code error;
-
-    for (const auto& artifact :
-         manifest.artifacts) {
-
-        auto path = artifact.path;
-
-        if (path.is_relative()) {
-            path = cache_directory / path;
-        }
-
-        if (!std::filesystem::exists(
-                path,
-                error) ||
-            error) {
-            return false;
-        }
-    }
-
-    for (const auto& subasset :
-         manifest.subassets) {
-
-        if (!subasset.valid()) {
-            return false;
-        }
-
-        for (const auto& artifact :
-             subasset.artifacts) {
-
-            auto path =
-                artifact.path;
-
-            if (path.is_relative()) {
-                path =
-                    cache_directory /
-                    path;
-            }
-
-            if (!std::filesystem::exists(
-                    path,
-                    error) ||
-                error) {
-                return false;
-            }
-        }
-    }
-
-    return true;
-}
-
 std::optional<std::filesystem::path>
 safe_cache_artifact_path(
     const std::filesystem::path& cache_directory,
     const std::filesystem::path& stored) {
-
-    std::error_code error;
-
-    const auto cache =
-        std::filesystem::absolute(
-            cache_directory,
-            error)
-            .lexically_normal();
-
-    if (error) {
-        return std::nullopt;
-    }
-
-    auto candidate =
-        stored.is_relative()
-            ? cache / stored
-            : stored;
-
-    candidate =
-        std::filesystem::absolute(
-            candidate,
-            error)
-            .lexically_normal();
-
-    if (error) {
-        return std::nullopt;
-    }
-
-    const auto relative =
-        candidate.lexically_relative(
-            cache);
-
-    if (relative.empty() ||
-        relative == "." ||
-        relative.has_root_path()) {
-        return std::nullopt;
-    }
-
-    for (const auto& part :
-         relative) {
-        if (part == "..") {
+    // Cached manifests must not authorize access outside the cache.
+    // Reject both lexical traversal and any symlink component.
+    if (stored.empty() || !stored.is_relative()) return std::nullopt;
+    for (const auto& part : stored) {
+        if (part == ".." || part == "." || part.empty())
             return std::nullopt;
-        }
     }
 
-    return candidate;
+    std::error_code ec;
+    const auto cache = std::filesystem::weakly_canonical(cache_directory, ec);
+    if (ec || cache.empty()) return std::nullopt;
+    const auto candidate = (cache / stored).lexically_normal();
+    const auto resolved = std::filesystem::weakly_canonical(candidate, ec);
+    if (ec || resolved != candidate) return std::nullopt;
+
+    const auto relative = resolved.lexically_relative(cache);
+    if (relative.empty() || relative == "." ||
+        relative.is_absolute() || *relative.begin() == "..")
+        return std::nullopt;
+    return resolved;
+}
+
+bool artifacts_exist(
+    const std::filesystem::path& cache_directory,
+    const CachedManifest& manifest) {
+    std::error_code ec;
+    const auto valid_artifacts = [&](const auto& artifacts) {
+        for (const auto& artifact : artifacts) {
+            const auto path = safe_cache_artifact_path(
+                cache_directory, artifact.path);
+            if (!path || !std::filesystem::is_regular_file(*path, ec) || ec)
+                return false;
+        }
+        return true;
+    };
+
+    if (!valid_artifacts(manifest.artifacts)) return false;
+    for (const auto& subasset : manifest.subassets) {
+        if (!subasset.valid() || !valid_artifacts(subasset.artifacts))
+            return false;
+    }
+    return true;
 }
 
 std::vector<std::filesystem::path>
