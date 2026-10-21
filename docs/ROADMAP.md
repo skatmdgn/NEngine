@@ -276,7 +276,8 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Canvas Image texture authoring via Windows Inspector: add Image, choose imported Texture from Assets, clear, Undo/Redo and Save
 - [x] ABI v18 C# UI.GetImageTexture / UI.SetImageTexture typed AssetGuid methods in Editor Play Mode and standalone Player
 - [ ] runtime Canvas-style UI (Korean/Unicode font glyphs and shaping, GPU hardware acceptance and advanced layout remain)
-- [ ] NavMesh agent/obstacle/link subset
+- [x] Native navigation graph foundation: convex polygons, bounded Dijkstra, runtime obstacles, off-mesh links, constant-speed agents, .nnav and 30-slice tests (source implementation, CI pending)
+- [ ] NavMesh agent/obstacle/link product integration: Scene/Editor/Player/C#, geometry baking, funnel smoothing and physical acceptance
 - [ ] particle system
 
 ## 0.8 — Packages/plugins

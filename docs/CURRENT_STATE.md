@@ -1,3 +1,11 @@
+## Navigation 30-slice development batch — 2026-10-21
+
+- Added NEngineNavigation with bounded convex polygon navigation, area masks,
+  deterministic paths, dynamic obstacles, directed links and agent movement.
+- Added NEngineNavigationTests; detailed 30-slice matrix:
+  NAVIGATION_FOUNDATION.md.
+- Scene baking, native Editor workflows, C# integration, hardware QA remain open.
+- The final batch PR CI is the gate for verification.
 ## Priority audit hardening — 2026-10-21
 
 - Baseline: integrated `main` `f92d293` (Windows/Ubuntu 11/11 CTest groups, run 39543507203).
