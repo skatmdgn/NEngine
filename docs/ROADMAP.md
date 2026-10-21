@@ -1,6 +1,6 @@
 # Roadmap
 
-Active development version: **0.9.0-dev** (partial standalone Windows Player integration; this is not a completed 0.9 or 1.0 release). Status reviewed 2026-10-17 KST from `main` `51db15f`. Marked boxes describe source work and focused tests **only**, not automatic production-hardware acceptance. Read [CURRENT_STATE.md](CURRENT_STATE.md) for CI, known limitations, and acceptance boundaries.
+Active development version: **0.9.0-dev** (partial standalone Windows Player integration; this is not a completed 0.9 or 1.0 release). Status reviewed 2026-10-21 KST against `main` `f92d293` plus priority audit hardening branch. Marked boxes describe source work and focused tests **only**, not automatic production-hardware acceptance. Read [CURRENT_STATE.md](CURRENT_STATE.md) for CI, known limitations, and acceptance boundaries.
 
 Roadmap entries are implementation order, not promises tied to dates.
 

@@ -1,3 +1,7 @@
+## Priority audit correctness fixes (2026-10-21)
+
+See [CURRENT_STATE.md](CURRENT_STATE.md) and [audit issue #25](https://github.com/skatmdgn/NEngine/issues/25). This correction batch implements the Player managed assembly manifest v2, Win32 audio lifetime/diagnostics, bounded text metadata parsers and 5K Canvas scaling with regression coverage. The release hardware/Android acceptance and Vulkan dynamic UI performance work remain outstanding.
+
 # Priority audit repairs — October 2026
 
 **Scope:** NEngine main baseline `51db15f`, reviewed in October 2026.
