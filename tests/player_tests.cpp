@@ -269,6 +269,107 @@ int main() {
             std::get<double>(volume) > 0.5;
     }
     if (!audio_property_ok) return test_failure(54, __LINE__);
+    // Standalone Player property bridge must match the 3D and 2D managed
+    // Rigidbody APIs, including wake/sleep semantics and invalid data.
+    nengine::core::World parity_world;
+    const auto parity_entity = parity_world.create("Properties");
+    auto* body3d = parity_world.add_component<nengine::physics::Rigidbody>(
+        parity_entity, nengine::physics::rigidbody_type());
+    auto* body2d = parity_world.add_component<nengine::physics::Rigidbody2D>(
+        parity_entity, nengine::physics::rigidbody2d_type());
+    auto* audio3 = parity_world.add_component<nengine::audio::AudioSource>(
+        parity_entity, nengine::audio::audio_source_type());
+    auto* listener = parity_world.add_component<nengine::audio::AudioListener>(
+        parity_entity, nengine::audio::audio_listener_type());
+    if (!body3d || !body2d || !audio3 || !listener)
+        return test_failure(55, __LINE__);
+    nengine::core::PropertyValue parity_value;
+    if (!write_player_transform_property(parity_world, parity_entity,
+            "NEngine.Rigidbody", "Mass", 5.0) ||
+        !read_player_transform_property(parity_world, parity_entity,
+            "NEngine.Rigidbody", "Mass", parity_value) ||
+        std::get<double>(parity_value) != 5.0 ||
+        !write_player_transform_property(parity_world, parity_entity,
+            "NEngine.Rigidbody", "Use Gravity", false) ||
+        !read_player_transform_property(parity_world, parity_entity,
+            "NEngine.Rigidbody", "Use Gravity", parity_value) ||
+        std::get<bool>(parity_value))
+        return test_failure(56, __LINE__);
+    if (!write_player_transform_property(parity_world, parity_entity,
+            "NEngine.Rigidbody", "Angular Velocity",
+            nengine::core::Vec3{0.f, 2.f, 0.f}) ||
+        !write_player_transform_property(parity_world, parity_entity,
+            "NEngine.Rigidbody", "Sleeping", true) ||
+        !body3d->sleeping || body3d->angular_velocity.y != 0.f ||
+        !write_player_transform_property(parity_world, parity_entity,
+            "NEngine.Rigidbody", "Linear Velocity",
+            nengine::core::Vec3{4.f, 0.f, 0.f}) ||
+        body3d->sleeping || body3d->linear_velocity.x != 4.f)
+        return test_failure(57, __LINE__);
+    if (write_player_transform_property(parity_world, parity_entity,
+            "NEngine.Rigidbody", "Mass", -4.0) ||
+        write_player_transform_property(parity_world, parity_entity,
+            "NEngine.Rigidbody", "Gravity Scale",
+            std::numeric_limits<double>::infinity()) ||
+        write_player_transform_property(parity_world, parity_entity,
+            "NEngine.Rigidbody", "Linear Velocity",
+            nengine::core::Vec3{0, std::numeric_limits<float>::quiet_NaN(), 0}) ||
+        body3d->mass != 5.f || body3d->linear_velocity.x != 4.f)
+        return test_failure(58, __LINE__);
+    if (!write_player_transform_property(parity_world, parity_entity,
+            "NEngine.Rigidbody2D", "Angular Velocity",
+            nengine::core::Vec3{0.f, 0.f, 3.f}) ||
+        !write_player_transform_property(parity_world, parity_entity,
+            "NEngine.Rigidbody2D", "Sleep Threshold", 0.01) ||
+        !write_player_transform_property(parity_world, parity_entity,
+            "NEngine.Rigidbody2D", "Sleeping", true) ||
+        !body2d->sleeping || body2d->angular_velocity.z != 0.f ||
+        !write_player_transform_property(parity_world, parity_entity,
+            "NEngine.Rigidbody2D", "Allow Sleep", false) ||
+        body2d->sleeping ||
+        write_player_transform_property(parity_world, parity_entity,
+            "NEngine.Rigidbody2D", "Sleeping", 1.0))
+        return test_failure(59, __LINE__);
+    if (!write_player_transform_property(parity_world, parity_entity,
+            "NEngine.AudioSource", "Clip", wav_guid.to_string()) ||
+        !read_player_transform_property(parity_world, parity_entity,
+            "NEngine.AudioSource", "Clip", parity_value) ||
+        std::get<std::string>(parity_value) != wav_guid.to_string() ||
+        !write_player_transform_property(parity_world, parity_entity,
+            "NEngine.AudioSource", "Playing", true) ||
+        !write_player_transform_property(parity_world, parity_entity,
+            "NEngine.AudioSource", "Time", 0.25) ||
+        !write_player_transform_property(parity_world, parity_entity,
+            "NEngine.AudioSource", "Clip", texture_guid.to_string()) ||
+        audio3->playing || audio3->time_seconds != 0.f)
+        return test_failure(60, __LINE__);
+    if (!write_player_transform_property(parity_world, parity_entity,
+            "NEngine.AudioSource", "Pitch", 1.5) ||
+        !write_player_transform_property(parity_world, parity_entity,
+            "NEngine.AudioSource", "Pan Stereo", -0.5) ||
+        !write_player_transform_property(parity_world, parity_entity,
+            "NEngine.AudioSource", "Min Distance", 2.0) ||
+        !write_player_transform_property(parity_world, parity_entity,
+            "NEngine.AudioSource", "Max Distance", 100.0) ||
+        write_player_transform_property(parity_world, parity_entity,
+            "NEngine.AudioSource", "Pitch", -1.0) ||
+        write_player_transform_property(parity_world, parity_entity,
+            "NEngine.AudioSource", "Time",
+            std::numeric_limits<double>::quiet_NaN()) ||
+        write_player_transform_property(parity_world, parity_entity,
+            "NEngine.AudioSource", "Clip", std::string("invalid-guid")) ||
+        audio3->pitch != 1.5f || audio3->max_distance != 100.f)
+        return test_failure(61, __LINE__);
+    if (!write_player_transform_property(parity_world, parity_entity,
+            "NEngine.AudioListener", "Volume", 0.7) ||
+        !read_player_transform_property(parity_world, parity_entity,
+            "NEngine.AudioListener", "Volume", parity_value) ||
+        std::get<double>(parity_value) < 0.69 ||
+        write_player_transform_property(parity_world, parity_entity,
+            "NEngine.AudioListener", "Volume", 1.1) ||
+        read_player_transform_property(parity_world, parity_entity,
+            "NEngine.NoSuchComponent", "Volume", parity_value))
+        return test_failure(62, __LINE__);
     const auto decoded_ping = runtime.assets().load_wav(wav_guid);
     const auto cooked_model = runtime.assets().cooked_artifacts(model_guid);
     const auto cooked_material = runtime.assets().cooked_artifacts(material_guid);

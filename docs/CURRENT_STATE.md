@@ -1,3 +1,9 @@
+## Standalone Player managed property parity follow-up (2026-10-21)
+
+- Player managed property callbacks now handle full Rigidbody/Rigidbody2D property access: mass, gravity, kinematic and sleep controls, linear/angular velocity and finite-safe validation. Sleeping resets velocities and velocity writes wake bodies, matching Editor semantics.
+- Player AudioSource exposes Clip GUID, play-on-awake, loop, spatialization, volume, pitch, stereo pan, distance, playback state and time; AudioListener exposes volume/enabled. Reassigning a clip resets playback state, and newly assigned packaged WAV clips are lazily loaded at most once per GUID.
+- Portable native regression coverage includes property read/write, sleep/wake behavior, rejected nonfinite/out-of-range inputs and AudioSource clip transitions. Actual .NET Player and Windows audio/GPU acceptance remain pending; C# parity for Camera, renderers, colliders, SpriteAnimator and action maps is not yet complete.
+
 ## Windows Player continuation — model/material cooking and managed input/queries
 
 A fifteen-chunk milestone extends standalone Player export to versioned, GUID-addressed .nmat materials and GLB/glTF/OBJ model source/descriptor artifacts. Built-in model imports stage supported relative external sidecars; unresolved or unsafe references abort export and remove the staged output. The Vulkan World resolver now receives model/material roles in addition to texture roles. Automatic generated glTF PBR material subassets are **not** shipped yet: this is source/descriptor-level model cooking, not full imported-material parity.

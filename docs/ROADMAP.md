@@ -8,6 +8,8 @@
 - [x] Managed Transform, Rigidbody2D and AudioSource property bridge with finite validation
 - [ ] Full imported model generated material and texture subasset cooking
 - [ ] Production Windows GPU + .NET runtime + game input hardware acceptance
+- [x] Standalone Player managed 3D/2D Rigidbody complete property bridge including wake/sleep behavior
+- [x] Standalone Player AudioSource/AudioListener property bridge and dynamically assigned bundled WAV loading
 - [ ] Full Player input action map and parity for all managed component properties
 
 

@@ -109,6 +109,17 @@ PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
             ++stats.sprite_sampled;
         }
     }
+    // Scripts can assign a packaged WAV clip after Scene load. Resolve each
+    // new GUID at most once; never retry missing/invalid assets every frame.
+    for (const auto entity : world_.entities()) {
+        const auto* source = world_.get_component<audio::AudioSource>(
+            entity, audio::audio_source_type());
+        if (!source || !source->clip.valid() ||
+            audio_clips_.contains(source->clip) ||
+            !attempted_audio_clips_.insert(source->clip).second) continue;
+        if (auto clip = assets_.load_wav(source->clip))
+            audio_clips_.emplace(source->clip, std::move(*clip));
+    }
     stats.audio = audio_playback_.update(world_, static_cast<float>(frame),
         [this](assets::AssetGuid guid) -> std::optional<float> {
             if (const auto* clip = audio_clip(guid))
@@ -172,6 +183,7 @@ void PlayerRuntime::unload() noexcept {
     bundle_root_.clear();
     assets_.clear();
     audio_clips_.clear();
+    attempted_audio_clips_.clear();
     sprite_clips_.clear();
     sprite_controllers_.clear();
     audio_playback_.reset();
@@ -248,6 +260,7 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
     input_ = {};
     assets_ = std::move(catalog);
     audio_clips_ = std::move(next_clips);
+    attempted_audio_clips_.clear();
     sprite_clips_ = std::move(next_sprites);
     sprite_controllers_ = std::move(next_controllers);
     audio_playback_.reset();

@@ -9,6 +9,7 @@
 #include "nengine/player/assets.hpp"
 #include "nengine/audio/playback.hpp"
 #include <unordered_map>
+#include <unordered_set>
 #include "nengine/physics/simulation.hpp"
 #include "nengine/physics/contact_events.hpp"
 #include "nengine/input/input_state.hpp"
@@ -79,6 +80,7 @@ private:
     render::SpriteControllerRuntime sprite_controllers_{};
     std::unordered_map<assets::AssetGuid, render::SpriteAnimationClip,
                        assets::AssetGuidHash> sprite_clips_{};
+    std::unordered_set<assets::AssetGuid, assets::AssetGuidHash> attempted_audio_clips_{};
     std::unordered_map<assets::AssetGuid, audio::AudioClipData,
                        assets::AssetGuidHash> audio_clips_{};
 };
