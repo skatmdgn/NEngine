@@ -168,6 +168,7 @@ int main(){
           !nav.find_path({.2f,0,.5f},{2.8f,0,.5f},
             NavQuery{~0u,0.f,false,0u}),
           "26 invalid query input is rejected");
+    if(!simple)return EXIT_FAILURE;
     // 27. Agent accepts a path without mutating input data.
     NavAgent agent;
     agent.position={.2f,0,.5f};

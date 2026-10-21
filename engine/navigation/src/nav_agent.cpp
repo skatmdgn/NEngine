@@ -71,7 +71,8 @@ bool NavAgent::update(float dt) noexcept {
         if(!finite_position(position)) {
             position=start;velocity={};return false;
         }
-        if(travel>=dist-0.0001f||last&&dist-travel<=stopping_distance+0.0001f){
+        if(travel>=dist-0.0001f||
+           (last&&dist-travel<=stopping_distance+0.0001f)){
             if(last) {
                 stop();
                 break;

@@ -1,6 +1,7 @@
 #include "nengine/navigation/nav_mesh.hpp"
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <limits>
 #include <queue>
 #include <tuple>

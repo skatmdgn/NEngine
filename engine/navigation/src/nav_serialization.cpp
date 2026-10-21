@@ -14,7 +14,9 @@ bool fail(std::string* error,const char* msg) {
     return false;
 }
 } // namespace
-bool write_nav_mesh(std::ostream& out,const NavMesh& mesh,std::string* error){
+bool write_nav_mesh(std::ostream& destination,const NavMesh& mesh,std::string* error){
+    // Stage before writing: reject overlarge records without partial output.
+    std::ostringstream out;
     out<<std::setprecision(9)<<"NENGINE_NAVMESH 1\nPOLYGONS "
        <<mesh.polygons().size()<<"\n";
     for(const auto& p:mesh.polygons()){
@@ -37,7 +39,12 @@ bool write_nav_mesh(std::ostream& out,const NavMesh& mesh,std::string* error){
         out<<"OBSTACLE "<<o.id<<" "<<o.center.x<<" "<<o.center.y
            <<" "<<o.center.z<<" "<<o.radius<<" "<<(o.enabled?1:0)<<"\n";
     out<<"END_NAVMESH\n";
-    if(!out.good())return fail(error,"navigation stream write failed");
+    const auto serialized=out.str();
+    if(!out.good()||serialized.size()>4u*1024u*1024u)
+        return fail(error,"navigation output exceeds 4MiB");
+    destination.write(serialized.data(),
+                      static_cast<std::streamsize>(serialized.size()));
+    if(!destination.good())return fail(error,"navigation stream write failed");
     if(error)error->clear();
     return true;
 }
