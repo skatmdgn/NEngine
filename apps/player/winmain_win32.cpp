@@ -83,6 +83,10 @@ int run() {
         const HWND native_window =
             static_cast<HWND>(window.native_handle());
         const bool focused = GetForegroundWindow() == native_window;
+        // Player samples its own InputState (separate from Window input).
+        // Release it on focus loss so the next focused cursor sample is a
+        // fresh baseline rather than a large off-window mouse movement.
+        if (!focused) input.release_all();
         const auto down = [focused](int virtual_key) {
             return focused && (GetAsyncKeyState(virtual_key) & 0x8000) != 0;
         };
