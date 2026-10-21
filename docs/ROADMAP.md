@@ -197,6 +197,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Union-by-size contact-island connectivity with 64-body 3D/2D sleep and wake stress coverage
 - [ ] Remaining collider shapes and production broad-phase/solver tuning
 - [x] Keyboard/mouse InputState transitions + Win32 message capture
+- [x] Input focus-loss pointer baseline reset, finite pointer/wheel accumulation and invalid-key hardening with regression coverage
 - [x] Named action-map binding/query foundation
 - [x] Managed KeyCode/GetKey/GetKeyDown/GetKeyUp + mouse position/delta/wheel
 - [ ] Gamepad/touch input backends and production action-map persistence
