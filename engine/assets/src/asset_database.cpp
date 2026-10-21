@@ -56,6 +56,12 @@ std::optional<AssetDatabase::MetaData> AssetDatabase::read_meta(
     const std::filesystem::path& path,
     std::string* error) const {
 
+    std::error_code size_error;
+    const auto bytes = std::filesystem::file_size(path, size_error);
+    if (size_error || bytes > 8192u) {
+        if (error) *error = "asset .meta exceeds 8KiB or is unavailable";
+        return std::nullopt;
+    }
     std::ifstream input(path, std::ios::binary);
     if (!input) {
         if (error) *error = "could not open meta file";

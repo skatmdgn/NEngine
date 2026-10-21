@@ -157,6 +157,13 @@ bool ProjectManifestSerializer::load(
     ProjectManifest& manifest,
     std::string* error) {
 
+    std::error_code size_error;
+    const auto bytes = std::filesystem::file_size(path, size_error);
+    if (size_error || bytes > 16384u) {
+        set_error(error, "project manifest exceeds 16KiB or is unavailable");
+        return false;
+    }
+
     std::ifstream input(
         path,
         std::ios::binary);

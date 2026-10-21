@@ -33,6 +33,9 @@ bool read_manifest(
     const std::filesystem::path& path,
     CachedManifest& manifest) {
 
+    std::error_code size_error;
+    const auto bytes = std::filesystem::file_size(path, size_error);
+    if (size_error || bytes > 4u * 1024u * 1024u) return false;
     std::ifstream input(path, std::ios::binary);
     if (!input) return false;
 
