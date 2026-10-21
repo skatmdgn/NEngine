@@ -1711,7 +1711,7 @@ int main() {
             "GetAbiVersion") !=
                 std::string::npos &&
         bridge.find(
-            "AbiVersion = 16") !=
+            "AbiVersion = 18") !=
                 std::string::npos &&
         bridge.find(
             "GameplayLoadContext") !=
@@ -1752,6 +1752,11 @@ int main() {
         bridge.find(
             "ConfigureNativeUiCallbacks") !=
                 std::string::npos &&
+        api.find("public static class Input") != std::string::npos &&
+        api.find("GetButtonDown(string name)") != std::string::npos &&
+        api.find("GetButtonUp(string name)") != std::string::npos &&
+        api.find("GetButton(string name)") != std::string::npos &&
+        api.find("private delegate int ActionFn") != std::string::npos &&
         api.find("public static class UI") != std::string::npos &&
         api.find("WasClicked") != std::string::npos &&
         api.find("SetInteractable") != std::string::npos &&
@@ -2077,11 +2082,14 @@ int main() {
                 << "    private void Update() {\n"
                 << "        if (frame == 0) {\n"
                 << "            if (!Input.GetKey(KeyCode.A) || !Input.GetKeyDown(KeyCode.A) || Input.GetKeyUp(KeyCode.A)) throw new System.Exception(\"input press mismatch\");\n"
+                << "            if (!Input.GetButton(\"Jump\") || !Input.GetButtonDown(\"Jump\") || Input.GetButtonUp(\"Jump\")) throw new System.Exception(\"action press mismatch\");\n"
+                << "            if (Input.GetButton(\"Unknown\") || Input.GetButtonDown(\"\") || Input.GetButtonUp(new string('x', 100))) throw new System.Exception(\"unsafe action accepted\");\n"
                 << "            Vector2 p = Input.mousePosition; Vector2 d = Input.mouseDelta; Vector2 w = Input.mouseScrollDelta;\n"
                 << "            if (p.x != 104 || p.y != 97 || d.x != 4 || d.y != -3 || w.y != 1.5f) throw new System.Exception(\"pointer mismatch\");\n"
                 << "            transform.localPosition = new Vector3(d.x, d.y, w.y);\n"
                 << "        } else {\n"
                 << "            if (Input.GetKey(KeyCode.A) || Input.GetKeyDown(KeyCode.A) || !Input.GetKeyUp(KeyCode.A)) throw new System.Exception(\"input release mismatch\");\n"
+                << "            if (Input.GetButton(\"Jump\") || Input.GetButtonDown(\"Jump\") || !Input.GetButtonUp(\"Jump\")) throw new System.Exception(\"action release mismatch\");\n"
                 << "            gameObject.name = \"Input Passed\";\n"
                 << "        }\n"
                 << "        frame++;\n"
@@ -2106,6 +2114,9 @@ int main() {
                 << "        if (UI.Find(\"Main.Start\") != button || UI.Find(\"Launch\") != 0 || UI.Find(\"시작\") != button) throw new System.Exception(\"UI stable name/legacy text lookup mismatch\");\n"
                 << "        if (!UI.SetVisible(button, false) || UI.IsVisible(button) || !UI.SetInteractable(button, false) || UI.IsInteractable(button)) throw new System.Exception(\"UI mutation mismatch\");\n"
                 << "        if (UI.SetText(9999, \"No\") || UI.GetText(9999) != null || UI.WasClicked(9999)) throw new System.Exception(\"invalid UI widget accepted\");\n"
+                << "        if (UI.GetImageTexture(18).valid || !AssetGuid.TryParse(\"aaaaaaaaaaaaaaaabbbbbbbbbbbbbbbb\", out AssetGuid icon)) throw new System.Exception(\"Image default state mismatch\");\n"
+                << "        if (!UI.SetImageTexture(18, icon) || UI.GetImageTexture(18) != icon) throw new System.Exception(\"Image GUID native roundtrip mismatch\");\n"
+                << "        if (UI.SetImageTexture(17, icon) || UI.SetImageTexture(9999, icon) || UI.GetImageTexture(9999).valid) throw new System.Exception(\"Image widget type safety mismatch\");\n"
                 << "        gameObject.name = \"UI Passed\";\n"
                 << "    }\n"
                 << "}\n"
@@ -2255,7 +2266,7 @@ int main() {
                 integration_root /
                 "Library" /
                 "ManagedBuild" /
-                "Debug";
+                "Debug&100%";
             integration_build.dotnet_executable =
                 *real_dotnet;
             integration_build.configuration =
@@ -2335,6 +2346,7 @@ int main() {
                             bool visible{true};
                             bool interactable{true};
                             bool clicked{true};
+                            std::string image_guid{};
                         } ui_test;
 
                         managed_runtime.bind_ui(
@@ -2369,6 +2381,18 @@ int main() {
                                 if (id != 17u || value.size() > 4096u) return false;
                                 ui.text = value;
                                 return true;
+                            },
+                            [](void* context, std::uint64_t id) -> std::optional<std::string> {
+                                const auto& ui = *static_cast<UiTestState*>(context);
+                                return id == 18u
+                                    ? std::optional<std::string>{ui.image_guid}
+                                    : std::nullopt;
+                            },
+                            [](void* context, std::uint64_t id, std::string_view guid) -> bool {
+                                auto& ui = *static_cast<UiTestState*>(context);
+                                if (id != 18u || guid.size() > 32u) return false;
+                                ui.image_guid = guid;
+                                return true;
                             });
 
                         const auto ui_probe = managed_runtime.create_behaviour("UIProbe");
@@ -2387,6 +2411,7 @@ int main() {
                                 ui_probe, probe_entity, probe_name, probe_active) &&
                             probe_name == "UI Passed" &&
                             ui_test.text == "시작" &&
+                            ui_test.image_guid == "aaaaaaaaaaaaaaaabbbbbbbbbbbbbbbb" &&
                             !ui_test.visible && !ui_test.interactable;
                         check(ui_passed,
                             "real .NET UI click subscriptions dispatch once, safely unsubscribe, preserve script IDs and roundtrip UTF-8");
@@ -3811,6 +3836,10 @@ int main() {
 
                             managed_runtime.bind_input(
                                 &managed_input);
+                            nengine::input::ActionMap script_actions;
+                            script_actions.bind("Jump", nengine::input::Key::A);
+                            script_actions.bind("Fire", nengine::input::Key::MouseLeft);
+                            managed_runtime.bind_input_actions(&script_actions);
 
                             const auto input_entity =
                                 script_world.create(

@@ -71,6 +71,14 @@ int run() {
 
     std::uint32_t old_width = window.client_width();
     std::uint32_t old_height = window.client_height();
+    // The Scene holds Vulkan pipelines and GPU caches associated with the
+    // old render pass. Shut it down before rebuilding swapchain resources.
+    const auto recreate_swapchain = [&](std::uint32_t width,
+                                        std::uint32_t height) {
+        scene.shutdown();
+        return renderer.resize(width, height) &&
+            scene.initialize(renderer);
+    };
     auto last_frame = std::chrono::steady_clock::now();
     while (window.poll_events()) {
         const auto now = std::chrono::steady_clock::now();
@@ -83,6 +91,10 @@ int run() {
         const HWND native_window =
             static_cast<HWND>(window.native_handle());
         const bool focused = GetForegroundWindow() == native_window;
+        // Player samples its own InputState (separate from Window input).
+        // Release it on focus loss so the next focused cursor sample is a
+        // fresh baseline rather than a large off-window mouse movement.
+        if (!focused) input.release_all();
         const auto down = [focused](int virtual_key) {
             return focused && (GetAsyncKeyState(virtual_key) & 0x8000) != 0;
         };
@@ -108,12 +120,20 @@ int run() {
         }};
         for (const auto [key, virtual_key] : mapped)
             input.set_key(key, down(virtual_key));
+        // Window::poll_events already consumed WM_MOUSEWHEEL. Forward the
+        // event delta to the Player's distinct managed-facing InputState.
+        if (focused)
+            input.add_wheel(window.input_state().pointer().wheel_y);
         POINT pointer{};
         if (focused && GetCursorPos(&pointer) &&
             ScreenToClient(native_window, &pointer))
             input.set_pointer_position(
                 static_cast<float>(pointer.x),
                 static_cast<float>(pointer.y));
+        // Route UI before managed gameplay Update so UI.WasClicked observes
+        // the current input-frame snapshot. No Canvas is valid as a no-op.
+        runtime.update_ui(static_cast<float>(window.client_width()),
+                          static_cast<float>(window.client_height()), focused);
         // The stand-alone Player World advances independently of Editor Play.
         // PlayerRuntime limits large frame stalls to eight fixed steps.
         runtime.advance(delta);
@@ -138,13 +158,36 @@ int run() {
         if (width != old_width || height != old_height) {
             old_width = width;
             old_height = height;
-            if (width && height) renderer.resize(width, height);
+            if (width && height && !recreate_swapchain(width, height)) {
+                message("Vulkan resize failed: " + renderer.diagnostic());
+                return 7;
+            }
         }
+        // Rasterize the current mutable runtime Canvas after C# Update.
+        // The CPU RGBA image is composited in the same Vulkan render pass
+        // after World geometry rather than overlaid with a Win32 child window.
+        const auto overlay = runtime.ui().ready()
+            ? runtime.ui().rasterize(width, height)
+            : nengine::ui::UiRgbaImage{};
+        const nengine::render::VulkanCanvasFrame overlay_view{
+            overlay.width, overlay.height, overlay.pixels
+        };
+        const auto* overlay_ptr =
+            overlay_view.valid() ? &overlay_view : nullptr;
         if (width && height && !scene.present_world(
                 renderer, runtime.world(),
                 [&runtime](nengine::assets::AssetGuid guid) {
                     return runtime.assets().cooked_artifacts(guid);
-                })) {
+                }, overlay_ptr)) {
+            if (renderer.needs_resize()) {
+                // Recover both swapchain resources and render-pass pipelines.
+                if (!recreate_swapchain(width, height)) {
+                    message("Vulkan swapchain recovery failed: " +
+                            renderer.diagnostic());
+                    return 7;
+                }
+                continue;
+            }
             message(scene.diagnostic());
             return 7;
         }

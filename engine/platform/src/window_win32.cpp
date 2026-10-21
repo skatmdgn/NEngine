@@ -294,7 +294,11 @@ bool Window::poll_events() {
     if (impl_->hwnd) {
         POINT cursor{};
 
-        if (GetCursorPos(&cursor) &&
+        // WM_KILLFOCUS resets InputState's pointer baseline. Do not
+        // repopulate it while another application owns the foreground;
+        // the first sample after focus returns must remain a baseline.
+        if (GetForegroundWindow() == impl_->hwnd &&
+            GetCursorPos(&cursor) &&
             ScreenToClient(
                 impl_->hwnd,
                 &cursor)) {

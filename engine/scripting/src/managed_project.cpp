@@ -168,7 +168,7 @@ namespace NEngine.Internal
 
     public static class NativeBridge
     {
-        public const int AbiVersion = 16;
+        public const int AbiVersion = 18;
 
         private static readonly Dictionary<long, NEngine.Behaviour> Instances = new();
         private static long _nextHandle = 1;
@@ -260,6 +260,7 @@ namespace NEngine.Internal
             public nint pressed;
             public nint released;
             public nint pointer;
+            public nint action;
         }
 
         [UnmanagedCallersOnly]
@@ -281,7 +282,8 @@ namespace NEngine.Internal
                     callbacks.held,
                     callbacks.pressed,
                     callbacks.released,
-                    callbacks.pointer);
+                    callbacks.pointer,
+                    callbacks.action);
 
                 return 1;
             }
@@ -302,6 +304,8 @@ namespace NEngine.Internal
             public nint write;
             public nint copyText;
             public nint setText;
+            public nint copyImage;
+            public nint setImage;
         }
 
         [UnmanagedCallersOnly]
@@ -324,7 +328,9 @@ namespace NEngine.Internal
                     callbacks.query,
                     callbacks.write,
                     callbacks.copyText,
-                    callbacks.setText);
+                    callbacks.setText,
+                    callbacks.copyImage,
+                    callbacks.setImage);
                 return 1;
             }
             catch
@@ -1699,24 +1705,32 @@ std::string api_stub(
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate int PointerFn(nint context, ref NativePointerState state);
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int ActionFn(nint context, nint utf8Name, uint mode);
+
         private static nint _context;
         private static KeyFn? _held;
         private static KeyFn? _pressed;
         private static KeyFn? _released;
         private static PointerFn? _pointer;
+        private static ActionFn? _action;
 
         internal static void Configure(
             nint context,
             nint held,
             nint pressed,
             nint released,
-            nint pointer)
+            nint pointer,
+            nint action)
         {
             _context = context;
             _held = Marshal.GetDelegateForFunctionPointer<KeyFn>(held);
             _pressed = Marshal.GetDelegateForFunctionPointer<KeyFn>(pressed);
             _released = Marshal.GetDelegateForFunctionPointer<KeyFn>(released);
             _pointer = Marshal.GetDelegateForFunctionPointer<PointerFn>(pointer);
+            _action = action == 0
+                ? null
+                : Marshal.GetDelegateForFunctionPointer<ActionFn>(action);
         }
 
         internal static void Clear()
@@ -1726,6 +1740,7 @@ std::string api_stub(
             _pressed = null;
             _released = null;
             _pointer = null;
+            _action = null;
         }
 
         internal static bool GetKey(uint key) =>
@@ -1736,6 +1751,24 @@ std::string api_stub(
 
         internal static bool GetKeyUp(uint key) =>
             _released?.Invoke(_context, key) > 0;
+
+        internal static bool GetButton(string actionName, uint mode)
+        {
+            if (_action == null || string.IsNullOrEmpty(actionName) ||
+                actionName.Length > 64 || mode > 2) return false;
+            byte[] encoded = Encoding.UTF8.GetBytes(actionName + "\0");
+            if (encoded.Length > 65) return false;
+            nint pointer = Marshal.AllocHGlobal(encoded.Length);
+            try
+            {
+                Marshal.Copy(encoded, 0, pointer, encoded.Length);
+                return _action(_context, pointer, mode) > 0;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(pointer);
+            }
+        }
 
         internal static bool TryGetPointer(out NativePointerState state)
         {
@@ -1758,6 +1791,10 @@ std::string api_stub(
         private delegate int CopyTextFn(nint context, ulong id, nint buffer, int capacity);
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate int SetTextFn(nint context, ulong id, nint utf8);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int CopyImageFn(nint context, ulong id, nint buffer, int capacity);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int SetImageFn(nint context, ulong id, nint utf8);
 
         private static nint _context;
         private static FindFn? _find;
@@ -1765,10 +1802,13 @@ std::string api_stub(
         private static WriteFn? _write;
         private static CopyTextFn? _copyText;
         private static SetTextFn? _setText;
+        private static CopyImageFn? _copyImage;
+        private static SetImageFn? _setImage;
 
         internal static void Configure(
             nint context, nint find, nint query, nint write,
-            nint copyText, nint setText)
+            nint copyText, nint setText,
+            nint copyImage, nint setImage)
         {
             _context = context;
             _find = Marshal.GetDelegateForFunctionPointer<FindFn>(find);
@@ -1776,6 +1816,8 @@ std::string api_stub(
             _write = Marshal.GetDelegateForFunctionPointer<WriteFn>(write);
             _copyText = Marshal.GetDelegateForFunctionPointer<CopyTextFn>(copyText);
             _setText = Marshal.GetDelegateForFunctionPointer<SetTextFn>(setText);
+            _copyImage = Marshal.GetDelegateForFunctionPointer<CopyImageFn>(copyImage);
+            _setImage = Marshal.GetDelegateForFunctionPointer<SetImageFn>(setImage);
         }
 
         internal static void Clear()
@@ -1787,6 +1829,8 @@ std::string api_stub(
             _write = null;
             _copyText = null;
             _setText = null;
+            _copyImage = null;
+            _setImage = null;
         }
 
         private static T WithUtf8<T>(string? value, Func<nint, T> callback, T fallback)
@@ -1819,6 +1863,26 @@ std::string api_stub(
         internal static bool SetText(ulong id, string text) =>
             id != 0UL && _setText != null && WithUtf8(
                 text, ptr => _setText(_context, id, ptr) > 0, false);
+
+        internal static string? GetImage(ulong id)
+        {
+            if (id == 0UL || _copyImage == null) return null;
+            int required = -_copyImage(_context, id, 0, 0);
+            if (required <= 0 || required > 33) return null;
+            nint buffer = Marshal.AllocHGlobal(required);
+            try
+            {
+                if (_copyImage(_context, id, buffer, required) != required)
+                    return null;
+                return Marshal.PtrToStringUTF8(buffer);
+            }
+            finally { Marshal.FreeHGlobal(buffer); }
+        }
+
+        internal static bool SetImage(ulong id, AssetGuid guid) =>
+            id != 0UL && _setImage != null &&
+            WithUtf8(guid.valid ? guid.ToString() : "",
+                ptr => _setImage(_context, id, ptr) > 0, false);
 
         internal static string? GetText(ulong id)
         {
@@ -1899,6 +1963,15 @@ std::string api_stub(
             NativeUi.GetText(id);
         public static bool SetText(ulong id, string text) =>
             NativeUi.SetText(id, text);
+        // Only Image widgets support this property; AssetGuid.none clears.
+        public static AssetGuid GetImageTexture(ulong id)
+        {
+            var encoded = NativeUi.GetImage(id);
+            return AssetGuid.TryParse(encoded, out AssetGuid guid)
+                ? guid : AssetGuid.none;
+        }
+        public static bool SetImageTexture(ulong id, AssetGuid guid) =>
+            NativeUi.SetImage(id, guid);
     }
 
     public abstract class Component
@@ -4260,6 +4333,15 @@ std::string api_stub(
 
         public static bool GetKeyUp(KeyCode key) =>
             NativeInput.GetKeyUp((uint)key);
+
+        public static bool GetButton(string name) =>
+            NativeInput.GetButton(name, 0);
+
+        public static bool GetButtonDown(string name) =>
+            NativeInput.GetButton(name, 1);
+
+        public static bool GetButtonUp(string name) =>
+            NativeInput.GetButton(name, 2);
 
         private static NativePointerState Pointer
         {

@@ -19,6 +19,7 @@ class World;
 
 namespace nengine::input {
 class InputState;
+class ActionMap;
 }
 
 namespace nengine::scripting {
@@ -216,6 +217,9 @@ public:
     void bind_input(
         const input::InputState* input_state) noexcept;
 
+    void bind_input_actions(
+        const input::ActionMap* action_map) noexcept;
+
     // Domain-neutral callback boundary: Scripting never depends on NEngineUI.
     // Query op: 0=visible, 1=interactable, 2=clicked in current runtime frame.
     using UiFindFn = std::uint64_t (*)(void*, std::string_view);
@@ -223,9 +227,13 @@ public:
     using UiWriteFn = int (*)(void*, std::uint64_t, int, int);
     using UiTextFn = std::optional<std::string> (*)(void*, std::uint64_t);
     using UiSetTextFn = bool (*)(void*, std::uint64_t, std::string_view);
+    using UiImageFn = std::optional<std::string> (*)(void*, std::uint64_t);
+    using UiSetImageFn = bool (*)(void*, std::uint64_t, std::string_view);
     void bind_ui(void* context, UiFindFn find, UiQueryFn query,
                  UiWriteFn write, UiTextFn text,
-                 UiSetTextFn set_text) noexcept;
+                 UiSetTextFn set_text,
+                 UiImageFn image = nullptr,
+                 UiSetImageFn set_image = nullptr) noexcept;
 
     bool unload_gameplay();
 
@@ -361,6 +369,7 @@ private:
     struct NativeWorldContext {
         core::World* world{nullptr};
         const input::InputState* input{nullptr};
+        const input::ActionMap* action_map{nullptr};
         void* property_context{nullptr};
         PropertyReadFn property_read{nullptr};
         PropertyWriteFn property_write{nullptr};
@@ -374,6 +383,8 @@ private:
         UiWriteFn ui_write{nullptr};
         UiTextFn ui_text{nullptr};
         UiSetTextFn ui_set_text{nullptr};
+        UiImageFn ui_image{nullptr};
+        UiSetImageFn ui_set_image{nullptr};
         std::vector<core::Entity> pending_destroy{};
     };
 
@@ -705,12 +716,16 @@ private:
             void*,
             NativePointerState*);
 
+    // 0=held, 1=pressed, 2=released; nullptr map => unavailable.
+    using InputActionFn = int (*)(void*, const char*, std::uint32_t);
+
     struct NativeInputCallbacks {
         void* context{nullptr};
         InputKeyFn held{nullptr};
         InputKeyFn pressed{nullptr};
         InputKeyFn released{nullptr};
         InputPointerFn pointer{nullptr};
+        InputActionFn action{nullptr};
     };
 
     using ConfigureInputCallbacksFn =
@@ -733,11 +748,16 @@ private:
         void* context,
         NativePointerState* state);
 
+    static int callback_input_action(
+        void* context, const char* name, std::uint32_t mode);
+
     using UiFindCallbackFn = std::uint64_t (*)(void*, const char*);
     using UiQueryCallbackFn = int (*)(void*, std::uint64_t, int);
     using UiWriteCallbackFn = int (*)(void*, std::uint64_t, int, int);
     using UiCopyTextCallbackFn = int (*)(void*, std::uint64_t, char*, int);
     using UiSetTextCallbackFn = int (*)(void*, std::uint64_t, const char*);
+    using UiCopyImageCallbackFn = int (*)(void*, std::uint64_t, char*, int);
+    using UiSetImageCallbackFn = int (*)(void*, std::uint64_t, const char*);
     struct NativeUiCallbacks {
         void* context{nullptr};
         UiFindCallbackFn find{nullptr};
@@ -745,6 +765,8 @@ private:
         UiWriteCallbackFn write{nullptr};
         UiCopyTextCallbackFn copy_text{nullptr};
         UiSetTextCallbackFn set_text{nullptr};
+        UiCopyImageCallbackFn copy_image{nullptr};
+        UiSetImageCallbackFn set_image{nullptr};
     };
     using ConfigureUiCallbacksFn = int (*)(const NativeUiCallbacks*);
     static std::uint64_t callback_ui_find(void*, const char*);
@@ -752,6 +774,8 @@ private:
     static int callback_ui_write(void*, std::uint64_t, int, int);
     static int callback_ui_copy_text(void*, std::uint64_t, char*, int);
     static int callback_ui_set_text(void*, std::uint64_t, const char*);
+    static int callback_ui_copy_image(void*, std::uint64_t, char*, int);
+    static int callback_ui_set_image(void*, std::uint64_t, const char*);
 
     using LoadGameplayFn =
         int (*)(

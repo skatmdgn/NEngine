@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <array>
+#include <cstdint>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -437,6 +439,48 @@ int main() {
               "Canvas authoring save roundtrips v2 stable names and editable widget data");
     }
 
+    // Image property authoring uses a genuinely imported Texture AssetGuid.
+    const auto image_import_path = project_root / "Assets" / "UI" / "icon.bmp";
+    {
+        std::array<std::uint8_t, 58> bmp_data{};
+        bmp_data[0] = 'B'; bmp_data[1] = 'M';
+        bmp_data[2] = 58; bmp_data[10] = 54; bmp_data[14] = 40;
+        bmp_data[18] = 1; bmp_data[22] = 1;
+        bmp_data[26] = 1; bmp_data[28] = 24; bmp_data[34] = 4;
+        bmp_data[54] = 30; bmp_data[55] = 80; bmp_data[56] = 200;
+        std::ofstream bmp(image_import_path, std::ios::binary);
+        bmp.write(reinterpret_cast<const char*>(bmp_data.data()),
+                  static_cast<std::streamsize>(bmp_data.size()));
+    }
+    model.project().refresh_assets();
+    model.project().import_supported_assets();
+    const auto* image_record = model.project().assets().find_relative("UI/icon.bmp");
+    const auto imported_image_guid =
+        image_record ? image_record->guid : assets::AssetGuid{};
+    const auto ui_image_widget = model.ui_edit_add_widget(ui::WidgetKind::Image);
+    const auto bogus_image_guid = assets::AssetGuid::generate();
+    check(ui_image_widget != ui::invalid_widget &&
+          !model.ui_edit_set_image_texture(bogus_image_guid) &&
+          !model.ui_edit_image_texture().valid(),
+          "Canvas image authoring rejects missing/unknown Texture AssetGuid");
+    const auto edit_image_before = model.ui_edit_image_texture();
+    check(!edit_image_before.valid() &&
+          model.ui_edit_set_image_texture({}) == false &&
+          model.ui_edit_undo() &&
+          model.ui_edit_redo() &&
+          !model.ui_edit_image_texture().valid(),
+          "Canvas Image clear/no-op and Undo/Redo retain correct asset reference");
+    // Undo/Redo correctly clears authoring selection for deleted widgets.
+    // Explicitly reselect the restored Image before editing its property.
+    check(imported_image_guid.valid() &&
+          model.select_ui_widget(ui_image_widget) &&
+          model.ui_edit_set_image_texture(imported_image_guid) &&
+          model.ui_edit_image_texture() == imported_image_guid &&
+          model.ui_edit_undo() &&
+          !model.ui_edit_image_texture().valid() &&
+          model.ui_edit_redo() &&
+          model.ui_edit_image_texture() == imported_image_guid,
+          "Canvas Image Inspector assignment of real imported Texture is undoable");
     check(
         std::filesystem::exists(project_root / "Library" / "Cache"),
         "project creates Library/Cache");

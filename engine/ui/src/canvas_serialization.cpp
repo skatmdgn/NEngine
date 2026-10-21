@@ -32,7 +32,7 @@ bool write_canvas(
 
     std::ostringstream staged;
     staged << std::setprecision(std::numeric_limits<float>::max_digits10);
-    staged << "NENGINE_CANVAS 2\nWIDGETS " << canvas.widgets().size() << '\n';
+    staged << "NENGINE_CANVAS 3\nWIDGETS " << canvas.widgets().size() << '\n';
     std::unordered_set<WidgetId> written;
     std::unordered_set<std::string> names;
     for (const auto& node : canvas.widgets()) {
@@ -44,6 +44,7 @@ bool write_canvas(
             !finite_widget(node) ||
             !valid_widget_name(node.name) ||
             node.text.size() > 4096u ||
+            (node.kind != WidgetKind::Image && node.image_texture.valid()) ||
             (!node.name.empty() && !names.insert(node.name).second))
             return fail(error, "cannot serialize invalid Canvas hierarchy");
 
@@ -56,6 +57,8 @@ bool write_canvas(
                << (node.clip_children ? 1 : 0) << ' '
                << std::quoted(node.text) << ' '
                << std::quoted(node.name) << ' '
+               << std::quoted(node.image_texture.valid()
+                    ? node.image_texture.to_string() : std::string{}) << ' '
                << a.anchor_min.x << ' ' << a.anchor_min.y << ' '
                << a.anchor_max.x << ' ' << a.anchor_max.y << ' '
                << a.offset_min.x << ' ' << a.offset_min.y << ' '
@@ -76,7 +79,7 @@ bool read_canvas(
     unsigned version = 0u;
     std::size_t count = 0u;
     if (!(input >> tag >> version) || tag != "NENGINE_CANVAS" ||
-        (version != 1u && version != 2u) ||
+        (version != 1u && version != 2u && version != 3u) ||
         !(input >> tag >> count) ||
         tag != "WIDGETS" || count > 8192u)
         return fail(error, "invalid Canvas header or widget count");
@@ -84,9 +87,11 @@ bool read_canvas(
     // A widget record must fit on a single reasonably sized line;
     // bounded reads prevent hostile .ncanvas sources from allocating an
     // unbounded quoted string before validation.
-    std::string header_tail;
-    std::getline(input, header_tail);
-    if (header_tail.find_first_not_of(" \t\r") != std::string::npos)
+    std::array<char, 256> header_tail{};
+    if (!input.getline(header_tail.data(),
+            static_cast<std::streamsize>(header_tail.size())))
+        return fail(error, "Canvas header line too large or truncated");
+    if (std::string_view(header_tail.data()).find_first_not_of(" \t\r") != std::string_view::npos)
         return fail(error, "invalid Canvas header trailing data");
 
     UiCanvas candidate;
@@ -109,6 +114,19 @@ bool read_canvas(
             return fail(error, "malformed Canvas WIDGET record");
         if (version >= 2u && !(fields >> std::quoted(node.name)))
             return fail(error, "malformed Canvas widget name");
+        if (version >= 3u) {
+            std::string image_guid;
+            if (!(fields >> std::quoted(image_guid)) ||
+                (kind != static_cast<unsigned>(WidgetKind::Image) &&
+                 !image_guid.empty()))
+                return fail(error, "invalid Canvas image texture field");
+            if (!image_guid.empty()) {
+                const auto parsed = assets::AssetGuid::parse(image_guid);
+                if (!parsed || !parsed->valid())
+                    return fail(error, "invalid Canvas image GUID");
+                node.image_texture = *parsed;
+            }
+        }
         if (!(fields >> a.anchor_min.x >> a.anchor_min.y >>
                 a.anchor_max.x >> a.anchor_max.y >>
                 a.offset_min.x >> a.offset_min.y >>

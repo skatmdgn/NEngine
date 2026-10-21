@@ -1,19 +1,6 @@
-### Player milestone: exported geometry and managed gameplay access
-
-- [x] Export-time raw model + metadata cooking for GLB, glTF, OBJ with collected sidecars
-- [x] GUID-based Vulkan model descriptor/source/sidecar and .nmat material resolver
-- [x] Reject missing glTF sidecars before atomic export publishes game bundle
-- [x] Native Player Win32 keyboard and mouse input state with managed binding
-- [x] Managed 2D/3D raycast, overlap, box cast callbacks in independent Player
-- [x] Managed Transform, Rigidbody2D and AudioSource property bridge with finite validation
-- [ ] Full imported model generated material and texture subasset cooking
-- [ ] Production Windows GPU + .NET runtime + game input hardware acceptance
-- [x] Standalone Player managed 3D/2D Rigidbody complete property bridge including wake/sleep behavior
-- [x] Standalone Player AudioSource/AudioListener property bridge and dynamically assigned bundled WAV loading
-- [ ] Full Player input action map and parity for all managed component properties
-
-
 # Roadmap
+
+Active development version: **0.9.0-dev** (partial standalone Windows Player integration; this is not a completed 0.9 or 1.0 release). Status reviewed 2026-10-17 KST from `main` `51db15f`. Marked boxes describe source work and focused tests **only**, not automatic production-hardware acceptance. Read [CURRENT_STATE.md](CURRENT_STATE.md) for CI, known limitations, and acceptance boundaries.
 
 Roadmap entries are implementation order, not promises tied to dates.
 
@@ -210,6 +197,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Union-by-size contact-island connectivity with 64-body 3D/2D sleep and wake stress coverage
 - [ ] Remaining collider shapes and production broad-phase/solver tuning
 - [x] Keyboard/mouse InputState transitions + Win32 message capture
+- [x] Input focus-loss pointer baseline reset, finite pointer/wheel accumulation and invalid-key hardening with regression coverage
 - [x] Named action-map binding/query foundation
 - [x] Managed KeyCode/GetKey/GetKeyDown/GetKeyUp + mouse position/delta/wheel
 - [ ] Gamepad/touch input backends and production action-map persistence
@@ -281,7 +269,13 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] Windows Canvas parent dropdown + Reparent button (safe hierarchy authoring)
 - [x] Atomic multi-selection subtree deletion with Undo restoration
 - [x] Nested selection/drag, invalid parent and anchor preset regression coverage
-- [ ] runtime Canvas-style UI
+- [x] Packaged Windows Player Canvas asset loading, clipped pointer/keyboard interactions, and C# UI Find/Query/Write/Text callbacks (without Vulkan UI draw)
+- [x] Windows Player Canvas colored panel/button UI composited over Vulkan World (including camera-less menus), with basic ASCII font labels and headless pixel regressions
+- [x] Canvas v3 Image AssetGuid source serialization, Player PNG/JPEG/BMP/TGA texture resolver, UV clipping, alpha/tint CPU compositor and exported BMP integration tests
+- [x] UTF-8 scalar-safe built-in text fallback, without false claims of actual Korean glyph coverage
+- [x] Canvas Image texture authoring via Windows Inspector: add Image, choose imported Texture from Assets, clear, Undo/Redo and Save
+- [x] ABI v18 C# UI.GetImageTexture / UI.SetImageTexture typed AssetGuid methods in Editor Play Mode and standalone Player
+- [ ] runtime Canvas-style UI (Korean/Unicode font glyphs and shaping, GPU hardware acceptance and advanced layout remain)
 - [ ] NavMesh agent/obstacle/link subset
 - [ ] particle system
 
@@ -294,6 +288,42 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [ ] adapter SDK
 
 ## 0.9 — Build/toolchain/productization
+
+### Active Player slice: exported geometry and managed gameplay access
+
+#### User-defined gameplay action maps (30 bounded development slices)
+
+- [x] Integrate deterministic versioned `ActionMap` text serializer from existing input PR and enforce action/key/name limits at runtime
+- [x] Add transactional source `Input.ninput` load and safe staged saving with corruption, missing, symlink and size-limit tests
+- [x] Export validated, canonical `Input.ninput` to Player Content; cover source/CLI bundle fixtures
+- [x] Load Player action map transactionally alongside Scene and expose native held/pressed/released state
+- [x] Forward named action states through native C# Input callback ABI and expose `Input.GetButton`, `GetButtonDown`, `GetButtonUp`
+- [x] Add generated API, managed gameplay and Player runtime tests for press/release, invalid names and optional legacy bundles
+- [ ] Editor action-map configuration UI and a fully packaged C# end-to-end physical-device acceptance test
+
+
+- [x] Export-time raw model + metadata cooking for GLB, glTF, OBJ with collected sidecars
+- [x] GUID-based Vulkan model descriptor/source/sidecar and .nmat material resolver
+- [x] Reject missing glTF sidecars before atomic export publishes game bundle
+- [x] Native Player Win32 keyboard and mouse input state with managed binding
+- [x] Managed 2D/3D raycast, overlap, box cast callbacks in independent Player
+- [x] Managed Transform, Rigidbody2D and AudioSource property bridge with finite validation
+- [x] Player export invokes render-aware model importer and packages generated OBJ/glTF material/texture GUID artifacts
+- [x] Standalone Player catalog loads bounded per-model subasset index and resolves material/texture GUIDs for Vulkan material-slot maps
+- [x] Export and CLI regressions verify OBJ-generated material mapping, .nmat dependency, decoded texture and malformed-index rollback
+- [ ] Full imported model generated material and texture subasset cooking (production image-format/driver QA and fallback policy still pending)
+- [ ] Production Windows GPU + .NET runtime + game input hardware acceptance
+- [x] Full native Player 3D/2D Rigidbody C# property bridge with sleeping/wake semantics and invalid-value regressions
+- [x] Player managed Camera, Light, SpriteRenderer and MeshRenderer native property/AssetGuid bridge with type, range and malformed-GUID regression tests
+- [x] Player managed AudioSource/AudioListener native property bridge, GUID clip resets, finite/bounds validation and standalone regressions
+- [x] Player runtime lazily resolves C#-assigned bundled WAV and sprite clip GUIDs with missing-asset retry suppression and regressions
+- [x] Standalone managed SpriteAnimator bindings (Clip/Controller/Speed/Time/Loop/Playing/SetBool), validated by Player regressions
+- [x] Dynamic controller replacement/unbinding, graph state-clip prefetch and transition tests
+- [x] Standalone nonloop playback termination, high-speed time stabilization, disabled-renderer guard and bounded negative GUID caches
+- [x] Player C# native BoxCollider/SphereCollider/CapsuleCollider and 2D Box/Circle/Capsule collider property parity (geometry, trigger/layer/mask/material), bounded validation and portable regression tests
+- [x] Packaged Player collider property integration with 2D raycast layer/trigger/enabled filtering regression
+- [ ] Full Player input action map and parity for all managed component properties
+
 - [x] Standalone Windows Player bootstrap target and project export CLI (foundation only)
 - [x] Versioned Player bundle manifest with path traversal protection and atomic export staging
 - [x] Isolated Player World loads serialized render/physics/audio/script components

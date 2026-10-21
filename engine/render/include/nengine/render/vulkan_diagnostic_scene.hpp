@@ -2,6 +2,9 @@
 
 #include <functional>
 #include <optional>
+#include <span>
+#include <vector>
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 
@@ -23,6 +26,15 @@ using CachedArtifactResolver =
     std::function<
         std::optional<assets::CachedArtifactSet>(
             assets::AssetGuid)>;
+
+// A straight-alpha CPU Canvas overlay, composited after World geometry.
+// Pixels are row-major RGBA8 in a top-left-origin viewport.
+struct VulkanCanvasFrame {
+    std::uint32_t width{0};
+    std::uint32_t height{0};
+    std::span<const std::uint8_t> rgba{};
+    bool valid() const noexcept;
+};
 
 class VulkanDiagnosticScene {
 public:
@@ -47,7 +59,8 @@ public:
         VulkanContext& context,
         const core::World& world,
         const CachedArtifactResolver&
-            asset_resolver = {});
+            asset_resolver = {},
+        const VulkanCanvasFrame* canvas = nullptr);
 
     void invalidate_imported_assets() noexcept {
         imported_mesh_cache_.clear();
@@ -77,6 +90,8 @@ public:
     }
 
 private:
+    bool prepare_canvas(VulkanContext& context, const VulkanCanvasFrame& frame,
+                        bool& visible);
     struct CookedMaterialMapCacheEntry {
         std::string fingerprint{};
         CookedModelMaterialMap materials{};
@@ -94,6 +109,11 @@ private:
         assets::AssetGuidHash>
         cooked_model_material_maps_{};
 
+    VulkanTextureResource canvas_texture_{};
+    VulkanMaterialResource canvas_material_{};
+    std::vector<std::uint8_t> last_canvas_pixels_{};
+    std::uint32_t last_canvas_width_{0u};
+    std::uint32_t last_canvas_height_{0u};
     VulkanTextureResource texture_{};
     VulkanMaterialResource material_{};
     VulkanGraphicsPipeline pipeline_{};

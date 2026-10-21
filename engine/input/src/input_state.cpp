@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
+#include <sstream>
 #include <utility>
 
 namespace nengine::input {
@@ -32,7 +34,7 @@ void InputState::set_key(
     bool next) noexcept {
 
     if (key == Key::Unknown ||
-        key == Key::Count) {
+        static_cast<std::size_t>(key) >= key_count) {
         return;
     }
 
@@ -64,13 +66,19 @@ void InputState::release_all() noexcept {
         held_[i] = false;
         released_[i] = true;
     }
+    // Regaining focus must establish a new cursor baseline. Otherwise the
+    // first pointer sample includes movement made while the app was inactive.
+    pointer_initialized_ = false;
+    pointer_.delta_x = 0.0f;
+    pointer_.delta_y = 0.0f;
+    pointer_.wheel_y = 0.0f;
 }
 
 bool InputState::held(
     Key key) const noexcept {
 
     if (key == Key::Unknown ||
-        key == Key::Count) {
+        static_cast<std::size_t>(key) >= key_count) {
         return false;
     }
 
@@ -81,7 +89,7 @@ bool InputState::pressed(
     Key key) const noexcept {
 
     if (key == Key::Unknown ||
-        key == Key::Count) {
+        static_cast<std::size_t>(key) >= key_count) {
         return false;
     }
 
@@ -92,7 +100,7 @@ bool InputState::released(
     Key key) const noexcept {
 
     if (key == Key::Unknown ||
-        key == Key::Count) {
+        static_cast<std::size_t>(key) >= key_count) {
         return false;
     }
 
@@ -109,10 +117,19 @@ void InputState::set_pointer_position(
     }
 
     if (pointer_initialized_) {
-        pointer_.delta_x +=
-            x - pointer_.x;
-        pointer_.delta_y +=
-            y - pointer_.y;
+        // Finite float positions can still overflow when subtracted.
+        // Keep all observable frame deltas finite even for malformed
+        // or unexpectedly large platform coordinate samples.
+        const double next_dx = static_cast<double>(pointer_.delta_x) +
+            static_cast<double>(x) - static_cast<double>(pointer_.x);
+        const double next_dy = static_cast<double>(pointer_.delta_y) +
+            static_cast<double>(y) - static_cast<double>(pointer_.y);
+        const double limit = static_cast<double>(
+            std::numeric_limits<float>::max());
+        pointer_.delta_x = std::abs(next_dx) <= limit
+            ? static_cast<float>(next_dx) : 0.0f;
+        pointer_.delta_y = std::abs(next_dy) <= limit
+            ? static_cast<float>(next_dy) : 0.0f;
     } else {
         pointer_initialized_ = true;
     }
@@ -125,8 +142,11 @@ void InputState::add_wheel(
     float delta_y) noexcept {
 
     if (std::isfinite(delta_y)) {
-        pointer_.wheel_y +=
-            delta_y;
+        const double next = static_cast<double>(pointer_.wheel_y) +
+            static_cast<double>(delta_y);
+        if (std::abs(next) <= static_cast<double>(
+                std::numeric_limits<float>::max()))
+            pointer_.wheel_y = static_cast<float>(next);
     }
 }
 
@@ -136,10 +156,28 @@ bool ActionMap::bind(
 
     if (action.empty() ||
         key == Key::Unknown ||
-        key == Key::Count) {
+        static_cast<std::size_t>(key) >=
+            static_cast<std::size_t>(Key::Count) ||
+        action.size() > 64u ||
+        !std::all_of(action.begin(), action.end(), [](unsigned char ch) {
+            return (ch >= 'a' && ch <= 'z') ||
+                   (ch >= 'A' && ch <= 'Z') ||
+                   (ch >= '0' && ch <= '9') ||
+                   ch == '_' || ch == '-' || ch == '.';
+        })) {
         return false;
     }
 
+    const auto existing_action = bindings_.find(action);
+    if (existing_action == bindings_.end() && bindings_.size() >= 128u)
+        return false;
+    if (existing_action != bindings_.end() &&
+        existing_action->second.size() >= 16u) {
+        const auto exists = std::find_if(existing_action->second.begin(),
+            existing_action->second.end(),
+            [key](const auto& entry) { return entry.key == key; });
+        return exists != existing_action->second.end();
+    }
     auto& list =
         bindings_[std::move(action)];
 
@@ -164,6 +202,18 @@ bool ActionMap::unbind(
 
     return bindings_.erase(
         std::string{action}) != 0u;
+}
+
+bool ActionMap::unbind_key(std::string_view action, Key key) {
+    auto it = bindings_.find(std::string{action});
+    if (it == bindings_.end() || key == Key::Unknown || key == Key::Count)
+        return false;
+    auto& list = it->second;
+    const auto old_size = list.size();
+    std::erase_if(list, [key](const ActionBinding& b) { return b.key == key; });
+    const bool removed = list.size() != old_size;
+    if (list.empty()) bindings_.erase(it);
+    return removed;
 }
 
 bool ActionMap::contains(
@@ -235,6 +285,197 @@ bool ActionMap::released(
         [&](const auto& binding) {
             return input.released(binding.key);
         });
+}
+
+
+namespace {
+
+constexpr std::size_t max_action_map_bytes = 64u * 1024u;
+constexpr std::size_t max_action_count = 128u;
+constexpr std::size_t max_action_name_bytes = 64u;
+constexpr std::size_t max_action_bindings = 16u;
+
+// Explicit labels avoid persisting enum ordinals that may change as new
+// input devices and keys are added in future engine versions.
+constexpr std::array<std::string_view,
+    static_cast<std::size_t>(Key::Count)> key_names{{
+    "",
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "F",
+    "G",
+    "H",
+    "I",
+    "J",
+    "K",
+    "L",
+    "M",
+    "N",
+    "O",
+    "P",
+    "Q",
+    "R",
+    "S",
+    "T",
+    "U",
+    "V",
+    "W",
+    "X",
+    "Y",
+    "Z",
+    "Digit0",
+    "Digit1",
+    "Digit2",
+    "Digit3",
+    "Digit4",
+    "Digit5",
+    "Digit6",
+    "Digit7",
+    "Digit8",
+    "Digit9",
+    "Space",
+    "Enter",
+    "Escape",
+    "Tab",
+    "Backspace",
+    "Up",
+    "Down",
+    "Left",
+    "Right",
+    "LeftShift",
+    "RightShift",
+    "LeftControl",
+    "RightControl",
+    "LeftAlt",
+    "RightAlt",
+    "MouseLeft",
+    "MouseRight",
+    "MouseMiddle"
+}};
+
+std::string_view key_name(Key key) noexcept {
+    const auto index = static_cast<std::size_t>(key);
+    return index < key_names.size() ? key_names[index] : std::string_view{};
+}
+
+Key parse_key(std::string_view name) noexcept {
+    for (std::size_t index = 1u; index < key_names.size(); ++index)
+        if (key_names[index] == name)
+            return static_cast<Key>(index);
+    return Key::Unknown;
+}
+
+bool valid_action_name(std::string_view name) noexcept {
+    if (name.empty() || name.size() > max_action_name_bytes)
+        return false;
+    for (const unsigned char ch : name) {
+        if ((ch >= 'A' && ch <= 'Z') ||
+            (ch >= 'a' && ch <= 'z') ||
+            (ch >= '0' && ch <= '9') ||
+            ch == '_' || ch == '-' || ch == '.')
+            continue;
+        return false;
+    }
+    return true;
+}
+
+bool failure(std::string* error, const char* message) {
+    if (error) *error = message;
+    return false;
+}
+
+} // namespace
+
+bool ActionMap::serialize(std::string& output, std::string* error) const {
+    if (bindings_.size() > max_action_count)
+        return failure(error, "action map has too many actions");
+    std::vector<std::string_view> ordered;
+    ordered.reserve(bindings_.size());
+    for (const auto& [name, keys] : bindings_) {
+        if (!valid_action_name(name) ||
+            keys.empty() || keys.size() > max_action_bindings)
+            return failure(error, "invalid action name or binding count");
+        ordered.push_back(name);
+    }
+    std::sort(ordered.begin(), ordered.end());
+
+    std::string encoded = "NENGINE_ACTION_MAP 1\n";
+    for (const auto name : ordered) {
+        encoded += "action ";
+        encoded += name;
+        for (const auto& binding : bindings_.at(std::string{name})) {
+            const auto label = key_name(binding.key);
+            if (label.empty())
+                return failure(error, "unsupported action binding key");
+            encoded += ' ';
+            encoded += label;
+        }
+        encoded += '\n';
+        if (encoded.size() > max_action_map_bytes)
+            return failure(error, "action map exceeds size limit");
+    }
+    output = std::move(encoded);
+    if (error) error->clear();
+    return true;
+}
+
+bool ActionMap::deserialize(
+    std::string_view source,
+    ActionMap& output,
+    std::string* error) {
+
+    if (source.size() > max_action_map_bytes)
+        return failure(error, "action map exceeds size limit");
+
+    std::istringstream lines{std::string{source}};
+    std::string line;
+    if (!std::getline(lines, line))
+        return failure(error, "missing action map header");
+    if (!line.empty() && line.back() == '\r') line.pop_back();
+    if (line != "NENGINE_ACTION_MAP 1")
+        return failure(error, "unsupported action map format or version");
+
+    ActionMap parsed;
+    std::size_t action_count = 0u;
+    while (std::getline(lines, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        std::istringstream fields{line};
+        std::string directive;
+        std::string action;
+        if (!(fields >> directive >> action) ||
+            directive != "action" || !valid_action_name(action))
+            return failure(error, "invalid action record");
+        if (parsed.contains(action))
+            return failure(error, "duplicate action name");
+        if (++action_count > max_action_count)
+            return failure(error, "too many action records");
+
+        std::string token;
+        std::size_t binding_count = 0u;
+        while (fields >> token) {
+            if (++binding_count > max_action_bindings)
+                return failure(error, "too many action bindings");
+            const auto key = parse_key(token);
+            if (key == Key::Unknown)
+                return failure(error, "unsupported action binding key");
+            const auto* existing = parsed.bindings(action);
+            if (existing && std::any_of(existing->begin(), existing->end(),
+                [key](const ActionBinding& binding) {
+                    return binding.key == key;
+                }))
+                return failure(error, "duplicate action binding");
+            if (!parsed.bind(action, key))
+                return failure(error, "failed to bind action");
+        }
+        if (binding_count == 0u)
+            return failure(error, "action has no bindings");
+    }
+    output = std::move(parsed);
+    if (error) error->clear();
+    return true;
 }
 
 } // namespace nengine::input

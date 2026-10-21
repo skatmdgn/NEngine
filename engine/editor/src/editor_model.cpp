@@ -654,6 +654,27 @@ void EditorModel::bind_managed_ui() {
             if (!editor.play_session_.is_playing() || !editor.ui_canvas_)
                 return false;
             return editor.ui_canvas_->set_text(id, std::string(value));
+        },
+        [](void* context, std::uint64_t id) -> std::optional<std::string> {
+            auto& editor = *static_cast<EditorModel*>(context);
+            if (!editor.play_session_.is_playing() || !editor.ui_canvas_)
+                return std::nullopt;
+            const auto* widget = editor.ui_canvas_->find(id);
+            if (!widget || widget->kind != ui::WidgetKind::Image)
+                return std::nullopt;
+            return widget->image_texture.valid()
+                ? widget->image_texture.to_string() : std::string{};
+        },
+        [](void* context, std::uint64_t id, std::string_view guid) -> bool {
+            auto& editor = *static_cast<EditorModel*>(context);
+            if (!editor.play_session_.is_playing() || !editor.ui_canvas_)
+                return false;
+            if (guid.empty())
+                return editor.ui_canvas_->set_image_texture(id, {});
+            if (guid.size() != 32u) return false;
+            const auto parsed = assets::AssetGuid::parse(guid);
+            return parsed && parsed->valid() &&
+                   editor.ui_canvas_->set_image_texture(id, *parsed);
         });
 }
 
@@ -849,6 +870,21 @@ bool EditorModel::ui_edit_set_anchors(ui::RectAnchors anchors) {
     if (!ui_edit_widget()) return false;
     auto candidate = ui_edit_history_.canvas();
     if (!candidate.set_anchors(ui_edit_selected_, anchors)) return false;
+    return ui_edit_history_.commit(std::move(candidate));
+}
+
+bool EditorModel::ui_edit_set_image_texture(
+    assets::AssetGuid texture) {
+    if (!ui_edit_widget() || ui_edit_drag_active_ ||
+        ui_edit_widget()->kind != ui::WidgetKind::Image) return false;
+    if (texture == ui_edit_image_texture()) return false;
+    if (texture.valid()) {
+        const auto* record = project_.assets().find(texture);
+        if (!record || record->importer_id != "NEngine.Texture")
+            return false;
+    }
+    auto candidate = ui_edit_history_.canvas();
+    if (!candidate.set_image_texture(ui_edit_selected_, texture)) return false;
     return ui_edit_history_.commit(std::move(candidate));
 }
 

@@ -26,7 +26,7 @@ int main() {
 
     editor.selection().set(cube);
 
-    nengine::platform::Window window({"NEngine Editor 0.2.2-dev", 1440, 900, true});
+    nengine::platform::Window window({"NEngine Editor 0.9.0-dev", 1440, 900, true});
     if (!window.open()) {
         std::cerr << "Failed to create NEngine editor window.\n";
         return 1;
@@ -44,7 +44,7 @@ int main() {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 #else
-    std::cout << "NEngine Editor 0.2.2-dev\n";
+    std::cout << "NEngine Editor 0.9.0-dev\n";
     std::cout << "Edit World: " << world.size() << " objects\n";
     std::cout << "Win32 editor shell is exercised by Windows CI and Windows runtime QA.\n";
     window.close();

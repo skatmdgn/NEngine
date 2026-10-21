@@ -1,10 +1,14 @@
 #include "nengine/player/exporter.hpp"
 #include "nengine/player/bundle.hpp"
+#include "nengine/input/action_map_io.hpp"
 #include "nengine/core/scene.hpp"
 #include "nengine/assets/asset_database.hpp"
 #include "nengine/assets/builtin_processors.hpp"
+#include "nengine/render/model_importer.hpp"
+#include "nengine/player/subassets.hpp"
 #include "nengine/assets/asset_importer.hpp"
 #include <chrono>
+#include <fstream>
 #include <array>
 #include <algorithm>
 #include <filesystem>
@@ -85,6 +89,30 @@ bool export_player_data(const ExportSettings& settings,
         source, staging / "Content" / "Main.nscene",
         std::filesystem::copy_options::none, ec);
     if (ec) { cleanup(); return fail(error, "cannot copy player startup Scene"); }
+    // A data-only export still needs an empty asset catalog.
+    std::filesystem::create_directories(staging / "Content" / "Assets", ec);
+    if (ec) { cleanup(); return fail(error, "cannot stage empty asset catalog"); }
+    const auto action_source = root / "Input.ninput";
+    const auto action_status =
+        std::filesystem::symlink_status(action_source, ec);
+    if (ec == std::errc::no_such_file_or_directory) ec.clear();
+    if (ec || std::filesystem::is_symlink(action_status)) {
+        cleanup(); return fail(error, "project action map path is unsafe");
+    }
+    if (std::filesystem::exists(action_status)) {
+        input::ActionMap map;
+        if (!input::load_action_map_file(action_source, map, error)) {
+            cleanup();
+            return false;
+        }
+        std::string canonical;
+        if (!map.serialize(canonical, error)) { cleanup(); return false; }
+        std::ofstream output(staging / "Content" / "Input.ninput", std::ios::binary);
+        if (!output || !(output << canonical) || !output.flush()) {
+            cleanup(); return fail(error, "cannot stage canonical action map");
+        }
+        output.close();
+    }
     std::size_t copied_assets = 0;
     if (settings.copy_supported_assets) {
         const auto assets_root = root / "Assets";
@@ -121,6 +149,13 @@ bool export_player_data(const ExportSettings& settings,
                 }
                 const auto source_path = it->path();
                 const auto ext = source_path.extension().string();
+                // Staging WebP as a valid texture would produce a Player
+                // bundle whose GPU pixel decoder cannot render the asset.
+                if (ext == ".webp") {
+                    cleanup();
+                    return fail(error,
+                        "WebP textures are not supported by the Player renderer");
+                }
                 if (std::find(extensions.begin(), extensions.end(), ext) ==
                     extensions.end()) continue;
                 const auto bytes = it->file_size(ec);
@@ -206,6 +241,8 @@ bool export_player_data(const ExportSettings& settings,
         }
     }
     std::size_t cooked_models = 0;
+    std::size_t generated_materials = 0;
+    std::size_t generated_textures = 0;
     if (settings.copy_supported_assets) {
         const auto packaged = staging / "Content" / "Assets";
         assets::AssetDatabase db(packaged);
@@ -221,9 +258,26 @@ bool export_player_data(const ExportSettings& settings,
             std::filesystem::create_directories(folder, ec);
             if (ec) { cleanup(); return fail(error, "cannot create model cook directory"); }
             const assets::ImportContext context{&record, &descriptor, folder};
-            const auto cooked = assets::model_source_importer(context);
+            const auto cooked = render::model_asset_importer(context);
             if (!cooked.success) {
                 cleanup(); return fail(error, "cannot cook Player model: " + cooked.message);
+            }
+            if (!write_model_subassets(folder, cooked.subassets, error)) {
+                cleanup();
+                return false;
+            }
+            if (generated_materials > 8192u || generated_textures > 8192u ||
+                cooked.subassets.size() > 1024u) {
+                cleanup(); return fail(error, "too many generated Player subassets");
+            }
+            for (const auto& subasset : cooked.subassets) {
+                if (subasset.importer_id == "NEngine.Material")
+                    ++generated_materials;
+                if (subasset.importer_id == "NEngine.Texture")
+                    ++generated_textures;
+                if (generated_materials > 8192u || generated_textures > 8192u) {
+                    cleanup(); return fail(error, "too many generated Player subassets");
+                }
             }
             ++cooked_models;
         }
@@ -297,7 +351,8 @@ bool export_player_data(const ExportSettings& settings,
     std::filesystem::rename(staging, final_path, ec);
     if (ec) { cleanup(); return fail(error, "cannot atomically finish player bundle"); }
     report = {final_path, scene.objects.size(), copied_assets,
-              cooked_textures, cooked_materials, cooked_models, managed_files};
+              cooked_textures, cooked_materials, cooked_models, managed_files,
+              generated_materials, generated_textures};
     if (error) error->clear();
     return true;
 }

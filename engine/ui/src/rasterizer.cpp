@@ -1,8 +1,11 @@
 #include "nengine/ui/rasterizer.hpp"
 
 #include <algorithm>
+#include <array>
+#include <cctype>
 #include <cmath>
 #include <limits>
+#include <string_view>
 
 namespace nengine::ui {
 namespace {
@@ -13,25 +16,109 @@ std::uint8_t byte(float value) noexcept {
     return static_cast<std::uint8_t>(
         std::lround(channel(value) * 255.0f));
 }
+// Small built-in 5x7 fallback glyphs. Supports the ASCII set without
+// allocating OS font handles in the headless Vulkan/CTest build.
+// Decode one Unicode scalar, consuming malformed sequences safely. The
+// compact 5x7 font still substitutes '?' for glyphs it does not contain.
+std::uint32_t next_codepoint(std::string_view text, std::size_t& index) {
+    const auto first = static_cast<unsigned char>(text[index++]);
+    if (first < 0x80u) return first;
+    const auto need = first >= 0xC2u && first <= 0xDFu ? 1u :
+        (first >= 0xE0u && first <= 0xEFu ? 2u :
+        (first >= 0xF0u && first <= 0xF4u ? 3u : 0u));
+    if (need == 0u || index + need > text.size()) return 0xFFFDu;
+    std::uint32_t result = first & (need == 1u ? 0x1Fu : need == 2u ? 0x0Fu : 0x07u);
+    for (std::size_t n = 0; n < need; ++n) {
+        const auto ch = static_cast<unsigned char>(text[index + n]);
+        if ((ch & 0xC0u) != 0x80u) return 0xFFFDu;
+        result = (result << 6u) | (ch & 0x3Fu);
+    }
+    if ((need == 2u && result < 0x800u) ||
+        (need == 3u && result < 0x10000u) ||
+        result > 0x10FFFFu ||
+        (result >= 0xD800u && result <= 0xDFFFu))
+        return 0xFFFDu;
+    index += need;
+    return result;
+}
+std::array<std::uint8_t, 7> glyph(unsigned char raw) noexcept {
+    const char c = static_cast<char>(std::toupper(raw));
+    switch (c) {
+        case 'A': return {14,17,17,31,17,17,17};
+        case 'B': return {30,17,17,30,17,17,30};
+        case 'C': return {14,17,16,16,16,17,14};
+        case 'D': return {30,17,17,17,17,17,30};
+        case 'E': return {31,16,16,30,16,16,31};
+        case 'F': return {31,16,16,30,16,16,16};
+        case 'G': return {14,17,16,23,17,17,14};
+        case 'H': return {17,17,17,31,17,17,17};
+        case 'I': return {14,4,4,4,4,4,14};
+        case 'J': return {7,2,2,2,18,18,12};
+        case 'K': return {17,18,20,24,20,18,17};
+        case 'L': return {16,16,16,16,16,16,31};
+        case 'M': return {17,27,21,21,17,17,17};
+        case 'N': return {17,25,21,19,17,17,17};
+        case 'O': return {14,17,17,17,17,17,14};
+        case 'P': return {30,17,17,30,16,16,16};
+        case 'Q': return {14,17,17,17,21,18,13};
+        case 'R': return {30,17,17,30,20,18,17};
+        case 'S': return {15,16,16,14,1,1,30};
+        case 'T': return {31,4,4,4,4,4,4};
+        case 'U': return {17,17,17,17,17,17,14};
+        case 'V': return {17,17,17,17,17,10,4};
+        case 'W': return {17,17,17,21,21,21,10};
+        case 'X': return {17,17,10,4,10,17,17};
+        case 'Y': return {17,17,10,4,4,4,4};
+        case 'Z': return {31,1,2,4,8,16,31};
+        case '0': return {14,17,19,21,25,17,14};
+        case '1': return {4,12,4,4,4,4,14};
+        case '2': return {14,17,1,2,4,8,31};
+        case '3': return {30,1,1,14,1,1,30};
+        case '4': return {2,6,10,18,31,2,2};
+        case '5': return {31,16,16,30,1,1,30};
+        case '6': return {14,16,16,30,17,17,14};
+        case '7': return {31,1,2,4,8,8,8};
+        case '8': return {14,17,17,14,17,17,14};
+        case '9': return {14,17,17,15,1,1,14};
+        case ' ': return {};
+        case '.': return {0,0,0,0,0,12,12};
+        case ',': return {0,0,0,0,12,12,8};
+        case '!': return {4,4,4,4,4,0,4};
+        case '?': return {14,17,1,2,4,0,4};
+        case ':': return {0,12,12,0,12,12,0};
+        case '-': return {0,0,0,31,0,0,0};
+        case '_': return {0,0,0,0,0,0,31};
+        case '/': return {1,1,2,4,8,16,16};
+        case '(': return {2,4,8,8,8,4,2};
+        case ')': return {8,4,2,2,2,4,8};
+        case '+': return {0,4,4,31,4,4,0};
+        default: return {14,17,1,2,4,0,4};
+    }
+}
 } // namespace
 
 std::vector<UiDrawQuad> build_ui_draw_list(const UiLayout& layout) {
     std::vector<UiDrawQuad> commands;
     commands.reserve(layout.items.size());
     for (const auto& item : layout.items) {
-        if (item.kind == WidgetKind::Text ||
-            item.clipped_rect.width <= 0.0f ||
+        if (item.clipped_rect.width <= 0.0f ||
             item.clipped_rect.height <= 0.0f ||
             channel(item.color.a) == 0.0f)
             continue;
-        commands.push_back({item.id, item.clipped_rect, item.color});
+        if (item.kind == WidgetKind::Text && item.text.empty())
+            continue;
+        const bool background = item.kind != WidgetKind::Text;
+        commands.push_back({item.id, item.clipped_rect, item.color,
+                            item.text, background,
+                            item.image_texture, item.rect});
     }
     return commands;
 }
 
 UiRgbaImage rasterize_ui(
     const std::vector<UiDrawQuad>& commands,
-    std::uint32_t width, std::uint32_t height) {
+    std::uint32_t width, std::uint32_t height,
+    const UiImageResolver& images) {
 
     UiRgbaImage image;
     constexpr std::uint32_t max_dimension = 4096;
@@ -65,21 +152,95 @@ UiRgbaImage rasterize_ui(
         const float src_g = channel(draw.color.g);
         const float src_b = channel(draw.color.b);
         if (src_a == 0.0f) continue;
-        for (auto y = y0; y < y1; ++y) {
+        const UiRgbaImage* sampled = nullptr;
+        if (draw.image_texture.valid() && images)
+            sampled = images(draw.image_texture);
+        if (sampled && (sampled->width == 0u || sampled->height == 0u ||
+            sampled->width > 4096u || sampled->height > 4096u ||
+            sampled->pixels.size() !=
+                static_cast<std::size_t>(sampled->width) * sampled->height * 4u))
+            sampled = nullptr;
+        const auto uv_rect = draw.source_rect.width > 0.f &&
+            draw.source_rect.height > 0.f ? draw.source_rect : draw.rect;
+        if (draw.paint_background) for (auto y = y0; y < y1; ++y) {
             for (auto x = x0; x < x1; ++x) {
                 auto* pixel = image.pixels.data() +
                     (static_cast<std::size_t>(y) * width + x) * 4u;
+                float paint_a = src_a;
+                float paint_r = src_r, paint_g = src_g, paint_b = src_b;
+                if (sampled) {
+                    const auto u = std::clamp(
+                        (static_cast<float>(x) + 0.5f - uv_rect.x) /
+                            uv_rect.width, 0.f, 0.999999f);
+                    const auto v = std::clamp(
+                        (static_cast<float>(y) + 0.5f - uv_rect.y) /
+                            uv_rect.height, 0.f, 0.999999f);
+                    const auto tx = static_cast<std::uint32_t>(u * sampled->width);
+                    const auto ty = static_cast<std::uint32_t>(v * sampled->height);
+                    const auto offset =
+                        (static_cast<std::size_t>(ty) * sampled->width + tx) * 4u;
+                    paint_r *= sampled->pixels[offset] / 255.f;
+                    paint_g *= sampled->pixels[offset + 1u] / 255.f;
+                    paint_b *= sampled->pixels[offset + 2u] / 255.f;
+                    paint_a *= sampled->pixels[offset + 3u] / 255.f;
+                }
                 const float dst_a = pixel[3] / 255.0f;
-                const float out_a = src_a + dst_a * (1.0f - src_a);
+                const float out_a = paint_a + dst_a * (1.0f - paint_a);
                 const auto blend = [&](float src, unsigned channel_index) {
                     const float dst = pixel[channel_index] / 255.0f;
                     return out_a <= 0.0f ? 0.0f :
-                        (src * src_a + dst * dst_a * (1.0f - src_a)) / out_a;
+                        (src * paint_a + dst * dst_a * (1.0f - paint_a)) / out_a;
                 };
-                pixel[0] = byte(blend(src_r, 0));
-                pixel[1] = byte(blend(src_g, 1));
-                pixel[2] = byte(blend(src_b, 2));
+                pixel[0] = byte(blend(paint_r, 0));
+                pixel[1] = byte(blend(paint_g, 1));
+                pixel[2] = byte(blend(paint_b, 2));
                 pixel[3] = byte(out_a);
+            }
+        }
+        if (!draw.text.empty()) {
+            const bool label_only = !draw.paint_background;
+            const float lum = 0.2126f * src_r + 0.7152f * src_g + 0.0722f * src_b;
+            const float ink = label_only ? 1.0f : (lum > 0.53f ? 0.04f : 1.0f);
+            const float ink_r = label_only ? src_r : ink;
+            const float ink_g = label_only ? src_g : ink;
+            const float ink_b = label_only ? src_b : ink;
+            const float ink_a = label_only ? src_a : 1.0f;
+            const int scale = (x1 - x0 >= 100u && y1 - y0 >= 20u) ? 2 : 1;
+            const auto letter_width = static_cast<std::uint32_t>(6 * scale);
+            const auto start_x = x0 + static_cast<std::uint32_t>(2 * scale);
+            const auto start_y = y0 + (y1 - y0 > static_cast<std::uint32_t>(7 * scale)
+                ? (y1 - y0 - static_cast<std::uint32_t>(7 * scale)) / 2u : 0u);
+            auto cursor = start_x;
+            std::size_t character = 0u;
+            for (std::size_t i = 0; i < draw.text.size() && character < 256u; ++character) {
+                if (cursor >= x1 || letter_width > x1 - cursor) break;
+                const auto scalar = next_codepoint(draw.text, i);
+                const auto glyph_bits = glyph(
+                    static_cast<unsigned char>(scalar <= 0x7Fu ? scalar : '?'));
+                for (int gy = 0; gy < 7; ++gy) {
+                    for (int gx = 0; gx < 5; ++gx) {
+                        if (!(glyph_bits[gy] & (1u << (4 - gx)))) continue;
+                        for (int sy = 0; sy < scale; ++sy) {
+                            for (int sx = 0; sx < scale; ++sx) {
+                                const auto x = cursor + static_cast<std::uint32_t>(gx * scale + sx);
+                                const auto y = start_y + static_cast<std::uint32_t>(gy * scale + sy);
+                                if (x >= x1 || y >= y1) continue;
+                                auto* pixel = image.pixels.data() +
+                                    (static_cast<std::size_t>(y) * width + x) * 4u;
+                                const float dst_a = pixel[3] / 255.0f;
+                                const float out_a = ink_a + dst_a * (1.0f - ink_a);
+                                for (int ch = 0; ch < 3; ++ch) {
+                                    const float dst = pixel[ch] / 255.0f;
+                                    const float source = ch == 0 ? ink_r : (ch == 1 ? ink_g : ink_b);
+                                    pixel[ch] = byte(out_a == 0.f ? 0.f :
+                                        (source * ink_a + dst * dst_a * (1.f - ink_a)) / out_a);
+                                }
+                                pixel[3] = byte(out_a);
+                            }
+                        }
+                    }
+                }
+                cursor += letter_width;
             }
         }
     }

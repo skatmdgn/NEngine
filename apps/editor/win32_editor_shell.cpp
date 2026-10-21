@@ -66,6 +66,10 @@ enum ControlId : int {
     IdCanvasSave,
     IdCanvasAddButton,
     IdCanvasAddText,
+    IdCanvasAddImage,
+    IdCanvasImageGuid,
+    IdCanvasAssignImage,
+    IdCanvasClearImage,
     IdCanvasDelete,
     IdCanvasUndo,
     IdCanvasRedo,
@@ -316,6 +320,10 @@ struct Win32EditorShell::Impl {
     HWND canvas_save{nullptr};
     HWND canvas_add_button{nullptr};
     HWND canvas_add_text{nullptr};
+    HWND canvas_add_image{nullptr};
+    HWND canvas_image_guid{nullptr};
+    HWND canvas_assign_image{nullptr};
+    HWND canvas_clear_image{nullptr};
     HWND canvas_delete{nullptr};
     HWND canvas_undo{nullptr};
     HWND canvas_redo{nullptr};
@@ -1124,6 +1132,16 @@ struct Win32EditorShell::Impl {
             host, L"BUTTON", L"+ Button", BS_PUSHBUTTON, IdCanvasAddButton);
         canvas_add_text = create_control(
             host, L"BUTTON", L"+ Text", BS_PUSHBUTTON, IdCanvasAddText);
+        canvas_add_image = create_control(
+            host, L"BUTTON", L"+ Image", BS_PUSHBUTTON, IdCanvasAddImage);
+        canvas_image_guid = create_control(
+            host, L"EDIT", L"", WS_BORDER | ES_AUTOHSCROLL | ES_READONLY,
+            IdCanvasImageGuid);
+        canvas_assign_image = create_control(
+            host, L"BUTTON", L"Use Selected Texture",
+            BS_PUSHBUTTON, IdCanvasAssignImage);
+        canvas_clear_image = create_control(
+            host, L"BUTTON", L"Clear Image", BS_PUSHBUTTON, IdCanvasClearImage);
         canvas_delete = create_control(
             host, L"BUTTON", L"Delete UI", BS_PUSHBUTTON, IdCanvasDelete);
         canvas_undo = create_control(
@@ -1192,7 +1210,9 @@ struct Win32EditorShell::Impl {
                         [](HWND control) { return !control; }) ||
             !canvas_edit_toggle || !canvas_name || !canvas_text ||
             !canvas_apply || !canvas_save || !canvas_add_button ||
-            !canvas_add_text || !canvas_delete || !canvas_undo ||
+            !canvas_add_text || !canvas_add_image || !canvas_image_guid ||
+            !canvas_assign_image || !canvas_clear_image ||
+            !canvas_delete || !canvas_undo ||
             !canvas_redo) {
             shell_log("attach failed: Canvas authoring controls");
             return false;
@@ -1955,9 +1975,11 @@ struct Win32EditorShell::Impl {
         MoveWindow(canvas_edit_toggle, ix, iy, iw, 26, TRUE);
         iy += 32;
         const bool ui_authoring = canvas_mode && editor.has_ui_canvas_draft();
-        const std::array<HWND, 9> ui_controls{
+        const std::array<HWND, 13> ui_controls{
             canvas_name, canvas_text, canvas_apply, canvas_save,
-            canvas_add_button, canvas_add_text, canvas_delete,
+            canvas_add_button, canvas_add_text, canvas_add_image,
+            canvas_image_guid, canvas_assign_image, canvas_clear_image,
+            canvas_delete,
             canvas_undo, canvas_redo};
         for (HWND control : ui_controls)
             ShowWindow(control, ui_authoring ? SW_SHOW : SW_HIDE);
@@ -1988,8 +2010,16 @@ struct Win32EditorShell::Impl {
             MoveWindow(canvas_apply, ix, iy, iw, 24, TRUE); iy += 28;
             MoveWindow(canvas_save, ix, iy, iw, 24, TRUE); iy += 29;
             const int half = (iw - 4) / 2;
-            MoveWindow(canvas_add_button, ix, iy, half, 24, TRUE);
-            MoveWindow(canvas_add_text, ix + half + 4, iy, half, 24, TRUE);
+            const int third = (iw - 8) / 3;
+            MoveWindow(canvas_add_button, ix, iy, third, 24, TRUE);
+            MoveWindow(canvas_add_text, ix + third + 4, iy, third, 24, TRUE);
+            MoveWindow(canvas_add_image, ix + (third + 4) * 2, iy,
+                       third, 24, TRUE);
+            iy += 28;
+            MoveWindow(canvas_image_guid, ix, iy, iw, 24, TRUE);
+            iy += 28;
+            MoveWindow(canvas_assign_image, ix, iy, half, 24, TRUE);
+            MoveWindow(canvas_clear_image, ix + half + 4, iy, half, 24, TRUE);
             iy += 28;
             const int third_width = (iw - 8) / 3;
             MoveWindow(canvas_duplicate, ix, iy, third_width, 24, TRUE);
@@ -2515,13 +2545,15 @@ struct Win32EditorShell::Impl {
             scene_name = "Untitled";
         }
 
-        const auto data =
-            nengine::core::SceneSerializer::capture(
-                editor.world(),
-                scene_name,
-                &editor.component_serialization());
-
+        nengine::core::SceneData data;
         std::string error;
+        if (!nengine::core::SceneSerializer::capture_checked(
+                editor.world(), data, scene_name, &error,
+                &editor.component_serialization())) {
+            editor.console().warning("Scene", "Save blocked: " + error);
+            refresh_console();
+            return false;
+        }
         if (!nengine::core::SceneSerializer::save_file(
                 data,
                 path,
@@ -2666,6 +2698,12 @@ struct Win32EditorShell::Impl {
         SendMessageW(canvas_parent_combo, CB_SETCURSEL, parent_index, 0);
         set_text(canvas_name, widget ? widget->name : "");
         set_text(canvas_text, widget ? widget->text : "");
+        const bool is_image = widget && widget->kind == nengine::ui::WidgetKind::Image;
+        set_text(canvas_image_guid, is_image && widget->image_texture.valid()
+            ? widget->image_texture.to_string() : "");
+        EnableWindow(canvas_image_guid, is_image);
+        EnableWindow(canvas_assign_image, is_image);
+        EnableWindow(canvas_clear_image, is_image && widget->image_texture.valid());
         EnableWindow(canvas_name, widget != nullptr);
         EnableWindow(canvas_text, widget != nullptr);
         EnableWindow(canvas_apply, widget != nullptr);
@@ -2675,6 +2713,7 @@ struct Win32EditorShell::Impl {
         EnableWindow(canvas_redo, editor.ui_edit_redo_count() != 0);
         EnableWindow(canvas_add_button, true);
         EnableWindow(canvas_add_text, true);
+        EnableWindow(canvas_add_image, true);
         EnableWindow(canvas_duplicate, widget != nullptr);
         EnableWindow(canvas_to_back, widget != nullptr);
         EnableWindow(canvas_to_front, widget != nullptr);
@@ -3661,7 +3700,7 @@ struct Win32EditorShell::Impl {
 
             editor.console().info(
                 "Scripting",
-                "Managed gameplay DLL loaded through hostfxr + NEngine.Bridge ABI v5; collectible hot reload is ready.");
+                "Managed gameplay DLL loaded through hostfxr + NEngine.Bridge ABI v18; collectible hot reload is ready.");
         }
 
         refresh_console();
@@ -3930,13 +3969,37 @@ struct Win32EditorShell::Impl {
             handled = true;
             break;
         }
+        case IdCanvasAssignImage: {
+            if (notification != BN_CLICKED) return false;
+            if (canvas_mode && editor.ui_edit_widget()) {
+                const int index = static_cast<int>(
+                    SendMessageW(assets_list, LB_GETCURSEL, 0, 0));
+                if (index < 0 || static_cast<std::size_t>(index) >= asset_rows.size() ||
+                    asset_rows[static_cast<std::size_t>(index)].importer_id !=
+                        "NEngine.Texture" ||
+                    !editor.ui_edit_set_image_texture(
+                        asset_rows[static_cast<std::size_t>(index)].guid))
+                    editor.console().warning("UI",
+                        "Select an imported texture in Assets before assigning to Image");
+            }
+            handled = true;
+            break;
+        }
+        case IdCanvasClearImage:
+            if (notification != BN_CLICKED) return false;
+            if (canvas_mode) editor.ui_edit_set_image_texture({});
+            handled = true;
+            break;
         case IdCanvasAddButton:
-        case IdCanvasAddText: {
+        case IdCanvasAddText:
+        case IdCanvasAddImage: {
             if (notification != BN_CLICKED) return false;
             if (canvas_mode && editor.has_ui_canvas_draft()) {
                 const auto kind = id == IdCanvasAddButton
                     ? nengine::ui::WidgetKind::Button
-                    : nengine::ui::WidgetKind::Text;
+                    : (id == IdCanvasAddImage
+                        ? nengine::ui::WidgetKind::Image
+                        : nengine::ui::WidgetKind::Text);
                 editor.ui_edit_add_widget(kind);
             }
             handled = true;

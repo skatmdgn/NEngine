@@ -879,10 +879,18 @@ void ManagedRuntime::bind_input(
         input_state;
 }
 
+void ManagedRuntime::bind_input_actions(
+    const input::ActionMap* action_map) noexcept {
+    if (!world_context_)
+        world_context_ = std::make_unique<NativeWorldContext>();
+    world_context_->action_map = action_map;
+}
+
 void ManagedRuntime::bind_ui(
     void* context, UiFindFn find, UiQueryFn query,
     UiWriteFn write, UiTextFn text,
-    UiSetTextFn set_text) noexcept {
+    UiSetTextFn set_text, UiImageFn image,
+    UiSetImageFn set_image) noexcept {
     if (!world_context_)
         world_context_ = std::make_unique<NativeWorldContext>();
     world_context_->ui_context = context;
@@ -891,6 +899,8 @@ void ManagedRuntime::bind_ui(
     world_context_->ui_write = write;
     world_context_->ui_text = text;
     world_context_->ui_set_text = set_text;
+    world_context_->ui_image = image;
+    world_context_->ui_set_image = set_image;
 }
 
 std::uint64_t ManagedRuntime::callback_ui_find(
@@ -932,6 +942,31 @@ int ManagedRuntime::callback_ui_set_text(
     auto* state = static_cast<NativeWorldContext*>(context);
     if (!state || !state->ui_set_text || !text) return -1;
     return state->ui_set_text(state->ui_context, id, text) ? 1 : 0;
+}
+
+int ManagedRuntime::callback_ui_copy_image(
+    void* context, std::uint64_t id, char* buffer, int capacity) {
+    auto* state = static_cast<NativeWorldContext*>(context);
+    if (!state || !state->ui_image) return 0;
+    const auto image = state->ui_image(state->ui_context, id);
+    if (!image || (image->size() != 0u && image->size() != 32u))
+        return 0;
+    const int required = static_cast<int>(image->size() + 1u);
+    if (!buffer || capacity < required) return -required;
+    if (!image->empty()) std::memcpy(buffer, image->data(), image->size());
+    buffer[image->size()] = '\0';
+    return required;
+}
+
+int ManagedRuntime::callback_ui_set_image(
+    void* context, std::uint64_t id, const char* guid) {
+    auto* state = static_cast<NativeWorldContext*>(context);
+    if (!state || !state->ui_set_image || !guid) return -1;
+    std::size_t size = 0u;
+    while (size <= 32u && guid[size] != '\0') ++size;
+    if (size > 32u) return -1;
+    return state->ui_set_image(state->ui_context, id,
+        std::string_view{guid, size}) ? 1 : 0;
 }
 
 int ManagedRuntime::callback_physics_raycast(
@@ -1198,6 +1233,23 @@ int ManagedRuntime::callback_input_released(
             key))
         ? 1
         : 0;
+}
+
+int ManagedRuntime::callback_input_action(
+    void* context, const char* name, std::uint32_t mode) {
+    const auto* ctx = static_cast<NativeWorldContext*>(context);
+    if (!ctx || !ctx->input || !name || mode > 2u) return -1;
+    // Byte-bounded scan prevents C# passing a runaway action identifier.
+    std::size_t length = 0;
+    while (length <= 64u && name[length] != '\0') ++length;
+    if (length == 0u || length > 64u) return -1;
+    const std::string_view action{name, length};
+    if (!ctx->action_map) return 0;
+    bool result = false;
+    if (mode == 0u) result = ctx->action_map->held(action, *ctx->input);
+    else if (mode == 1u) result = ctx->action_map->pressed(action, *ctx->input);
+    else result = ctx->action_map->released(action, *ctx->input);
+    return result ? 1 : 0;
 }
 
 int ManagedRuntime::callback_input_pointer(
@@ -1584,9 +1636,9 @@ bool ManagedRuntime::initialize(
     const int abi_version =
         abi();
 
-    if (abi_version != 16) {
+    if (abi_version != 18) {
         diagnostic_ =
-            "managed bridge ABI mismatch: expected 16, got " +
+            "managed bridge ABI mismatch: expected 18, got " +
             std::to_string(
                 abi_version);
         shutdown();
@@ -1887,6 +1939,8 @@ bool ManagedRuntime::initialize(
         &ManagedRuntime::callback_input_released;
     input_callbacks.pointer =
         &ManagedRuntime::callback_input_pointer;
+    input_callbacks.action =
+        &ManagedRuntime::callback_input_action;
 
     if (configure_input_callbacks_(
             &input_callbacks) <= 0) {
@@ -1905,6 +1959,8 @@ bool ManagedRuntime::initialize(
     ui_callbacks.write = &ManagedRuntime::callback_ui_write;
     ui_callbacks.copy_text = &ManagedRuntime::callback_ui_copy_text;
     ui_callbacks.set_text = &ManagedRuntime::callback_ui_set_text;
+    ui_callbacks.copy_image = &ManagedRuntime::callback_ui_copy_image;
+    ui_callbacks.set_image = &ManagedRuntime::callback_ui_set_image;
     if (configure_ui_callbacks_(&ui_callbacks) <= 0) {
         diagnostic_ = "managed Bridge rejected native UI callback table";
         shutdown();
@@ -2577,6 +2633,8 @@ void ManagedRuntime::shutdown() noexcept {
         world_context_->ui_write = nullptr;
         world_context_->ui_text = nullptr;
         world_context_->ui_set_text = nullptr;
+        world_context_->ui_image = nullptr;
+        world_context_->ui_set_image = nullptr;
     }
 
     create_ = nullptr;

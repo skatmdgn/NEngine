@@ -7,6 +7,8 @@
 #include "nengine/core/scene.hpp"
 #include "nengine/player/bundle.hpp"
 #include "nengine/player/assets.hpp"
+#include "nengine/player/ui_runtime.hpp"
+#include "nengine/render/decoded_texture.hpp"
 #include "nengine/audio/playback.hpp"
 #include <unordered_map>
 #include <unordered_set>
@@ -53,22 +55,49 @@ public:
     input::InputState& input() noexcept { return input_; }
     const input::InputState& input() const noexcept { return input_; }
     void begin_input_frame() noexcept { input_.begin_frame(); }
+    void update_ui(float width, float height, bool focused = true) {
+        if (ready_) ui_.update(width, height, input_, focused);
+    }
+    input::ActionMap& actions() noexcept { return actions_; }
+    const input::ActionMap& actions() const noexcept { return actions_; }
     bool paused() const noexcept { return paused_; }
     float fixed_delta_seconds() const noexcept { return 1.0f / 60.0f; }
     const PlayerAssets& assets() const noexcept { return assets_; }
+    PlayerUiRuntime& ui() noexcept { return ui_; }
+    const PlayerUiRuntime& ui() const noexcept { return ui_; }
+    std::size_t cached_ui_images() const noexcept { return ui_images_.size(); }
     const audio::AudioClipData* audio_clip(assets::AssetGuid guid) const noexcept;
     double elapsed_seconds() const noexcept { return elapsed_seconds_; }
     std::size_t entity_count() const noexcept { return world_.size(); }
-    // Managed gameplay isn't yet attached in this standalone bootstrap.
-    // Surface this explicitly rather than silently promising script execution.
+    // Managed runtime is supported with bundled GameScripts.dll; this count
+    // only describes ScriptBehaviour components awaiting an assembly.
     std::size_t pending_script_count() const noexcept;
 private:
+    // Resolve newly assigned C# clip GUIDs from the immutable export bundle
+    // without repeatedly attempting to decode invalid/missing assets.
+    void ensure_referenced_assets();
+    const ui::UiRgbaImage* resolve_ui_image(assets::AssetGuid guid);
+    std::unordered_set<assets::AssetGuid, assets::AssetGuidHash>
+        missing_audio_clips_{};
+    std::unordered_set<assets::AssetGuid, assets::AssetGuidHash>
+        missing_sprite_clips_{};
+    // Tracks which controller GUID is currently bound for each full Entity.
+    std::unordered_map<std::uint64_t, assets::AssetGuid> controller_bindings_{};
+    std::unordered_set<assets::AssetGuid, assets::AssetGuidHash>
+        missing_controller_guids_{};
+
     core::World world_{};
     std::filesystem::path bundle_root_{};
     scripting::ManagedRuntime managed_runtime_{};
     scripting::ManagedScriptSystem script_system_{};
     input::InputState input_{};
+    input::ActionMap actions_{};
     PlayerAssets assets_{};
+    PlayerUiRuntime ui_{};
+    std::unordered_map<assets::AssetGuid, ui::UiRgbaImage,
+        assets::AssetGuidHash> ui_images_{};
+    std::unordered_set<assets::AssetGuid, assets::AssetGuidHash>
+        missing_ui_images_{};
     BundleManifest manifest_{};
     bool ready_{false};
     bool paused_{false};
@@ -80,7 +109,6 @@ private:
     render::SpriteControllerRuntime sprite_controllers_{};
     std::unordered_map<assets::AssetGuid, render::SpriteAnimationClip,
                        assets::AssetGuidHash> sprite_clips_{};
-    std::unordered_set<assets::AssetGuid, assets::AssetGuidHash> attempted_audio_clips_{};
     std::unordered_map<assets::AssetGuid, audio::AudioClipData,
                        assets::AssetGuidHash> audio_clips_{};
 };

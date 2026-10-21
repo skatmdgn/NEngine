@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <span>
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -43,6 +44,13 @@ select_material_pipeline(
 }
 
 } // namespace
+
+bool VulkanCanvasFrame::valid() const noexcept {
+    constexpr std::uint32_t max_dimension = 4096u;
+    return width > 0u && height > 0u &&
+        width <= max_dimension && height <= max_dimension &&
+        rgba.size() == static_cast<std::size_t>(width) * height * 4u;
+}
 
 VulkanDiagnosticScene::~VulkanDiagnosticScene() {
     shutdown();
@@ -363,7 +371,8 @@ bool VulkanDiagnosticScene::present_world(
     VulkanContext& context,
     const core::World& world,
     const CachedArtifactResolver&
-        asset_resolver) {
+        asset_resolver,
+    const VulkanCanvasFrame* canvas) {
 
     if (!ready() ||
         !context.ready()) {
@@ -393,9 +402,30 @@ bool VulkanDiagnosticScene::present_world(
             world);
 
     if (snapshot.cameras.empty()) {
+        // UI-only menus should remain visible before any Camera is authored.
+        if (canvas && canvas->valid()) {
+            bool ui_visible = false;
+            if (!prepare_canvas(context, *canvas, ui_visible)) return false;
+            if (ui_visible) {
+                const auto* screen_quad =
+                    mesh_cache_.find(builtin_unit_quad_mesh_guid());
+                if (!screen_quad) return false;
+                auto screen = Mat4::identity();
+                screen.at(0, 0) = 2.f;
+                screen.at(1, 1) = 2.f;
+                const VulkanMeshDraw only_ui{
+                    &sprite_pipeline_, screen_quad, screen, &canvas_material_};
+                if (!context.present_meshes(
+                        std::span<const VulkanMeshDraw>{&only_ui, 1u})) {
+                    diagnostic_ = context.diagnostic();
+                    return false;
+                }
+                diagnostic_ = "Vulkan Canvas-only menu presented";
+                return true;
+            }
+        }
         diagnostic_ =
             "World contains no active Camera; using diagnostic fallback";
-
         return present(context);
     }
 
@@ -872,6 +902,28 @@ bool VulkanDiagnosticScene::present_world(
         }
     }
 
+    // UI is screen space and must draw after all opaque and transparent
+    // World meshes/sprites, using the pre-existing depth-disabled alpha
+    // pipeline. The fullscreen textured quad covers the swapchain extent.
+    if (canvas) {
+        bool ui_visible = false;
+        if (!prepare_canvas(context, *canvas, ui_visible)) return false;
+        if (ui_visible) {
+            const auto* screen_quad =
+                mesh_cache_.find(builtin_unit_quad_mesh_guid());
+            if (!screen_quad) {
+                diagnostic_ = "Fullscreen Canvas quad is unavailable";
+                return false;
+            }
+            auto screen = Mat4::identity();
+            screen.at(0, 0) = 2.f;
+            screen.at(1, 1) = 2.f;
+            draws.push_back({
+                &sprite_pipeline_, screen_quad, screen,
+                &canvas_material_, 0u, 0u
+            });
+        }
+    }
     if (draws.empty()) {
         if (!context.present_clear(
                 0.08f,
@@ -950,7 +1002,73 @@ bool VulkanDiagnosticScene::present_world(
     return true;
 }
 
+bool VulkanDiagnosticScene::prepare_canvas(
+    VulkanContext& context, const VulkanCanvasFrame& frame,
+    bool& visible) {
+    visible = false;
+    if (!frame.valid()) {
+        diagnostic_ = "Canvas overlay frame has invalid dimensions or RGBA byte count";
+        return false;
+    }
+    // Only nonzero alpha makes overlay visible; zero-alpha RGB garbage
+    // must not cause a descriptor upload or occlude the World.
+    for (std::size_t i = 3u; i < frame.rgba.size(); i += 4u) {
+        if (frame.rgba[i] != 0u) {
+            visible = true;
+            break;
+        }
+    }
+    if (!visible) return true;
+    // UI GPU uploads are content-addressed: static menus and repeated
+    // gameplay frames reuse descriptors rather than recreating textures.
+    if (canvas_texture_.valid() && canvas_material_.valid() &&
+        last_canvas_width_ == frame.width &&
+        last_canvas_height_ == frame.height &&
+        std::equal(frame.rgba.begin(), frame.rgba.end(),
+                   last_canvas_pixels_.begin(), last_canvas_pixels_.end()))
+        return true;
+    // Vulkan draw submissions can still reference the old descriptor set
+    // until their frame fence signals. Do not free the texture or descriptor
+    // while a previous UI frame is in flight. Dynamic UI uploads therefore
+    // use a safe full-device barrier; future triple buffering can optimize it.
+    if (canvas_material_.valid() || canvas_texture_.valid()) {
+        using WaitIdle = std::int32_t (*)(void*);
+        const auto wait = reinterpret_cast<WaitIdle>(
+            context.device().get_proc_address("vkDeviceWaitIdle"));
+        if (!wait || wait(context.device().native_device()) != 0) {
+            diagnostic_ = "Vulkan Canvas upload cannot synchronize in-flight GPU usage";
+            return false;
+        }
+    }
+    canvas_material_.destroy();
+    canvas_texture_.destroy();
+    last_canvas_pixels_.clear();
+    if (!canvas_texture_.create_rgba8(
+            context.loader(), context.instance(), context.device(),
+            frame.width, frame.height, frame.rgba.data(), frame.rgba.size(),
+            VulkanTextureColorSpace::SRgb)) {
+        diagnostic_ = "Canvas Vulkan texture upload failed: " +
+                      canvas_texture_.diagnostic();
+        return false;
+    }
+    if (!canvas_material_.create_textured(context.device(), canvas_texture_)) {
+        diagnostic_ = "Canvas Vulkan material descriptor failed: " +
+                      canvas_material_.diagnostic();
+        canvas_texture_.destroy();
+        return false;
+    }
+    last_canvas_pixels_.assign(frame.rgba.begin(), frame.rgba.end());
+    last_canvas_width_ = frame.width;
+    last_canvas_height_ = frame.height;
+    return true;
+}
+
 void VulkanDiagnosticScene::shutdown() noexcept {
+    canvas_material_.destroy();
+    canvas_texture_.destroy();
+    last_canvas_pixels_.clear();
+    last_canvas_width_ = 0;
+    last_canvas_height_ = 0;
     sprite_pipeline_.destroy();
     blend_double_sided_pipeline_.destroy();
     blend_pipeline_.destroy();

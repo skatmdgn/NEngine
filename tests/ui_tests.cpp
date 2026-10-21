@@ -216,10 +216,10 @@ int main() {
     std::stringstream named_stream;
     UiCanvas named_restore;
     check(write_canvas(named_stream, named) &&
-          named_stream.str().find("NENGINE_CANVAS 2") == 0 &&
+          named_stream.str().find("NENGINE_CANVAS 3") == 0 &&
           read_canvas(named_stream, named_restore) &&
           named_restore.find(named_button)->name == "Main.Start",
-          "Canvas v2 serializes stable script names separately from visible text");
+          "Canvas v3 retains stable script names alongside optional image identity");
     std::stringstream legacy_source(
         "NENGINE_CANVAS 1\nWIDGETS 1\n"
         "WIDGET 7 0 3 1 1 0 \"Legacy\" 0 0 0 0 0 0 100 30 1 1 1 1\n"
@@ -229,6 +229,48 @@ int main() {
           legacy_restore.find(7u)->name.empty() &&
           legacy_restore.find(7u)->text == "Legacy",
           "Canvas v1 sources remain readable without names");
+    UiCanvas image_authoring;
+    const auto textured_widget = image_authoring.add(WidgetKind::Image);
+    const auto non_image_widget = image_authoring.add(WidgetKind::Button);
+    const auto texture_id = nengine::assets::AssetGuid::generate();
+    check(image_authoring.set_image_texture(textured_widget, texture_id) &&
+          !image_authoring.set_image_texture(non_image_widget, texture_id),
+          "Canvas Image assets cannot be assigned to other widget kinds");
+    std::stringstream image_v3;
+    UiCanvas image_readback;
+    check(write_canvas(image_v3, image_authoring) &&
+          read_canvas(image_v3, image_readback) &&
+          image_readback.find(textured_widget)->image_texture == texture_id &&
+          image_readback.layout(200.f, 200.f).items[0].image_texture == texture_id,
+          "versioned Canvas v3 roundtrips image GUID through layout");
+    const auto v3 = image_v3.str();
+    const auto image_entry = texture_id.to_string();
+    const auto malformed_offset = v3.find(image_entry);
+    auto malformed_v3 = v3;
+    if (malformed_offset != std::string::npos)
+        malformed_v3.replace(malformed_offset, image_entry.size(), "../unsafe");
+    std::stringstream broken_image(malformed_v3);
+    UiCanvas unchanged_image = image_readback;
+    check(!read_canvas(broken_image, image_readback) &&
+          image_readback.find(textured_widget)->image_texture ==
+              unchanged_image.find(textured_widget)->image_texture,
+          "malformed v3 image GUID cannot replace existing Canvas");
+    std::stringstream legacy_v2(
+        "NENGINE_CANVAS 2\nWIDGETS 1\n"
+        "WIDGET 13 0 2 1 1 0 \"LegacyIcon\" \"Icon\" "
+        "0 0 0 0 0 0 20 20 1 1 1 1\nEND_CANVAS\n");
+    UiCanvas legacy_image;
+    check(read_canvas(legacy_v2, legacy_image) &&
+          legacy_image.find(13u)->kind == WidgetKind::Image &&
+          !legacy_image.find(13u)->image_texture.valid(),
+          "old Canvas v2 image nodes keep their solid-color fallback");
+    Widget invalid_image_owner;
+    invalid_image_owner.id = 9876u;
+    invalid_image_owner.kind = WidgetKind::Text;
+    invalid_image_owner.image_texture = texture_id;
+    check(!image_readback.restore(invalid_image_owner) &&
+          !image_readback.find(9876u),
+          "Canvas restore disallows image references on non-Image widgets");
     auto clone_named = named.duplicate_subtree(named_button);
     check(clone_named != invalid_widget &&
           named.find(clone_named)->name.empty(),
@@ -280,6 +322,13 @@ int main() {
     check(!read_canvas(oversized_source, named_restore) &&
           named_restore.widgets().size() == retained_widgets,
           "Canvas importer bounds oversized source records transactionally");
+    std::stringstream oversized_header(
+        "NENGINE_CANVAS 2\nWIDGETS 0" + std::string(100000, ' ') +
+        "\nEND_CANVAS\n");
+    check(!read_canvas(oversized_header, named_restore) &&
+          named_restore.widgets().size() == retained_widgets,
+          "Canvas importer bounds oversized header lines transactionally");
+
 
     const auto next = canvas.add(WidgetKind::Text);
     check(next > overflow && canvas.layout(0.0f, 600.0f).items.empty(),
@@ -399,6 +448,138 @@ int main() {
           rgba(4, 4, 0) >= 126u && rgba(4, 4, 2) >= 126u &&
           rgba(6, 6, 3) == 0u,
           "CPU UI renderer blends ordered quads and respects child clipping");
+    UiCanvas texture_paint;
+    const auto tex_item = texture_paint.add(WidgetKind::Image);
+    const auto test_texture_guid = nengine::assets::AssetGuid::generate();
+    texture_paint.set_image_texture(tex_item, test_texture_guid);
+    texture_paint.find(tex_item)->anchors.offset_max = {2.f, 2.f};
+    UiRgbaImage checker{2u, 2u, {
+        255u,0u,0u,255u, 0u,255u,0u,255u,
+        0u,0u,255u,255u, 255u,255u,255u,255u}};
+    const auto colored_pixels = rasterize_ui(
+        build_ui_draw_list(texture_paint.layout(2.f, 2.f)), 2u, 2u,
+        [&](nengine::assets::AssetGuid id) -> const UiRgbaImage* {
+            return id == test_texture_guid ? &checker : nullptr;
+        });
+    check(colored_pixels.pixels == checker.pixels,
+          "Image GUID resolver samples nearest RGBA8 pixels preserving UV order");
+    const auto fallback_pixels = rasterize_ui(
+        build_ui_draw_list(texture_paint.layout(2.f, 2.f)), 2u, 2u);
+    check(fallback_pixels.pixels[0] == 255u &&
+          fallback_pixels.pixels[1] == 255u &&
+          fallback_pixels.pixels[3] == 255u,
+          "unresolved image GUID keeps legacy solid white placeholder");
+    texture_paint.find(tex_item)->color = {1.f, .5f, 1.f, .5f};
+    const auto tinted_pixels = rasterize_ui(
+        build_ui_draw_list(texture_paint.layout(2.f, 2.f)), 2u, 2u,
+        [&](nengine::assets::AssetGuid) -> const UiRgbaImage* {
+            return &checker;
+        });
+    check(tinted_pixels.pixels[3] == 128u &&
+          tinted_pixels.pixels[4+1] >= 126u &&
+          tinted_pixels.pixels[4+1] <= 129u,
+          "Canvas image sampling multiplies asset color and alpha by Image tint");
+    UiDrawQuad clipped_texture_quad{};
+    clipped_texture_quad.widget = 126u;
+    clipped_texture_quad.rect = {1.f, 0.f, 1.f, 2.f};
+    clipped_texture_quad.source_rect = {0.f, 0.f, 2.f, 2.f};
+    clipped_texture_quad.color = {1.f, 1.f, 1.f, 1.f};
+    clipped_texture_quad.image_texture = test_texture_guid;
+    const auto clipped_texels = rasterize_ui({clipped_texture_quad}, 2u, 2u,
+        [&](nengine::assets::AssetGuid) -> const UiRgbaImage* {
+            return &checker;
+        });
+    check(clipped_texels.pixels[3] == 0u &&
+          clipped_texels.pixels[4u + 1u] == 255u &&
+          clipped_texels.pixels[12u + 0u] == 255u,
+          "clipped Image samples correct UV from full untrimmed widget rectangle");
+    UiLayout alpha_stack;
+    alpha_stack.items.push_back({128u, WidgetKind::Panel,
+        {0.f,0.f,2.f,2.f}, {0.f,0.f,2.f,2.f}, "", true,
+        {0.f,0.f,1.f,1.f}});
+    alpha_stack.items.push_back({129u, WidgetKind::Image,
+        {0.f,0.f,2.f,2.f}, {0.f,0.f,2.f,2.f}, "", true,
+        {1.f,1.f,1.f,.5f}, test_texture_guid});
+    const auto merged = rasterize_ui(build_ui_draw_list(alpha_stack), 2u, 2u,
+        [&](nengine::assets::AssetGuid) -> const UiRgbaImage* {
+            return &checker;
+        });
+    check(merged.pixels[0] >= 126u && merged.pixels[0] <= 129u &&
+          merged.pixels[2] >= 126u && merged.pixels[2] <= 129u &&
+          merged.pixels[3] == 255u,
+          "alpha-blended textured Canvas Image composites over opaque Panel");
+    UiRgbaImage broken_texture{2049u,1u,{255u,0u,0u,255u}};
+    const auto safe_placeholder = rasterize_ui(
+        build_ui_draw_list(texture_paint.layout(2.f,2.f)), 2u,2u,
+        [&](nengine::assets::AssetGuid) -> const UiRgbaImage* {
+            return &broken_texture;
+        });
+    const auto untinted_placeholder = rasterize_ui(
+        build_ui_draw_list(texture_paint.layout(2.f,2.f)), 2u,2u);
+    check(safe_placeholder.pixels == untinted_placeholder.pixels,
+          "malformed or oversized RGBA resource cannot cause out-of-bounds sample");
+    UiLayout ascii_layout;
+    ascii_layout.items.push_back({
+        123, WidgetKind::Text, {0.f, 0.f, 60.f, 18.f},
+        {0.f, 0.f, 60.f, 18.f}, "PLAY", true,
+        {1.f, 1.f, 1.f, 1.f}
+    });
+    const auto letters = rasterize_ui(build_ui_draw_list(ascii_layout), 60u, 18u);
+    const auto lit = std::count_if(letters.pixels.begin() + 3,
+        letters.pixels.end(),
+        [i = std::size_t{3}](std::uint8_t v) mutable {
+            const bool alpha = (i % 4u) == 3u;
+            ++i;
+            return alpha && v != 0u;
+        });
+    check(lit > 20u && letters.pixels.size() == 60u * 18u * 4u,
+          "text-only Canvas widgets render visible glyphs without background");
+    UiLayout button_label_layout;
+    button_label_layout.items.push_back({
+        124, WidgetKind::Button, {0.f, 0.f, 72.f, 20.f},
+        {0.f, 0.f, 72.f, 20.f}, "START", true,
+        {0.f, 0.f, 0.f, 1.f}
+    });
+    const auto button_label = rasterize_ui(
+        build_ui_draw_list(button_label_layout), 72u, 20u);
+    const auto bright_ink = std::count_if(button_label.pixels.begin(),
+        button_label.pixels.end(), [](std::uint8_t v) { return v > 200u; });
+    check(bright_ink > 10u && button_label.pixels[3] == 255u,
+          "dark Canvas button keeps its panel while drawing contrasting label ink");
+    UiLayout clipped_label;
+    clipped_label.items.push_back({
+        125, WidgetKind::Text, {0.f, 0.f, 60.f, 20.f},
+        {0.f, 0.f, 6.f, 10.f}, "LONG CAPTION", true,
+        {1.f, 1.f, 1.f, 1.f}
+    });
+    const auto clip_glyphs = rasterize_ui(
+        build_ui_draw_list(clipped_label), 20u, 20u);
+    bool glyph_escaped = false;
+    for (std::uint32_t y = 0; y < 20u; ++y)
+        for (std::uint32_t x = 0; x < 20u; ++x)
+            if ((x >= 6u || y >= 10u) &&
+                clip_glyphs.pixels[(y * 20u + x) * 4u + 3u] != 0u)
+                glyph_escaped = true;
+    check(!glyph_escaped,
+          "ASCII Canvas text glyphs cannot escape clipped UI widget bounds");
+    UiLayout utf8_layout;
+    utf8_layout.items.push_back({
+        127u, WidgetKind::Text, {0.f, 0.f, 18.f, 10.f},
+        {0.f, 0.f, 18.f, 10.f}, "\xED\x95\x9C", true,
+        {1.f, 1.f, 1.f, 1.f}
+    });
+    const auto korean_fallback = rasterize_ui(
+        build_ui_draw_list(utf8_layout), 18u, 10u);
+    utf8_layout.items[0].text = "?";
+    const auto question = rasterize_ui(
+        build_ui_draw_list(utf8_layout), 18u, 10u);
+    check(korean_fallback.pixels == question.pixels,
+          "missing Korean glyph substitutes one visible placeholder per codepoint");
+    utf8_layout.items[0].text = std::string("\xC0\xAF", 2);
+    const auto invalid_utf8 = rasterize_ui(
+        build_ui_draw_list(utf8_layout), 18u, 10u);
+    check(invalid_utf8.pixels.size() == 18u * 10u * 4u,
+          "malformed UTF-8 safely renders bounded replacement glyphs");
     check(rasterize_ui({}, 5000u, 1u).pixels.empty(),
           "rasterizer guards oversized render targets");
 

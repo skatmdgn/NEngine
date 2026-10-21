@@ -145,6 +145,7 @@ bool UiCanvas::restore(Widget widget) {
         widget.id == UINT64_MAX || find(widget.id) ||
         (widget.parent != invalid_widget && !find(widget.parent)) ||
         !valid_widget_name(widget.name) ||
+        (widget.kind != WidgetKind::Image && widget.image_texture.valid()) ||
         widget.text.size() > 4096u)
         return false;
     if (!widget.name.empty())
@@ -383,6 +384,13 @@ bool UiCanvas::set_anchors(WidgetId id, RectAnchors anchors) noexcept {
     return true;
 }
 
+bool UiCanvas::set_image_texture(WidgetId id, assets::AssetGuid guid) noexcept {
+    auto* widget = find(id);
+    if (!widget || widget->kind != WidgetKind::Image) return false;
+    widget->image_texture = guid;
+    return true;
+}
+
 bool UiCanvas::set_color(WidgetId id, UiColor color) noexcept {
     auto* widget = find(id);
     const auto valid_channel = [](float value) {
@@ -461,7 +469,8 @@ UiLayout UiCanvas::layout(float width, float height) const {
         result.items.push_back({
             node.id, node.kind, rect, clipped, node.text,
             node.kind == WidgetKind::Button && node.interactable,
-            node.color
+            node.color,
+            node.image_texture
         });
         // When clip_children=false, descendants inherit the parent's
         // effective clipping from ancestors, not the parent's own bounds.

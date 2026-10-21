@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "nengine/core/math.hpp"
+#include "nengine/assets/asset_guid.hpp"
 
 namespace nengine::ui {
 
@@ -74,6 +75,8 @@ struct Widget {
     UiColor color{};
     // Stable optional script name, independent of visible widget text.
     std::string name{};
+    // Image-only optional texture identity; zero is a solid-color fallback.
+    assets::AssetGuid image_texture{};
 };
 
 struct UiLayoutItem {
@@ -84,6 +87,7 @@ struct UiLayoutItem {
     std::string text{};
     bool interactable{false};
     UiColor color{};
+    assets::AssetGuid image_texture{};
 };
 
 struct UiLayout {
@@ -111,6 +115,7 @@ public:
     bool set_interactable(WidgetId id, bool interactable) noexcept;
     // Reject non-finite, out-of-gamut RGBA values atomically.
     bool set_color(WidgetId id, UiColor color) noexcept;
+    bool set_image_texture(WidgetId id, assets::AssetGuid guid) noexcept;
     bool set_anchors(WidgetId id, RectAnchors anchors) noexcept;
     WidgetId find_by_text(std::string_view text) const noexcept;
     bool remove(WidgetId id);
