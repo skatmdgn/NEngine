@@ -4202,7 +4202,7 @@ match_cached_impulses(
                 if (choice == 0u) continue;
 
                 const std::size_t old_index = choice - 1u;
-                if ((used & (1u << old_index)) != 0u) {
+                if ((used & (std::size_t{1} << old_index)) != 0u) {
                     valid = false;
                     break;
                 }
@@ -4224,7 +4224,7 @@ match_cached_impulses(
                     break;
                 }
 
-                used |= 1u << old_index;
+                used |= std::size_t{1} << old_index;
                 ++match_count;
                 total_cost += distance_squared;
             }

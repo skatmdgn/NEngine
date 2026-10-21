@@ -1,3 +1,17 @@
+## Priority audit hardening — 2026-10-21
+
+- Baseline: integrated `main` `f92d293` (Windows/Ubuntu 11/11 CTest groups, run 39543507203).
+- Correctness fixes staged in `fix/audit-core-priority-20261021` (must pass final PR CI before merge):
+  - Player bundle manifest v2 stores managed assembly identity; legacy v1 bundle loading remains supported.
+  - Standalone Windows Player reads actual managed DLL identity instead of assuming `GameScripts`.
+  - Windows audio move-assignment closes the old WASAPI/COM endpoint; silent Null backend surfaces an explicit warning.
+  - Files read for Player manifest, project metadata, import metadata and animation/material records are bounded before untrusted formatted extraction.
+  - High-resolution Player Canvas overlays are uniformly downscaled to bounded 4096px-axis staging surfaces instead of silently disappearing.
+  - Added malformed-input, custom-DLL, backend lifetime and high-resolution Canvas regression tests.
+- The Vulkan Canvas full-device barrier and full Unicode font/shaping pipeline remain architectural/performance work, **not** claimed resolved by this audit batch.
+- Windows real GPU/audio/.NET Player acceptance and Android hardware builds remain **unverified** in hosted CI.
+- Audit issue: https://github.com/skatmdgn/NEngine/issues/25.
+
 ## Integration snapshot — 2026-10-21
 
 - The October audit consolidation (#12: bounded Scene IO, asset path/manifest guards,
@@ -13,14 +27,14 @@
 
 # NEngine current state
 
-Status snapshot: **2026-10-17 (KST)**, reviewed against `main` commit [`51db15f`](https://github.com/skatmdgn/NEngine/commit/51db15f79eaa443368e956cada956884aa7dec48).
+Status snapshot: **2026-10-21 (KST)**. Last merged `main` was `f92d293` before priority audit fixes on this branch.
 Development version: **0.9.0-dev** (pre-1.0; the number identifies the active standalone-Player integration milestone, **not** completed 0.9 scope).
 Authoritative product target: [MASTER_PLAN.md](MASTER_PLAN.md). Detailed feature checkboxes: [ROADMAP.md](ROADMAP.md). Detailed historical implementation notes: [history/CURRENT_STATE_THROUGH_2026-10-16.md](history/CURRENT_STATE_THROUGH_2026-10-16.md).
 
 ## What is verified and what is not
 
 - **Repository inspection:** CMake targets/source tree and representative public headers were checked; this is **not** an exhaustive line-by-line code audit.
-- **Latest known CI:** [NEngine CI #1037](https://github.com/skatmdgn/NEngine/actions/runs/38903656615), commit `51db15f`, completed 2026-10-16 UTC: **11/11 CTest groups passed on Ubuntu and 11/11 passed on Windows**. Tests cover Core, Editor, Assets, Scripting, Render, Input, Physics, Audio, UI, Player, and Player CLI. Both builds and Windows executable artifact uploads succeeded.
+- **Last verified main CI:** [NEngine CI](https://github.com/skatmdgn/NEngine/actions/runs/39543507203), commit `f92d293`, completed 2026-10-21 UTC: **11/11 CTest groups passed on Ubuntu and 11/11 passed on Windows**. Tests cover Core, Editor, Assets, Scripting, Render, Input, Physics, Audio, UI, Player, and Player CLI. Both builds and Windows executable artifact uploads succeeded.
 - **Historical user acceptance:** Windows editor 0.2.6 previously opened successfully; Hierarchy, Inspector, rename/Transform, Undo/Redo, Play/Pause/Step/Stop, .nscene save/load, and Korean names were checked by the user.
 - **Not verified by CI:** Production Windows Vulkan GPU/rendering, audible playback on physical devices, a complete interactive packaged .NET game, cross-vendor drivers, long-running stability, and Android device/build QA. These must not be presented as passed.
 

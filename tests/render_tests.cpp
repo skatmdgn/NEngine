@@ -127,6 +127,12 @@ int main() {
               bad_controller, loaded_graph, &graph_error) &&
           loaded_graph.states.size() == original_count,
           "malformed controller file does not replace the old graph");
+    std::stringstream oversized_controller;
+    oversized_controller << std::string(4u * 1024u * 1024u + 1u, 'X');
+    check(!render::read_animation_controller(
+              oversized_controller, loaded_graph, &graph_error) &&
+          loaded_graph.states.size() == original_count,
+          "oversized controller stream rejected before quoted parsing");
 
     // The project importer validates .nanimctrl files and declares clip
     // dependencies. Cache updates are fingerprint-aware.
@@ -618,6 +624,13 @@ int main() {
                 clip.duration_seconds() -
                 0.3f) < 0.0001f,
             "SpriteAnimationClip parser accepts timed Texture AssetGuid frames");
+        const auto original_frames = clip.frames.size();
+        std::stringstream oversized_sprite;
+        oversized_sprite << std::string(4u * 1024u * 1024u + 1u, 'X');
+        check(!render::read_sprite_animation_clip(
+                  oversized_sprite, clip, &clip_error) &&
+              clip.frames.size() == original_frames,
+              "oversized SpriteAnimation stream rejected transactionally");
 
         check(
             render::sample_sprite_animation_frame(

@@ -51,6 +51,44 @@ int main() {
     restored = manifest;
     restored.width = 0;
     if (validate_bundle(restored)) return test_failure(4, __LINE__);
+    // Bundles v2 carry the exact managed assembly identity. v1 bundles
+    // remain readable with their historical implicit GameScripts name.
+    if (manifest.version != 2u || restored.managed_assembly_name != "GameScripts")
+        return test_failure(903, __LINE__);
+    BundleManifest custom = manifest;
+    custom.managed_assembly_name = "My.Game";
+    std::stringstream custom_stream;
+    BundleManifest custom_roundtrip;
+    if (!write_bundle(custom_stream, custom) ||
+        !read_bundle(custom_stream, custom_roundtrip) ||
+        custom_roundtrip.managed_assembly_name != "My.Game")
+        return test_failure(904, __LINE__);
+    custom.managed_assembly_name = "../Escape";
+    if (validate_bundle(custom)) return test_failure(905, __LINE__);
+    custom.managed_assembly_name = "My.Game";
+    custom.version = 1u;
+    if (validate_bundle(custom)) return test_failure(906, __LINE__);
+    std::stringstream legacy_stream;
+    legacy_stream << "NENGINE_PLAYER_BUNDLE 1\n"
+                  << "TITLE \"Legacy\"\n"
+                  << "SCENE \"Content/Main.nscene\"\n"
+                  << "RESOLUTION 1280 720\nEND_PLAYER_BUNDLE\n";
+    BundleManifest legacy;
+    if (!read_bundle(legacy_stream, legacy) || legacy.version != 1u ||
+        legacy.managed_assembly_name != "GameScripts")
+        return test_failure(907, __LINE__);
+    BundleManifest sentinel = manifest;
+    sentinel.title = "untouched";
+    std::stringstream oversized;
+    oversized << "NENGINE_PLAYER_BUNDLE 2\nTITLE \""
+              << std::string(10000, 'Q') << "\"\n";
+    if (read_bundle(oversized, sentinel) || sentinel.title != "untouched")
+        return test_failure(908, __LINE__);
+    std::stringstream malformed;
+    malformed << "NENGINE_PLAYER_BUNDLE 2\n"
+              << "TITLE \"broken without closing quote";
+    if (read_bundle(malformed, sentinel) || sentinel.title != "untouched")
+        return test_failure(909, __LINE__);
     const auto root = std::filesystem::temp_directory_path() /
         "nengine_player_bundle_test";
     std::filesystem::remove_all(root);
@@ -1070,8 +1108,12 @@ int main() {
         rendered_ui.pixels.size() != 32u * 32u * 4u ||
         rendered_ui.pixels[3] != 255u)
         return test_failure(187, __LINE__);
-    if (!runtime.ui().rasterize(5000u, 100u).pixels.empty() ||
-        !runtime.ui().rasterize(0u, 100u).pixels.empty())
+    const auto scaled_canvas = runtime.ui().rasterize(5000u, 100u);
+    if (scaled_canvas.width != 4096u || scaled_canvas.height != 81u ||
+        scaled_canvas.pixels.size() != 4096u * 81u * 4u ||
+        scaled_canvas.pixels[3] == 0u ||
+        !runtime.ui().rasterize(0u, 100u).pixels.empty() ||
+        !runtime.ui().rasterize(16385u, 100u).pixels.empty())
         return test_failure(188, __LINE__);
     if (runtime.ui().write(ui_button, 0, 0) != 1 ||
         !runtime.ui().rasterize(32u, 32u).pixels.empty() ||
@@ -1363,6 +1405,21 @@ int main() {
         std::filesystem::exists(report.bundle_root / "Content" /
                                 "Managed" / "Unsafe.cs"))
         return test_failure(42, __LINE__);
+    { std::ofstream dll(managed_dir / "CustomGame.dll"); dll << "fixture"; }
+    { std::ofstream config(managed_dir / "CustomGame.runtimeconfig.json");
+      config << "fixture"; }
+    settings.managed_assembly_name = "CustomGame";
+    settings.destination = export_base / "CustomManaged";
+    BundleManifest exported_custom;
+    if (!export_player_data(settings, report, &error) ||
+        !load_bundle(report.bundle_root / "NEngine.player", exported_custom, &error) ||
+        exported_custom.managed_assembly_name != "CustomGame" ||
+        !std::filesystem::exists(report.bundle_root / "Content" /
+                                 "Managed" / "CustomGame.dll") ||
+        std::filesystem::exists(report.bundle_root / "Content" /
+                                "Managed" / "GameScripts.dll"))
+        return test_failure(910, __LINE__);
+    settings.managed_assembly_name = "GameScripts";
     std::filesystem::remove(managed_dir / "NEngine.Bridge.dll");
     settings.destination = export_base / "BrokenManaged";
     if (export_player_data(settings, report, &error) ||

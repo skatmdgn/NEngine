@@ -34,7 +34,8 @@ int run() {
     if (!runtime.load(root, &error)) { message(error); return 3; }
 
     const auto gameplay_path =
-        root / "Content" / "Managed" / "GameScripts.dll";
+        root / "Content" / "Managed" /
+        (runtime.manifest().managed_assembly_name + ".dll");
     if (std::filesystem::is_regular_file(gameplay_path)) {
         std::string script_error;
         if (!runtime.initialize_managed(&script_error)) {
@@ -44,7 +45,7 @@ int run() {
         OutputDebugStringA("NEngine Player: managed C# gameplay initialized.\n");
     } else if (runtime.pending_script_count()) {
         OutputDebugStringA("NEngine Player: ScriptBehaviours present without"
-                           " packaged GameScripts.dll; managed gameplay disabled.\n");
+                           " packaged managed assembly; managed gameplay disabled.\n");
     }
     const auto& config = runtime.manifest();
     nengine::platform::Window window({
@@ -64,10 +65,19 @@ int run() {
     nengine::audio::AudioOutputDevice audio_device;
     std::string audio_error;
     bool audio_ready = audio_device.open(&audio_error);
-    if (!audio_ready)
-        OutputDebugStringA(
-            ("NEngine Player: audio device unavailable: " +
-             audio_error + "\n").c_str());
+    // A Null fallback reports open=true so headless tests can run; a
+    // graphical Player must not silently masquerade it as audible output.
+    const auto audio_info = audio_device.info();
+    if (!audio_ready || audio_info.backend != "WASAPI") {
+        const auto reason = !audio_ready ? audio_error : audio_info.diagnostic;
+        const auto warning = "Audio playback is unavailable (silent mode): " +
+                             reason;
+        OutputDebugStringA(("NEngine Player: " + warning + "\n").c_str());
+        MessageBoxW(static_cast<HWND>(window.native_handle()),
+                    std::wstring(warning.begin(), warning.end()).c_str(),
+                    L"NEngine Player - Audio warning", MB_OK | MB_ICONWARNING);
+        audio_ready = false;
+    }
 
     std::uint32_t old_width = window.client_width();
     std::uint32_t old_height = window.client_height();

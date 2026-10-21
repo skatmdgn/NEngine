@@ -5,10 +5,12 @@
 #include <fstream>
 #include <iomanip>
 #include <limits>
+#include <sstream>
 #include <unordered_set>
 #include <utility>
 
 #include "nengine/assets/builtin_processors.hpp"
+#include "nengine/assets/bounded_input.hpp"
 #include "nengine/render/components.hpp"
 
 namespace nengine::render {
@@ -84,10 +86,16 @@ float SpriteAnimationClip::duration_seconds()
 }
 
 bool read_sprite_animation_clip(
-    std::istream& input,
+    std::istream& source,
     SpriteAnimationClip& clip,
     std::string* error) {
 
+    std::string bytes;
+    if (!assets::read_bounded_text(source, bytes, 4u * 1024u * 1024u)) {
+        set_error(error, "sprite animation exceeds 4MiB or read failed");
+        return false;
+    }
+    std::istringstream input{std::move(bytes)};
     clip = {};
 
     std::string token;

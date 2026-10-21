@@ -14,6 +14,7 @@
 #include "nengine/audio/components.hpp"
 #include "nengine/core/scene.hpp"
 #include "nengine/editor/editor_model.hpp"
+#include "nengine/editor/project_manifest.hpp"
 #include "nengine/editor/presentation.hpp"
 #include "nengine/editor/property_command.hpp"
 #include "nengine/editor/property_text.hpp"
@@ -135,6 +136,18 @@ int main() {
          std::to_string(project_stamp));
 
     std::string project_error;
+    // Bound project manifest bytes before formatted extraction.
+    const auto huge_project_file = project_root / "Huge.nproject";
+    std::filesystem::create_directories(project_root);
+    { std::ofstream huge(huge_project_file, std::ios::binary);
+      huge << std::string(17000u, 'Q'); }
+    editor::ProjectManifest unchanged;
+    unchanged.name = "untouched";
+    check(!editor::ProjectManifestSerializer::load(
+              huge_project_file, unchanged, &project_error) &&
+          unchanged.name == "untouched",
+          "oversized .nproject is rejected transactionally");
+    std::filesystem::remove(huge_project_file);
     check(
         model.project().open(project_root, &project_error),
         "project session opens");

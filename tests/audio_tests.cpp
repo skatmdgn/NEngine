@@ -812,11 +812,20 @@ int main() {
             output_info.buffer_frames,
         "audio output device pumps mixed PCM and tracks submitted frames");
 
+    // Move-assigning into a live device must close the old COM/WASAPI
+    // endpoint first; repeated closes and self-move must also be safe.
+    audio::AudioOutputDevice replacement;
+    check(replacement.open(&device_error),
+          "replacement device opens before move-assignment");
+    replacement = std::move(output_device);
+    check(replacement.is_open() && !output_device.is_open(),
+          "moving output device transfers live backend ownership");
+    replacement = std::move(replacement);
+    check(replacement.is_open(), "self-move preserves active output backend");
+    replacement.close();
     output_device.close();
-
-    check(
-        !output_device.is_open(),
-        "audio output device closes cleanly");
+    check(!replacement.is_open() && !output_device.is_open(),
+          "moved output devices close without stale ownership");
 
     if (failures == 0) {
         std::cout

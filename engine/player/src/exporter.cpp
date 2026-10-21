@@ -66,6 +66,7 @@ bool export_player_data(const ExportSettings& settings,
 
     BundleManifest manifest;
     manifest.title = settings.title;
+    manifest.managed_assembly_name = settings.managed_assembly_name;
     manifest.width = settings.width;
     manifest.height = settings.height;
     if (!validate_bundle(manifest, error)) return false;

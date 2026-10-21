@@ -1,8 +1,10 @@
 #include "nengine/render/material_asset.hpp"
+#include "nengine/assets/bounded_input.hpp"
 
 #include <fstream>
 #include <iomanip>
 #include <istream>
+#include <sstream>
 #include <string_view>
 #include <utility>
 
@@ -36,10 +38,16 @@ const assets::ImportArtifact* find_role(
 } // namespace
 
 bool read_material_asset(
-    std::istream& input,
+    std::istream& source,
     MaterialAssetData& material,
     std::string* error) {
 
+    std::string bytes;
+    if (!assets::read_bounded_text(source, bytes, 1024u * 1024u)) {
+        set_error(error, "material asset exceeds 1MiB or read failed");
+        return false;
+    }
+    std::istringstream input{std::move(bytes)};
     MaterialAssetData parsed;
     std::string token;
     std::uint32_t version = 0u;

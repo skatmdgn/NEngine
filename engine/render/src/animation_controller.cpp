@@ -1,5 +1,6 @@
 #include "nengine/render/animation_controller.hpp"
 #include "nengine/render/components.hpp"
+#include "nengine/assets/bounded_input.hpp"
 
 #include <cmath>
 #include <iomanip>
@@ -78,13 +79,17 @@ bool write_animation_controller(
 }
 
 bool read_animation_controller(
-    std::istream& input, AnimationController& result,
+    std::istream& source, AnimationController& result,
     std::string* error) {
 
     const auto fail = [&](const char* message) {
         if (error) *error = message;
         return false;
     };
+    std::string bytes;
+    if (!assets::read_bounded_text(source, bytes, 4u * 1024u * 1024u))
+        return fail("animation controller exceeds 4MiB or read failed");
+    std::istringstream input{std::move(bytes)};
     std::string tag;
     unsigned version = 0;
     AnimationController candidate;

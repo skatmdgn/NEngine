@@ -798,6 +798,20 @@ int main() {
     check(readonly_database.size() == 2u && repaired_result.meta_repaired > 0,
           "mutable Editor scan can explicitly repair GUID collisions");
 
+    const auto huge_root = root / "HugeMetadata";
+    const auto huge_asset = huge_root / "huge.bin";
+    write_file(huge_asset, "x");
+    const auto huge_meta = std::filesystem::path(huge_asset.string() + ".meta");
+    write_file(huge_meta, "NENGINE_META 1\nGUID " +
+                          AssetGuid::generate().to_string() +
+                          "\nIMPORTER \"" + std::string(9000u, 'X'));
+    AssetDatabase bounded_database(huge_root);
+    const auto bounded_scan = bounded_database.scan(false);
+    check(bounded_database.size() == 0u &&
+          !bounded_scan.messages.empty() &&
+          std::filesystem::file_size(huge_meta) > 8192u,
+          "oversized .meta is rejected in read-only scan");
+
     std::filesystem::remove_all(root, ec);
 
     if (failures == 0) {
