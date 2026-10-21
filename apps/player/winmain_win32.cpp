@@ -34,7 +34,8 @@ int run() {
     if (!runtime.load(root, &error)) { message(error); return 3; }
 
     const auto gameplay_path =
-        root / "Content" / "Managed" / "GameScripts.dll";
+        root / "Content" / "Managed" /
+        (runtime.manifest().managed_assembly_name + ".dll");
     if (std::filesystem::is_regular_file(gameplay_path)) {
         std::string script_error;
         if (!runtime.initialize_managed(&script_error)) {
@@ -44,7 +45,7 @@ int run() {
         OutputDebugStringA("NEngine Player: managed C# gameplay initialized.\n");
     } else if (runtime.pending_script_count()) {
         OutputDebugStringA("NEngine Player: ScriptBehaviours present without"
-                           " packaged GameScripts.dll; managed gameplay disabled.\n");
+                           " packaged managed assembly; managed gameplay disabled.\n");
     }
     const auto& config = runtime.manifest();
     nengine::platform::Window window({

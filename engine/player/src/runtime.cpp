@@ -24,8 +24,9 @@ bool PlayerRuntime::initialize_managed(std::string* error) {
         return false;
     }
     const auto managed = bundle_root_ / "Content" / "Managed";
-    const auto gameplay = managed / "GameScripts.dll";
-    const auto configuration = managed / "GameScripts.runtimeconfig.json";
+    const auto& name = manifest_.managed_assembly_name;
+    const auto gameplay = managed / (name + ".dll");
+    const auto configuration = managed / (name + ".runtimeconfig.json");
     std::error_code ec;
     if (!std::filesystem::is_regular_file(gameplay, ec) ||
         !std::filesystem::is_regular_file(configuration, ec) ||
@@ -43,7 +44,7 @@ bool PlayerRuntime::initialize_managed(std::string* error) {
     script_system_.clear(&world_);
     managed_runtime_.shutdown();
     if (!managed_runtime_.initialize(
-            host->hostfxr_path, configuration, gameplay, "GameScripts")) {
+            host->hostfxr_path, configuration, gameplay, name)) {
         if (error) *error = managed_runtime_.diagnostic();
         return false;
     }

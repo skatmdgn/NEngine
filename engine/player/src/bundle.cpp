@@ -1,5 +1,7 @@
 #include "nengine/player/bundle.hpp"
 
+#include <array>
+#include <algorithm>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
@@ -14,12 +16,23 @@ bool fail(std::string* error, std::string message) {
 }
 
 bool validate_bundle(const BundleManifest& manifest, std::string* error) {
-    if (manifest.version != BundleManifest::current_version)
+    if (manifest.version != 1u &&
+        manifest.version != BundleManifest::current_version)
         return fail(error, "unsupported player manifest version");
     if (manifest.title.empty() || manifest.title.size() > 256 ||
         manifest.title.find('\0') != std::string::npos ||
         manifest.title.find('\n') != std::string::npos)
         return fail(error, "invalid player title");
+    const auto& assembly = manifest.managed_assembly_name;
+    if (assembly.empty() || assembly.size() > 100u ||
+        (manifest.version == 1u && assembly != "GameScripts") ||
+        assembly.front() == '.' || assembly.back() == '.' ||
+        !std::all_of(assembly.begin(), assembly.end(), [](unsigned char c) {
+            return (c >= 'a' && c <= 'z') ||
+                   (c >= 'A' && c <= 'Z') ||
+                   (c >= '0' && c <= '9') || c == '_' || c == '.';
+        }))
+        return fail(error, "invalid player managed assembly name");
     if (manifest.width < 64 || manifest.height < 64 ||
         manifest.width > 16384 || manifest.height > 16384)
         return fail(error, "invalid player resolution");
@@ -64,28 +77,52 @@ bool write_bundle(std::ostream& output, const BundleManifest& manifest,
     output << "NENGINE_PLAYER_BUNDLE " << manifest.version << '\n'
            << "TITLE " << std::quoted(manifest.title) << '\n'
            << "SCENE " << std::quoted(manifest.scene.generic_string()) << '\n'
-           << "RESOLUTION " << manifest.width << ' ' << manifest.height << '\n'
-           << "END_PLAYER_BUNDLE\n";
+           << "RESOLUTION " << manifest.width << ' ' << manifest.height << '\n';
+    if (manifest.version >= 2u)
+        output << "MANAGED_ASSEMBLY "
+               << std::quoted(manifest.managed_assembly_name) << '\n';
+    output << "END_PLAYER_BUNDLE\n";
     return output.good() || fail(error, "writing player manifest failed");
 }
 
 bool read_bundle(std::istream& input, BundleManifest& manifest,
                  std::string* error) {
+    // Bound the complete stream before std::quoted can allocate strings.
+    constexpr std::size_t max_manifest_bytes = 8192u;
+    std::string text;
+    std::array<char, 1024> block{};
+    while (true) {
+        input.read(block.data(), static_cast<std::streamsize>(block.size()));
+        const auto read = static_cast<std::size_t>(input.gcount());
+        if (read > max_manifest_bytes - text.size())
+            return fail(error, "player manifest exceeds 8KiB");
+        text.append(block.data(), read);
+        if (input.eof()) break;
+        if (!input) return fail(error, "player manifest read failure");
+    }
+
+    std::istringstream fields{text};
     BundleManifest candidate;
     std::string key;
     std::string scene;
-    if (!(input >> key) || key != "NENGINE_PLAYER_BUNDLE" ||
-        !(input >> candidate.version) ||
-        !(input >> key) || key != "TITLE" ||
-        !(input >> std::quoted(candidate.title)) ||
-        !(input >> key) || key != "SCENE" ||
-        !(input >> std::quoted(scene)) ||
-        !(input >> key) || key != "RESOLUTION" ||
-        !(input >> candidate.width >> candidate.height) ||
-        !(input >> key) || key != "END_PLAYER_BUNDLE")
+    if (!(fields >> key) || key != "NENGINE_PLAYER_BUNDLE" ||
+        !(fields >> candidate.version) ||
+        !(fields >> key) || key != "TITLE" ||
+        !(fields >> std::quoted(candidate.title)) ||
+        !(fields >> key) || key != "SCENE" ||
+        !(fields >> std::quoted(scene)) ||
+        !(fields >> key) || key != "RESOLUTION" ||
+        !(fields >> candidate.width >> candidate.height))
         return fail(error, "invalid player manifest format");
-    input >> std::ws;
-    if (!input.eof()) return fail(error, "trailing player manifest fields");
+    if (candidate.version == 2u) {
+        if (!(fields >> key) || key != "MANAGED_ASSEMBLY" ||
+            !(fields >> std::quoted(candidate.managed_assembly_name)))
+            return fail(error, "player managed assembly field missing");
+    }
+    if (!(fields >> key) || key != "END_PLAYER_BUNDLE")
+        return fail(error, "invalid player manifest terminator");
+    fields >> std::ws;
+    if (!fields.eof()) return fail(error, "trailing player manifest fields");
     candidate.scene = std::filesystem::u8path(scene);
     if (!validate_bundle(candidate, error)) return false;
     manifest = std::move(candidate);
