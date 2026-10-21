@@ -144,16 +144,16 @@ bool read_manifest(
 
             GeneratedSubasset subasset;
             std::string guid_text;
-            std::size_t artifact_count = 0;
+            std::size_t subasset_artifact_count = 0;
 
             if (!(input >> token) ||
                 token != "SUBASSET" ||
                 !(input >> std::quoted(guid_text)) ||
                 !(input >> std::quoted(subasset.importer_id)) ||
                 !(input >> std::quoted(subasset.name)) ||
-                !(input >> artifact_count) ||
-                artifact_count == 0u ||
-                artifact_count > 1024u) {
+                !(input >> subasset_artifact_count) ||
+                subasset_artifact_count == 0u ||
+                subasset_artifact_count > 1024u) {
                 return false;
             }
 
@@ -170,10 +170,10 @@ bool read_manifest(
                 *guid;
 
             subasset.artifacts.reserve(
-                artifact_count);
+                subasset_artifact_count);
 
             for (std::size_t artifact_index = 0;
-                 artifact_index < artifact_count;
+                 artifact_index < subasset_artifact_count;
                  ++artifact_index) {
 
                 ImportArtifact artifact;
