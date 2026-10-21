@@ -3698,7 +3698,7 @@ struct Win32EditorShell::Impl {
 
             editor.console().info(
                 "Scripting",
-                "Managed gameplay DLL loaded through hostfxr + NEngine.Bridge ABI v5; collectible hot reload is ready.");
+                "Managed gameplay DLL loaded through hostfxr + NEngine.Bridge ABI v18; collectible hot reload is ready.");
         }
 
         refresh_console();

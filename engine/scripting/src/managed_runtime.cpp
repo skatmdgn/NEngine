@@ -1638,7 +1638,7 @@ bool ManagedRuntime::initialize(
 
     if (abi_version != 18) {
         diagnostic_ =
-            "managed bridge ABI mismatch: expected 17, got " +
+            "managed bridge ABI mismatch: expected 18, got " +
             std::to_string(
                 abi_version);
         shutdown();
