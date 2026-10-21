@@ -1,6 +1,7 @@
 #include "nengine/player/ui_runtime.hpp"
 #include "nengine/ui/canvas_serialization.hpp"
 #include "nengine/ui/rasterizer.hpp"
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <system_error>
@@ -74,12 +75,36 @@ ui::UiLayout PlayerUiRuntime::layout(float width, float height) const {
 ui::UiRgbaImage PlayerUiRuntime::rasterize(
     std::uint32_t width, std::uint32_t height) const {
     if (!canvas_ || width == 0u || height == 0u ||
-        width > 4096u || height > 4096u) return {};
-    const auto draw_commands = ui::build_ui_draw_list(
+        width > 16384u || height > 16384u) return {};
+    // Player permits up to 16K display dimensions, but the CPU Canvas
+    // compositor deliberately caps its allocation to a 4096px axis.
+    // Draw at a uniformly downscaled resolution and let Vulkan stretch
+    // the normalized overlay across the full viewport.
+    const double scale = std::min(
+        {1.0, 4096.0 / static_cast<double>(width),
+              4096.0 / static_cast<double>(height)});
+    const auto scaled_width = std::max(1u,
+        static_cast<std::uint32_t>(std::floor(width * scale)));
+    const auto scaled_height = std::max(1u,
+        static_cast<std::uint32_t>(std::floor(height * scale)));
+    auto draw_commands = ui::build_ui_draw_list(
         canvas_->layout(static_cast<float>(width),
                         static_cast<float>(height)));
     if (draw_commands.empty()) return {};
-    return ui::rasterize_ui(draw_commands, width, height, images_);
+    if (scale != 1.0) {
+        const auto scale_rect = [scale](ui::UiRect& rect) {
+            rect.x = static_cast<float>(rect.x * scale);
+            rect.y = static_cast<float>(rect.y * scale);
+            rect.width = static_cast<float>(rect.width * scale);
+            rect.height = static_cast<float>(rect.height * scale);
+        };
+        for (auto& draw : draw_commands) {
+            scale_rect(draw.rect);
+            scale_rect(draw.source_rect);
+        }
+    }
+    return ui::rasterize_ui(draw_commands,
+                            scaled_width, scaled_height, images_);
 }
 void PlayerUiRuntime::update(float width, float height,
                              const input::InputState& input, bool focused) {

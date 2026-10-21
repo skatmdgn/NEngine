@@ -1070,8 +1070,12 @@ int main() {
         rendered_ui.pixels.size() != 32u * 32u * 4u ||
         rendered_ui.pixels[3] != 255u)
         return test_failure(187, __LINE__);
-    if (!runtime.ui().rasterize(5000u, 100u).pixels.empty() ||
-        !runtime.ui().rasterize(0u, 100u).pixels.empty())
+    const auto scaled_canvas = runtime.ui().rasterize(5000u, 100u);
+    if (scaled_canvas.width != 4096u || scaled_canvas.height != 81u ||
+        scaled_canvas.pixels.size() != 4096u * 81u * 4u ||
+        scaled_canvas.pixels[3] == 0u ||
+        !runtime.ui().rasterize(0u, 100u).pixels.empty() ||
+        !runtime.ui().rasterize(16385u, 100u).pixels.empty())
         return test_failure(188, __LINE__);
     if (runtime.ui().write(ui_button, 0, 0) != 1 ||
         !runtime.ui().rasterize(32u, 32u).pixels.empty() ||
