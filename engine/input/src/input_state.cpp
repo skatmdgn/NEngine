@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <sstream>
 #include <utility>
 
@@ -33,7 +34,7 @@ void InputState::set_key(
     bool next) noexcept {
 
     if (key == Key::Unknown ||
-        key == Key::Count) {
+        static_cast<std::size_t>(key) >= key_count) {
         return;
     }
 
@@ -65,13 +66,19 @@ void InputState::release_all() noexcept {
         held_[i] = false;
         released_[i] = true;
     }
+    // Regaining focus must establish a new cursor baseline. Otherwise the
+    // first pointer sample includes movement made while the app was inactive.
+    pointer_initialized_ = false;
+    pointer_.delta_x = 0.0f;
+    pointer_.delta_y = 0.0f;
+    pointer_.wheel_y = 0.0f;
 }
 
 bool InputState::held(
     Key key) const noexcept {
 
     if (key == Key::Unknown ||
-        key == Key::Count) {
+        static_cast<std::size_t>(key) >= key_count) {
         return false;
     }
 
@@ -82,7 +89,7 @@ bool InputState::pressed(
     Key key) const noexcept {
 
     if (key == Key::Unknown ||
-        key == Key::Count) {
+        static_cast<std::size_t>(key) >= key_count) {
         return false;
     }
 
@@ -93,7 +100,7 @@ bool InputState::released(
     Key key) const noexcept {
 
     if (key == Key::Unknown ||
-        key == Key::Count) {
+        static_cast<std::size_t>(key) >= key_count) {
         return false;
     }
 
@@ -110,10 +117,19 @@ void InputState::set_pointer_position(
     }
 
     if (pointer_initialized_) {
-        pointer_.delta_x +=
-            x - pointer_.x;
-        pointer_.delta_y +=
-            y - pointer_.y;
+        // Finite float positions can still overflow when subtracted.
+        // Keep all observable frame deltas finite even for malformed
+        // or unexpectedly large platform coordinate samples.
+        const double next_dx = static_cast<double>(pointer_.delta_x) +
+            static_cast<double>(x) - static_cast<double>(pointer_.x);
+        const double next_dy = static_cast<double>(pointer_.delta_y) +
+            static_cast<double>(y) - static_cast<double>(pointer_.y);
+        const double limit = static_cast<double>(
+            std::numeric_limits<float>::max());
+        pointer_.delta_x = std::abs(next_dx) <= limit
+            ? static_cast<float>(next_dx) : 0.0f;
+        pointer_.delta_y = std::abs(next_dy) <= limit
+            ? static_cast<float>(next_dy) : 0.0f;
     } else {
         pointer_initialized_ = true;
     }
@@ -126,8 +142,11 @@ void InputState::add_wheel(
     float delta_y) noexcept {
 
     if (std::isfinite(delta_y)) {
-        pointer_.wheel_y +=
-            delta_y;
+        const double next = static_cast<double>(pointer_.wheel_y) +
+            static_cast<double>(delta_y);
+        if (std::abs(next) <= static_cast<double>(
+                std::numeric_limits<float>::max()))
+            pointer_.wheel_y = static_cast<float>(next);
     }
 }
 
