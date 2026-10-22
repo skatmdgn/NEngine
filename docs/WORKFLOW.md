@@ -62,7 +62,15 @@
 - **PR #29는 독립된 미병합 Navigation 작업이다.** 새 체크리스트 체계가 main에 병합된 후 #29를 통합할 때 구버전 docs 변경을 되살리지 말고 NAV 작업의 코드·테스트와 근거만 이관한다.
 - `THIRD_PARTY_NOTICES.md`, `third_party/stb/LICENSE`, 빌드·테스트·소스는 문서 정리의 삭제 대상이 아니다.
 
-## 7. 빌드/개발 검증 명령
+## 7. 자동 검사 (CI 게이트)
+
+- `tools/verify_checklist.py`는 모든 체크 ID의 유일성·연속성·섹션/전체 집계·완료 증거를 검사한다.
+- PR은 기준 브랜치의 기존 ID를 삭제하거나 바꿀 수 없다. 체크를 새로 완료했다면 `PR #번호` 및 테스트/CI 증거가 있어야 하고 해당 ID가 PR 제목이나 본문에 나타나야 한다.
+- `tools/test_verify_checklist.py` 단위 테스트가 Windows와 Ubuntu CI에서 실행된다. CI checkout에는 전체 Git 이력이 필요하다.
+- `python -m unittest discover -s tools -p test_verify_checklist.py`와 `python tools/verify_checklist.py`로 로컬 검사할 수 있다.
+- 이 검증기는 체크리스트 무결성만 강제한다. 실기기 검증 로그의 진위나 코드의 제품 품질까지 자동으로 증명하지 않는다.
+
+## 8. 빌드/개발 검증 명령
 
 필수 CMake 3.25+, C++20 빌드 도구. 실제 Windows 10/11 Editor/Player, Vulkan 가능한 GPU/드라이버와 관리형 실행용 적합한 .NET SDK/hostfxr는 별도 수용 전제다. Android toolchain은 아직 구현·배포 검증 대상이다.
 
