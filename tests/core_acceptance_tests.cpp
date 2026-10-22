@@ -16,7 +16,7 @@ int failures = 0;
 void expect(bool value, const char* message) {
     if (!value) {
         ++failures;
-        std::cerr << "FAIL: " << message << '\\n';
+        std::cerr << "FAIL: " << message << '\n';
     }
 }
 
@@ -87,10 +87,10 @@ void check_transactional_scene_load() {
     };
 
     const std::string invalids[] = {
-        "NENGINE_SCENE 3\\nNAME \\"Truncated\\"\\nOBJECTS 1\\nOBJECT",
-        "NENGINE_SCENE 3\\nNAME \\"OversizedCount\\"\\nOBJECTS 9999999999\\n",
-        "NENGINE_SCENE 3\\nNAME \\"Extra\\"\\nOBJECTS 0\\nEND_SCENE\\nJUNK\\n",
-        "NENGINE_SCENE 0\\nNAME \\"UnknownVersion\\"\\nOBJECTS 0\\nEND_SCENE",
+        "NENGINE_SCENE 3\nNAME \"Truncated\"\nOBJECTS 1\nOBJECT",
+        "NENGINE_SCENE 3\nNAME \"OversizedCount\"\nOBJECTS 9999999999\n",
+        "NENGINE_SCENE 3\nNAME \"Extra\"\nOBJECTS 0\nEND_SCENE\nJUNK\n",
+        "NENGINE_SCENE 0\nNAME \"UnknownVersion\"\nOBJECTS 0\nEND_SCENE",
     };
     for (const auto& text : invalids) {
         std::stringstream stream(text);
@@ -180,7 +180,7 @@ int main() {
     check_parent_topology();
     check_transactional_scene_load();
     check_entity_reference_lifecycle();
-    if (failures) std::cerr << failures << " core acceptance failures\\n";
-    else std::cout << "NEngineCoreAcceptanceTests: PASS\\n";
+    if (failures) std::cerr << failures << " core acceptance failures\n";
+    else std::cout << "NEngineCoreAcceptanceTests: PASS\n";
     return failures ? EXIT_FAILURE : EXIT_SUCCESS;
 }
