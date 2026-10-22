@@ -4,6 +4,8 @@
 #include <string>
 #include <unordered_map>
 #include "nengine/core/world.hpp"
+#include "nengine/core/component_serialization.hpp"
+#include <utility>
 #include "nengine/navigation/nav_mesh.hpp"
 namespace nengine::navigation {
 struct NavSurface {

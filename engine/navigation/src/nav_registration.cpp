@@ -1,5 +1,7 @@
 #include "nengine/navigation/nav_world.hpp"
 #include <cmath>
+#include <vector>
+#include <utility>
 #include <optional>
 #include <string_view>
 #include <variant>
