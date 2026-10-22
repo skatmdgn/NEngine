@@ -2,17 +2,17 @@
 
 **검증 기준선:** main 671cddf2d50d184b1889310f86c85a3df43306bd (2026-10-22), [Windows/Ubuntu CI 39713209272](https://github.com/skatmdgn/NEngine/actions/runs/39713209272), 양쪽 12/12 CTest 그룹 통과. 현재는 실 GPU·오디오·.NET 배포 및 Android 기기 검증을 통과했다고 주장하지 않는다.
 
-**초기 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 26개, 미완료 259개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
+**초기 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 28개, 미완료 257개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
 
-**우선 순위:** GOV-002부터 작업 추적 게이트 구현, WIN 실기기 수용과 Android 빌드 토대 구축. PR #29는 아직 main 미병합이므로 NAV-003은 반드시 미완료 유지. 작업 규칙은 [WORKFLOW.md](WORKFLOW.md), 근거와 저장소 조사는 [FILE_AUDIT.md](FILE_AUDIT.md)를 참고한다.
+**우선 순위:** GOV-004부터 회귀 검증과 장치 수용 규칙을 강화하고, WIN 실기기 수용과 Android 빌드 토대를 구축. PR #29는 아직 main 미병합이므로 NAV-003은 반드시 미완료 유지. 작업 규칙은 [WORKFLOW.md](WORKFLOW.md), 근거와 저장소 조사는 [FILE_AUDIT.md](FILE_AUDIT.md)를 참고한다.
 
-## GOV — 개발 관리·검증 (1/10)
+## GOV — 개발 관리·검증 (3/10)
 
 참조: .github/workflows/ci.yml; tests/CMakeLists.txt
 
 - [x] GOV-001 main의 Windows/Ubuntu 12개 CTest 그룹 성공을 검증한다 — 증거: CI 39713209272 / CI run 39713209272
-- [ ] GOV-002 작업 ID 변경과 증거 누락을 검사하는 자동 검증기를 만든다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] GOV-003 PR 제목과 본문에 완료한 작업 ID를 강제하는 CI 검증을 추가한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] GOV-002 작업 ID 변경과 증거 누락을 검사하는 자동 검증기를 만든다 — 증거: PR #30, tools/verify_checklist.py, tools/test_verify_checklist.py, CI Verify acceptance checklist 게이트
+- [x] GOV-003 PR 제목과 본문에 완료한 작업 ID를 강제하는 CI 검증을 추가한다 — 증거: PR #30, tools/verify_checklist.py check_baseline, tools/test_verify_checklist.py, CI Verify acceptance checklist 게이트
 - [ ] GOV-004 기존 통과 테스트의 회귀를 차단한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] GOV-005 새 요구를 발견하면 고유 ID와 추가 사유를 기록한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] GOV-006 작업 삭제/분할/통합 시 원본 ID를 추적할 수 있게 한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -408,6 +408,7 @@
 
 ## 작업 기록과 변경 이력
 
+- 2026-10-22: PR #30에서 GOV-002, GOV-003 구현 및 CI 자동 검사 연결. 체크 26→28, 미완료 259→257. 최종 CI는 최신 SHA로 재확인.
 완료 체크 시 해당 항목 끝에 (PR #, commit SHA, 테스트명, CI run, OS/하드웨어)를 기재한다. 작업 중 발견된 하위 작업은 새 ID를 추가하고 증감 원인을 PR 본문에 남긴다. 기존 완료 체크를 그대로 옮긴 것이 아니며, 기존 286/319 로드맵 체크와 합산하지 않는다.
 
 - 2026-10-22: 구 MASTER_PLAN 목표와 역대조하여 49개 누락 요구를 ID가 있는 작업으로 추가 (SCN/TWOD/VFX/SHDR/EDTOOL/BUILD/UTIL).
