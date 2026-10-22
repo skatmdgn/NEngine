@@ -2,6 +2,8 @@ add_library(NEngineNavigation STATIC
   src/nav_mesh.cpp
   src/nav_path.cpp
   src/nav_agent.cpp
+  src/nav_world.cpp
+  src/nav_registration.cpp
   src/nav_serialization.cpp
 )
 target_include_directories(NEngineNavigation PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
