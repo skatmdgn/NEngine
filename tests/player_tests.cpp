@@ -316,7 +316,8 @@ int main() {
             no_assets_report.bundle_root / "Content" / "Assets") ||
         !no_assets_runtime.load(no_assets_report.bundle_root, &error) ||
         !no_assets_runtime.ready() ||
-        no_assets_runtime.entity_count() != 2u)
+        no_assets_runtime.entity_count() != 2u ||
+        !no_assets_runtime.navigation_mesh().polygons().empty())
         return test_failure(901, __LINE__);
     // A package must never report success for an unsupported WebP source.
     const auto unsupported_webp = project / "Assets" / "Textures" / "bad.webp";
@@ -329,6 +330,23 @@ int main() {
         error.find("WebP") == std::string::npos)
         return test_failure(902, __LINE__);
     std::filesystem::remove(unsupported_webp);
+    // Invalid navigation input must fail export and leave no partial bundle.
+    {
+        const auto nav_path = project / "Assets" / "Navigation" / "Main.nnav";
+        { std::ofstream corrupt(nav_path, std::ios::binary | std::ios::trunc);
+          corrupt << "NENGINE_NAVMESH 1\nPOLYGONS 99999999\n"; }
+        ExportSettings bad_nav_settings = settings;
+        bad_nav_settings.destination = export_base / "InvalidNavigation";
+        ExportReport bad_nav_report;
+        const bool bad_nav_accepted = export_player_data(
+            bad_nav_settings, bad_nav_report, &error);
+        if (bad_nav_accepted ||
+            std::filesystem::exists(bad_nav_settings.destination) ||
+            error.find("navigation") == std::string::npos)
+            return test_failure(933, __LINE__);
+        if (!nengine::navigation::save_nav_mesh(nav_path, nav_fixture))
+            return test_failure(934, __LINE__);
+    }
     nengine::input::ActionMap bundled_actions;
     if (!nengine::input::load_action_map_file(
             report.bundle_root / "Content" / "Input.ninput", bundled_actions, &error) ||

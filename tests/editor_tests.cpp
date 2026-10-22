@@ -2496,6 +2496,15 @@ int main() {
           model.navigation_mesh().polygons().size() == 2u,
           "invalid Editor navigation GUID preserves existing loaded mesh");
 
+    // Failed nav reload may never erase the last successfully loaded graph.
+    { std::ofstream invalid(nav_dir / "Main.nnav", std::ios::trunc);
+      invalid << "NENGINE_NAVMESH 1\nPOLYGONS 999999\n"; }
+    check(!model.load_navigation(nav_guid, &project_error) &&
+          model.navigation_mesh().polygons().size() == 2u,
+          "malformed navigation data does not clobber Editor graph");
+    check(navigation::save_nav_mesh(nav_dir / "Main.nnav", nav_fixture),
+          "valid navigation content restores after invalid edit");
+
     model.project().close();
     std::error_code cleanup_error;
     std::filesystem::remove_all(
