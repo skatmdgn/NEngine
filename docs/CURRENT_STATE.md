@@ -1,3 +1,16 @@
+## Native navigation triangle surface cooking — 2026-10-22
+
+- Added a standalone native, bounded, transactional triangle-list/indexed
+  `NavMesh` cooker with face filtering, seam/duplicate/non-manifold checks,
+  vertex quantization and a 30-slice regression suite.
+- **Status:** source implementation on development branch, final GitHub CI
+  not yet verified at this SHA. Native triangle cooking is not automated
+  scene mesh extraction or NavMeshAgent/C# integration; full milestone stays open.
+- Previous baseline `main` 671cddf: push CI 39713209272 succeeded on
+  Ubuntu and Windows, including 12/12 CTest groups on both platforms.
+  PRs #26, #27 and #28 had merged; there were no open PRs at preflight.
+- Details: [NAVIGATION_TRIANGLE_BAKE.md](NAVIGATION_TRIANGLE_BAKE.md).
+
 ## Navigation project / Windows Player integration — 2026-10-22
 
 - Editor ProjectSession registers `.nnav` as a real `NEngine.Navigation`
