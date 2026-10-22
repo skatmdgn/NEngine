@@ -120,6 +120,90 @@ def validate(text: str, baseline: str | None = None, title: str = "",
     return errors
 
 
+
+def parse_change_journal(raw: str) -> tuple[list[dict], list[str]]:
+    """Parse append-only provenance records for stable task IDs."""
+    try:
+        value = json.loads(raw)
+    except (TypeError, ValueError) as exc:
+        return [], [f"invalid change journal JSON: {exc}"]
+    if (not isinstance(value, dict) or value.get("version") != 1 or
+            not isinstance(value.get("records"), list)):
+        return [], ["change journal must contain version=1 and records list"]
+    errors = []
+    records = value["records"]
+    from datetime import date
+    for i, entry in enumerate(records):
+        if not isinstance(entry, dict):
+            errors.append(f"journal entry {i} is not an object")
+            continue
+        if entry.get("kind") not in ("add", "revise", "split", "merge"):
+            errors.append(f"journal entry {i} has invalid kind")
+        key = entry.get("id")
+        if not isinstance(key, str) or not TASK.fullmatch("- [ ] " + key + " entry"):
+            errors.append(f"journal entry {i} has invalid stable ID")
+        reason = entry.get("reason")
+        if not isinstance(reason, str) or len(reason.strip()) < 15:
+            errors.append(f"journal entry {i} needs meaningful reason")
+        try:
+            date.fromisoformat(entry["date"])
+        except (ValueError, TypeError, KeyError):
+            errors.append(f"journal entry {i} needs ISO date")
+        sources = entry.get("sources")
+        if not isinstance(sources, list) or len(sources) != len(set(map(str, sources))):
+            errors.append(f"journal entry {i} has invalid sources")
+    return records, errors
+
+
+def check_change_journal(current: dict, old: dict, records: list[dict],
+                         previous: list[dict]) -> list[str]:
+    """New IDs and revised criteria must have append-only auditable history."""
+    errors = []
+    if records[:len(previous)] != previous:
+        errors.append("prior checklist change records were edited or deleted")
+    additions = records[len(previous):]
+    by_id: dict[str, list[dict]] = {}
+    for entry in additions:
+        if isinstance(entry, dict):
+            by_id.setdefault(entry.get("id", ""), []).append(entry)
+    altered = set()
+    for key, (done, detail) in current.items():
+        if key not in old:
+            altered.add(key)
+            matches = [r for r in by_id.get(key, [])
+                       if r.get("kind") in ("add", "split", "merge")]
+            if len(matches) != 1:
+                errors.append(f"new checklist ID {key} requires add/split/merge provenance")
+        elif detail.split(" — ", 1)[0] != old[key][1].split(" — ", 1)[0]:
+            altered.add(key)
+            matches = [r for r in by_id.get(key, []) if r.get("kind") == "revise"]
+            if len(matches) != 1:
+                errors.append(f"changed criteria {key} require revise provenance")
+    for entry in additions:
+        if not isinstance(entry, dict):
+            continue
+        key, kind, sources = entry.get("id"), entry.get("kind"), entry.get("sources")
+        if key not in altered:
+            errors.append(f"journal record for unchanged ID {key}")
+        if kind in ("split", "merge"):
+            minimum = 1 if kind == "split" else 2
+            if not isinstance(sources, list) or len(sources) < minimum:
+                errors.append(f"{key}: {kind} needs {minimum} source ID(s)")
+                continue
+            for source in sources:
+                if source not in old or source not in current or source == key:
+                    errors.append(f"{key}: invalid {kind} source {source}")
+        elif isinstance(sources, list) and sources:
+            errors.append(f"{key}: {kind} cannot claim source IDs")
+    return errors
+
+
+def git_optional_file(ref: str, path: str) -> str | None:
+    command = subprocess.run(["git", "show", f"{ref}:{path}"],
+                             capture_output=True, text=True, encoding="utf-8",
+                             errors="replace", check=False)
+    return command.stdout if command.returncode == 0 else None
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checklist", default="docs/CHECKLIST.md")
@@ -136,6 +220,20 @@ def main() -> int:
         title = event.get("pull_request", {}).get("title", "")
         body = event.get("pull_request", {}).get("body", "") or ""
     errors = validate(text, baseline, title, body)
+    journal_file = Path("tools/checklist_changes.json")
+    if journal_file.exists():
+        records, journal_errors = parse_change_journal(journal_file.read_text(encoding="utf-8"))
+        errors.extend(journal_errors)
+        if baseline is not None:
+            previous_raw = git_optional_file(ref, "tools/checklist_changes.json")
+            previous, previous_errors = parse_change_journal(
+                previous_raw if previous_raw is not None else '{"version":1,"records":[]}')
+            errors.extend(previous_errors)
+            newer, _, _ = parse_document(text)
+            older, _, _ = parse_document(baseline)
+            errors.extend(check_change_journal(newer, older, records, previous))
+    else:
+        errors.append("missing tools/checklist_changes.json")
     if errors:
         for error in errors:
             print("CHECKLIST ERROR:", error, file=sys.stderr)
