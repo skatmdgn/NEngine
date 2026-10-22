@@ -277,6 +277,7 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [x] ABI v18 C# UI.GetImageTexture / UI.SetImageTexture typed AssetGuid methods in Editor Play Mode and standalone Player
 - [ ] runtime Canvas-style UI (Korean/Unicode font glyphs and shaping, GPU hardware acceptance and advanced layout remain)
 - [x] Native navigation graph foundation: convex polygons, bounded Dijkstra, runtime obstacles, off-mesh links, constant-speed agents, .nnav and 30-slice tests (source implementation, CI pending)
+- [x] Editor GUID-backed .nnav asset import and transactional native route API; Player bundle validation/default graph load and native route API (CI verification required)
 - [ ] NavMesh agent/obstacle/link product integration: Scene/Editor/Player/C#, geometry baking, funnel smoothing and physical acceptance
 - [ ] particle system
 

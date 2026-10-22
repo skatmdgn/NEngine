@@ -55,3 +55,16 @@ agent components, adaptive obstacle repathing, link traversal animation,
 Windows gameplay acceptance and Android integration remain unimplemented.
 
 Tests: cmake configure/build and ctest; final GitHub CI on Ubuntu and Windows.
+
+## Editor and Windows Player adapter (2026-10-22)
+
+Use `EditorModel::load_navigation(AssetGuid)` after project asset indexing to
+load an authored `.nnav`; `EditorModel::find_navigation_path` calls the
+same native query as Player. The standalone exporter now accepts/validates
+`.nnav` in Assets. A packaged `Assets/Navigation/Main.nnav` is the current
+optional Player default graph; `PlayerRuntime::navigation_mesh()` and
+`find_navigation_path()` provide read-only native routing. Malformed documents
+abort export and failed Editor imports leave prior graph unchanged.
+
+This does not wire scene GameObject NavAgent components or a managed C# bridge.
+Those remain explicit 1.0 navigation tasks, alongside baking/authoring.

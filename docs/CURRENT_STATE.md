@@ -1,3 +1,24 @@
+## Navigation project / Windows Player integration — 2026-10-22
+
+- Editor ProjectSession registers `.nnav` as a real `NEngine.Navigation`
+  GUID-backed asset, and loads bounded documents using an immutable indexed path
+  with symlink/path traversal checks.
+- EditorModel exposes `load_navigation(guid)` and native `find_navigation_path`
+  to edit tooling; loading is transactional and cannot replace the loaded graph
+  on invalid data or while Play Mode is active.
+- Windows Player export packages valid `.nnav` assets and rejects malformed
+  navigation files before publishing a game bundle.
+- PlayerRuntime loads the optional `Assets/Navigation/Main.nnav` convention
+  from the exported catalog and exposes the same native route query; it
+  clears nav state on unload and retains legacy behavior when no graph exists.
+- Added regression tests to Player and Editor suites for GUID import,
+  exported routing, corrupt source rejection, missing graphs and unload state.
+- **Not yet implemented:** scene-entity NavMeshAgent components, managed C# API,
+  automatic scene mesh baking, navigation authoring inspector, avoidance,
+  smoothing/portal traversal, Android hardware acceptance. The product
+  NavMesh milestone remains unchecked.
+- CI status: final integration PR run required; no hardware acceptance claimed.
+
 ## Navigation 30-slice development batch — 2026-10-21
 
 - Added NEngineNavigation with bounded convex polygon navigation, area masks,
