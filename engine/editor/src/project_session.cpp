@@ -18,6 +18,7 @@
 #include "nengine/ui/canvas_asset.hpp"
 #include "nengine/render/material_asset.hpp"
 #include "nengine/render/model_importer.hpp"
+#include "nengine/navigation/nav_mesh.hpp"
 #include <system_error>
 #include <utility>
 
@@ -53,6 +54,9 @@ ProjectSession::ProjectSession() {
     import_pipeline_.register_processor(
         "NEngine.Canvas",
         ui::canvas_source_importer);
+    import_pipeline_.register_processor(
+        "NEngine.Navigation",
+        assets::copy_source_importer);
 
     import_pipeline_.register_processor(
         "NEngine.Model",
@@ -108,6 +112,9 @@ void ProjectSession::register_builtin_importers() {
         "NEngine.Canvas", 1,
         {".ncanvas"},
         false
+    });
+    importers_.register_importer({
+        "NEngine.Navigation", 1, {".nnav"}, false
     });
 
     importers_.register_importer({

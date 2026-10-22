@@ -12,6 +12,7 @@
 #include "nengine/assets/file_watcher.hpp"
 #include "nengine/assets/import_pipeline.hpp"
 #include "nengine/editor/project_manifest.hpp"
+#include "nengine/navigation/nav_mesh.hpp"
 
 namespace nengine::editor {
 
@@ -105,6 +106,11 @@ public:
 
     AssetActivation activation_for(
         assets::AssetGuid guid) const;
+
+    // Resolve imported, confined project navigation data by stable AssetGuid.
+    bool load_nav_mesh(assets::AssetGuid guid,
+                       navigation::NavMesh& output,
+                       std::string* error = nullptr) const;
 
 private:
     void register_builtin_importers();

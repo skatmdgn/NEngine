@@ -326,6 +326,7 @@ void PlayerRuntime::unload() noexcept {
     actions_ = {};
     bundle_root_.clear();
     assets_.clear();
+    navigation_.clear();
     ui_.reset();
     ui_images_.clear();
     missing_ui_images_.clear();
@@ -384,6 +385,8 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
         return false;
     PlayerAssets catalog;
     if (!catalog.open(root, error)) return false;
+    navigation::NavMesh next_nav;
+    if (!catalog.load_navigation_default(next_nav, error)) return false;
     PlayerUiRuntime next_ui;
     if (!next_ui.load(root, error)) return false;
     std::unordered_map<assets::AssetGuid, audio::AudioClipData,
@@ -429,6 +432,7 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
     input_ = {};
     actions_ = std::move(next_actions);
     assets_ = std::move(catalog);
+    navigation_ = std::move(next_nav);
     ui_ = std::move(next_ui);
     ui_images_.clear();
     missing_ui_images_.clear();

@@ -15,6 +15,7 @@
 #include "nengine/physics/simulation.hpp"
 #include "nengine/physics/contact_events.hpp"
 #include "nengine/input/input_state.hpp"
+#include "nengine/navigation/nav_mesh.hpp"
 #include "nengine/scripting/managed_runtime.hpp"
 #include "nengine/scripting/script_system.hpp"
 
@@ -63,6 +64,12 @@ public:
     bool paused() const noexcept { return paused_; }
     float fixed_delta_seconds() const noexcept { return 1.0f / 60.0f; }
     const PlayerAssets& assets() const noexcept { return assets_; }
+    const navigation::NavMesh& navigation_mesh() const noexcept { return navigation_; }
+    std::optional<navigation::NavPath> find_navigation_path(
+        core::Vec3 from, core::Vec3 to,
+        const navigation::NavQuery& query = {}) const {
+        return navigation_.find_path(from, to, query);
+    }
     PlayerUiRuntime& ui() noexcept { return ui_; }
     const PlayerUiRuntime& ui() const noexcept { return ui_; }
     std::size_t cached_ui_images() const noexcept { return ui_images_.size(); }
@@ -93,6 +100,7 @@ private:
     input::InputState input_{};
     input::ActionMap actions_{};
     PlayerAssets assets_{};
+    navigation::NavMesh navigation_{};
     PlayerUiRuntime ui_{};
     std::unordered_map<assets::AssetGuid, ui::UiRgbaImage,
         assets::AssetGuidHash> ui_images_{};
