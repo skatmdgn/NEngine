@@ -9,6 +9,7 @@
 #include "nengine/render/asset_resources.hpp"
 #include "nengine/render/decoded_texture.hpp"
 #include "nengine/physics/registration.hpp"
+#include "nengine/navigation/nav_world.hpp"
 #include "nengine/render/registration.hpp"
 #include "nengine/scripting/registration.hpp"
 #include "nengine/scripting/components.hpp"
@@ -277,6 +278,7 @@ PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
             stats.managed_fixed_updates += script.fixed_updated;
             stats.managed_errors += script.unresolved;
         }
+        stats.navigation = navigation_.step(world_, static_cast<float>(fixed));
         const auto result = physics::step_physics(
             world_, static_cast<float>(fixed), {0, -9.81f, 0},
             &physics_cache_);
@@ -322,6 +324,7 @@ void PlayerRuntime::unload() noexcept {
     script_system_.clear(&world_);
     managed_runtime_.shutdown();
     world_.clear();
+    navigation_.reset();
     input_.release_all();
     actions_ = {};
     bundle_root_.clear();
@@ -382,6 +385,21 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
     if (!core::SceneSerializer::instantiate(
             source, next_world, error, &codecs))
         return false;
+    navigation::NavWorldSystem next_navigation;
+    const auto nav_path = root / "Content" / "Navigation.nnav";
+    std::error_code nav_ec;
+    const auto nav_status = std::filesystem::symlink_status(nav_path, nav_ec);
+    if (nav_ec == std::errc::no_such_file_or_directory) nav_ec.clear();
+    if (nav_ec || std::filesystem::is_symlink(nav_status)) {
+        if (error) *error = "unsafe Player Navigation.nnav path";
+        return false;
+    }
+    if (std::filesystem::exists(nav_status)) {
+        navigation::NavMesh cooked;
+        if (!navigation::load_nav_mesh(nav_path, cooked, error)) return false;
+        next_navigation.set_mesh(std::move(cooked));
+    } else if (!next_navigation.bake(next_world, nullptr, error))
+        return false;
     PlayerAssets catalog;
     if (!catalog.open(root, error)) return false;
     PlayerUiRuntime next_ui;
@@ -425,6 +443,7 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
     script_system_.clear(&world_);
     managed_runtime_.shutdown();
     world_ = std::move(next_world);
+    navigation_ = std::move(next_navigation);
     bundle_root_ = root;
     input_ = {};
     actions_ = std::move(next_actions);

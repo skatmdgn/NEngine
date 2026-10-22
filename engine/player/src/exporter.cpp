@@ -6,6 +6,7 @@
 #include "nengine/assets/builtin_processors.hpp"
 #include "nengine/render/model_importer.hpp"
 #include "nengine/player/subassets.hpp"
+#include "nengine/navigation/nav_mesh.hpp"
 #include "nengine/assets/asset_importer.hpp"
 #include <chrono>
 #include <fstream>
@@ -93,6 +94,22 @@ bool export_player_data(const ExportSettings& settings,
     // A data-only export still needs an empty asset catalog.
     std::filesystem::create_directories(staging / "Content" / "Assets", ec);
     if (ec) { cleanup(); return fail(error, "cannot stage empty asset catalog"); }
+    // Optional project navigation asset: copy only after strict roundtrip
+    // validation, never copy external symlinks into the shipped Player.
+    const auto nav_source = root / "Navigation.nnav";
+    const auto nav_status = std::filesystem::symlink_status(nav_source, ec);
+    if (ec == std::errc::no_such_file_or_directory) ec.clear();
+    if (ec || std::filesystem::is_symlink(nav_status)) {
+        cleanup(); return fail(error, "unsafe Navigation.nnav project file");
+    }
+    if (std::filesystem::exists(nav_status)) {
+        navigation::NavMesh nav;
+        if (!navigation::load_nav_mesh(nav_source, nav, error) ||
+            !navigation::save_nav_mesh(
+                staging / "Content" / "Navigation.nnav", nav, error)) {
+            cleanup(); return false;
+        }
+    }
     const auto action_source = root / "Input.ninput";
     const auto action_status =
         std::filesystem::symlink_status(action_source, ec);

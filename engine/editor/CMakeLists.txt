@@ -7,6 +7,7 @@ add_library(NEngineEditorModel STATIC
   src/editor_model.cpp
   src/play_session.cpp
   src/physics_integration.cpp
+  src/navigation_integration.cpp
   src/property_access.cpp
   src/property_command.cpp
   src/property_text.cpp
@@ -23,7 +24,7 @@ target_include_directories(NEngineEditorModel
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(NEngineEditorModel PUBLIC NEngineCore NEngineAssets NEngineAudio NEnginePhysics NEngineRender NEngineScripting NEngineInput NEngineUI)
+target_link_libraries(NEngineEditorModel PUBLIC NEngineCore NEngineAssets NEngineAudio NEnginePhysics NEngineNavigation NEngineRender NEngineScripting NEngineInput NEngineUI)
 target_compile_features(NEngineEditorModel PUBLIC cxx_std_20)
 
 if(MSVC)

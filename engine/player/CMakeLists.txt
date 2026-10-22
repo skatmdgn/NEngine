@@ -12,5 +12,5 @@ add_library(NEnginePlayerKit STATIC
   src/managed_collider_properties.cpp
 )
 target_include_directories(NEnginePlayerKit PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(NEnginePlayerKit PUBLIC NEngineCore NEngineAssets NEngineRender NEnginePhysics NEngineAudio NEngineScripting NEngineInput NEngineUI)
+target_link_libraries(NEnginePlayerKit PUBLIC NEngineCore NEngineAssets NEngineRender NEnginePhysics NEngineNavigation NEngineAudio NEngineScripting NEngineInput NEngineUI)
 target_compile_features(NEnginePlayerKit PUBLIC cxx_std_20)

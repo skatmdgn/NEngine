@@ -15,6 +15,7 @@
 #include "nengine/audio/clip_cache.hpp"
 #include "nengine/audio/mix_snapshot.hpp"
 #include "nengine/audio/playback.hpp"
+#include "nengine/navigation/nav_world.hpp"
 #include "nengine/core/component_registry.hpp"
 #include "nengine/core/component_serialization.hpp"
 #include "nengine/core/world.hpp"
@@ -114,6 +115,11 @@ public:
 
     bool can_edit() const noexcept { return !play_session_.is_playing(); }
 
+    navigation::NavWorldSystem& navigation() noexcept { return navigation_; }
+    const navigation::NavWorldSystem& navigation() const noexcept { return navigation_; }
+    bool bake_navigation(std::string* error = nullptr) {
+        return can_edit() && navigation_.bake(world_, nullptr, error);
+    }
     bool begin_play_mode();
     bool stop_play_mode();
 
@@ -304,6 +310,7 @@ private:
     CommandStack commands_{};
     ComponentFactoryRegistry component_factories_{};
     PlaySession play_session_{};
+    navigation::NavWorldSystem navigation_{};
     ConsoleModel console_{};
     EditorLayoutState layout_{};
     ProjectSession project_{};

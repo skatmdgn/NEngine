@@ -8,6 +8,7 @@
 #include "nengine/player/bundle.hpp"
 #include "nengine/player/assets.hpp"
 #include "nengine/player/ui_runtime.hpp"
+#include "nengine/navigation/nav_world.hpp"
 #include "nengine/render/decoded_texture.hpp"
 #include "nengine/audio/playback.hpp"
 #include <unordered_map>
@@ -34,6 +35,7 @@ struct PlayerFrameStats {
     std::size_t managed_updates{0};
     std::size_t managed_errors{0};
     std::size_t contact_events{0};
+    navigation::NavWorldStats navigation{};
 };
 
 // Isolated player World bootstrap. Never depends on the editor UI/model.
@@ -62,6 +64,8 @@ public:
     const input::ActionMap& actions() const noexcept { return actions_; }
     bool paused() const noexcept { return paused_; }
     float fixed_delta_seconds() const noexcept { return 1.0f / 60.0f; }
+    navigation::NavWorldSystem& navigation() noexcept { return navigation_; }
+    const navigation::NavWorldSystem& navigation() const noexcept { return navigation_; }
     const PlayerAssets& assets() const noexcept { return assets_; }
     PlayerUiRuntime& ui() noexcept { return ui_; }
     const PlayerUiRuntime& ui() const noexcept { return ui_; }
@@ -87,6 +91,7 @@ private:
         missing_controller_guids_{};
 
     core::World world_{};
+    navigation::NavWorldSystem navigation_{};
     std::filesystem::path bundle_root_{};
     scripting::ManagedRuntime managed_runtime_{};
     scripting::ManagedScriptSystem script_system_{};

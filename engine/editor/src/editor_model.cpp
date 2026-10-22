@@ -2,6 +2,7 @@
 #include "nengine/editor/audio_integration.hpp"
 #include "nengine/editor/render_integration.hpp"
 #include "nengine/editor/physics_integration.hpp"
+#include "nengine/editor/navigation_integration.hpp"
 #include "nengine/editor/scripting_integration.hpp"
 #include "nengine/physics/simulation.hpp"
 #include "nengine/ui/canvas_serialization.hpp"
@@ -401,6 +402,9 @@ EditorModel::EditorModel() {
             "Scripting component factories were only partially registered.");
     }
 
+    if (!register_navigation_integration(component_registry_, component_serialization_,
+                                         property_access_, component_factories_))
+        console_.warning("Navigation", "Navigation component integration incomplete");
     managed_script_system_.bind(
         &managed_runtime_);
 
@@ -423,6 +427,9 @@ bool EditorModel::begin_play_mode() {
         return false;
     }
 
+    std::string nav_error;
+    if (!navigation_.bake(world_, nullptr, &nav_error))
+        console_.warning("Navigation", nav_error);
     managed_script_system_.clear(play_session_.runtime_world());
     physics_contact_tracker_.clear();
     physics_impulse_cache_.clear();
@@ -491,6 +498,7 @@ bool EditorModel::stop_play_mode() {
     audio_playback_system_.reset();
     audio_output_device_.close();
     audio_mix_snapshot_ = {};
+    navigation_.reset();
     return play_session_.stop();
 }
 
@@ -1336,6 +1344,7 @@ void EditorModel::tick_runtime(
                 },
                 &animation_error);
 
+            navigation_.step(*runtime, fixed_delta);
             const auto physics_frame =
                 physics::step_physics(
                     *runtime,
