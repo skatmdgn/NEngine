@@ -6,6 +6,7 @@
 #include "nengine/assets/builtin_processors.hpp"
 #include "nengine/render/model_importer.hpp"
 #include "nengine/player/subassets.hpp"
+#include "nengine/navigation/nav_mesh.hpp"
 #include "nengine/assets/asset_importer.hpp"
 #include <chrono>
 #include <fstream>
@@ -131,11 +132,11 @@ bool export_player_data(const ExportSettings& settings,
             constexpr std::uintmax_t max_total = 1024ull * 1024 * 1024;
             constexpr std::uintmax_t max_file = 512ull * 1024 * 1024;
             std::uintmax_t total = 0;
-            const std::array<std::string_view, 22> extensions{
+            const std::array<std::string_view, 23> extensions{
                 ".meta", ".nscene", ".ncanvas", ".nanim", ".nspriteanim", ".nanimctrl",
                 ".nmat", ".glb", ".gltf", ".bin", ".png",
                 ".jpg", ".jpeg", ".bmp", ".tga", ".webp",
-                ".wav", ".ogg", ".mp3", ".flac", ".obj", ".mtl"};
+                ".wav", ".ogg", ".mp3", ".flac", ".obj", ".mtl", ".nnav"};
             for (std::filesystem::recursive_directory_iterator it(
                      assets_root, ec), end; it != end && !ec;
                      it.increment(ec)) {
@@ -152,6 +153,16 @@ bool export_player_data(const ExportSettings& settings,
                 const auto ext = source_path.extension().string();
                 // Staging WebP as a valid texture would produce a Player
                 // bundle whose GPU pixel decoder cannot render the asset.
+                // Navigation documents must be valid before they are shipped.
+                if (ext == ".nnav") {
+                    navigation::NavMesh candidate;
+                    std::string nav_error;
+                    if (!navigation::load_nav_mesh(source_path, candidate, &nav_error)) {
+                        cleanup();
+                        return fail(error, "cannot export invalid navigation asset: " +
+                                    nav_error);
+                    }
+                }
                 if (ext == ".webp") {
                     cleanup();
                     return fail(error,

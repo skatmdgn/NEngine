@@ -138,6 +138,20 @@ int main() {
     auto scene = nengine::core::SceneSerializer::capture(world, "Main", &codecs);
     if (!nengine::core::SceneSerializer::save_file(
         scene, project / "Assets" / "Scenes" / "Main.nscene")) return test_failure(7, __LINE__);
+    // Bundled navigation roundtrip through the actual Player runtime.
+    const auto nav_guid = nengine::assets::AssetGuid::generate();
+    const auto navigation_dir = project / "Assets" / "Navigation";
+    std::filesystem::create_directories(navigation_dir);
+    nengine::navigation::NavMesh nav_fixture;
+    if (!nav_fixture.add_polygon({{0,0,0},{1,0,0},{1,0,1},{0,0,1}}) ||
+        !nav_fixture.add_polygon({{1,0,0},{2,0,0},{2,0,1},{1,0,1}}) ||
+        !nav_fixture.connect(0,1) ||
+        !nengine::navigation::save_nav_mesh(
+            navigation_dir / "Main.nnav", nav_fixture))
+        return test_failure(930, __LINE__);
+    { std::ofstream meta(navigation_dir / "Main.nnav.meta");
+      meta << "NENGINE_META 1\nGUID " << nav_guid.to_string()
+           << "\nIMPORTER \"NEngine.Navigation\"\nEND_META\n"; }
     std::filesystem::create_directories(project / "Assets" / "Textures");
     { std::ofstream file(project / "Assets" / "Textures" / "hero.png");
       file << "texture test bytes"; }
@@ -302,7 +316,8 @@ int main() {
             no_assets_report.bundle_root / "Content" / "Assets") ||
         !no_assets_runtime.load(no_assets_report.bundle_root, &error) ||
         !no_assets_runtime.ready() ||
-        no_assets_runtime.entity_count() != 2u)
+        no_assets_runtime.entity_count() != 2u ||
+        !no_assets_runtime.navigation_mesh().polygons().empty())
         return test_failure(901, __LINE__);
     // A package must never report success for an unsupported WebP source.
     const auto unsupported_webp = project / "Assets" / "Textures" / "bad.webp";
@@ -315,6 +330,23 @@ int main() {
         error.find("WebP") == std::string::npos)
         return test_failure(902, __LINE__);
     std::filesystem::remove(unsupported_webp);
+    // Invalid navigation input must fail export and leave no partial bundle.
+    {
+        const auto nav_path = project / "Assets" / "Navigation" / "Main.nnav";
+        { std::ofstream corrupt(nav_path, std::ios::binary | std::ios::trunc);
+          corrupt << "NENGINE_NAVMESH 1\nPOLYGONS 99999999\n"; }
+        ExportSettings bad_nav_settings = settings;
+        bad_nav_settings.destination = export_base / "InvalidNavigation";
+        ExportReport bad_nav_report;
+        const bool bad_nav_accepted = export_player_data(
+            bad_nav_settings, bad_nav_report, &error);
+        if (bad_nav_accepted ||
+            std::filesystem::exists(bad_nav_settings.destination) ||
+            error.find("navigation") == std::string::npos)
+            return test_failure(933, __LINE__);
+        if (!nengine::navigation::save_nav_mesh(nav_path, nav_fixture))
+            return test_failure(934, __LINE__);
+    }
     nengine::input::ActionMap bundled_actions;
     if (!nengine::input::load_action_map_file(
             report.bundle_root / "Content" / "Input.ninput", bundled_actions, &error) ||
@@ -329,6 +361,20 @@ int main() {
     if (!std::filesystem::is_regular_file(
             report.bundle_root / "Content" / "Assets" / "UI" / "Main.ncanvas"))
         return test_failure(172, __LINE__);
+    {
+        PlayerRuntime nav_runtime;
+        if (!nav_runtime.load(report.bundle_root, &error) ||
+            nav_runtime.navigation_mesh().polygons().size() != 2u ||
+            !nav_runtime.find_navigation_path({0.2f,0,0.5f},
+                                              {1.8f,0,0.5f}) ||
+            !std::filesystem::is_regular_file(
+                report.bundle_root / "Content" / "Assets" /
+                "Navigation" / "Main.nnav"))
+            return test_failure(931, __LINE__);
+        nav_runtime.unload();
+        if (!nav_runtime.navigation_mesh().polygons().empty())
+            return test_failure(932, __LINE__);
+    }
     PlayerRuntime runtime;
     if (!runtime.load(report.bundle_root, &error) ||
         !runtime.ready() || runtime.entity_count() != 2u ||

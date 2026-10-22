@@ -2472,6 +2472,39 @@ int main() {
     model.sanitize_selection();
     check(model.selection().empty(), "selection drops destroyed entities");
 
+    // Project navigation is a real GUID-imported asset and Editor query surface.
+    const auto nav_dir = project_root / "Assets" / "Navigation";
+    std::filesystem::create_directories(nav_dir);
+    navigation::NavMesh nav_fixture;
+    check(nav_fixture.add_polygon({{0,0,0},{1,0,0},{1,0,1},{0,0,1}}) &&
+          nav_fixture.add_polygon({{1,0,0},{2,0,0},{2,0,1},{1,0,1}}) &&
+          nav_fixture.connect(0,1) &&
+          navigation::save_nav_mesh(nav_dir / "Main.nnav", nav_fixture),
+          "navigation fixture saved in project");
+    const auto nav_guid = assets::AssetGuid::generate();
+    { std::ofstream meta(nav_dir / "Main.nnav.meta");
+      meta << "NENGINE_META 1\nGUID " << nav_guid.to_string()
+           << "\nIMPORTER \"NEngine.Navigation\"\nEND_META\n"; }
+    model.project().refresh_assets();
+    check(model.project().assets().find(nav_guid) != nullptr &&
+          model.load_navigation(nav_guid, &project_error) &&
+          model.navigation_mesh().polygons().size() == 2u &&
+          model.find_navigation_path({0.2f,0,0.5f},
+                                     {1.8f,0,0.5f}).has_value(),
+          "Editor resolves navigation GUID and uses native route query");
+    check(!model.load_navigation(assets::AssetGuid{}, &project_error) &&
+          model.navigation_mesh().polygons().size() == 2u,
+          "invalid Editor navigation GUID preserves existing loaded mesh");
+
+    // Failed nav reload may never erase the last successfully loaded graph.
+    { std::ofstream invalid(nav_dir / "Main.nnav", std::ios::trunc);
+      invalid << "NENGINE_NAVMESH 1\nPOLYGONS 999999\n"; }
+    check(!model.load_navigation(nav_guid, &project_error) &&
+          model.navigation_mesh().polygons().size() == 2u,
+          "malformed navigation data does not clobber Editor graph");
+    check(navigation::save_nav_mesh(nav_dir / "Main.nnav", nav_fixture),
+          "valid navigation content restores after invalid edit");
+
     model.project().close();
     std::error_code cleanup_error;
     std::filesystem::remove_all(

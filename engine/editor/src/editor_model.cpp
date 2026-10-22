@@ -410,6 +410,18 @@ EditorModel::EditorModel() {
 }
 
 
+bool EditorModel::load_navigation(assets::AssetGuid guid,
+                                   std::string* error) {
+    if (!can_edit()) {
+        if (error) *error = "navigation cannot change during Play Mode";
+        return false;
+    }
+    navigation::NavMesh loaded;
+    if (!project_.load_nav_mesh(guid, loaded, error)) return false;
+    navigation_ = std::move(loaded);
+    return true;
+}
+
 bool EditorModel::begin_play_mode() {
     // Prefer an optional project Canvas convention without requiring
     // a new scene/component format for this diagnostic preview.

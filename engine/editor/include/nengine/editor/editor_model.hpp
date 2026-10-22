@@ -114,6 +114,15 @@ public:
 
     bool can_edit() const noexcept { return !play_session_.is_playing(); }
 
+    // Navigation graph is an independently authored .nnav asset.
+    bool load_navigation(assets::AssetGuid guid,
+                         std::string* error = nullptr);
+    const navigation::NavMesh& navigation_mesh() const noexcept { return navigation_; }
+    std::optional<navigation::NavPath> find_navigation_path(
+        core::Vec3 from, core::Vec3 to,
+        const navigation::NavQuery& query = {}) const {
+        return navigation_.find_path(from,to,query);
+    }
     bool begin_play_mode();
     bool stop_play_mode();
 
@@ -298,6 +307,7 @@ public:
 
 private:
     core::World world_{};
+    navigation::NavMesh navigation_{};
     core::ComponentRegistry component_registry_{};
     core::ComponentSerializationRegistry component_serialization_{};
     Selection selection_{};

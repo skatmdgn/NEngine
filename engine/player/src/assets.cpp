@@ -276,4 +276,24 @@ std::optional<audio::AudioClipData> PlayerAssets::load_wav(
     return result;
 }
 
+bool PlayerAssets::load_navigation_default(navigation::NavMesh& output,
+                                           std::string* error) const {
+    if (root_.empty()) {
+        if (error) *error = "Player asset catalog is not open";
+        return false;
+    }
+    const auto* record = database_.find_relative("Navigation/Main.nnav");
+    if (!record) {
+        output.clear(); // Projects without navigation preserve old behavior.
+        if (error) error->clear();
+        return true;
+    }
+    const auto source_path = source(record->guid, error);
+    if (!source_path || source_path->extension() != ".nnav") {
+        if (error) *error = "default navigation asset unavailable";
+        return false;
+    }
+    return navigation::load_nav_mesh(*source_path, output, error);
+}
+
 } // namespace nengine::player
