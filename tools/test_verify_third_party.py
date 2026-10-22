@@ -7,7 +7,7 @@ import verify_third_party as third_party
 
 
 NOTICE = """# Third-Party Notices
-## stb
+## stb_image
 
 - Project: stb
 - Upstream: nothings/stb
