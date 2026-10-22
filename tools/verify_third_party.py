@@ -22,8 +22,10 @@ def validate(repo):
     if not directories:
         errors.append("no vendored dependency directories")
     for dep in directories:
+        # Some upstream component headings intentionally differ from the vendor folder.
+        section_name = {"stb": "stb_image"}.get(dep.name, dep.name)
         section = re.search(
-            r"(?ms)^## " + re.escape(dep.name) + r"\s*\n(.*?)(?=^## |\Z)", text)
+            r"(?ms)^## " + re.escape(section_name) + r"\s*\n(.*?)(?=^## |\Z)", text)
         if not section:
             errors.append(f"unlisted third-party dependency: {dep.name}")
             continue
