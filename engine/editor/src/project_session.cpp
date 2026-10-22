@@ -868,4 +868,34 @@ AssetActivation ProjectSession::activation_for(
 }
 
 
+bool ProjectSession::load_nav_mesh(assets::AssetGuid guid,
+                                   navigation::NavMesh& output,
+                                   std::string* error) const {
+    if (!open_ || !guid.valid()) {
+        if (error) *error = "navigation project or GUID unavailable";
+        return false;
+    }
+    const auto* record = assets_.find(guid);
+    if (!record || record->source_path.extension() != ".nnav" ||
+        record->importer_id != "NEngine.Navigation") {
+        if (error) *error = "navigation asset not indexed";
+        return false;
+    }
+    std::error_code ec;
+    const auto root = std::filesystem::canonical(assets_path_, ec);
+    if (ec || std::filesystem::is_symlink(record->source_path, ec) || ec) {
+        if (error) *error = "navigation asset root or link unsafe";
+        return false;
+    }
+    const auto resolved = std::filesystem::canonical(record->source_path, ec);
+    const auto relative = resolved.lexically_relative(root);
+    if (ec || relative.empty() || relative.is_absolute() ||
+        *relative.begin() == ".." ||
+        !std::filesystem::is_regular_file(resolved, ec) || ec) {
+        if (error) *error = "navigation asset outside project";
+        return false;
+    }
+    return navigation::load_nav_mesh(resolved, output, error);
+}
+
 } // namespace nengine::editor
