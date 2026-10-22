@@ -153,6 +153,16 @@ bool export_player_data(const ExportSettings& settings,
                 const auto ext = source_path.extension().string();
                 // Staging WebP as a valid texture would produce a Player
                 // bundle whose GPU pixel decoder cannot render the asset.
+                // Navigation documents must be valid before they are shipped.
+                if (ext == ".nnav") {
+                    navigation::NavMesh candidate;
+                    std::string nav_error;
+                    if (!navigation::load_nav_mesh(source_path, candidate, &nav_error)) {
+                        cleanup();
+                        return fail(error, "cannot export invalid navigation asset: " +
+                                    nav_error);
+                    }
+                }
                 if (ext == ".webp") {
                     cleanup();
                     return fail(error,
