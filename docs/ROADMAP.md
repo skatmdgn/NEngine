@@ -278,7 +278,8 @@ Roadmap entries are implementation order, not promises tied to dates.
 - [ ] runtime Canvas-style UI (Korean/Unicode font glyphs and shaping, GPU hardware acceptance and advanced layout remain)
 - [x] Native navigation graph foundation: convex polygons, bounded Dijkstra, runtime obstacles, off-mesh links, constant-speed agents, .nnav and 30-slice tests (source implementation, CI pending)
 - [x] Editor GUID-backed .nnav asset import and transactional native route API; Player bundle validation/default graph load and native route API (CI verification required)
-- [x] Native bounded triangle-list/indexed navigation surface cooker: slope/area/height filtering, seam welding, auto-adjacency and transactional validation (30 acceptance slices; final CI required; see NAVIGATION_TRIANGLE_BAKE.md)\n- [ ] NavMesh agent/obstacle/link product integration: Scene/Editor/Player/C#, geometry baking, funnel smoothing and physical acceptance
+- [x] Native bounded triangle-list/indexed navigation surface cooker: slope/area/height filtering, seam welding, auto-adjacency and transactional validation (30 acceptance slices; final CI required; see NAVIGATION_TRIANGLE_BAKE.md)
+- [ ] NavMesh agent/obstacle/link product integration: Scene/Editor/Player/C#, geometry baking, funnel smoothing and physical acceptance
 - [ ] particle system
 
 ## 0.8 — Packages/plugins
