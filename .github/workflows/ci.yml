@@ -19,6 +19,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Install GLSL compiler
         if: runner.os == 'Linux'
@@ -48,6 +50,11 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Verify acceptance checklist and governance regressions
+        run: |
+          python -m unittest discover -s tools -p test_verify_checklist.py
+          python tools/verify_checklist.py
 
       - name: Upload Windows editor
         if: runner.os == 'Windows'
