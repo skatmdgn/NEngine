@@ -65,3 +65,9 @@ if(TARGET NEnginePlayerBuild AND TARGET NEnginePlayer)
     "-DTEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/player_cli_bundle"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/player_cli_smoke.cmake")
 endif()
+
+# CORE-004 / CORE-006 / CORE-008 acceptance regressions are separately visible in CTest.
+add_executable(NEngineCoreAcceptanceTests core_acceptance_tests.cpp)
+target_link_libraries(NEngineCoreAcceptanceTests PRIVATE NEngineCore)
+target_compile_features(NEngineCoreAcceptanceTests PRIVATE cxx_std_20)
+add_test(NAME NEngineCoreAcceptanceTests COMMAND NEngineCoreAcceptanceTests)
