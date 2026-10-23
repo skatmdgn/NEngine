@@ -1,5 +1,6 @@
 #include "nengine/player/save_data.hpp"
 #include <array>
+#include <atomic>
 #include <cstdlib>
 #include <fstream>
 #include <limits>
@@ -93,7 +94,7 @@ bool GameSaveStore::write(std::string slot,const GameSave& data,std::string* err
         return bad(error,"save target cannot be a symlink");
     // Exclusive temp name prevents other writers from truncating our data.
     // Filename entropy is not a security token; it only avoids collisions.
-    static std::uint64_t generation=0;
+    static std::atomic<std::uint64_t> generation{0};
     const auto temp=root_/("." + slot + ".nsave-" +
                           std::to_string(++generation)+".tmp");
     if(std::filesystem::exists(temp,ec)||ec)
