@@ -175,6 +175,18 @@ AssetScanResult AssetDatabase::scan(bool create_missing_meta) {
     for (; !error && iterator != end; iterator.increment(error)) {
         const auto& entry = *iterator;
 
+        // Do not follow a symlinked source (or a directory symlink)
+        // outside the project's asset root. The target may be attacker-
+        // controlled and must never be assigned a project GUID/meta.
+        if (entry.is_symlink(error) || error) {
+            error.clear();
+            result.messages.push_back({
+                AssetMessageSeverity::Warning, entry.path(),
+                "unsafe symlinked asset ignored"
+            });
+            continue;
+        }
+
         if (!entry.is_regular_file(error) || error) {
             error.clear();
             continue;

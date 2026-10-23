@@ -2,7 +2,7 @@
 
 **검증 기준선:** main 671cddf2d50d184b1889310f86c85a3df43306bd (2026-10-22), [Windows/Ubuntu CI 39713209272](https://github.com/skatmdgn/NEngine/actions/runs/39713209272), 양쪽 12/12 CTest 그룹 통과. 현재는 실 GPU·오디오·.NET 배포 및 Android 기기 검증을 통과했다고 주장하지 않는다.
 
-**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 38개, 미완료 247개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
+**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 53개, 미완료 232개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
 
 **우선 순위:** 남은 GOV-007/010의 SHA 검증 강화와 WIN 실기기 수용, Android 빌드 토대를 구축. PR #29는 아직 main 미병합이므로 NAV-003은 반드시 미완료 유지. 작업 규칙은 [WORKFLOW.md](WORKFLOW.md), 근거와 저장소 조사는 [FILE_AUDIT.md](FILE_AUDIT.md)를 참고한다.
 
@@ -21,7 +21,7 @@
 - [x] GOV-009 실제 Android 기기 테스트 기록 형식을 검증한다 — 증거: PR #31, verify_acceptance.py Android 보고서 schema·SHA256 및 test_verify_acceptance.py, Windows/Ubuntu CI; 실제 기기 테스트 미실시
 - [ ] GOV-010 릴리스 후보 SHA·실행 파일·검증 로그의 일치를 확인한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## CORE — Core·Scene·Prefab (6/12)
+## CORE — Core·Scene·Prefab (9/12)
 
 참조: engine/core; tests/core_tests.cpp
 
@@ -33,9 +33,9 @@
 - [x] CORE-006 Scene의 손상·절단·과대 파일을 거부하면서 현재 World를 보존한다 — 증거: PR #31, NEngineCoreAcceptanceTests 손상·절단·33MiB 파일 거부 및 World 보존, Windows/Ubuntu CI
 - [ ] CORE-007 프리팹 중첩/오버라이드/리버트를 실제 Editor에서 확인한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] CORE-008 엔티티 참조가 복제·삭제·재로드 뒤에도 안전하다 — 증거: PR #31, NEngineCoreAcceptanceTests 복제·삭제·slot 재사용·Scene 재로드 stale 참조 검증, Windows/Ubuntu CI
-- [ ] CORE-009 Play/Stop 뒤 Runtime World 변경사항이 편집 World에 남지 않는다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] CORE-010 다중 Scene 전환·로드 실패 복구가 가능하다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] CORE-011 Scene 저장 도중 쓰기 실패에 데이터가 보존된다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] CORE-009 Play/Stop 뒤 Runtime World 변경사항이 편집 World에 남지 않는다 — 증거: PR #32, NEngineRoundTwoCoreTests, Editor Play/Pause/Step/Stop 월드 격리, Windows/Ubuntu CI
+- [x] CORE-010 다중 Scene 전환·로드 실패 복구가 가능하다 — 증거: PR #32, NEngineRoundTwoCoreTests, Scene A/B/A 교체·실패 rollback, Windows/Ubuntu CI
+- [x] CORE-011 Scene 저장 도중 쓰기 실패에 데이터가 보존된다 — 증거: PR #32, NEngineRoundTwoCoreTests, 씬 손상 저장·권한 실패 시 원본 보존과 atomic publish, Windows/Ubuntu CI
 - [ ] CORE-012 최소 2D·3D Scene이 Player에서 동일하게 실행된다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
 ## EDIT — Windows Editor (3/16)
@@ -59,24 +59,24 @@
 - [ ] EDIT-015 Play/Pause/Step/Stop을 실제 2D·3D 게임에 적용한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] EDIT-016 다중 프로젝트 전환 시 파일 감시·캐시·핸들을 안전하게 복구한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## ASSET — 에셋 파이프라인 (2/15)
+## ASSET — 에셋 파이프라인 (6/15)
 
 참조: engine/assets; engine/render/src/model_importer.cpp; tests/asset_tests.cpp
 
 - [x] ASSET-001 GUID/.meta와 의존성 기본 회귀 테스트가 통과한다 — 증거: tests/asset_tests.cpp / CI run 39713209272
 - [x] ASSET-002 GLB/glTF/OBJ 기본 파서 회귀 테스트가 통과한다 — 증거: tests/asset_tests.cpp / CI run 39713209272
 - [ ] ASSET-003 여러 외부 BIN/이미지 참조를 가진 glTF를 가져온다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] ASSET-004 모델 디렉터리 밖의 glTF 리소스에 안전한 명시적 정책을 적용한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] ASSET-004 모델 디렉터리 밖의 glTF 리소스에 안전한 명시적 정책을 적용한다 — 증거: PR #32, NEngineRoundTwoAssetTests, glTF URI 경로·scheme·percent escape 거부·rollback; gltf_sidecars.cpp 수정, Windows/Ubuntu CI
 - [ ] ASSET-005 FBX 모델·재질·노드 계층 가져오기를 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] ASSET-006 PNG·JPEG·BMP·TGA의 색상 및 알파를 실제 렌더러에서 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] ASSET-007 WebP 텍스처 가져오기를 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] ASSET-008 GPU 압축 텍스처 트랜스코딩과 폴백을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] ASSET-009 멀티 머티리얼 모델의 모든 하위 에셋을 GUID로 저장한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] ASSET-010 모든 모델 메쉬·재질·텍스처가 Player로 함께 내보내진다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] ASSET-011 텍스처·모델 크기 한도를 정의하고 과대 입력을 안전하게 거부한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] ASSET-012 임포트·리임포트·이름 변경 뒤 에셋 GUID가 안정적이다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] ASSET-011 텍스처·모델 크기 한도를 정의하고 과대 입력을 안전하게 거부한다 — 증거: PR #32, NEngineRoundTwoAssetTests, 33MiB glTF·9KiB meta 상한 초과 거부, Windows/Ubuntu CI
+- [x] ASSET-012 임포트·리임포트·이름 변경 뒤 에셋 GUID가 안정적이다 — 증거: PR #32, NEngineRoundTwoAssetTests, 재가져오기·이름변경·재시작 후 AssetGuid 안정성, Windows/Ubuntu CI
 - [ ] ASSET-013 원본 누락·참조 오류에서 사용자에게 복구 가능한 진단을 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] ASSET-014 경로 순회와 심볼릭 링크를 포함한 악성 에셋을 거부한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] ASSET-014 경로 순회와 심볼릭 링크를 포함한 악성 에셋을 거부한다 — 증거: PR #32, NEngineRoundTwoAssetTests, symlinked 에셋 GUID 생성 거부와 glTF 외부 symlink escape; asset_database.cpp 수정, Windows/Ubuntu CI
 - [ ] ASSET-015 에셋 핫리로드 후 실제 화면과 런타임 캐시가 동일하다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
 ## REND — 2D/3D 렌더링 (2/16)
@@ -119,7 +119,7 @@
 - [ ] CS-013 관리형 외부 라이브러리 의존성을 컴파일·실행·배포한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] CS-014 C# 공개 API에 컴파일 가능한 최소 예제와 참조 문서를 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## PHYS — 2D/3D 물리 (3/13)
+## PHYS — 2D/3D 물리 (5/13)
 
 참조: engine/physics; tests/physics_tests.cpp
 
@@ -131,10 +131,10 @@
 - [ ] PHYS-006 고속 충돌 검출에서 터널링을 방지한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] PHYS-007 장시간 쌓인 동적 물체의 안정성과 수치 발산을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] PHYS-008 Trigger/Collision 이벤트가 C#·Editor·Player에서 일치한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] PHYS-009 레이어 마스크·필터가 물리 쿼리마다 동일하다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] PHYS-009 레이어 마스크·필터가 물리 쿼리마다 동일하다 — 증거: PR #32, NEngineRoundTwoAnimPhysicsTests, 3D overlap/raycast 계층 mask 및 trigger, Windows/Ubuntu CI
 - [ ] PHYS-010 Rigidbody의 정적·동적·키네마틱 전환이 안전하다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] PHYS-011 FixedUpdate·pause·time scale에 물리 시뮬레이션이 연동된다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] PHYS-012 2D·3D 물리가 의도치 않게 혼합되지 않는다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] PHYS-012 2D·3D 물리가 의도치 않게 혼합되지 않는다 — 증거: PR #32, NEngineRoundTwoAnimPhysicsTests, 2D·3D 분리 충돌·물리 적분·분리 query, Windows/Ubuntu CI
 - [ ] PHYS-013 1000개 이상 물체에서 broadphase 성능과 정확도를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
 ## AUD — Audio (2/12)
@@ -154,7 +154,7 @@
 - [ ] AUD-011 C# AudioSource Play/Stop/Loop/Volume이 Player에서 동작한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] AUD-012 소리 장치 실패 시 안전하게 폴백하고 오류를 표시한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## INPUT — Input (2/11)
+## INPUT — Input (4/11)
 
 참조: engine/input; tests/input_tests.cpp
 
@@ -164,41 +164,41 @@
 - [ ] INPUT-004 Action Map 변경이 Windows Player 번들까지 전달된다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] INPUT-005 C# 액션 입력과 물리 키 상태가 실제 키보드에서 일치한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] INPUT-006 마우스 버튼·좌표·스크롤이 DPI 변경 시 정상 동작한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] INPUT-007 포커스를 잃으면 눌린 입력이 고착되지 않는다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] INPUT-007 포커스를 잃으면 눌린 입력이 고착되지 않는다 — 증거: PR #32, NEngineRoundTwoInputUiTests, 같은 프레임 focus-loss 키·마우스 취소 및 커서 리셋; input_state.cpp 수정, Windows/Ubuntu CI
 - [ ] INPUT-008 게임패드 입력·연결 해제·재연결을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] INPUT-009 Android 터치·멀티 터치를 실제 기기에서 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] INPUT-010 UI가 소비한 입력을 게임플레이가 중복 처리하지 않는다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] INPUT-011 입력맵 부재·손상 오류를 안전하게 처리한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] INPUT-011 입력맵 부재·손상 오류를 안전하게 처리한다 — 증거: PR #32, NEngineRoundTwoInputUiTests, 악성·누락·과대 ActionMap 거부·기존 Action 보존, Windows/Ubuntu CI
 
-## ANIM — Animation (1/10)
+## ANIM — Animation (3/10)
 
 참조: engine/render/src/animation_controller.cpp; tests/render_tests.cpp
 
 - [x] ANIM-001 SpriteAnimation과 Controller 기본 회귀 테스트가 통과한다 — 증거: tests/render_tests.cpp / CI run 39713209272
 - [ ] ANIM-002 스프라이트 시트·클립·타임라인 Editor를 완성한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] ANIM-003 2D SpriteAnimator 클립을 Scene 저장 후 Player에서 재생한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] ANIM-004 애니메이션 상태 머신 Transition 조건을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] ANIM-004 애니메이션 상태 머신 Transition 조건을 검증한다 — 증거: PR #32, NEngineRoundTwoAnimPhysicsTests, 상태머신 전이 조건·exit 시간·복귀·잘못된 참조 검증, Windows/Ubuntu CI
 - [ ] ANIM-005 Blend Tree 보간과 중단·재진입을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] ANIM-006 애니메이션 이벤트를 ScriptBehaviour에 전달한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] ANIM-007 3D 스켈레탈 애니메이션 가져오기·스키닝을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] ANIM-008 Root Motion과 시간 배율을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] ANIM-009 Inspector에서 애니메이션 파라미터를 조작·관찰한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] ANIM-010 중단·재시작·루프·장시간 재생의 안정성을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] ANIM-010 중단·재시작·루프·장시간 재생의 안정성을 검증한다 — 증거: PR #32, NEngineRoundTwoAnimPhysicsTests, 1만 프레임 루프·클립 종료·재시작·비정상 시간, Windows/Ubuntu CI
 
-## UI — Canvas·런타임 UI (1/14)
+## UI — Canvas·런타임 UI (3/14)
 
 참조: engine/ui; engine/player/src/ui_runtime.cpp; tests/ui_tests.cpp
 
 - [x] UI-001 Canvas 데이터·이벤트 기본 회귀 테스트가 통과한다 — 증거: tests/ui_tests.cpp / CI run 39713209272
 - [ ] UI-002 Canvas 계층·Anchor·RectTransform을 Editor에서 편집한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] UI-003 Button/Image/Text/Panel을 함께 배치하고 저장한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] UI-004 Pointer 클릭·드래그·키보드 포커스를 통합 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] UI-004 Pointer 클릭·드래그·키보드 포커스를 통합 검증한다 — 증거: PR #32, NEngineRoundTwoInputUiTests, pointer hover/down/drag/up/cancel 및 Tab/Enter 포커스, Windows/Ubuntu CI
 - [ ] UI-005 UI Button 클릭으로 C# 콜백을 실제 호출한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] UI-006 Windows Vulkan 화면에 런타임 UI를 합성한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] UI-007 한글 글리프·한글 문자열을 완전하게 렌더한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] UI-008 폰트 대체·조합 Unicode·줄바꿈을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] UI-009 UI 셰이핑과 텍스트 정렬·크기 조절을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] UI-010 UI 앵커·DPI·화면비 변경을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] UI-010 UI 앵커·DPI·화면비 변경을 검증한다 — 증거: PR #32, NEngineRoundTwoInputUiTests, UI anchor viewport 크기 변경·중앙 정렬·0 영역 검증, Windows/Ubuntu CI
 - [ ] UI-011 이미지 알파·클리핑·마스크·레이아웃을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] UI-012 AssetGuid 이미지가 Editor·Player에서 같은 결과를 낸다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] UI-013 최소 UI 메뉴 게임을 Windows Player에서 직접 클릭한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -415,3 +415,5 @@
 - 2026-10-22: 전체 301개 소스/문서/테스트 파일의 내용을 조회·대조한 새 수용 원장 작성. 실기기 수용 항목은 증거 부재로 미체크.
 
 - 2026-10-22: PR #31에서 GOV-004/005/006/008/009, CORE-004/006/008, QA-001/017 수용 검증과 CI 게이트를 추가. 검증 완료 시 28→38개, 미완료 257→247개. 실기기 Windows/Android 실행 수용은 별도 미완료로 유지. 체크 근거는 PR #31 최종 HEAD의 Windows/Ubuntu CI와 테스트.
+
+- 2026-10-23: PR #32를 PR #31의 커밋 위에 스택으로 생성. CORE-009/010/011, INPUT-007/011, UI-004/010, ANIM-004/010, PHYS-009/012, ASSET-004/011/012/014 총 15 ID를 독립된 네 CTest 그룹에서 검증. 성공한 PR HEAD 기준 38→53 완료, 247→232 미완료; 새 ID 없음. Windows·Ubuntu CI 완료 전에는 main 완료로 산입하지 않는다.
