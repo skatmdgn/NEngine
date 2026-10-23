@@ -79,8 +79,11 @@ void filtering() {
     world.transform(left)->local_position={2,0,0};
     world.transform(right)->local_position={5,0,0};
     auto* a=world.add_component<physics::BoxCollider>(left,physics::box_collider_type());
+    // Adding the next collider can relocate the component pool.
+    // Set fields before insertion and do not retain the earlier pointer.
+    a->layer=0;
     auto* b=world.add_component<physics::BoxCollider>(right,physics::box_collider_type());
-    a->layer=0;b->layer=3;
+    b->layer=3;
     auto mask3=std::uint32_t{1}<<3;
     auto mask0=std::uint32_t{1}<<0;
     auto zero=physics::overlap_box(world,{2,0,0},{2,2,2},false,mask0);
