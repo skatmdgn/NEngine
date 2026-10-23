@@ -153,4 +153,28 @@ std::optional<RaycastHit> box_cast_2d(
     bool include_triggers = true,
     std::uint32_t layer_mask = 0xffffffffu);
 
+
+ // Continuous, geometry-aware world-space casts. Distance is measured along
+ // normalized travel direction; capsule's long axis is world +Y.
+ // Only enabled 3D colliders participate. The hit point is the cast origin
+ // translated to time-of-impact, consistent with box_cast.
+std::optional<RaycastHit> sphere_cast(
+    const core::World& world,
+    core::Vec3 origin,
+    float radius,
+    core::Vec3 direction,
+    float max_distance,
+    bool include_triggers = true,
+    std::uint32_t layer_mask = 0xffffffffu);
+
+std::optional<RaycastHit> capsule_cast(
+    const core::World& world,
+    core::Vec3 origin,
+    float radius,
+    float height,
+    core::Vec3 direction,
+    float max_distance,
+    bool include_triggers = true,
+    std::uint32_t layer_mask = 0xffffffffu);
+
 } // namespace nengine::physics
