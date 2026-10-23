@@ -1,3 +1,13 @@
+add_executable(NEngineGameSaveTests save_data_tests.cpp)
+target_link_libraries(NEngineGameSaveTests PRIVATE NEnginePlayerKit)
+target_compile_features(NEngineGameSaveTests PRIVATE cxx_std_20)
+add_test(NAME NEngineGameSaveTests COMMAND NEngineGameSaveTests)
+
+add_executable(NEngineAdditiveSceneTests additive_scene_tests.cpp)
+target_link_libraries(NEngineAdditiveSceneTests PRIVATE NEngineCore)
+target_compile_features(NEngineAdditiveSceneTests PRIVATE cxx_std_20)
+add_test(NAME NEngineAdditiveSceneTests COMMAND NEngineAdditiveSceneTests)
+
 add_executable(NEngineCoreTests core_tests.cpp)
 target_link_libraries(NEngineCoreTests PRIVATE NEngineCore)
 target_compile_features(NEngineCoreTests PRIVATE cxx_std_20)
@@ -115,3 +125,15 @@ add_executable(NEngineRoundThreePlayerSafetyTests round_three_player_safety_test
 target_link_libraries(NEngineRoundThreePlayerSafetyTests PRIVATE NEnginePlayerKit)
 target_compile_features(NEngineRoundThreePlayerSafetyTests PRIVATE cxx_std_20)
 add_test(NAME NEngineRoundThreePlayerSafetyTests COMMAND NEngineRoundThreePlayerSafetyTests)
+
+# Round Four integration: project Action Map propagation, Unicode Player
+# bootstrap, and untrusted source parser security corpus.
+add_executable(NEngineInputBundleAcceptanceTests input_bundle_acceptance_tests.cpp)
+target_link_libraries(NEngineInputBundleAcceptanceTests PRIVATE NEnginePlayerKit)
+target_compile_features(NEngineInputBundleAcceptanceTests PRIVATE cxx_std_20)
+add_test(NAME NEngineInputBundleAcceptanceTests COMMAND NEngineInputBundleAcceptanceTests)
+
+add_executable(NEngineUntrustedInputTests untrusted_input_tests.cpp)
+target_link_libraries(NEngineUntrustedInputTests PRIVATE NEngineRender NEngineCore NEngineInput NEngineAssets)
+target_compile_features(NEngineUntrustedInputTests PRIVATE cxx_std_20)
+add_test(NAME NEngineUntrustedInputTests COMMAND NEngineUntrustedInputTests)
