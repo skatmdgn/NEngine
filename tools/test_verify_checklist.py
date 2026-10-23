@@ -60,5 +60,68 @@ class ChecklistTests(unittest.TestCase):
         self.assertTrue(any("malformed" in x for x in check.validate(text)))
 
 
+
+    def test_gov005_added_id_requires_explanation(self):
+        old_text = sample()
+        updated = sample().replace("총 1개", "총 2개").replace(
+            "미완료 1개", "미완료 2개").replace("(0/1)", "(0/2)")
+        updated += "- [ ] DEMO-002 New unmet acceptance — 수용: TEST\\n"
+        old, _, _ = check.parse_document(old_text)
+        new, _, _ = check.parse_document(updated)
+        problems = check.check_change_journal(new, old, [], [])
+        self.assertTrue(any("DEMO-002" in x for x in problems))
+        audit = [{"id": "DEMO-002", "kind": "add", "date": "2026-10-22",
+                  "reason": "User discovered a previously missing acceptance goal",
+                  "sources": []}]
+        self.assertEqual([], check.check_change_journal(new, old, audit, []))
+
+    def test_gov006_split_requires_parent_and_keeps_prior_id(self):
+        old_text = sample()
+        updated = sample().replace("총 1개", "총 2개").replace(
+            "미완료 1개", "미완료 2개").replace("(0/1)", "(0/2)")
+        updated += "- [ ] DEMO-002 Smaller goal — 수용: TEST\\n"
+        old, _, _ = check.parse_document(old_text)
+        new, _, _ = check.parse_document(updated)
+        log = [{"id": "DEMO-002", "kind": "split", "date": "2026-10-22",
+                "reason": "Large acceptance split into independently measurable work",
+                "sources": ["DEMO-001"]}]
+        self.assertEqual([], check.check_change_journal(new, old, log, []))
+        log[0]["sources"] = ["MISSING-001"]
+        self.assertTrue(any("invalid split source" in e for e
+                            in check.check_change_journal(new, old, log, [])))
+
+    def test_gov006_merge_needs_two_sources(self):
+        old = {"DEMO-001": (False, "A"), "DEMO-002": (False, "B")}
+        new = dict(old, **{"DEMO-003": (False, "C")})
+        records = [{"id": "DEMO-003", "kind": "merge", "date": "2026-10-22",
+                    "reason": "Two tasks were found to have a shared acceptance",
+                    "sources": ["DEMO-001"]}]
+        self.assertTrue(any("needs 2 source" in e for e in
+                            check.check_change_journal(new, old, records, [])))
+
+    def test_gov006_acceptance_change_requires_revision_record(self):
+        old = {"DEMO-001": (False, "Old behavior — 수용: TEST")}
+        new = {"DEMO-001": (False, "New behavior — 수용: TEST")}
+        self.assertTrue(check.check_change_journal(new, old, [], []))
+        record = [{"id": "DEMO-001", "kind": "revise", "date": "2026-10-22",
+                   "reason": "Clarified previously ambiguous acceptance criterion",
+                   "sources": []}]
+        self.assertEqual([], check.check_change_journal(new, old, record, []))
+
+    def test_gov006_append_only_records(self):
+        old = {"DEMO-001": (False, "Old")}
+        previous = [{"id": "DEMO-001", "kind": "add", "date": "2026-10-20",
+                     "reason": "Found a missing requirement", "sources": []}]
+        self.assertTrue(any("prior checklist change records" in e for e
+                            in check.check_change_journal(old, old, [], previous)))
+
+    def test_gov005_audit_record_schema(self):
+        valid = '{"version":1,"records":[{"id":"DEMO-002","kind":"add","date":"2026-10-22","reason":"A real new user requirement","sources":[]}]}'
+        entries, errors = check.parse_change_journal(valid)
+        self.assertEqual([], errors)
+        self.assertEqual(1, len(entries))
+        invalid = valid.replace("2026-10-22", "yesterday")
+        self.assertTrue(check.parse_change_journal(invalid)[1])
+
 if __name__ == "__main__":
     unittest.main()

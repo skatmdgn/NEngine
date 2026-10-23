@@ -67,6 +67,11 @@
 - `tools/verify_checklist.py`는 모든 체크 ID의 유일성·연속성·섹션/전체 집계·완료 증거를 검사한다.
 - PR은 기준 브랜치의 기존 ID를 삭제하거나 바꿀 수 없다. 체크를 새로 완료했다면 `PR #번호` 및 테스트/CI 증거가 있어야 하고 해당 ID가 PR 제목이나 본문에 나타나야 한다.
 - `tools/test_verify_checklist.py` 단위 테스트가 Windows와 Ubuntu CI에서 실행된다. CI checkout에는 전체 Git 이력이 필요하다.
+- **새 ID 추가·요구 변경·분할·통합:** `tools/checklist_changes.json`에 날짜·ID·사유·종류(`add/revise/split/merge`)·원본 `sources`를 추가한다. 기존 기록은 수정·삭제하지 않는다. 단순 체크상태와 증거 문자열 변경은 새 작업으로 세지 않는다.
+- **기존 테스트 회귀 차단:** `tools/verify_test_matrix.py`가 역사적 CTest 12개 그룹이 사라지지 않았는지 검증한다. 추가 테스트 그룹은 허용하지만 삭제는 실패로 처리한다.
+- **실기기 수용 근거:** `evidence/hardware/README.md` 형식의 Windows/Android 결과를 `tools/verify_acceptance.py`로 검증한다. 보고서가 0개거나 형식만 통과했으면 실기기 수용을 완료로 처리하지 않는다.
+- **서드파티 준수:** `tools/verify_third_party.py`로 `third_party` 실제 폴더/소스·고지문·PIN SHA·라이선스를 대조한다. 신규 의존성을 넣으면 고지와 테스트를 함께 수정한다.
+- **Python 검증 전체:** `python -m unittest discover -s tools -p "test_*.py"`, `python tools/verify_checklist.py`, `python tools/verify_test_matrix.py` (빌드 후), `python tools/verify_acceptance.py`, `python tools/verify_third_party.py`를 Windows/Ubuntu 최종 CI에 연결한다.
 - `python -m unittest discover -s tools -p test_verify_checklist.py`와 `python tools/verify_checklist.py`로 로컬 검사할 수 있다.
 - 이 검증기는 체크리스트 무결성만 강제한다. 실기기 검증 로그의 진위나 코드의 제품 품질까지 자동으로 증명하지 않는다.
 

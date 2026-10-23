@@ -2,37 +2,37 @@
 
 **검증 기준선:** main 671cddf2d50d184b1889310f86c85a3df43306bd (2026-10-22), [Windows/Ubuntu CI 39713209272](https://github.com/skatmdgn/NEngine/actions/runs/39713209272), 양쪽 12/12 CTest 그룹 통과. 현재는 실 GPU·오디오·.NET 배포 및 Android 기기 검증을 통과했다고 주장하지 않는다.
 
-**초기 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 28개, 미완료 257개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
+**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 38개, 미완료 247개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
 
-**우선 순위:** GOV-004부터 회귀 검증과 장치 수용 규칙을 강화하고, WIN 실기기 수용과 Android 빌드 토대를 구축. PR #29는 아직 main 미병합이므로 NAV-003은 반드시 미완료 유지. 작업 규칙은 [WORKFLOW.md](WORKFLOW.md), 근거와 저장소 조사는 [FILE_AUDIT.md](FILE_AUDIT.md)를 참고한다.
+**우선 순위:** 남은 GOV-007/010의 SHA 검증 강화와 WIN 실기기 수용, Android 빌드 토대를 구축. PR #29는 아직 main 미병합이므로 NAV-003은 반드시 미완료 유지. 작업 규칙은 [WORKFLOW.md](WORKFLOW.md), 근거와 저장소 조사는 [FILE_AUDIT.md](FILE_AUDIT.md)를 참고한다.
 
-## GOV — 개발 관리·검증 (3/10)
+## GOV — 개발 관리·검증 (8/10)
 
 참조: .github/workflows/ci.yml; tests/CMakeLists.txt
 
 - [x] GOV-001 main의 Windows/Ubuntu 12개 CTest 그룹 성공을 검증한다 — 증거: CI 39713209272 / CI run 39713209272
 - [x] GOV-002 작업 ID 변경과 증거 누락을 검사하는 자동 검증기를 만든다 — 증거: PR #30, tools/verify_checklist.py, tools/test_verify_checklist.py, CI Verify acceptance checklist 게이트
 - [x] GOV-003 PR 제목과 본문에 완료한 작업 ID를 강제하는 CI 검증을 추가한다 — 증거: PR #30, tools/verify_checklist.py check_baseline, tools/test_verify_checklist.py, CI Verify acceptance checklist 게이트
-- [ ] GOV-004 기존 통과 테스트의 회귀를 차단한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] GOV-005 새 요구를 발견하면 고유 ID와 추가 사유를 기록한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] GOV-006 작업 삭제/분할/통합 시 원본 ID를 추적할 수 있게 한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] GOV-004 기존 통과 테스트의 회귀를 차단한다 — 증거: PR #31, verify_test_matrix.py BASELINE 12개 유지 및 test_ci_contract.py, Windows/Ubuntu CI
+- [x] GOV-005 새 요구를 발견하면 고유 ID와 추가 사유를 기록한다 — 증거: PR #31, verify_checklist.py change journal 새 ID 추가 사유 검사 및 test_verify_checklist.py, Windows/Ubuntu CI
+- [x] GOV-006 작업 삭제/분할/통합 시 원본 ID를 추적할 수 있게 한다 — 증거: PR #31, verify_checklist.py append-only split/merge/revise 출처 검사 및 test_verify_checklist.py, Windows/Ubuntu CI
 - [ ] GOV-007 완료 체크는 검증 결과와 같은 커밋에서만 변경한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] GOV-008 실제 Windows 하드웨어 테스트 기록 형식을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] GOV-009 실제 Android 기기 테스트 기록 형식을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] GOV-008 실제 Windows 하드웨어 테스트 기록 형식을 검증한다 — 증거: PR #31, verify_acceptance.py Windows 보고서 schema·SHA256 및 test_verify_acceptance.py, Windows/Ubuntu CI; 실제 기기 테스트 미실시
+- [x] GOV-009 실제 Android 기기 테스트 기록 형식을 검증한다 — 증거: PR #31, verify_acceptance.py Android 보고서 schema·SHA256 및 test_verify_acceptance.py, Windows/Ubuntu CI; 실제 기기 테스트 미실시
 - [ ] GOV-010 릴리스 후보 SHA·실행 파일·검증 로그의 일치를 확인한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## CORE — Core·Scene·Prefab (3/12)
+## CORE — Core·Scene·Prefab (6/12)
 
 참조: engine/core; tests/core_tests.cpp
 
 - [x] CORE-001 Entity/World 생명주기 회귀 테스트가 통과한다 — 증거: tests/core_tests.cpp / CI run 39713209272
 - [x] CORE-002 Scene 저장과 복원 기본 테스트가 통과한다 — 증거: tests/core_tests.cpp / CI run 39713209272
 - [x] CORE-003 Prefab 기본 테스트가 통과한다 — 증거: tests/core_tests.cpp / CI run 39713209272
-- [ ] CORE-004 트랜스폼 부모 변경과 계층 순환 오류를 통합 테스트한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] CORE-004 트랜스폼 부모 변경과 계층 순환 오류를 통합 테스트한다 — 증거: PR #31, NEngineCoreAcceptanceTests 계층 재부모·순환·해제·stale parent 검증, Windows/Ubuntu CI
 - [ ] CORE-005 Scene의 모든 핵심 컴포넌트가 왕복 직렬화된다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] CORE-006 Scene의 손상·절단·과대 파일을 거부하면서 현재 World를 보존한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] CORE-006 Scene의 손상·절단·과대 파일을 거부하면서 현재 World를 보존한다 — 증거: PR #31, NEngineCoreAcceptanceTests 손상·절단·33MiB 파일 거부 및 World 보존, Windows/Ubuntu CI
 - [ ] CORE-007 프리팹 중첩/오버라이드/리버트를 실제 Editor에서 확인한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] CORE-008 엔티티 참조가 복제·삭제·재로드 뒤에도 안전하다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] CORE-008 엔티티 참조가 복제·삭제·재로드 뒤에도 안전하다 — 증거: PR #31, NEngineCoreAcceptanceTests 복제·삭제·slot 재사용·Scene 재로드 stale 참조 검증, Windows/Ubuntu CI
 - [ ] CORE-009 Play/Stop 뒤 Runtime World 변경사항이 편집 World에 남지 않는다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] CORE-010 다중 Scene 전환·로드 실패 복구가 가능하다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] CORE-011 Scene 저장 도중 쓰기 실패에 데이터가 보존된다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -295,11 +295,11 @@
 - [ ] PLUG-017 JSON NuGet 라이브러리를 예제 C# 게임에 적용한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] PLUG-018 외부 플러그인 제거·업데이트 후 캐시와 앱이 정합적이다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## QA — 제품 수용·릴리스 (0/22)
+## QA — 제품 수용·릴리스 (2/22)
 
 참조: CMakeLists.txt; .github/workflows/ci.yml; tests
 
-- [ ] QA-001 Windows와 Ubuntu Release 빌드 및 자동 테스트 통과를 기록한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] QA-001 Windows와 Ubuntu Release 빌드 및 자동 테스트 통과를 기록한다 — 증거: PR #31, ci.yml Release 구성·빌드·CTest 및 NEngineCoreAcceptanceTests, Windows/Ubuntu CI
 - [ ] QA-002 Windows 실제 GPU·입력·오디오 실기기 통합 테스트를 통과한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] QA-003 Android 실제 기기 통합 테스트를 통과한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] QA-004 Editor 8시간 실행 후 메모리·핸들 누출 기준을 통과한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -315,7 +315,7 @@
 - [ ] QA-014 Editor 설치 관리자와 제거 절차를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] QA-015 업데이트·서명·릴리스 아티팩트 재현 절차를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] QA-016 에셋 파서·불신 입력·플러그인 경로 보안 테스트를 수행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] QA-017 OSS 종속성 고지와 실제 포함 라이브러리를 일치시킨다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] QA-017 OSS 종속성 고지와 실제 포함 라이브러리를 일치시킨다 — 증거: PR #31, verify_third_party.py 제3자 고지·stb 이미지 라이선스 정합 및 test_verify_third_party.py, Windows/Ubuntu CI
 - [ ] QA-018 저사양 Windows 장치 최소 성능 기준을 충족한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] QA-019 Android 중급 기기 최소 성능 기준을 충족한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] QA-020 1.0 차단 이슈가 모두 닫혔음을 재검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -413,3 +413,5 @@
 
 - 2026-10-22: 구 MASTER_PLAN 목표와 역대조하여 49개 누락 요구를 ID가 있는 작업으로 추가 (SCN/TWOD/VFX/SHDR/EDTOOL/BUILD/UTIL).
 - 2026-10-22: 전체 301개 소스/문서/테스트 파일의 내용을 조회·대조한 새 수용 원장 작성. 실기기 수용 항목은 증거 부재로 미체크.
+
+- 2026-10-22: PR #31에서 GOV-004/005/006/008/009, CORE-004/006/008, QA-001/017 수용 검증과 CI 게이트를 추가. 검증 완료 시 28→38개, 미완료 257→247개. 실기기 Windows/Android 실행 수용은 별도 미완료로 유지. 체크 근거는 PR #31 최종 HEAD의 Windows/Ubuntu CI와 테스트.
