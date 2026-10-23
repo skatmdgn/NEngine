@@ -1,5 +1,6 @@
 add_library(NEngineAssets STATIC
   src/asset_guid.cpp
+  src/scriptable_data.cpp
   src/asset_importer.cpp
   src/asset_database.cpp
   src/builtin_processors.cpp
