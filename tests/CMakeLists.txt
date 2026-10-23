@@ -1,3 +1,8 @@
+add_executable(NEngineGameSaveTests save_data_tests.cpp)
+target_link_libraries(NEngineGameSaveTests PRIVATE NEnginePlayerKit)
+target_compile_features(NEngineGameSaveTests PRIVATE cxx_std_20)
+add_test(NAME NEngineGameSaveTests COMMAND NEngineGameSaveTests)
+
 add_executable(NEngineAdditiveSceneTests additive_scene_tests.cpp)
 target_link_libraries(NEngineAdditiveSceneTests PRIVATE NEngineCore)
 target_compile_features(NEngineAdditiveSceneTests PRIVATE cxx_std_20)
