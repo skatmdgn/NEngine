@@ -22,6 +22,46 @@ void check(bool ok, const char* message) {
 bool near(float value,float target,float tolerance=0.002f){
     return std::isfinite(value)&&std::fabs(value-target)<=tolerance;
 }
+
+void stacked_stability() {
+    using namespace nengine;
+    core::World world;
+    auto floor = world.create("StaticFloor");
+    world.transform(floor)->local_position={0,-0.5f,0};
+    auto* ground=world.add_component<physics::BoxCollider>(floor,physics::box_collider_type());
+    ground->size={10,1,10};
+    std::vector<core::Entity> bodies;
+    for(int i=0;i<8;++i) {
+        auto e=world.create("StackedBox");
+        world.transform(e)->local_position={0,0.5f+i*1.01f,0};
+        world.add_component<physics::BoxCollider>(e,physics::box_collider_type());
+        auto* body=world.add_component<physics::Rigidbody>(e,physics::rigidbody_type());
+        body->mass=1;
+        bodies.push_back(e);
+    }
+    physics::ContactImpulseCache cache;
+    bool stable=true;
+    std::size_t resolved_frames=0;
+    for(int frame=0;frame<3600;++frame) {
+        const auto stats=physics::step_physics(world,1.f/60.f,
+                                               {0,-9.81f,0},&cache);
+        if(stats.resolution.resolved_3d) ++resolved_frames;
+        for(auto e:bodies) {
+            const auto* t=world.transform(e);
+            const auto* body=world.get_component<physics::Rigidbody>(
+                e,physics::rigidbody_type());
+            if(!t||!body||!std::isfinite(t->local_position.x)||
+               !std::isfinite(t->local_position.y)||
+               !std::isfinite(body->linear_velocity.y)||
+               std::fabs(t->local_position.y)>100||
+               std::fabs(body->linear_velocity.y)>100) stable=false;
+        }
+        if(!stable)break;
+    }
+    check(stable && resolved_frames>100,
+          "PHYS-007: 8 stacked dynamic cubes stay finite/bounded over 60 seconds of simulated contact");
+}
+
 void continuous_casts() {
     using namespace nengine;
     core::World world;
@@ -201,7 +241,7 @@ void particles() {
 }
 }
 int main(){
-  continuous_casts();physics_lifecycle();tilemap_roundtrip();particles();
+  continuous_casts();physics_lifecycle();stacked_stability();tilemap_roundtrip();particles();
   if(failures)std::cerr<<failures<<" Round Three feature regressions failed\n";
   else std::cout<<"NEngineRoundThreeFeatureTests PASS\n";
   return failures?EXIT_FAILURE:EXIT_SUCCESS;
