@@ -463,7 +463,9 @@ resolve_gltf_sidecar(
 
         set_error(
             error,
-            "glTF sidecar missing, non-file or escapes the model directory");
+            "glTF external reference '" + relative.generic_string() +
+            "' missing, not a regular file, or outside the model directory; " +
+            "restore the file under the .gltf directory or fix its URI, then reimport");
         return std::nullopt;
     }
 
@@ -500,7 +502,7 @@ bool collect_gltf_sidecars(
     std::vector<std::string> uris;
     ResourceJsonReader reader{json};
     if (!reader.scan(uris)) {
-        set_error(error, "malformed glTF JSON buffers/images resource references");
+        set_error(error, "malformed glTF buffers/images JSON; fix the references in the source .gltf and reimport");
         return false;
     }
 
