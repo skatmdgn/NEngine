@@ -5,6 +5,12 @@
 
 namespace nengine::editor {
 
+bool PlaySession::set_time_scale(double scale) noexcept {
+    if(!std::isfinite(scale) || scale<0.0 || scale>4.0)return false;
+    time_scale_=scale;
+    return true;
+}
+
 bool PlaySession::play(const core::World& editor_world) {
     if (state_ != PlayState::Editing) return false;
     runtime_world_.emplace(editor_world.clone());
@@ -78,7 +84,7 @@ std::uint32_t PlaySession::consume_simulation_steps(
             0.25);
 
     accumulator_seconds_ +=
-        clamped;
+        clamped*time_scale_;
 
     const auto max_accumulator =
         fixed_delta_seconds_ *
