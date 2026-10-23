@@ -7333,4 +7333,143 @@ std::optional<RaycastHit> box_cast_2d(
             true));
 }
 
+
+// Signed narrowphase clearance of a moving capsule (or zero-length sphere)
+// against a static collider. Separation is 1-Lipschitz under unit-speed
+// translation. This property makes conservative advancement skip empty space
+// without tunneling through thin obstacles.
+struct CastClearance {
+    float gap{0.0f};
+    core::Vec3 normal{};
+};
+
+CastClearance capsule_clearance(
+    core::Vec3 first,
+    core::Vec3 second,
+    float radius,
+    const ColliderBounds& target,
+    core::Vec3 travel) noexcept {
+
+    core::Vec3 moving_point{};
+    core::Vec3 fixed_point{};
+    float distance_squared = 0.0f;
+    if (target.shape == ColliderShape::Box) {
+        const core::Vec3 local_a = box_local_point(target, first, false);
+        const core::Vec3 local_b = box_local_point(target, second, false);
+        core::Vec3 local_moving{}, local_fixed{};
+        distance_squared = segment_aabb_distance_squared(
+            local_a, local_b, {}, target.half, false,
+            &local_moving, &local_fixed);
+        moving_point = box_world_point(target, local_moving, false);
+        fixed_point = box_world_point(target, local_fixed, false);
+    } else {
+        closest_segment_pair(
+            first, second,
+            target.shape == ColliderShape::Radial
+                ? target.center : target.segment_a,
+            target.shape == ColliderShape::Radial
+                ? target.center : target.segment_b,
+            false, moving_point, fixed_point);
+        distance_squared = length_squared({
+            moving_point.x - fixed_point.x,
+            moving_point.y - fixed_point.y,
+            moving_point.z - fixed_point.z}, false);
+    }
+    const auto distance = std::sqrt(std::max(0.0f, distance_squared));
+    const float combined = radius + (target.shape == ColliderShape::Box
+        ? 0.0f : target.radius);
+    core::Vec3 normal{
+        moving_point.x - fixed_point.x,
+        moving_point.y - fixed_point.y,
+        moving_point.z - fixed_point.z
+    };
+    normal = distance > 1.0e-6f
+        ? scaled(normal, 1.0f / distance)
+        : normalized_or_axis(scaled(travel, -1.0f), false);
+    return {distance - combined, normal};
+}
+
+std::optional<RaycastHit> round_cast(
+    const core::World& world,
+    core::Vec3 origin,
+    float radius,
+    float half_segment,
+    core::Vec3 direction,
+    float max_distance,
+    bool include_triggers,
+    std::uint32_t layer_mask) {
+
+    const auto finite = [](float x) { return std::isfinite(x); };
+    if (!finite(origin.x) || !finite(origin.y) || !finite(origin.z) ||
+        !finite(radius) || radius <= 0.0f ||
+        !finite(half_segment) || half_segment < 0.0f ||
+        !finite(direction.x) || !finite(direction.y) ||
+        !finite(direction.z) || !finite(max_distance) ||
+        max_distance < 0.0f) return std::nullopt;
+
+    const auto velocity = normalized_direction(direction, false);
+    if (velocity == core::Vec3{}) return std::nullopt;
+
+    std::vector<ColliderBounds> all =
+        collect_bounds<BoxCollider>(world, box_collider_type(), false);
+    auto spheres = collect_radial_bounds<SphereCollider>(
+        world, sphere_collider_type(), false);
+    auto capsules = collect_capsule_bounds(world);
+    all.insert(all.end(), spheres.begin(), spheres.end());
+    all.insert(all.end(), capsules.begin(), capsules.end());
+
+    std::optional<RaycastHit> best;
+    // Per-target signed distance advances only as far as free space allows;
+    // 1e-4 m tolerance ensures stable tangential hits and termination.
+    constexpr float tolerance = 0.0001f;
+    for (const auto& target : all) {
+        if ((!include_triggers && target.trigger) ||
+            !layer_enabled(layer_mask, target.layer)) continue;
+
+        float travel = 0.0f;
+        for (int iteration = 0; iteration < 160; ++iteration) {
+            const core::Vec3 current = added(origin, scaled(velocity, travel));
+            const auto clearance = capsule_clearance(
+                {current.x, current.y - half_segment, current.z},
+                {current.x, current.y + half_segment, current.z},
+                radius, target, velocity);
+            if (!finite(clearance.gap)) break;
+            if (clearance.gap <= tolerance) {
+                if (!best || travel < best->distance) {
+                    best = RaycastHit{
+                        target.entity, current, clearance.normal, travel,
+                        target.trigger, false, target.layer
+                    };
+                }
+                break;
+            }
+            // Exact distance lower bounds collision time; avoid jumping
+            // beyond a closer hit from another collider.
+            const float next = travel + std::max(clearance.gap, tolerance);
+            if (!finite(next) || next > max_distance ||
+                (best && next > best->distance)) break;
+            travel = next;
+        }
+    }
+    return best;
+}
+
+std::optional<RaycastHit> sphere_cast(
+    const core::World& world, core::Vec3 origin, float radius,
+    core::Vec3 direction, float max_distance,
+    bool include_triggers, std::uint32_t layer_mask) {
+    return round_cast(world, origin, radius, 0.0f, direction,
+                      max_distance, include_triggers, layer_mask);
+}
+
+std::optional<RaycastHit> capsule_cast(
+    const core::World& world, core::Vec3 origin, float radius,
+    float height, core::Vec3 direction, float max_distance,
+    bool include_triggers, std::uint32_t layer_mask) {
+    if (!std::isfinite(height) || height < radius * 2.0f)
+        return std::nullopt;
+    return round_cast(world, origin, radius, height * 0.5f - radius,
+                      direction, max_distance, include_triggers, layer_mask);
+}
+
 } // namespace nengine::physics
