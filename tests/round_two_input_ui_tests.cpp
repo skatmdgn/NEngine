@@ -145,8 +145,8 @@ void anchored_layout() {
           b.x==20&&b.y==10&&b.width==600&&b.height==380,
           "UI-010: resizing preserves fixed safe margins and expands center");
     const auto zero=canvas.layout(0,0);
-    check(!zero.items.empty()&&zero.items.front().rect.width<=0,
-          "UI-010: zero viewport must not produce a drawable button");
+    check(zero.items.empty(),
+          "UI-010: zero viewport must not produce a drawable widget");
     auto original=ui::UiRect{50,60,100,40};
     auto preset=ui::apply_anchor_preset({0,0,320,200},original,
                                         ui::AnchorPreset::MiddleCenter);
