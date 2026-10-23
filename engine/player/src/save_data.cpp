@@ -90,7 +90,9 @@ bool GameSaveStore::write(std::string slot,const GameSave& data,std::string* err
     if(ec||std::filesystem::is_symlink(root_,ec)||ec)
         return bad(error,"cannot initialize game save directory");
     const auto target=root_/(slot+".nsave");
-    if(std::filesystem::is_symlink(target,ec)||ec)
+    const auto status=std::filesystem::symlink_status(target,ec);
+    if(ec==std::errc::no_such_file_or_directory)ec.clear();
+    if(ec||std::filesystem::is_symlink(status))
         return bad(error,"save target cannot be a symlink");
     // Exclusive temp name prevents other writers from truncating our data.
     // Filename entropy is not a security token; it only avoids collisions.
