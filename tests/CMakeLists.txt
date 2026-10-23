@@ -153,3 +153,8 @@ target_link_libraries(NEngineRoundFiveRuntimeTests PRIVATE
   NEngineRender NEnginePhysics NEngineEditorModel NEnginePlayerKit)
 target_compile_features(NEngineRoundFiveRuntimeTests PRIVATE cxx_std_20)
 add_test(NAME NEngineRoundFiveRuntimeTests COMMAND NEngineRoundFiveRuntimeTests)
+
+add_executable(NEngineMultiExternalGltfTests gltf_multisidecar_tests.cpp)
+target_link_libraries(NEngineMultiExternalGltfTests PRIVATE NEngineRender NEngineAssets)
+target_compile_features(NEngineMultiExternalGltfTests PRIVATE cxx_std_20)
+add_test(NAME NEngineMultiExternalGltfTests COMMAND NEngineMultiExternalGltfTests)
