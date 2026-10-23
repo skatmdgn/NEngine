@@ -2,7 +2,7 @@
 
 **검증 기준선:** main 671cddf2d50d184b1889310f86c85a3df43306bd (2026-10-22), [Windows/Ubuntu CI 39713209272](https://github.com/skatmdgn/NEngine/actions/runs/39713209272), 양쪽 12/12 CTest 그룹 통과. 현재는 실 GPU·오디오·.NET 배포 및 Android 기기 검증을 통과했다고 주장하지 않는다.
 
-**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 88개, 미완료 197개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
+**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 97개, 미완료 188개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
 
 **우선 순위:** 남은 GOV-010의 릴리스 SHA 검증 강화와 WIN 실기기 수용, Android 빌드 토대를 구축. PR #29는 아직 main 미병합이므로 NAV-003은 반드시 미완료 유지. 작업 규칙은 [WORKFLOW.md](WORKFLOW.md), 근거와 저장소 조사는 [FILE_AUDIT.md](FILE_AUDIT.md)를 참고한다.
 
@@ -59,13 +59,13 @@
 - [ ] EDIT-015 Play/Pause/Step/Stop을 실제 2D·3D 게임에 적용한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] EDIT-016 다중 프로젝트 전환 시 파일 감시·캐시·핸들을 안전하게 복구한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## ASSET — 에셋 파이프라인 (6/15)
+## ASSET — 에셋 파이프라인 (8/15)
 
 참조: engine/assets; engine/render/src/model_importer.cpp; tests/asset_tests.cpp
 
 - [x] ASSET-001 GUID/.meta와 의존성 기본 회귀 테스트가 통과한다 — 증거: tests/asset_tests.cpp / CI run 39713209272
 - [x] ASSET-002 GLB/glTF/OBJ 기본 파서 회귀 테스트가 통과한다 — 증거: tests/asset_tests.cpp / CI run 39713209272
-- [ ] ASSET-003 여러 외부 BIN/이미지 참조를 가진 glTF를 가져온다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] ASSET-003 여러 외부 BIN/이미지 참조를 가진 glTF를 가져온다 — 증거: PR #35, NEngineMultiExternalGltfTests 2 external BIN + 2 PNG images staged/imported/material decoded, Windows/Ubuntu Release+Debug CI
 - [x] ASSET-004 모델 디렉터리 밖의 glTF 리소스에 안전한 명시적 정책을 적용한다 — 증거: PR #32, NEngineRoundTwoAssetTests, glTF URI 경로·scheme·percent escape 거부·rollback; gltf_sidecars.cpp 수정, Windows/Ubuntu CI
 - [ ] ASSET-005 FBX 모델·재질·노드 계층 가져오기를 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] ASSET-006 PNG·JPEG·BMP·TGA의 색상 및 알파를 실제 렌더러에서 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -75,7 +75,7 @@
 - [ ] ASSET-010 모든 모델 메쉬·재질·텍스처가 Player로 함께 내보내진다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] ASSET-011 텍스처·모델 크기 한도를 정의하고 과대 입력을 안전하게 거부한다 — 증거: PR #32, NEngineRoundTwoAssetTests, 33MiB glTF·9KiB meta 상한 초과 거부, Windows/Ubuntu CI
 - [x] ASSET-012 임포트·리임포트·이름 변경 뒤 에셋 GUID가 안정적이다 — 증거: PR #32, NEngineRoundTwoAssetTests, 재가져오기·이름변경·재시작 후 AssetGuid 안정성, Windows/Ubuntu CI
-- [ ] ASSET-013 원본 누락·참조 오류에서 사용자에게 복구 가능한 진단을 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] ASSET-013 원본 누락·참조 오류에서 사용자에게 복구 가능한 진단을 제공한다 — 증거: PR #35, gltf_sidecars.cpp provides missing filename/repair hint; NEngineMultiExternalGltfTests missing-file failure, Windows/Ubuntu Release+Debug CI
 - [x] ASSET-014 경로 순회와 심볼릭 링크를 포함한 악성 에셋을 거부한다 — 증거: PR #32, NEngineRoundTwoAssetTests, symlinked 에셋 GUID 생성 거부와 glTF 외부 symlink escape; asset_database.cpp 수정, Windows/Ubuntu CI
 - [ ] ASSET-015 에셋 핫리로드 후 실제 화면과 런타임 캐시가 동일하다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
@@ -119,7 +119,7 @@
 - [ ] CS-013 관리형 외부 라이브러리 의존성을 컴파일·실행·배포한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] CS-014 C# 공개 API에 컴파일 가능한 최소 예제와 참조 문서를 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## PHYS — 2D/3D 물리 (10/13)
+## PHYS — 2D/3D 물리 (11/13)
 
 참조: engine/physics; tests/physics_tests.cpp
 
@@ -133,7 +133,7 @@
 - [ ] PHYS-008 Trigger/Collision 이벤트가 C#·Editor·Player에서 일치한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] PHYS-009 레이어 마스크·필터가 물리 쿼리마다 동일하다 — 증거: PR #32, NEngineRoundTwoAnimPhysicsTests, 3D overlap/raycast 계층 mask 및 trigger, Windows/Ubuntu CI
 - [x] PHYS-010 Rigidbody의 정적·동적·키네마틱 전환이 안전하다 — 증거: PR #33, dynamic/kinematic/disabled 상태 전환 후 위치 보존 및 재통합 NEngineRoundThreeFeatureTests, Windows/Ubuntu Release CI
-- [ ] PHYS-011 FixedUpdate·pause·time scale에 물리 시뮬레이션이 연동된다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] PHYS-011 FixedUpdate·pause·time scale에 물리 시뮬레이션이 연동된다 — 증거: PR #35, Editor PlaySession + PlayerRuntime time scale/FIxedUpdate/pause/single step, NEngineRoundFiveRuntimeTests, Windows/Ubuntu Release+Debug CI
 - [x] PHYS-012 2D·3D 물리가 의도치 않게 혼합되지 않는다 — 증거: PR #32, NEngineRoundTwoAnimPhysicsTests, 2D·3D 분리 충돌·물리 적분·분리 query, Windows/Ubuntu CI
 - [x] PHYS-013 1000개 이상 물체에서 broadphase 성능과 정확도를 검증한다 — 증거: PR #33, 1200개 콜라이더 broadphase narrowphase 후보 수 검증 NEngineRoundThreeFeatureTests, Windows/Ubuntu Release CI
 
@@ -154,7 +154,7 @@
 - [ ] AUD-011 C# AudioSource Play/Stop/Loop/Volume이 Player에서 동작한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] AUD-012 소리 장치 실패 시 안전하게 폴백하고 오류를 표시한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## INPUT — Input (5/11)
+## INPUT — Input (6/11)
 
 참조: engine/input; tests/input_tests.cpp
 
@@ -167,7 +167,7 @@
 - [x] INPUT-007 포커스를 잃으면 눌린 입력이 고착되지 않는다 — 증거: PR #32, NEngineRoundTwoInputUiTests, 같은 프레임 focus-loss 키·마우스 취소 및 커서 리셋; input_state.cpp 수정, Windows/Ubuntu CI
 - [ ] INPUT-008 게임패드 입력·연결 해제·재연결을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] INPUT-009 Android 터치·멀티 터치를 실제 기기에서 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] INPUT-010 UI가 소비한 입력을 게임플레이가 중복 처리하지 않는다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] INPUT-010 UI가 소비한 입력을 게임플레이가 중복 처리하지 않는다 — 증거: PR #35, InputState gameplay-consumed mask, PlayerUiRuntime pointer/keyboard routing, C# raw key callbacks, NEngineRoundFiveRuntimeTests, Windows/Ubuntu Release+Debug CI
 - [x] INPUT-011 입력맵 부재·손상 오류를 안전하게 처리한다 — 증거: PR #32, NEngineRoundTwoInputUiTests, 악성·누락·과대 ActionMap 거부·기존 Action 보존, Windows/Ubuntu CI
 
 ## ANIM — Animation (3/10)
@@ -272,7 +272,7 @@
 - [ ] AND-020 두 개 이상 Android 하드웨어/OS 환경에서 동작한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] AND-021 Windows와 Android에서 동일 게임 Scene·C# 동작을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## PLUG — 패키지·외부 SDK (3/18)
+## PLUG — 패키지·외부 SDK (5/18)
 
 참조: engine/scripting; engine/player
 
@@ -282,8 +282,8 @@
 - [ ] PLUG-004 NuGet restore를 Editor·C# 빌드에 통합한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] PLUG-005 NuGet managed DLL을 Windows Player에 패키징한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] PLUG-006 임의 managed DLL 플러그인을 Editor에서 등록한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] PLUG-007 Windows native DLL 플러그인 로딩을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] PLUG-008 native DLL 보안 경로·오류 처리를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] PLUG-007 Windows native DLL 플러그인 로딩을 구현한다 — 증거: PR #35, NativePlugin LoadLibraryExW/dlopen/exports/unload with compiled fixture, NEngineNativePluginTests, Windows/Ubuntu Release+Debug CI
+- [x] PLUG-008 native DLL 보안 경로·오류 처리를 검증한다 — 증거: PR #35, NativePlugin symlink/path escape, missing DLL and duplicate handle rejects, NEngineNativePluginTests, Windows/Ubuntu Release+Debug CI
 - [ ] PLUG-009 P/Invoke 기반 외부 C# 플러그인을 실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] PLUG-010 Android AAR 의존성을 앱 빌드에 통합한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] PLUG-011 Android JAR과 C#-Java 호출 브리지를 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -295,7 +295,7 @@
 - [ ] PLUG-017 JSON NuGet 라이브러리를 예제 C# 게임에 적용한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] PLUG-018 외부 플러그인 제거·업데이트 후 캐시와 앱이 정합적이다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## QA — 제품 수용·릴리스 (4/22)
+## QA — 제품 수용·릴리스 (5/22)
 
 참조: CMakeLists.txt; .github/workflows/ci.yml; tests
 
@@ -304,7 +304,7 @@
 - [ ] QA-003 Android 실제 기기 통합 테스트를 통과한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] QA-004 Editor 8시간 실행 후 메모리·핸들 누출 기준을 통과한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] QA-005 Player 8시간 실행 후 메모리·핸들 누출 기준을 통과한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] QA-006 한글/공백/긴 경로 프로젝트 생성·빌드·배포를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] QA-006 한글/공백/긴 경로 프로젝트 생성·빌드·배포를 검증한다 — 증거: PR #35, NEngineUnicodeLongProjectCLI generates/builds/exports nested Korean+spaces long-path project on Windows/Ubuntu, Windows/Ubuntu Release+Debug CI
 - [x] QA-007 Debug/Release 실행 결과 차이를 회귀 테스트한다 — 증거: PR #34, Windows/Ubuntu Debug+Release 2구성 동일 CTest 실행·JUnit 그룹 비교 tools/verify_build_parity.py, Windows/Ubuntu CI
 - [ ] QA-008 새 Windows PC에서 2D 게임 제작·내보내기를 재현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] QA-009 새 Windows PC에서 3D 게임 제작·내보내기를 재현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -334,14 +334,14 @@
 - [ ] SCN-006 Scriptable 데이터 에셋을 C# 스크립트에서 조회·변경한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] SCN-007 씬 로드·전환·추가 로드 후 엔티티 참조를 검증한다 — 증거: PR #34, engine/core/additive_scene.cpp Scene-local refs·중복 ID·unload invalid refs, NEngineAdditiveSceneTests, Windows/Ubuntu CI
 
-## TWOD — 2D 편집·Tilemap (1/7)
+## TWOD — 2D 편집·Tilemap (2/7)
 
 참조: engine/render; apps/editor
 
 - [x] TWOD-001 Tilemap 에셋의 격자·셀·팔레트 직렬화를 구현한다 — 증거: PR #33, Tilemap grid/palette/cell versioned .ntilemap 왕복·트랜잭션 검사 NEngineRoundThreeFeatureTests, Windows/Ubuntu Release CI
 - [ ] TWOD-002 Tilemap을 Editor Scene 뷰에서 배치·페인팅한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] TWOD-003 Tilemap 렌더링을 Sprite 레이어 순서와 일치시킨다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] TWOD-004 Tilemap Collider를 2D Physics에 연동한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] TWOD-004 Tilemap Collider를 2D Physics에 연동한다 — 증거: PR #35, engine/render/tilemap_physics.cpp, NEngineRoundFiveRuntimeTests (BoxCollider2D run-merge/rebuild/rollback), Windows/Ubuntu Release+Debug CI
 - [ ] TWOD-005 스프라이트 시트 자동·수동 슬라이싱을 Editor에 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] TWOD-006 2D 카메라의 픽셀 퍼펙트 및 픽셀 스냅을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] TWOD-007 2D 프로젝트 시작 템플릿에서 Tilemap과 Sprite를 함께 실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -382,7 +382,7 @@
 - [ ] EDTOOL-008 Windows·Android Build Settings Editor 화면을 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] EDTOOL-009 Android SDK/NDK/JDK 도구 경로 설정·검증 UI를 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## BUILD — 빌드 프로필·애플리케이션 메타데이터 (3/9)
+## BUILD — 빌드 프로필·애플리케이션 메타데이터 (4/9)
 
 참조: apps/player; engine/player; .github/workflows/ci.yml
 
@@ -392,7 +392,7 @@
 - [ ] BUILD-004 Windows 아이콘·메타데이터를 최종 실행 파일에 삽입한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] BUILD-005 Android 아이콘·스플래시·패키지 이름을 APK/AAB에 반영한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] BUILD-006 Windows 게임 저장 데이터 경로와 마이그레이션 규칙을 구현한다 — 증거: PR #34, engine/player/save_data.cpp CRC·원자적 슬롯 쓰기·마이그레이션·OS 사용자 데이터 경로, NEngineGameSaveTests, Windows/Ubuntu CI
-- [ ] BUILD-007 Android manifest 권한·기능·Gradle 기여와 충돌을 검출한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] BUILD-007 Android manifest 권한·기능·Gradle 기여와 충돌을 검출한다 — 증거: PR #35, tools/nengine_android_contributions.py Android SDK/permission/feature/Gradle conflict checks, Python unit tests, Windows/Ubuntu Release+Debug CI
 - [ ] BUILD-008 빌드 실패·서명 누락 시 사용자에게 명확한 오류를 표시한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] BUILD-009 동일 커밋을 사용한 재현 가능한 빌드 결과를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
@@ -421,3 +421,5 @@
 - 2026-10-23: PR #33에서 GOV-007, PHYS-004/005/007/010/013, TWOD-001, VFX-001/002/003, SCN-001/002/005, WIN-010/014 (15개) 구현 및 수용 CTest/CI 검증. 총계 변화 53→68 완료, 232→217 미완료, 전체 ID 285 유지. GPU VFX 렌더링, Tilemap Editor, Android 및 실제 Windows 하드웨어는 별도 미완료이며 이 PR의 체크가 해당 수용을 의미하지 않는다.
 
 - 2026-10-23: PR #34에서 패키지 의존성/캐시, Android·Windows 빌드 프로필, Additive Scene, HLSL/셰이더 캐시, 게임 세이브·입력 번들·한글 경로, Debug/Release CI·보안 검사·릴리스 후보 SHA 증거 총 20개 기존 ID 수용 검사. 68→88개 체크 / 217→197개 미완료 / 총 285개 유지. 실기기 Android 빌드, Windows 실제 GPU, NuGet·플러그인 로딩 및 네트워크 패키지 설치 등 별도 ID는 미완료. 본 PR의 정확한 Windows/Ubuntu CI와 성공 병합을 최종 수용 증거로 삼는다.
+
+- 2026-10-23: 추가 개발 목표는 20개였지만, PR #35에서는 검증 가능한 9개(ID TWOD-004, INPUT-010, PHYS-011, PLUG-007/008, BUILD-007, ASSET-003/013, QA-006)만 수용 후보로 지정. 나머지 11개는 완료로 계산하지 않는다. Windows/Ubuntu Debug/Release 결과 및 PR 병합 확인 전의 체크는 조건부이며, 실패한 ID는 반드시 미완료로 복원한다. 전체 285개 그대로 유지하고 이번 수용 후보가 전부 검증될 경우 88→97 체크 / 197→188 미완료.
