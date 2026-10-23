@@ -5,6 +5,10 @@
 #include <iterator>
 #include <utility>
 #include <system_error>
+#if defined(_WIN32)
+#define NOMINMAX
+#include <windows.h>
+#endif
 
 namespace nengine::input {
 namespace {
@@ -35,7 +39,7 @@ bool load_action_map_file(const std::filesystem::path& file, ActionMap& out,
 
 
 bool save_action_map_file(const std::filesystem::path& file, const ActionMap& map,
-                          std::string* error) {
+                          std::string* error, bool replace_existing) {
     std::string encoded;
     if (!map.serialize(encoded, error)) return false;
     std::error_code ec;
@@ -48,8 +52,9 @@ bool save_action_map_file(const std::filesystem::path& file, const ActionMap& ma
     if (ec == std::errc::no_such_file_or_directory) ec.clear();
     if (ec || std::filesystem::is_symlink(status))
         return fail(error, "invalid or symlinked action map destination");
-    // Never replace an existing file, including on POSIX.
-    if (std::filesystem::exists(status))
+    // Existing action maps are only replaced when the caller explicitly
+    // requests an edit rather than first-time creation.
+    if (std::filesystem::exists(status) && !replace_existing)
         return fail(error, "action map target already exists");
     auto temporary = file;
     temporary += ".nengine-" + std::to_string(
@@ -64,9 +69,19 @@ bool save_action_map_file(const std::filesystem::path& file, const ActionMap& ma
             return fail(error, "failed to stage action map data");
         }
     }
-    // On Windows std::filesystem::rename does not replace existing target;
-    // retain the existing good file instead of deleting it on failure.
+    // New or edited maps are published without an intermediate deletion.
+    // On Windows rename() alone cannot replace existing files.
+#if defined(_WIN32)
+    const DWORD flags = replace_existing
+        ? MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
+        : MOVEFILE_WRITE_THROUGH;
+    if (!MoveFileExW(temporary.c_str(), file.c_str(), flags))
+        ec = std::error_code(static_cast<int>(GetLastError()), std::system_category());
+    else
+        ec.clear();
+#else
     std::filesystem::rename(temporary, file, ec);
+#endif
     if (ec) {
         std::error_code ignored;
         std::filesystem::remove(temporary, ignored);
