@@ -18,6 +18,7 @@ add_library(NEngineRender STATIC
   src/sprite_animation.cpp
   src/stb_image_impl.cpp
   src/tilemap.cpp
+  src/tilemap_physics.cpp
   src/particle.cpp
   src/vulkan_buffer.cpp
   src/vulkan_builtin_mesh_cache.cpp
@@ -64,6 +65,7 @@ target_link_libraries(NEngineRender
   PUBLIC
     NEngineCore
     NEngineAssets
+    NEnginePhysics
 )
 
 target_compile_features(NEngineRender PUBLIC cxx_std_20)
