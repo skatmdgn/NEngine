@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <string>
 #include "nengine/core/world.hpp"
 #include "nengine/editor/play_session.hpp"
