@@ -23,6 +23,10 @@ public:
         double elapsed_seconds,
         std::uint32_t max_steps = 8u) noexcept;
 
+    // A zero scale freezes automatic FixedUpdate without discarding queued
+    // single-steps. Time is clamped before entering the fixed accumulator.
+    bool set_time_scale(double scale) noexcept;
+    double time_scale() const noexcept {return time_scale_;}
     double fixed_delta_seconds() const noexcept {
         return fixed_delta_seconds_;
     }
@@ -39,6 +43,7 @@ private:
     std::optional<core::World> runtime_world_{};
     std::uint64_t requested_steps_{0};
     double accumulator_seconds_{0.0};
+    double time_scale_{1.0};
     double fixed_delta_seconds_{1.0 / 60.0};
 };
 
