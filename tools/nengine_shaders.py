@@ -94,6 +94,41 @@ def valid_spirv(blob: bytes):
     return len(blob)>=20 and len(blob)%4==0 and blob[:4]==MAGIC
 
 
+
+def resolve_last_good(project: Path, guid: str):
+    if not GUID.fullmatch(guid):
+        raise ShaderError("invalid shader GUID")
+    root=project/"Library"/"Shaders"
+    if root.is_symlink(): raise ShaderError("shader cache root is a symlink")
+    pointer=root/(guid+".current")
+    if pointer.is_symlink() or not pointer.is_file():
+        return None
+    name=pointer.read_text(encoding="ascii").strip()
+    if not re.fullmatch(re.escape(guid)+r"-[0-9a-f]{64}\.spv",name):
+        raise ShaderError("invalid last-good shader cache pointer")
+    candidate=root/name
+    if candidate.is_symlink() or not candidate.is_file() or not valid_spirv(candidate.read_bytes()):
+        raise ShaderError("last-good shader cache missing/corrupt")
+    return candidate
+
+
+def publish_current(root: Path, guid: str, filename: str):
+    pointer=root/(guid+".current")
+    if pointer.is_symlink(): raise ShaderError("last-good shader pointer is symlinked")
+    temporary=None
+    try:
+        with tempfile.NamedTemporaryFile(dir=root,prefix=".nengine-pointer-",
+                                         delete=False) as out:
+            temporary=Path(out.name)
+            out.write((filename+"\n").encode("ascii"))
+            out.flush()
+            os.fsync(out.fileno())
+        os.replace(temporary,pointer)
+        temporary=None
+    finally:
+        if temporary is not None: temporary.unlink(missing_ok=True)
+
+
 def compile_registered(project: Path, descriptor: Path, compiler: Path,
                        compile_callback=None):
     record,source=register_shader(project,descriptor)
@@ -112,6 +147,7 @@ def compile_registered(project: Path, descriptor: Path, compiler: Path,
         blob=cache.read_bytes()
         if not valid_spirv(blob):
             raise ShaderError("shader cache corruption (invalid SPIR-V)")
+        publish_current(root,record["guid"],cache.name)
         return cache,False
     temp=None
     try:
@@ -137,6 +173,7 @@ def compile_registered(project: Path, descriptor: Path, compiler: Path,
             raise ShaderError("compiler output missing SPIR-V header")
         os.replace(temp,cache)
         temp=None
+        publish_current(root,record["guid"],cache.name)
         return cache,True
     finally:
         if temp is not None:temp.unlink(missing_ok=True)
