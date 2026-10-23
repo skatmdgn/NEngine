@@ -17,6 +17,8 @@ add_library(NEngineRender STATIC
   src/render_snapshot.cpp
   src/sprite_animation.cpp
   src/stb_image_impl.cpp
+  src/tilemap.cpp
+  src/particle.cpp
   src/vulkan_buffer.cpp
   src/vulkan_builtin_mesh_cache.cpp
   src/vulkan_context.cpp

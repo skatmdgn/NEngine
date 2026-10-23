@@ -57,6 +57,7 @@ jobs:
       - name: Verify acceptance checklist and governance regressions
         run: |
           python -m unittest discover -s tools -p "test_*.py"
+          python tools/verify_checkout_provenance.py
           python tools/verify_checklist.py
           python tools/verify_third_party.py
           python tools/verify_acceptance.py

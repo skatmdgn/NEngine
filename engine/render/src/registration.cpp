@@ -8,6 +8,7 @@
 #include <variant>
 
 #include "nengine/render/components.hpp"
+#include "nengine/render/particle.hpp"
 
 namespace nengine::render {
 namespace {
@@ -203,7 +204,7 @@ core::SerializedPropertyData asset_property(
 bool register_component_metadata(
     core::ComponentRegistry& registry) {
 
-    bool ok = true;
+    bool ok = register_particle_metadata(registry);
 
     ok =
         registry.register_type(
@@ -551,7 +552,7 @@ bool register_component_metadata(
 bool register_component_serializers(
     core::ComponentSerializationRegistry& registry) {
 
-    bool ok = true;
+    bool ok = register_particle_serializers(registry);
 
     ok =
         registry.register_codec({

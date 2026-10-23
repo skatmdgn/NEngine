@@ -2,11 +2,11 @@
 
 **검증 기준선:** main 671cddf2d50d184b1889310f86c85a3df43306bd (2026-10-22), [Windows/Ubuntu CI 39713209272](https://github.com/skatmdgn/NEngine/actions/runs/39713209272), 양쪽 12/12 CTest 그룹 통과. 현재는 실 GPU·오디오·.NET 배포 및 Android 기기 검증을 통과했다고 주장하지 않는다.
 
-**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 53개, 미완료 232개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
+**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 68개, 미완료 217개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
 
-**우선 순위:** 남은 GOV-007/010의 SHA 검증 강화와 WIN 실기기 수용, Android 빌드 토대를 구축. PR #29는 아직 main 미병합이므로 NAV-003은 반드시 미완료 유지. 작업 규칙은 [WORKFLOW.md](WORKFLOW.md), 근거와 저장소 조사는 [FILE_AUDIT.md](FILE_AUDIT.md)를 참고한다.
+**우선 순위:** 남은 GOV-010의 릴리스 SHA 검증 강화와 WIN 실기기 수용, Android 빌드 토대를 구축. PR #29는 아직 main 미병합이므로 NAV-003은 반드시 미완료 유지. 작업 규칙은 [WORKFLOW.md](WORKFLOW.md), 근거와 저장소 조사는 [FILE_AUDIT.md](FILE_AUDIT.md)를 참고한다.
 
-## GOV — 개발 관리·검증 (8/10)
+## GOV — 개발 관리·검증 (9/10)
 
 참조: .github/workflows/ci.yml; tests/CMakeLists.txt
 
@@ -16,7 +16,7 @@
 - [x] GOV-004 기존 통과 테스트의 회귀를 차단한다 — 증거: PR #31, verify_test_matrix.py BASELINE 12개 유지 및 test_ci_contract.py, Windows/Ubuntu CI
 - [x] GOV-005 새 요구를 발견하면 고유 ID와 추가 사유를 기록한다 — 증거: PR #31, verify_checklist.py change journal 새 ID 추가 사유 검사 및 test_verify_checklist.py, Windows/Ubuntu CI
 - [x] GOV-006 작업 삭제/분할/통합 시 원본 ID를 추적할 수 있게 한다 — 증거: PR #31, verify_checklist.py append-only split/merge/revise 출처 검사 및 test_verify_checklist.py, Windows/Ubuntu CI
-- [ ] GOV-007 완료 체크는 검증 결과와 같은 커밋에서만 변경한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] GOV-007 완료 체크는 검증 결과와 같은 커밋에서만 변경한다 — 증거: PR #33, verify_checkout_provenance.py 및 Python unit test; PR head/CI checkout SHA 일치 검증, Windows/Ubuntu Release CI
 - [x] GOV-008 실제 Windows 하드웨어 테스트 기록 형식을 검증한다 — 증거: PR #31, verify_acceptance.py Windows 보고서 schema·SHA256 및 test_verify_acceptance.py, Windows/Ubuntu CI; 실제 기기 테스트 미실시
 - [x] GOV-009 실제 Android 기기 테스트 기록 형식을 검증한다 — 증거: PR #31, verify_acceptance.py Android 보고서 schema·SHA256 및 test_verify_acceptance.py, Windows/Ubuntu CI; 실제 기기 테스트 미실시
 - [ ] GOV-010 릴리스 후보 SHA·실행 파일·검증 로그의 일치를 확인한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -119,23 +119,23 @@
 - [ ] CS-013 관리형 외부 라이브러리 의존성을 컴파일·실행·배포한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] CS-014 C# 공개 API에 컴파일 가능한 최소 예제와 참조 문서를 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## PHYS — 2D/3D 물리 (5/13)
+## PHYS — 2D/3D 물리 (10/13)
 
 참조: engine/physics; tests/physics_tests.cpp
 
 - [x] PHYS-001 Rigidbody·접촉과 충돌 기본 테스트가 통과한다 — 증거: tests/physics_tests.cpp / CI run 39713209272
 - [x] PHYS-002 Box/Sphere/Capsule 및 2D 형태 테스트가 통과한다 — 증거: tests/physics_tests.cpp / CI run 39713209272
 - [x] PHYS-003 Raycast/BoxCast/Overlap 기본 테스트가 통과한다 — 증거: tests/physics_tests.cpp / CI run 39713209272
-- [ ] PHYS-004 SphereCast 쿼리를 구현·검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] PHYS-005 CapsuleCast 쿼리를 구현·검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] PHYS-004 SphereCast 쿼리를 구현·검증한다 — 증거: PR #33, sphere_cast 연속 충돌·거리·트리거·레이어·비정상 입력 검증 NEngineRoundThreeFeatureTests, Windows/Ubuntu Release CI
+- [x] PHYS-005 CapsuleCast 쿼리를 구현·검증한다 — 증거: PR #33, capsule_cast 연속 충돌·capsule/box·유효성 검증 NEngineRoundThreeFeatureTests, Windows/Ubuntu Release CI
 - [ ] PHYS-006 고속 충돌 검출에서 터널링을 방지한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] PHYS-007 장시간 쌓인 동적 물체의 안정성과 수치 발산을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] PHYS-007 장시간 쌓인 동적 물체의 안정성과 수치 발산을 검증한다 — 증거: PR #33, 8개 적층 동적 물체의 3600프레임 안정성·접촉 유효성 NEngineRoundThreeFeatureTests, Windows/Ubuntu Release CI
 - [ ] PHYS-008 Trigger/Collision 이벤트가 C#·Editor·Player에서 일치한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] PHYS-009 레이어 마스크·필터가 물리 쿼리마다 동일하다 — 증거: PR #32, NEngineRoundTwoAnimPhysicsTests, 3D overlap/raycast 계층 mask 및 trigger, Windows/Ubuntu CI
-- [ ] PHYS-010 Rigidbody의 정적·동적·키네마틱 전환이 안전하다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] PHYS-010 Rigidbody의 정적·동적·키네마틱 전환이 안전하다 — 증거: PR #33, dynamic/kinematic/disabled 상태 전환 후 위치 보존 및 재통합 NEngineRoundThreeFeatureTests, Windows/Ubuntu Release CI
 - [ ] PHYS-011 FixedUpdate·pause·time scale에 물리 시뮬레이션이 연동된다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] PHYS-012 2D·3D 물리가 의도치 않게 혼합되지 않는다 — 증거: PR #32, NEngineRoundTwoAnimPhysicsTests, 2D·3D 분리 충돌·물리 적분·분리 query, Windows/Ubuntu CI
-- [ ] PHYS-013 1000개 이상 물체에서 broadphase 성능과 정확도를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] PHYS-013 1000개 이상 물체에서 broadphase 성능과 정확도를 검증한다 — 증거: PR #33, 1200개 콜라이더 broadphase narrowphase 후보 수 검증 NEngineRoundThreeFeatureTests, Windows/Ubuntu Release CI
 
 ## AUD — Audio (2/12)
 
@@ -224,7 +224,7 @@
 - [ ] NAV-014 Windows 배포 게임에서 목적지까지 캐릭터가 이동한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] NAV-015 Android 게임에서 동일 NavMeshAgent 예제를 실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## WIN — Windows Player (2/17)
+## WIN — Windows Player (4/17)
 
 참조: engine/player; apps/player; tests/player_tests.cpp
 
@@ -237,11 +237,11 @@
 - [ ] WIN-007 실제 렌더러에 멀티 머티리얼 모델을 표시한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] WIN-008 UI·3D 렌더링·오디오를 동시에 실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] WIN-009 입력 액션을 Editor 설정대로 Player에서 실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] WIN-010 누락·손상 파일의 오류를 안내하고 안전 종료한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] WIN-010 누락·손상 파일의 오류를 안내하고 안전 종료한다 — 증거: PR #33, Player 손상 bundle/scene 오류 설명·기존 World 보존 및 회복 NEngineRoundThreePlayerSafetyTests, Windows/Ubuntu Release CI
 - [ ] WIN-011 4K/DPI·화면 크기 변경에서 화면이 유지된다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] WIN-012 의존 DLL/런타임을 포함한 재현 가능한 번들을 배포한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] WIN-013 Project·Assets 경로에 한글이 포함돼도 실행된다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] WIN-014 Export 작업 실패 시 대상 출력 폴더를 손상시키지 않는다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] WIN-014 Export 작업 실패 시 대상 출력 폴더를 손상시키지 않는다 — 증거: PR #33, Player export 실패/중복 대상/누락 바이너리 시 원본 디렉터리 보존 NEngineRoundThreePlayerSafetyTests, Windows/Ubuntu Release CI
 - [ ] WIN-015 최소 2D 게임을 만들고 Windows Player로 완주한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] WIN-016 최소 3D 게임을 만들고 Windows Player로 완주한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] WIN-017 두 게임 모두 종료·재시작 뒤 게임 저장 상태가 복원된다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -322,23 +322,23 @@
 - [ ] QA-021 각 1.0 작업에 검증 SHA·환경·테스트 증거가 기록된다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] QA-022 릴리스 태그·최종 CI·배포 파일이 같은 커밋에서 생성된다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## SCN — 씬 고급 로딩·데이터 자산 (0/7)
+## SCN — 씬 고급 로딩·데이터 자산 (3/7)
 
 참조: engine/core; engine/scripting
 
-- [ ] SCN-001 Scene 비동기 로딩을 프레임 정지 없이 수행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] SCN-002 Scene 비동기 로드 실패 시 이전 월드를 안전하게 보존한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] SCN-001 Scene 비동기 로딩을 프레임 정지 없이 수행한다 — 증거: PR #33, std::async 기반 Scene 파일 IO/컴포넌트 복원 비동기 스테이징 NEngineAsyncSceneAcceptanceTests, Windows/Ubuntu Release CI
+- [x] SCN-002 Scene 비동기 로드 실패 시 이전 월드를 안전하게 보존한다 — 증거: PR #33, Scene 비동기 로드 실패 시 기존 World 원자적 보존 NEngineAsyncSceneAcceptanceTests, Windows/Ubuntu Release CI
 - [ ] SCN-003 Additive Scene 로드와 엔티티 충돌 방지 규칙을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] SCN-004 Additive Scene 단위 unload와 참조 정리를 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] SCN-005 Scriptable 직렬화 데이터 에셋 형식을 정의한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] SCN-005 Scriptable 직렬화 데이터 에셋 형식을 정의한다 — 증거: PR #33, typed ScriptableData v1 저장·읽기·파손/중복/과대 입력 트랜잭션 NEngineRoundThreeScriptableTests, Windows/Ubuntu Release CI
 - [ ] SCN-006 Scriptable 데이터 에셋을 C# 스크립트에서 조회·변경한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] SCN-007 씬 로드·전환·추가 로드 후 엔티티 참조를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## TWOD — 2D 편집·Tilemap (0/7)
+## TWOD — 2D 편집·Tilemap (1/7)
 
 참조: engine/render; apps/editor
 
-- [ ] TWOD-001 Tilemap 에셋의 격자·셀·팔레트 직렬화를 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] TWOD-001 Tilemap 에셋의 격자·셀·팔레트 직렬화를 구현한다 — 증거: PR #33, Tilemap grid/palette/cell versioned .ntilemap 왕복·트랜잭션 검사 NEngineRoundThreeFeatureTests, Windows/Ubuntu Release CI
 - [ ] TWOD-002 Tilemap을 Editor Scene 뷰에서 배치·페인팅한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] TWOD-003 Tilemap 렌더링을 Sprite 레이어 순서와 일치시킨다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] TWOD-004 Tilemap Collider를 2D Physics에 연동한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -346,13 +346,13 @@
 - [ ] TWOD-006 2D 카메라의 픽셀 퍼펙트 및 픽셀 스냅을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] TWOD-007 2D 프로젝트 시작 템플릿에서 Tilemap과 Sprite를 함께 실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## VFX — 파티클·효과 (0/6)
+## VFX — 파티클·효과 (3/6)
 
 참조: engine/render; engine/player
 
-- [ ] VFX-001 ParticleEmitter/ParticleSystem 컴포넌트를 Scene 직렬화에 등록한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] VFX-002 파티클 생성율·수명·색상·크기를 시간에 따라 평가한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] VFX-003 파티클 중력·속도·기본 버스트 방출을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] VFX-001 ParticleEmitter/ParticleSystem 컴포넌트를 Scene 직렬화에 등록한다 — 증거: PR #33, ParticleEmitter Scene 컴포넌트 등록·직렬화·rollback 검증 NEngineRoundThreeFeatureTests, Windows/Ubuntu Release CI
+- [x] VFX-002 파티클 생성율·수명·색상·크기를 시간에 따라 평가한다 — 증거: PR #33, 파티클 생성률·수명·색상·크기 시간 보간 NEngineRoundThreeFeatureTests, Windows/Ubuntu Release CI
+- [x] VFX-003 파티클 중력·속도·기본 버스트 방출을 구현한다 — 증거: PR #33, 파티클 중력·속도·burst 방출 NEngineRoundThreeFeatureTests, Windows/Ubuntu Release CI
 - [ ] VFX-004 2D/3D 파티클을 Vulkan 경로로 그린다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] VFX-005 ParticleSystem Inspector·Play Mode 조절을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] VFX-006 Windows Player에서 다중 파티클 효과를 실제 GPU로 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -417,3 +417,5 @@
 - 2026-10-22: PR #31에서 GOV-004/005/006/008/009, CORE-004/006/008, QA-001/017 수용 검증과 CI 게이트를 추가. 검증 완료 시 28→38개, 미완료 257→247개. 실기기 Windows/Android 실행 수용은 별도 미완료로 유지. 체크 근거는 PR #31 최종 HEAD의 Windows/Ubuntu CI와 테스트.
 
 - 2026-10-23: PR #32를 PR #31의 커밋 위에 스택으로 생성. CORE-009/010/011, INPUT-007/011, UI-004/010, ANIM-004/010, PHYS-009/012, ASSET-004/011/012/014 총 15 ID를 독립된 네 CTest 그룹에서 검증. 성공한 PR HEAD 기준 38→53 완료, 247→232 미완료; 새 ID 없음. Windows·Ubuntu CI 완료 전에는 main 완료로 산입하지 않는다.
+
+- 2026-10-23: PR #33에서 GOV-007, PHYS-004/005/007/010/013, TWOD-001, VFX-001/002/003, SCN-001/002/005, WIN-010/014 (15개) 구현 및 수용 CTest/CI 검증. 총계 변화 53→68 완료, 232→217 미완료, 전체 ID 285 유지. GPU VFX 렌더링, Tilemap Editor, Android 및 실제 Windows 하드웨어는 별도 미완료이며 이 PR의 체크가 해당 수용을 의미하지 않는다.
