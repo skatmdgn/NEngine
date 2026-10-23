@@ -158,3 +158,14 @@ add_executable(NEngineMultiExternalGltfTests gltf_multisidecar_tests.cpp)
 target_link_libraries(NEngineMultiExternalGltfTests PRIVATE NEngineRender NEngineAssets)
 target_compile_features(NEngineMultiExternalGltfTests PRIVATE cxx_std_20)
 add_test(NAME NEngineMultiExternalGltfTests COMMAND NEngineMultiExternalGltfTests)
+
+# Korean/space/long paths: project generation and actual Player export.
+if(TARGET NEnginePlayerBuild AND TARGET NEnginePlayer)
+  add_test(NAME NEngineUnicodeLongProjectCLI COMMAND
+    ${CMAKE_COMMAND}
+    "-DFIXTURE=$<TARGET_FILE:NEnginePlayerCLIFixture>"
+    "-DBUILDER=$<TARGET_FILE:NEnginePlayerBuild>"
+    "-DPLAYER=$<TARGET_FILE:NEnginePlayer>"
+    "-DTEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/한글_경로_깊이_검증"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/unicode_long_project_smoke.cmake")
+endif()
