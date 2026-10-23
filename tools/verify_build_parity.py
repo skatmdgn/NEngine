@@ -14,10 +14,10 @@ def read_results(path: Path):
     if not path.is_file() or path.stat().st_size>2*1024*1024:
         raise ValueError("missing or oversized CTest XML report")
     root=ET.parse(path).getroot()
-    if root.tag!="testsuites":
-        raise ValueError("expected CTest --output-junit testsuites root")
+    if root.tag not in ("testsuites","testsuite"):
+        raise ValueError("expected CTest --output-junit testsuite(s) root")
     result={}
-    for suite in root.findall("testsuite"):
+    for suite in ([root] if root.tag=="testsuite" else root.findall("testsuite")):
         for case in suite.findall("testcase"):
             name=case.get("name")
             if not name or name in result:
