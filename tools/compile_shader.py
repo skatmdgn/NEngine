@@ -87,6 +87,7 @@ def main() -> int:
         ]
         if source.suffix.lower() == ".hlsl":
             command.insert(1, "-D")
+            command[2:2] = ["-e", "main"]
     elif "glslc" in lower:
         command = [
             str(compiler),
@@ -97,7 +98,7 @@ def main() -> int:
             str(source),
         ]
         if source.suffix.lower() == ".hlsl":
-            command[1:1] = ["-x", "hlsl"]
+            command[1:1] = ["-x", "hlsl", "-fentry-point=main"]
     else:
         print(f"Unsupported compiler executable: {compiler}", file=sys.stderr)
         return 2
