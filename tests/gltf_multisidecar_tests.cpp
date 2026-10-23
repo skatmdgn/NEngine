@@ -111,7 +111,9 @@ const std::array<std::uint8_t,74> png_bytes{
     std::filesystem::remove(missing,ec);
     auto prior=deps;
     error.clear();
-    check(!assets::collect_gltf_sidecars(model,deps,&error)&&!error.empty()&&
+    check(!assets::collect_gltf_sidecars(model,deps,&error)&&
+          error.find("indices.bin")!=std::string::npos&&
+          error.find("reimport")!=std::string::npos&&
           deps.size()==prior.size(),
           "ASSET-003: missing second external BIN diagnosed without partial dependency publication");
     std::filesystem::remove_all(root,ec);
