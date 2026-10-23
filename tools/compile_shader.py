@@ -96,6 +96,8 @@ def main() -> int:
             str(output),
             str(source),
         ]
+        if source.suffix.lower() == ".hlsl":
+            command[1:1] = ["-x", "hlsl"]
     else:
         print(f"Unsupported compiler executable: {compiler}", file=sys.stderr)
         return 2
