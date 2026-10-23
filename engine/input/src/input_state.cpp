@@ -55,6 +55,9 @@ void InputState::set_key(
 }
 
 void InputState::release_all() noexcept {
+    // Focus-loss is a cancellation, not a key press. Suppress any Down
+    // observed earlier in this frame before releasing held keys.
+    pressed_.fill(false);
     for (std::size_t i = 1u;
          i < key_count;
          ++i) {
