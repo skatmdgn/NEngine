@@ -46,6 +46,8 @@ bool NativePlugin::open(const std::filesystem::path& plugins_root,
     if(ec||!std::filesystem::is_directory(root,ec)||ec||
        std::filesystem::is_symlink(plugins_root,ec)||ec)
         return fail(error,"native Plugins root is invalid");
+    if(std::filesystem::is_symlink(library,ec)||ec)
+        return fail(error,"native plugin symlinked library rejected");
     auto file=std::filesystem::weakly_canonical(library,ec);
     if(ec||!std::filesystem::is_regular_file(file,ec)||ec||
        symlink_in_path(root,file))
