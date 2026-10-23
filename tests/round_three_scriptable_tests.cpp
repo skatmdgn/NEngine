@@ -1,6 +1,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <string>
 #include "nengine/assets/scriptable_data.hpp"
