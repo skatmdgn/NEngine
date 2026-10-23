@@ -1,5 +1,6 @@
 add_library(NEngineCore STATIC
   src/world.cpp
+  src/async_scene.cpp
   src/component_registry.cpp
   src/component_serialization.cpp
   src/scene.cpp
