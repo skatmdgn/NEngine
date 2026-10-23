@@ -176,7 +176,11 @@ def cache_archive(archive: Path, expected: str, root: Path):
     if _sha256_file(archive) != expected:
         raise PackageError("archive SHA256 mismatch")
     destination = root / expected[:2] / expected
+    if destination.parent.is_symlink():
+        raise PackageError("cache shard cannot be a symlink")
     destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.parent.is_symlink():
+        raise PackageError("cache shard cannot be a symlink")
     if destination.exists() or destination.is_symlink():
         if _sha256_file(destination) != expected:
             raise PackageError("existing cache entry does not match SHA256")
@@ -207,6 +211,8 @@ def cache_archive(archive: Path, expected: str, root: Path):
 
 
 def verify_lock(lock, cache_root):
+    if cache_root.is_symlink() or not cache_root.is_dir():
+        raise PackageError("invalid cache root")
     if not isinstance(lock, dict) or set(lock) != {"schema", "roots", "packages"} or lock["schema"] != 1:
         raise PackageError("invalid lockfile")
     packages = lock["packages"]
@@ -223,6 +229,8 @@ def verify_lock(lock, cache_root):
         unique.add(item["name"])
         expected = item["sha256"]
         blob = cache_root / expected[:2] / expected
+        if blob.parent.is_symlink():
+            raise PackageError("symlink cache shard rejected")
         if _sha256_file(blob) != expected:
             raise PackageError(f"cache corruption: {item['name']}")
     return True
