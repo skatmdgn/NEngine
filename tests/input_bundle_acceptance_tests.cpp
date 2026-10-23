@@ -56,7 +56,7 @@ int main(){
     // verify the new Player differs without silently mutating the old one.
     actions.unbind("Jump");
     actions.bind("Jump",input::Key::F);
-    expect(input::save_action_map_file(project/"Input.ninput",actions,&error),
+    expect(input::save_action_map_file(project/"Input.ninput",actions,&error,true),
            "INPUT-004: save modified Editor Action Map");
     config.destination=out/"Second";
     expect(player::export_player_data(config,report,&error),
