@@ -1,5 +1,6 @@
 #include "nengine/render/tilemap.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <iomanip>
 #include <limits>
