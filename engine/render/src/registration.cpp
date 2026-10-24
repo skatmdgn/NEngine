@@ -1,5 +1,7 @@
 #include "nengine/render/registration.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <optional>
 #include <string>
