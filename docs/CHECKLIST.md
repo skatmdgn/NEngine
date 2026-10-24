@@ -2,7 +2,7 @@
 
 **검증 기준선:** main 671cddf2d50d184b1889310f86c85a3df43306bd (2026-10-22), [Windows/Ubuntu CI 39713209272](https://github.com/skatmdgn/NEngine/actions/runs/39713209272), 양쪽 12/12 CTest 그룹 통과. 현재는 실 GPU·오디오·.NET 배포 및 Android 기기 검증을 통과했다고 주장하지 않는다.
 
-**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 97개, 미완료 188개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
+**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 98개, 미완료 187개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
 
 **우선 순위:** 남은 GOV-010의 릴리스 SHA 검증 강화와 WIN 실기기 수용, Android 빌드 토대를 구축. PR #29는 아직 main 미병합이므로 NAV-003은 반드시 미완료 유지. 작업 규칙은 [WORKFLOW.md](WORKFLOW.md), 근거와 저장소 조사는 [FILE_AUDIT.md](FILE_AUDIT.md)를 참고한다.
 
@@ -396,12 +396,12 @@
 - [ ] BUILD-008 빌드 실패·서명 누락 시 사용자에게 명확한 오류를 표시한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] BUILD-009 동일 커밋을 사용한 재현 가능한 빌드 결과를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## UTIL — 스크립팅 유틸리티·개발 진단 (0/5)
+## UTIL — 스크립팅 유틸리티·개발 진단 (1/5)
 
 참조: engine/scripting; engine/editor
 
 - [ ] UTIL-001 C# Debug.Log/Warning/Error 메시지와 Editor Console 위치를 연동한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] UTIL-002 C# Mathf/Vector/Quaternion 기본 수학 API를 샘플로 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] UTIL-002 C# Mathf/Vector/Quaternion 기본 수학 API를 샘플로 검증한다 — 증거: PR #37, engine/scripting/src/managed_project.cpp + tests/scripting_tests.cpp, 생성 C# API·실제 managed Start() 회귀 검증, Windows/Ubuntu Debug·Release NEngineScriptingTests 및 29/29 CTest PASS, CI run 40103756074
 - [ ] UTIL-003 C# Timer/Coroutine/WaitForSeconds 중단·취소를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] UTIL-004 프로파일 로그·크래시 로그에 엔진 및 게임 빌드 버전을 남긴다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] UTIL-005 런타임 오류 시 사용자 데이터 보호·복구 안내를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
