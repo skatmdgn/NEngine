@@ -525,7 +525,8 @@ std::optional<CameraMatrices>
 build_camera_matrices(
     const core::World& world,
     core::Entity entity,
-    float aspect) noexcept {
+    float aspect,
+    float viewport_height) noexcept {
 
     const auto* camera =
         world.get_component<Camera>(
@@ -545,6 +546,20 @@ build_camera_matrices(
             world,
             entity);
 
+    // Pixel-perfect orthographic view: one virtual texture pixel maps to
+    // exactly one viewport pixel. Snap in world coordinates before inverse.
+    if (camera->projection == ProjectionMode::Orthographic &&
+        camera->pixel_perfect && std::isfinite(viewport_height) &&
+        viewport_height > 0.0f && std::isfinite(camera->pixels_per_unit) &&
+        camera->pixels_per_unit > 0.0f) {
+        const auto unit = static_cast<double>(camera->pixels_per_unit);
+        for (int axis = 0; axis < 2; ++axis) {
+            const double coordinate = result.world.at(axis, 3);
+            const double rounded = std::round(coordinate * unit) / unit;
+            if (std::isfinite(rounded))
+                result.world.at(axis, 3) = static_cast<float>(rounded);
+        }
+    }
     const auto inverse =
         inverse_affine(
             result.world);
@@ -571,7 +586,13 @@ build_camera_matrices(
         result.projection =
             orthographic_lh_zo(
                 camera
-                    ->orthographic_size,
+                    ->pixel_perfect &&
+                        std::isfinite(viewport_height) &&
+                        viewport_height > 0.0f &&
+                        std::isfinite(camera->pixels_per_unit) &&
+                        camera->pixels_per_unit > 0.0f
+                        ? viewport_height / (2.0f * camera->pixels_per_unit)
+                        : camera->orthographic_size,
                 aspect,
                 camera->near_clip,
                 camera->far_clip);
