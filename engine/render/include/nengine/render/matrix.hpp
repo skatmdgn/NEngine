@@ -80,6 +80,7 @@ std::optional<CameraMatrices>
 build_camera_matrices(
     const core::World& world,
     core::Entity entity,
-    float aspect) noexcept;
+    float aspect,
+    float viewport_height = 0.0f) noexcept;
 
 } // namespace nengine::render

@@ -171,6 +171,36 @@ def android_preflight(settings, profile_key="android-debug"):
     return failures
 
 
+
+def signing_preflight(path):
+    """Validate release keystore without revealing or storing passwords."""
+    if path is None:
+        raise BuildError(
+            "Android Release signing missing: supply --signing-file with "
+            "keystore path, key alias, and password environment variable names")
+    signing=read_json(path)
+    if not isinstance(signing,dict) or set(signing) != {
+        "schema","keystore","alias","store_password_env","key_password_env"
+    } or type(signing["schema"]) is not int or signing["schema"]!=1:
+        raise BuildError("invalid Android signing manifest schema/fields")
+    keystore=signing["keystore"]
+    if not isinstance(keystore,str) or not keystore or "\0" in keystore:
+        raise BuildError("Android signing keystore path missing")
+    key_path=Path(keystore)
+    if key_path.is_symlink() or not key_path.is_file():
+        raise BuildError(f"Android Release signing keystore file not found: {keystore}")
+    alias=signing["alias"]
+    if not isinstance(alias,str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_.-]{0,95}",alias):
+        raise BuildError("Android signing key alias is missing or malformed")
+    for field in ("store_password_env","key_password_env"):
+        name=signing[field]
+        if not isinstance(name,str) or not re.fullmatch(r"[A-Z_][A-Z0-9_]{1,63}",name):
+            raise BuildError(f"invalid signing password environment variable name: {field}")
+        if not os.environ.get(name):
+            raise BuildError(f"Android Release signing secret missing: set environment variable {name} securely")
+    return True
+
+
 def main(argv=None):
     parser=argparse.ArgumentParser(description="NEngine project build profiles")
     sub=parser.add_subparsers(dest="command",required=True)
@@ -181,6 +211,7 @@ def main(argv=None):
     inspect.add_argument("--config",choices=("Debug","Release"),required=True)
     preflight=sub.add_parser("preflight");preflight.add_argument("project",type=Path)
     preflight.add_argument("--config",choices=("Debug","Release"),default="Debug")
+    preflight.add_argument("--signing-file",type=Path)
     args=parser.parse_args(argv)
     try:
         if args.command=="init":
@@ -191,6 +222,8 @@ def main(argv=None):
             if args.command=="inspect":
                 print(json.dumps(profile_for(conf,args.target,args.config),indent=2))
             else:
+                if args.config=="Release":
+                    signing_preflight(args.signing_file)
                 issues=android_preflight(conf,"android-"+args.config.lower())
                 if issues: raise BuildError("; ".join(issues))
                 print("Android toolchain preflight PASS (not APK/device validation)")

@@ -169,3 +169,34 @@ if(TARGET NEnginePlayerBuild AND TARGET NEnginePlayer)
     "-DTEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/한글_경로_깊이_검증"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/unicode_long_project_smoke.cmake")
 endif()
+
+
+# Two independently runnable sample games with actual PlayerRuntime bootstrap.
+# --self-test produces the complete project, exports the bundle, simulates
+# keyboard input through 2D/3D physics and reaches a win condition.
+add_executable(NEngineMiniRunner2D ../samples/mini_runner.cpp)
+target_compile_definitions(NEngineMiniRunner2D PRIVATE NENGINE_SAMPLE_2D=1)
+target_link_libraries(NEngineMiniRunner2D PRIVATE NEnginePlayerKit)
+target_compile_features(NEngineMiniRunner2D PRIVATE cxx_std_20)
+add_test(NAME NEngineMiniRunner2D COMMAND NEngineMiniRunner2D --self-test)
+add_executable(NEngineMiniRunner3D ../samples/mini_runner.cpp)
+target_compile_definitions(NEngineMiniRunner3D PRIVATE NENGINE_SAMPLE_2D=0)
+target_link_libraries(NEngineMiniRunner3D PRIVATE NEnginePlayerKit)
+target_compile_features(NEngineMiniRunner3D PRIVATE cxx_std_20)
+add_test(NAME NEngineMiniRunner3D COMMAND NEngineMiniRunner3D --self-test)
+
+add_executable(NEngineFollowupAcceptanceTests followup_acceptance_tests.cpp)
+target_link_libraries(NEngineFollowupAcceptanceTests PRIVATE NEnginePlayerKit)
+target_compile_features(NEngineFollowupAcceptanceTests PRIVATE cxx_std_20)
+add_test(NAME NEngineFollowupAcceptanceTests COMMAND NEngineFollowupAcceptanceTests)
+
+
+add_executable(NEngineMultiMaterialPlayerTests multimaterial_player_tests.cpp)
+target_link_libraries(NEngineMultiMaterialPlayerTests PRIVATE NEnginePlayerKit)
+target_compile_features(NEngineMultiMaterialPlayerTests PRIVATE cxx_std_20)
+add_test(NAME NEngineMultiMaterialPlayerTests COMMAND NEngineMultiMaterialPlayerTests)
+
+add_executable(NEngineGameSaveRecoveryTests save_recovery_tests.cpp)
+target_link_libraries(NEngineGameSaveRecoveryTests PRIVATE NEnginePlayerKit)
+target_compile_features(NEngineGameSaveRecoveryTests PRIVATE cxx_std_20)
+add_test(NAME NEngineGameSaveRecoveryTests COMMAND NEngineGameSaveRecoveryTests)
