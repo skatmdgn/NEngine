@@ -94,6 +94,17 @@ bool GameSaveStore::write(std::string slot,const GameSave& data,std::string* err
     if(ec==std::errc::no_such_file_or_directory)ec.clear();
     if(ec||std::filesystem::is_symlink(status))
         return bad(error,"save target cannot be a symlink");
+    // Preserve the previous validated save in an independent recovery area.
+    // Never replace a healthy backup with corrupt source data. Failure to
+    // create a requested backup aborts the new write before publish.
+    if (make_backup_ && std::filesystem::is_regular_file(target,ec) && !ec) {
+        GameSave previous;
+        if (read(slot,previous,nullptr)) {
+            GameSaveStore backup(root_/"Backup",false);
+            if (!backup.write(slot,previous,error))
+                return false;
+        }
+    }
     // Exclusive temp name prevents other writers from truncating our data.
     // Filename entropy is not a security token; it only avoids collisions.
     static std::atomic<std::uint64_t> generation{0};
@@ -148,10 +159,19 @@ bool GameSaveStore::read(std::string slot,GameSave& output,std::string* error) c
     staged.version=version;
     staged.bytes.resize(count);
     if(!in.read(reinterpret_cast<char*>(staged.bytes.data()),count)||crc(staged.bytes)!=hash)
-        return bad(error,"save checksum mismatch or truncated payload");
+        return bad(error,"save checksum mismatch or truncated payload; "
+                         "use read_backup() to recover previous validated save");
     output=std::move(staged);
     if(error)error->clear();
     return true;
+}
+bool GameSaveStore::read_backup(std::string slot,GameSave& output,
+    std::string* error) const {
+    GameSaveStore backup(root_/"Backup",false);
+    if (backup.read(slot,output,error))return true;
+    if(error)*error="Previous save backup is missing/corrupt; keep current save " 
+                    "unchanged and restore from an external copy if available";
+    return false;
 }
 bool GameSaveStore::read_migrated(std::string slot,std::uint32_t expected_version,
     const SaveMigration& migrate,GameSave& output,std::string* error) const {
