@@ -28,12 +28,26 @@ bool PlayerRuntime::initialize_managed(std::string* error) {
     const auto gameplay = managed / (name + ".dll");
     const auto configuration = managed / (name + ".runtimeconfig.json");
     std::error_code ec;
-    if (!std::filesystem::is_regular_file(gameplay, ec) ||
-        !std::filesystem::is_regular_file(configuration, ec) ||
-        !std::filesystem::is_regular_file(managed / "NEngine.Bridge.dll", ec) ||
-        !std::filesystem::is_regular_file(managed / "NEngine.API.dll", ec)) {
-        if (error) *error = "Player managed payload missing";
+    // Check each file separately: project assembly renames and incompatible
+    // runtimeconfig versions must be diagnosable before hostfxr is invoked.
+    if (!std::filesystem::is_regular_file(gameplay, ec)) {
+        if (error) *error = "Managed assembly name mismatch: bundle expects '" +
+            name + ".dll' in Content/Managed. Rebuild and export the project " +
+            "with the same managed assembly name as NEngine.player.";
         return false;
+    }
+    if (!std::filesystem::is_regular_file(configuration, ec)) {
+        if (error) *error = "Managed runtime configuration missing: expected '" +
+            name + ".runtimeconfig.json'. Check the managed project build " +
+            "and copy the matching config alongside " + name + ".dll.";
+        return false;
+    }
+    for (const auto* dependency : {"NEngine.Bridge.dll", "NEngine.API.dll"}) {
+        if (!std::filesystem::is_regular_file(managed / dependency, ec)) {
+            if (error) *error = std::string{"Required managed dependency missing: "} +
+                dependency + ". Re-export the NEngine managed runtime payload.";
+            return false;
+        }
     }
     std::string discovery_error;
     const auto host = scripting::discover_dotnet_host({}, &discovery_error);
