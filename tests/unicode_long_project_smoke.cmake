@@ -17,7 +17,7 @@ execute_process(COMMAND "${BUILDER}" "${root}" "${destination}" "${PLAYER}"
                 RESULT_VARIABLE exported
                 OUTPUT_VARIABLE export_out ERROR_VARIABLE export_err)
 if(NOT exported EQUAL 0)
-  message(FATAL_ERROR "QA-006 failed to export Unicode project: ${export_err}")
+  message(FATAL_ERROR "QA-006 exporter exit=${exported}; project=${root}; destination=${destination}; stdout=[${export_out}]; stderr=[${export_err}]")
 endif()
 if(NOT EXISTS "${destination}/NEngine.player" OR
    NOT EXISTS "${destination}/Content/Main.nscene")
