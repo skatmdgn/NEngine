@@ -26,6 +26,10 @@ public:
                std::string* error=nullptr) const;
     bool read(std::string slot,GameSave& output,
               std::string* error=nullptr) const;
+    // Retrieve the previous healthy save after a failed load or crash.
+    // Never overwrites the current file or caller output on failure.
+    bool read_backup(std::string slot, GameSave& output,
+                     std::string* error=nullptr) const;
     bool read_migrated(std::string slot,std::uint32_t expected_version,
                        const SaveMigration& migrate,GameSave& output,
                        std::string* error=nullptr) const;
@@ -33,7 +37,10 @@ public:
     static std::optional<std::filesystem::path> user_data_directory(
         std::string app_id);
 private:
+    GameSaveStore(std::filesystem::path root,bool make_backup):
+        root_(std::move(root)),make_backup_(make_backup) {}
     std::filesystem::path root_;
+    bool make_backup_{true};
 };
 
 } // namespace nengine::player
