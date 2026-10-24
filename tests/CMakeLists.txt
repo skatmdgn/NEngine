@@ -184,3 +184,8 @@ target_compile_definitions(NEngineMiniRunner3D PRIVATE NENGINE_SAMPLE_2D=0)
 target_link_libraries(NEngineMiniRunner3D PRIVATE NEnginePlayerKit)
 target_compile_features(NEngineMiniRunner3D PRIVATE cxx_std_20)
 add_test(NAME NEngineMiniRunner3D COMMAND NEngineMiniRunner3D --self-test)
+
+add_executable(NEngineFollowupAcceptanceTests followup_acceptance_tests.cpp)
+target_link_libraries(NEngineFollowupAcceptanceTests PRIVATE NEnginePlayerKit)
+target_compile_features(NEngineFollowupAcceptanceTests PRIVATE cxx_std_20)
+add_test(NAME NEngineFollowupAcceptanceTests COMMAND NEngineFollowupAcceptanceTests)
