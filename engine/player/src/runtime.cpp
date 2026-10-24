@@ -15,6 +15,9 @@
 #include "nengine/scripting/dotnet_host.hpp"
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <iterator>
+#include <regex>
 
 namespace nengine::player {
 
@@ -40,6 +43,31 @@ bool PlayerRuntime::initialize_managed(std::string* error) {
         if (error) *error = "Managed runtime configuration missing: expected '" +
             name + ".runtimeconfig.json'. Check the managed project build " +
             "and copy the matching config alongside " + name + ".dll.";
+        return false;
+    }
+    // Verify that the requested target framework and runtimeconfig version
+    // agree before passing a mismatched pair to hostfxr.
+    const auto bytes=std::filesystem::file_size(configuration,ec);
+    if (ec || bytes > 64u*1024u) {
+        if(error)*error="Managed runtimeconfig is unreadable/oversized; rebuild the matching GameScripts runtime configuration.";
+        return false;
+    }
+    std::ifstream runtime_file(configuration,std::ios::binary);
+    const std::string config_text(
+        (std::istreambuf_iterator<char>(runtime_file)),
+        std::istreambuf_iterator<char>());
+    const std::regex target(R"regex("tfm"\s*:\s*"net([0-9]+)\.([0-9]+)")regex");
+    const std::regex framework(R"regex("version"\s*:\s*"([0-9]+)\.([0-9]+)\.[0-9]+")regex");
+    std::smatch tfm_match, version_match;
+    if (std::regex_search(config_text,tfm_match,target) &&
+        std::regex_search(config_text,version_match,framework) &&
+        (tfm_match[1] != version_match[1] ||
+         tfm_match[2] != version_match[2])) {
+        if(error)*error="Managed .NET version mismatch: target framework net" +
+            tfm_match[1].str() + "." + tfm_match[2].str() +
+            " conflicts with runtimeconfig version " +
+            version_match[1].str()+"."+version_match[2].str() +
+            "; rebuild the runtimeconfig from the same managed project.";
         return false;
     }
     for (const auto* dependency : {"NEngine.Bridge.dll", "NEngine.API.dll"}) {
