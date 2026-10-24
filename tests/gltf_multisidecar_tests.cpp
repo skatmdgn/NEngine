@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include "nengine/assets/asset_importer.hpp"
+#include "nengine/assets/builtin_processors.hpp"
 #include "nengine/assets/import_pipeline.hpp"
 #include "nengine/assets/gltf_sidecars.hpp"
 #include "nengine/render/asset_resources.hpp"
