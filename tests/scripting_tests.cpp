@@ -1573,6 +1573,13 @@ int main() {
 
     const auto api =
         read_all(output.api_stub_path);
+    check(
+        api.find("public static class Mathf") != std::string::npos &&
+        api.find("public static float Dot(Vector3") != std::string::npos &&
+        api.find("public static Vector3 Cross(Vector3") != std::string::npos &&
+        api.find("public static Quaternion AngleAxis") != std::string::npos,
+        "UTIL-002 generated managed API includes scalar, vector and quaternion math");
+
 
     check(
         api.find("class Behaviour") !=
@@ -2039,7 +2046,23 @@ int main() {
                 << "    public int starts;\n"
                 << "    public int updates;\n"
                 << "    private void Awake() { awakes++; if (gameObject.name != \"Runtime Object\" && gameObject.name != \"Managed Example\") throw new System.Exception(\"Awake native state mismatch\"); gameObject.name = \"Managed Awakened\"; }\n"
-                << "    private void Start() { if (awakes != 1 || gameObject.name != \"Managed Awakened\") throw new System.Exception(\"Awake/Start order mismatch\"); starts++; gameObject.name = \"Managed Renamed\"; }\n"
+                << "    private void Start() {\n"
+                << "        if (awakes != 1 || gameObject.name != \"Managed Awakened\") throw new System.Exception(\"Awake/Start order mismatch\");\n"
+                << "        if (Mathf.Clamp(-3f, 0f, 4f) != 0f || Mathf.Clamp(7f, 0f, 4f) != 4f || Mathf.Clamp01(2f) != 1f) throw new System.Exception(\"Mathf clamp mismatch\");\n"
+                << "        if (!Mathf.Approximately(Mathf.Lerp(0f, 10f, 0.25f), 2.5f) || Mathf.Lerp(0f, 10f, 2f) != 10f || !Mathf.Approximately(Mathf.Sqrt(25f), 5f)) throw new System.Exception(\"Mathf interpolation or sqrt mismatch\");\n"
+                << "        if (!Mathf.Approximately(Mathf.Sin(Mathf.PI * 0.5f), 1f) || !Mathf.Approximately(Mathf.Cos(Mathf.PI), -1f) || Mathf.Approximately(float.NaN, 1f) || Mathf.Approximately(float.PositiveInfinity, float.PositiveInfinity)) throw new System.Exception(\"Mathf trig or nonfinite mismatch\");\n"
+                << "        Vector3 a = new Vector3(3f, 4f, 0f);\n"
+                << "        if (!Mathf.Approximately(a.magnitude, 5f) || !Mathf.Approximately(a.normalized.magnitude, 1f) || Vector3.zero.normalized.sqrMagnitude != 0f) throw new System.Exception(\"Vector3 magnitude or zero normalize mismatch\");\n"
+                << "        if (!Mathf.Approximately(Vector3.Dot(new Vector3(1f, 2f, 3f), new Vector3(4f, 5f, 6f)), 32f) || !Mathf.Approximately(Vector3.Distance(Vector3.zero, a), 5f)) throw new System.Exception(\"Vector3 dot or distance mismatch\");\n"
+                << "        Vector3 cross = Vector3.Cross(new Vector3(1f, 0f, 0f), new Vector3(0f, 1f, 0f));\n"
+                << "        if (cross.x != 0f || cross.y != 0f || cross.z != 1f) throw new System.Exception(\"Vector3 cross order mismatch\");\n"
+                << "        Quaternion quarterTurn = Quaternion.AngleAxis(90f, new Vector3(0f, 1f, 0f));\n"
+                << "        Vector3 right = quarterTurn * Vector3.forward;\n"
+                << "        Vector3 backward = (quarterTurn * quarterTurn) * Vector3.forward;\n"
+                << "        if (!Mathf.Approximately(right.x, 1f) || !Mathf.Approximately(right.z, 0f) || !Mathf.Approximately(backward.z, -1f)) throw new System.Exception(\"Quaternion rotate and compose mismatch\");\n"
+                << "        if (Quaternion.AngleAxis(45f, Vector3.zero).w != 1f || Quaternion.identity.normalized.w != 1f || new Quaternion(0f, 0f, 0f, 0f).normalized.w != 1f) throw new System.Exception(\"Quaternion degenerate axis/normalization mismatch\");\n"
+                << "        starts++; gameObject.name = \"Managed Renamed\";\n"
+                << "    }\n"
                 << "    private void FixedUpdate() { if (System.MathF.Abs(Time.fixedDeltaTime - 0.02f) > 0.0001f || System.MathF.Abs(Time.deltaTime - 0.02f) > 0.0001f) throw new System.Exception(\"fixed delta mismatch\"); }\n"
                 << "    private void Update() { updates++; var t = GetComponent<Transform>(); if (t == null) throw new System.Exception(\"Transform missing\"); t.localPosition = t.localPosition + new Vector3(1, 2, 3); }\n"
                 << "}\n"
