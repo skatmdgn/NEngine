@@ -15,6 +15,7 @@
 #include "nengine/render/asset_resources.hpp"
 #include "nengine/render/gltf_mesh.hpp"
 #include "nengine/render/decoded_mesh.hpp"
+#include "nengine/render/obj_mesh.hpp"
 
 namespace {
 int failures=0;
@@ -97,7 +98,7 @@ int main() {
             auto resolved=render::resolve_model_asset(model_guid,*model,&error);
             render::MeshData decoded;
             check(resolved.has_value()&&
-                  render::decode_model_mesh(*resolved,decoded,&error)&&
+                  render::decode_obj_mesh(*resolved,decoded,&error)&&
                   decoded.valid()&&decoded.indices.size()==6,
                   "ASSET-010: exported model geometry includes both triangles");
         }
