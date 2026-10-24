@@ -103,6 +103,14 @@ void managed_diagnostics() {
           "CS-012: missing runtimeconfig reports exact expected name");
     {std::ofstream f(managed/"GameScripts.runtimeconfig.json");
      f<<"{\\"runtimeOptions\\":{\\"tfm\\":\\"net8.0\\"}}";}
+    {std::ofstream f(managed/"GameScripts.runtimeconfig.json");
+     f<<R"json({"runtimeOptions":{"tfm":"net7.0","framework":{"name":"Microsoft.NETCore.App","version":"8.0.0"}}})json";}
+    error.clear();
+    check(!runner.initialize_managed(&error) &&
+          error.find("version mismatch")!=std::string::npos,
+          "CS-012: incompatible .NET framework versions identified precisely");
+    {std::ofstream f(managed/"GameScripts.runtimeconfig.json");
+     f<<R"json({"runtimeOptions":{"tfm":"net8.0","framework":{"name":"Microsoft.NETCore.App","version":"8.0.0"}}})json";}
     error.clear();
     check(!runner.initialize_managed(&error) &&
           error.find("NEngine.Bridge.dll")!=std::string::npos,
