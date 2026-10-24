@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <string>
 
@@ -50,6 +51,23 @@ bool create_project(const std::filesystem::path& project,std::string& error) {
     if(body) {body->use_gravity=false;body->allow_sleep=false;}
     if(body2d){body2d->use_gravity=false;body2d->allow_sleep=false;}
     if(game_2d){
+        auto* animator=world.add_component<render::SpriteAnimator>(
+            runner,render::sprite_animator_type());
+        if(!animator)return false;
+        const auto clip_guid=assets::AssetGuid::generate();
+        const auto frame_guid=assets::AssetGuid::generate();
+        animator->clip=clip_guid;
+        const auto folder=project/"Assets"/"Animations";
+        std::filesystem::create_directories(folder,ec);
+        if(ec)return false;
+        {std::ofstream clip(folder/"Run.nanim");
+         clip<<"NENGINE_SPRITE_ANIMATION 1\nFRAMES 2\n"
+             <<"FRAME "<<std::quoted(frame_guid.to_string())<<" 0.1\n"
+             <<"FRAME "<<std::quoted(frame_guid.to_string())<<" 0.1\n"
+             <<"END_SPRITE_ANIMATION\n";}
+        {std::ofstream meta(folder/"Run.nanim.meta");
+         meta<<"NENGINE_META 1\nGUID "<<clip_guid.to_string()
+             <<"\nIMPORTER \"NEngine.SpriteAnimation\"\nEND_META\n";}
         if(!world.add_component<render::SpriteRenderer>(
                runner,render::sprite_renderer_type())||
            !world.add_component<physics::BoxCollider2D>(
@@ -135,7 +153,7 @@ int main(int argc,char** argv) {
     settings.project_root=project;
     settings.startup_scene="Assets/Scenes/Main.nscene";
     settings.destination=root/"ExportedGame";
-    settings.copy_supported_assets=false;
+    settings.copy_supported_assets=true;
     settings.title=game_2d?"Mini Runner 2D":"Mini Runner 3D";
     player::ExportReport report;
     if(!player::export_player_data(settings,report,&error)){
@@ -147,6 +165,7 @@ int main(int argc,char** argv) {
         std::cerr<<"Sample Player load failed: "<<error<<"\n";return 5;
     }
     bool saw_step=false;
+    bool saw_animation=false;
     player::PlayerFrameStats stats{};
     const int frames=automatic?120:10000;
     for(int i=0;i<frames&&!won(runtime);++i) {
@@ -160,10 +179,12 @@ int main(int argc,char** argv) {
             std::cerr<<"Sample Player simulation failed\n";return 6;
         }
         saw_step=true;
+        if(stats.sprite_sampled>0)saw_animation=true;
     }
     if(automatic && (!won(runtime)||!saw_step||
         runtime.elapsed_seconds()<0.99 ||
-        runtime.actions().action_count()!=2)){
+        runtime.actions().action_count()!=2 ||
+        (game_2d && !saw_animation))){
         std::cerr<<"Sample did not reach goal or lost its packaged state\n";return 7;
     }
     if(won(runtime))std::cout<<"YOU WIN - "<<settings.title<<"\n";
