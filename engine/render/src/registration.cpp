@@ -604,7 +604,7 @@ bool register_component_serializers(
                     float_property(
                         "Orthographic Size",
                         camera->orthographic_size),
-                    bool_property("Pixel Perfect", camera->pixel_perfect),
+                    boolean_property("Pixel Perfect", camera->pixel_perfect),
                     float_property("Pixels Per Unit", camera->pixels_per_unit)
                 };
 
