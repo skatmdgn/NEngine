@@ -32,7 +32,7 @@ public:
     void bind_image_resolver(ui::UiImageResolver resolver) {
         images_ = std::move(resolver);
     }
-    void update(float width, float height, const input::InputState& input,
+    void update(float width, float height, input::InputState& input,
                 bool focused = true);
     ui::WidgetId find(std::string_view name) const noexcept;
     int query(ui::WidgetId id, int operation) const noexcept;

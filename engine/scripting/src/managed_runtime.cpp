@@ -1182,7 +1182,7 @@ int ManagedRuntime::callback_input_held(
         return -1;
     }
 
-    return state->input->held(
+    return state->input->gameplay_held(
         static_cast<input::Key>(
             key))
         ? 1
@@ -1205,7 +1205,7 @@ int ManagedRuntime::callback_input_pressed(
         return -1;
     }
 
-    return state->input->pressed(
+    return state->input->gameplay_pressed(
         static_cast<input::Key>(
             key))
         ? 1
@@ -1228,7 +1228,7 @@ int ManagedRuntime::callback_input_released(
         return -1;
     }
 
-    return state->input->released(
+    return state->input->gameplay_released(
         static_cast<input::Key>(
             key))
         ? 1

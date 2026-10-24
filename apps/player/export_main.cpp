@@ -67,7 +67,12 @@ int main(int argc, char** argv) {
         std::cerr << "Player export failed: " << error << "\n";
         return 5;
     }
-    std::cout << "Player bundle ready: " << result.bundle_root.string()
+    // Windows filesystem paths are UTF-16: path::string() can throw in
+    // a non-UTF-8 process codepage even after an otherwise successful
+    // Korean-named project export. Emit the portable UTF-8 representation.
+    const auto utf8_path = result.bundle_root.u8string();
+    std::cout << "Player bundle ready: "
+              << std::string(utf8_path.begin(), utf8_path.end())
               << " (" << result.scene_objects << " scene objects, "
               << result.cooked_textures << " cooked textures, "
               << result.managed_files << " managed files)\n";

@@ -7,9 +7,17 @@
 #include "nengine/assets/asset_guid.hpp"
 #include <fstream>
 
+#if defined(_WIN32)
+int wmain(int argc, wchar_t** argv) {
+#else
 int main(int argc, char** argv) {
+#endif
     if (argc != 2) return 2;
+#if defined(_WIN32)
+    const std::filesystem::path project{argv[1]};
+#else
     const std::filesystem::path project = std::filesystem::u8path(argv[1]);
+#endif
     std::error_code ec;
     std::filesystem::create_directories(project / "Assets" / "Scenes", ec);
     if (ec) return 3;

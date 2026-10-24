@@ -137,3 +137,35 @@ add_executable(NEngineUntrustedInputTests untrusted_input_tests.cpp)
 target_link_libraries(NEngineUntrustedInputTests PRIVATE NEngineRender NEngineCore NEngineInput NEngineAssets)
 target_compile_features(NEngineUntrustedInputTests PRIVATE cxx_std_20)
 add_test(NAME NEngineUntrustedInputTests COMMAND NEngineUntrustedInputTests)
+
+
+# Round Five: native plugin binary, gameplay input consumption, 2D tilemap
+# collision and fixed-step time scaling. Both CI OS run fixture .dll/.so.
+add_library(NEngineNativePluginFixture SHARED native_plugin_fixture.cpp)
+add_executable(NEngineNativePluginTests native_plugin_tests.cpp)
+target_link_libraries(NEngineNativePluginTests PRIVATE NEngineScripting)
+target_compile_features(NEngineNativePluginTests PRIVATE cxx_std_20)
+add_test(NAME NEngineNativePluginTests COMMAND
+  NEngineNativePluginTests "$<TARGET_FILE:NEngineNativePluginFixture>")
+
+add_executable(NEngineRoundFiveRuntimeTests round_five_runtime_tests.cpp)
+target_link_libraries(NEngineRoundFiveRuntimeTests PRIVATE
+  NEngineRender NEnginePhysics NEngineEditorModel NEnginePlayerKit)
+target_compile_features(NEngineRoundFiveRuntimeTests PRIVATE cxx_std_20)
+add_test(NAME NEngineRoundFiveRuntimeTests COMMAND NEngineRoundFiveRuntimeTests)
+
+add_executable(NEngineMultiExternalGltfTests gltf_multisidecar_tests.cpp)
+target_link_libraries(NEngineMultiExternalGltfTests PRIVATE NEngineRender NEngineAssets)
+target_compile_features(NEngineMultiExternalGltfTests PRIVATE cxx_std_20)
+add_test(NAME NEngineMultiExternalGltfTests COMMAND NEngineMultiExternalGltfTests)
+
+# Korean/space/long paths: project generation and actual Player export.
+if(TARGET NEnginePlayerBuild AND TARGET NEnginePlayer)
+  add_test(NAME NEngineUnicodeLongProjectCLI COMMAND
+    ${CMAKE_COMMAND}
+    "-DFIXTURE=$<TARGET_FILE:NEnginePlayerCLIFixture>"
+    "-DBUILDER=$<TARGET_FILE:NEnginePlayerBuild>"
+    "-DPLAYER=$<TARGET_FILE:NEnginePlayer>"
+    "-DTEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/한글_경로_깊이_검증"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/unicode_long_project_smoke.cmake")
+endif()

@@ -194,6 +194,12 @@ void PlayerRuntime::ensure_referenced_assets() {
     }
 }
 
+bool PlayerRuntime::set_time_scale(float scale) noexcept {
+    if(!std::isfinite(scale)||scale<0.0f||scale>4.0f)return false;
+    time_scale_=scale;
+    return true;
+}
+
 PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
     PlayerFrameStats stats;
     if (!ready_ || paused_ ||
@@ -202,7 +208,8 @@ PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
     constexpr double fixed = 1.0 / 60.0;
     constexpr double max_frame = 0.25;
     const double frame = std::min(
-        static_cast<double>(delta_seconds), max_frame);
+        static_cast<double>(delta_seconds), max_frame)
+        *static_cast<double>(time_scale_);
     stats.clamped_delta = frame < static_cast<double>(delta_seconds);
     elapsed_seconds_ += frame;
     ensure_referenced_assets();

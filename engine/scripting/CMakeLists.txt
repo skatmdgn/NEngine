@@ -3,6 +3,7 @@ add_library(NEngineScripting STATIC
   src/managed_build.cpp
   src/managed_project.cpp
   src/managed_runtime.cpp
+  src/native_plugin.cpp
   src/registration.cpp
   src/script_system.cpp
 )
