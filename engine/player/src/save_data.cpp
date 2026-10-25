@@ -84,7 +84,13 @@ bool GameSaveStore::write(std::string slot,const GameSave& data,std::string* err
     if(!valid_slot(slot)||data.version==0||data.bytes.size()>max_save_bytes)
         return bad(error,"invalid save slot, version or payload size");
     std::error_code ec;
-    if(root_.empty()||root_.is_relative()||std::filesystem::is_symlink(root_,ec)||ec)
+    // A missing save directory is expected on first launch. symlink_status()
+    // reports no_such_file_or_directory for that case on both platforms;
+    // reject actual symlinks and all other filesystem errors instead.
+    const auto root_status = std::filesystem::symlink_status(root_,ec);
+    if(ec==std::errc::no_such_file_or_directory)ec.clear();
+    if(root_.empty()||root_.is_relative()||ec||
+       std::filesystem::is_symlink(root_status))
         return bad(error,"invalid/symlinked game save directory");
     std::filesystem::create_directories(root_,ec);
     if(ec||std::filesystem::is_symlink(root_,ec)||ec)

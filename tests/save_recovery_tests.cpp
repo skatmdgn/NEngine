@@ -9,12 +9,16 @@ int main(){
   std::error_code ec;
   const auto root=std::filesystem::temp_directory_path()/"nengine-save-recovery-20261024";
   std::filesystem::remove_all(root,ec);
+  // The initial save must work even when neither the root nor Backup exists.
+  if(std::filesystem::exists(root,ec)||ec)return 8;
   GameSaveStore saves(root);
   GameSave one{1,{1,2,3}},two{2,{4,5,6}};
   std::string error;
   if(!saves.write("Continue",one,&error)||!saves.write("Continue",two,&error)){
     std::cerr<<error<<"\n";return 1;
   }
+  if(!std::filesystem::is_directory(root,ec)||ec||
+     !std::filesystem::is_directory(root/"Backup",ec)||ec)return 9;
   GameSave stored,backup;
   if(!saves.read("Continue",stored,&error)||stored.version!=2 ||
      !saves.read_backup("Continue",backup,&error)||backup.version!=1 ||
