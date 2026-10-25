@@ -53,6 +53,8 @@ public:
     bool ready() const noexcept { return ready_; }
     PlayerFrameStats advance(float delta_seconds);
     void set_paused(bool value) noexcept { paused_ = value; }
+    bool set_time_scale(float scale) noexcept;
+    float time_scale() const noexcept {return time_scale_;}
     input::InputState& input() noexcept { return input_; }
     const input::InputState& input() const noexcept { return input_; }
     void begin_input_frame() noexcept { input_.begin_frame(); }
@@ -109,6 +111,7 @@ private:
     BundleManifest manifest_{};
     bool ready_{false};
     bool paused_{false};
+    float time_scale_{1.0f};
     double accumulator_{0.0};
     double elapsed_seconds_{0.0};
     physics::ContactImpulseCache physics_cache_{};

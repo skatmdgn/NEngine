@@ -19,6 +19,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Install GLSL compiler
         if: runner.os == 'Linux'
@@ -31,6 +33,7 @@ jobs:
         run: |
           python3 tools/compile_shader.py engine/render/shaders/pbr.vert.glsl build/shaders/pbr.vert.spv
           python3 tools/compile_shader.py engine/render/shaders/pbr.frag.glsl build/shaders/pbr.frag.spv
+          python3 tools/compile_shader.py engine/render/shaders/acceptance.frag.hlsl build/shaders/acceptance.frag.spv
           python3 tools/embed_spirv.py build/shaders/pbr.vert.spv --symbol pbr_vertex_words > build/shaders/pbr.vert.inc
           python3 tools/embed_spirv.py build/shaders/pbr.frag.spv --symbol pbr_fragment_words > build/shaders/pbr.frag.inc
           echo "=== NENGINE_PBR_VERTEX_SPIRV_BEGIN ==="
@@ -41,13 +44,51 @@ jobs:
           echo "=== NENGINE_PBR_FRAGMENT_SPIRV_END ==="
 
       - name: Configure
-        run: cmake -S . -B build -DNENGINE_BUILD_TESTS=ON -DNENGINE_BUILD_EDITOR=ON -DNENGINE_BUILD_PLAYER=ON
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DNENGINE_BUILD_TESTS=ON -DNENGINE_BUILD_EDITOR=ON -DNENGINE_BUILD_PLAYER=ON
 
       - name: Build
         run: cmake --build build --config Release
 
+      - name: Verify historical CTest suite names (GOV-004)
+        run: python tools/verify_test_matrix.py --build-dir build --config Release
+
       - name: Test
-        run: ctest --test-dir build -C Release --output-on-failure
+        run: ctest --test-dir build -C Release --output-on-failure --output-junit "${{ github.workspace }}/release-tests.xml"
+
+      - name: Configure Debug
+        run: cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=Debug -DNENGINE_BUILD_TESTS=ON -DNENGINE_BUILD_EDITOR=ON -DNENGINE_BUILD_PLAYER=ON
+
+      - name: Build Debug
+        run: cmake --build build-debug --config Debug
+
+      - name: Test Debug
+        run: ctest --test-dir build-debug -C Debug --output-on-failure --output-junit "${{ github.workspace }}/debug-tests.xml"
+
+      - name: Verify Debug/Release test parity
+        run: python tools/verify_build_parity.py --debug debug-tests.xml --release release-tests.xml
+
+      - name: Verify acceptance checklist and governance regressions
+        run: |
+          python -m unittest discover -s tools -p "test_*.py"
+          python tools/verify_checkout_provenance.py
+          python tools/verify_checklist.py
+          python tools/verify_third_party.py
+          python tools/verify_acceptance.py
+
+      - name: Verify release candidate provenance (Windows)
+        if: runner.os == 'Windows'
+        run: python tools/verify_release_candidate.py --workspace . --sha "$env:GITHUB_SHA" --platform windows-x64 --binary build/apps/editor/Release/NEngineEditor.exe --binary build/apps/player/Release/NEnginePlayer.exe --binary build/apps/player/Release/NEnginePlayerBuild.exe --test-report release-tests.xml --output release-candidate-windows.json
+
+      - name: Verify release candidate provenance (Ubuntu)
+        if: runner.os == 'Linux'
+        run: python3 tools/verify_release_candidate.py --workspace . --sha "$GITHUB_SHA" --platform ubuntu-x64 --binary build/apps/editor/NEngineEditor --binary build/apps/player/NEnginePlayer --binary build/apps/player/NEnginePlayerBuild --test-report release-tests.xml --output release-candidate-ubuntu.json
+
+      - name: Upload verified candidate manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEngineReleaseEvidence-${{ runner.os }}
+          path: release-candidate-*.json
+          if-no-files-found: error
 
       - name: Upload Windows editor
         if: runner.os == 'Windows'

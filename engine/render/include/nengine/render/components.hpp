@@ -22,6 +22,8 @@ struct Camera {
     float near_clip{0.1f};
     float far_clip{1000.0f};
     float orthographic_size{5.0f};
+    bool pixel_perfect{false};
+    float pixels_per_unit{100.0f};
 };
 
 enum class LightType : std::uint8_t {

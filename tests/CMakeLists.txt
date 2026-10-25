@@ -1,3 +1,13 @@
+add_executable(NEngineGameSaveTests save_data_tests.cpp)
+target_link_libraries(NEngineGameSaveTests PRIVATE NEnginePlayerKit)
+target_compile_features(NEngineGameSaveTests PRIVATE cxx_std_20)
+add_test(NAME NEngineGameSaveTests COMMAND NEngineGameSaveTests)
+
+add_executable(NEngineAdditiveSceneTests additive_scene_tests.cpp)
+target_link_libraries(NEngineAdditiveSceneTests PRIVATE NEngineCore)
+target_compile_features(NEngineAdditiveSceneTests PRIVATE cxx_std_20)
+add_test(NAME NEngineAdditiveSceneTests COMMAND NEngineAdditiveSceneTests)
+
 add_executable(NEngineCoreTests core_tests.cpp)
 target_link_libraries(NEngineCoreTests PRIVATE NEngineCore)
 target_compile_features(NEngineCoreTests PRIVATE cxx_std_20)
@@ -70,3 +80,128 @@ if(TARGET NEnginePlayerBuild AND TARGET NEnginePlayer)
     "-DTEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/player_cli_bundle"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/player_cli_smoke.cmake")
 endif()
+
+# CORE-004 / CORE-006 / CORE-008 acceptance regressions are separately visible in CTest.
+add_executable(NEngineCoreAcceptanceTests core_acceptance_tests.cpp)
+target_link_libraries(NEngineCoreAcceptanceTests PRIVATE NEngineCore)
+target_compile_features(NEngineCoreAcceptanceTests PRIVATE cxx_std_20)
+add_test(NAME NEngineCoreAcceptanceTests COMMAND NEngineCoreAcceptanceTests)
+
+
+# Round 2 separately reported feature acceptance regressions.
+add_executable(NEngineRoundTwoCoreTests round_two_core_tests.cpp)
+target_link_libraries(NEngineRoundTwoCoreTests PRIVATE NEngineEditorModel)
+target_compile_features(NEngineRoundTwoCoreTests PRIVATE cxx_std_20)
+add_test(NAME NEngineRoundTwoCoreTests COMMAND NEngineRoundTwoCoreTests)
+
+add_executable(NEngineRoundTwoInputUiTests round_two_input_ui_tests.cpp)
+target_link_libraries(NEngineRoundTwoInputUiTests PRIVATE NEngineUI NEngineInput)
+target_compile_features(NEngineRoundTwoInputUiTests PRIVATE cxx_std_20)
+add_test(NAME NEngineRoundTwoInputUiTests COMMAND NEngineRoundTwoInputUiTests)
+
+add_executable(NEngineRoundTwoAssetTests round_two_asset_tests.cpp)
+target_link_libraries(NEngineRoundTwoAssetTests PRIVATE NEngineAssets)
+target_compile_features(NEngineRoundTwoAssetTests PRIVATE cxx_std_20)
+add_test(NAME NEngineRoundTwoAssetTests COMMAND NEngineRoundTwoAssetTests)
+
+add_executable(NEngineRoundTwoAnimPhysicsTests round_two_anim_physics_tests.cpp)
+target_link_libraries(NEngineRoundTwoAnimPhysicsTests PRIVATE NEngineRender NEnginePhysics)
+target_compile_features(NEngineRoundTwoAnimPhysicsTests PRIVATE cxx_std_20)
+add_test(NAME NEngineRoundTwoAnimPhysicsTests COMMAND NEngineRoundTwoAnimPhysicsTests)
+
+# Round Three: new physics queries, tilemap, particles, async scene,
+# typed ScriptableData and Player failure-safety acceptance groups.
+add_executable(NEngineRoundThreeFeatureTests round_three_feature_tests.cpp)
+target_link_libraries(NEngineRoundThreeFeatureTests PRIVATE NEngineRender NEnginePhysics)
+target_compile_features(NEngineRoundThreeFeatureTests PRIVATE cxx_std_20)
+add_test(NAME NEngineRoundThreeFeatureTests COMMAND NEngineRoundThreeFeatureTests)
+
+add_executable(NEngineRoundThreeScriptableTests round_three_scriptable_tests.cpp)
+target_link_libraries(NEngineRoundThreeScriptableTests PRIVATE NEngineAssets)
+target_compile_features(NEngineRoundThreeScriptableTests PRIVATE cxx_std_20)
+add_test(NAME NEngineRoundThreeScriptableTests COMMAND NEngineRoundThreeScriptableTests)
+
+add_executable(NEngineAsyncSceneAcceptanceTests async_scene_acceptance_tests.cpp)
+target_link_libraries(NEngineAsyncSceneAcceptanceTests PRIVATE NEngineRender NEngineCore)
+target_compile_features(NEngineAsyncSceneAcceptanceTests PRIVATE cxx_std_20)
+add_test(NAME NEngineAsyncSceneAcceptanceTests COMMAND NEngineAsyncSceneAcceptanceTests)
+
+add_executable(NEngineRoundThreePlayerSafetyTests round_three_player_safety_tests.cpp)
+target_link_libraries(NEngineRoundThreePlayerSafetyTests PRIVATE NEnginePlayerKit)
+target_compile_features(NEngineRoundThreePlayerSafetyTests PRIVATE cxx_std_20)
+add_test(NAME NEngineRoundThreePlayerSafetyTests COMMAND NEngineRoundThreePlayerSafetyTests)
+
+# Round Four integration: project Action Map propagation, Unicode Player
+# bootstrap, and untrusted source parser security corpus.
+add_executable(NEngineInputBundleAcceptanceTests input_bundle_acceptance_tests.cpp)
+target_link_libraries(NEngineInputBundleAcceptanceTests PRIVATE NEnginePlayerKit)
+target_compile_features(NEngineInputBundleAcceptanceTests PRIVATE cxx_std_20)
+add_test(NAME NEngineInputBundleAcceptanceTests COMMAND NEngineInputBundleAcceptanceTests)
+
+add_executable(NEngineUntrustedInputTests untrusted_input_tests.cpp)
+target_link_libraries(NEngineUntrustedInputTests PRIVATE NEngineRender NEngineCore NEngineInput NEngineAssets)
+target_compile_features(NEngineUntrustedInputTests PRIVATE cxx_std_20)
+add_test(NAME NEngineUntrustedInputTests COMMAND NEngineUntrustedInputTests)
+
+
+# Round Five: native plugin binary, gameplay input consumption, 2D tilemap
+# collision and fixed-step time scaling. Both CI OS run fixture .dll/.so.
+add_library(NEngineNativePluginFixture SHARED native_plugin_fixture.cpp)
+add_executable(NEngineNativePluginTests native_plugin_tests.cpp)
+target_link_libraries(NEngineNativePluginTests PRIVATE NEngineScripting)
+target_compile_features(NEngineNativePluginTests PRIVATE cxx_std_20)
+add_test(NAME NEngineNativePluginTests COMMAND
+  NEngineNativePluginTests "$<TARGET_FILE:NEngineNativePluginFixture>")
+
+add_executable(NEngineRoundFiveRuntimeTests round_five_runtime_tests.cpp)
+target_link_libraries(NEngineRoundFiveRuntimeTests PRIVATE
+  NEngineRender NEnginePhysics NEngineEditorModel NEnginePlayerKit)
+target_compile_features(NEngineRoundFiveRuntimeTests PRIVATE cxx_std_20)
+add_test(NAME NEngineRoundFiveRuntimeTests COMMAND NEngineRoundFiveRuntimeTests)
+
+add_executable(NEngineMultiExternalGltfTests gltf_multisidecar_tests.cpp)
+target_link_libraries(NEngineMultiExternalGltfTests PRIVATE NEngineRender NEngineAssets)
+target_compile_features(NEngineMultiExternalGltfTests PRIVATE cxx_std_20)
+add_test(NAME NEngineMultiExternalGltfTests COMMAND NEngineMultiExternalGltfTests)
+
+# Korean/space/long paths: project generation and actual Player export.
+if(TARGET NEnginePlayerBuild AND TARGET NEnginePlayer)
+  add_test(NAME NEngineUnicodeLongProjectCLI COMMAND
+    ${CMAKE_COMMAND}
+    "-DFIXTURE=$<TARGET_FILE:NEnginePlayerCLIFixture>"
+    "-DBUILDER=$<TARGET_FILE:NEnginePlayerBuild>"
+    "-DPLAYER=$<TARGET_FILE:NEnginePlayer>"
+    "-DTEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/한글_경로_깊이_검증"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/unicode_long_project_smoke.cmake")
+endif()
+
+
+# Two independently runnable sample games with actual PlayerRuntime bootstrap.
+# --self-test produces the complete project, exports the bundle, simulates
+# keyboard input through 2D/3D physics and reaches a win condition.
+add_executable(NEngineMiniRunner2D ../samples/mini_runner.cpp)
+target_compile_definitions(NEngineMiniRunner2D PRIVATE NENGINE_SAMPLE_2D=1)
+target_link_libraries(NEngineMiniRunner2D PRIVATE NEnginePlayerKit)
+target_compile_features(NEngineMiniRunner2D PRIVATE cxx_std_20)
+add_test(NAME NEngineMiniRunner2D COMMAND NEngineMiniRunner2D --self-test)
+add_executable(NEngineMiniRunner3D ../samples/mini_runner.cpp)
+target_compile_definitions(NEngineMiniRunner3D PRIVATE NENGINE_SAMPLE_2D=0)
+target_link_libraries(NEngineMiniRunner3D PRIVATE NEnginePlayerKit)
+target_compile_features(NEngineMiniRunner3D PRIVATE cxx_std_20)
+add_test(NAME NEngineMiniRunner3D COMMAND NEngineMiniRunner3D --self-test)
+
+add_executable(NEngineFollowupAcceptanceTests followup_acceptance_tests.cpp)
+target_link_libraries(NEngineFollowupAcceptanceTests PRIVATE NEnginePlayerKit)
+target_compile_features(NEngineFollowupAcceptanceTests PRIVATE cxx_std_20)
+add_test(NAME NEngineFollowupAcceptanceTests COMMAND NEngineFollowupAcceptanceTests)
+
+
+add_executable(NEngineMultiMaterialPlayerTests multimaterial_player_tests.cpp)
+target_link_libraries(NEngineMultiMaterialPlayerTests PRIVATE NEnginePlayerKit)
+target_compile_features(NEngineMultiMaterialPlayerTests PRIVATE cxx_std_20)
+add_test(NAME NEngineMultiMaterialPlayerTests COMMAND NEngineMultiMaterialPlayerTests)
+
+add_executable(NEngineGameSaveRecoveryTests save_recovery_tests.cpp)
+target_link_libraries(NEngineGameSaveRecoveryTests PRIVATE NEnginePlayerKit)
+target_compile_features(NEngineGameSaveRecoveryTests PRIVATE cxx_std_20)
+add_test(NAME NEngineGameSaveRecoveryTests COMMAND NEngineGameSaveRecoveryTests)

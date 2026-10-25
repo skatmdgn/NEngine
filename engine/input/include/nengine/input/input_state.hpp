@@ -55,6 +55,14 @@ public:
 
     void release_all() noexcept;
 
+    // A UI-consumed key stays observable to UI/diagnostics, but is not
+    // delivered to gameplay actions during the current frame.
+    void consume(Key key) noexcept;
+    bool consumed(Key key) const noexcept;
+    bool gameplay_held(Key key) const noexcept;
+    bool gameplay_pressed(Key key) const noexcept;
+    bool gameplay_released(Key key) const noexcept;
+
     bool held(
         Key key) const noexcept;
 
@@ -89,6 +97,7 @@ private:
     static std::size_t index(
         Key key) noexcept;
 
+    std::array<bool, key_count> consumed_{};
     std::array<bool, key_count> held_{};
     std::array<bool, key_count> pressed_{};
     std::array<bool, key_count> released_{};

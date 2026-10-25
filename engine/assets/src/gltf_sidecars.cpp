@@ -463,7 +463,9 @@ resolve_gltf_sidecar(
 
         set_error(
             error,
-            "glTF sidecar missing, non-file or escapes the model directory");
+            "glTF external reference '" + relative.generic_string() +
+            "' missing, not a regular file, or outside the model directory; " +
+            "restore the file under the .gltf directory or fix its URI, then reimport");
         return std::nullopt;
     }
 
@@ -478,7 +480,8 @@ bool collect_gltf_sidecars(
     std::vector<GltfSidecar>& sidecars,
     std::string* error) {
 
-    sidecars.clear();
+    // Preserve the caller's last valid dependency list on a partial parse.
+    std::vector<GltfSidecar> staged;
     std::error_code ec;
     const auto size = std::filesystem::file_size(source_gltf, ec);
     if (ec || size > 32u * 1024u * 1024u) {
@@ -499,7 +502,7 @@ bool collect_gltf_sidecars(
     std::vector<std::string> uris;
     ResourceJsonReader reader{json};
     if (!reader.scan(uris)) {
-        set_error(error, "malformed glTF JSON buffers/images resource references");
+        set_error(error, "malformed glTF buffers/images JSON; fix the references in the source .gltf and reimport");
         return false;
     }
 
@@ -523,16 +526,17 @@ bool collect_gltf_sidecars(
                 .generic_string();
 
         if (seen.insert(key).second) {
-            sidecars.push_back(
+            staged.push_back(
                 *resolved);
         }
     }
 
-    std::sort(sidecars.begin(), sidecars.end(),
+    std::sort(staged.begin(), staged.end(),
         [](const GltfSidecar& a, const GltfSidecar& b) {
             return a.relative_path.generic_string() <
                 b.relative_path.generic_string();
         });
+    sidecars = std::move(staged);
     return true;
 }
 

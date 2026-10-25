@@ -5,6 +5,7 @@ add_library(NEnginePlayerKit STATIC
   src/ui_runtime.cpp
   src/exporter.cpp
   src/runtime.cpp
+  src/save_data.cpp
   src/managed_queries.cpp
   src/managed_properties.cpp
   src/managed_render_properties.cpp

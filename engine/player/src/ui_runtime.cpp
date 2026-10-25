@@ -107,7 +107,7 @@ ui::UiRgbaImage PlayerUiRuntime::rasterize(
                             scaled_width, scaled_height, images_);
 }
 void PlayerUiRuntime::update(float width, float height,
-                             const input::InputState& input, bool focused) {
+                             input::InputState& input, bool focused) {
     clicked_.clear();
     events_.clear();
     if (!canvas_ || !std::isfinite(width) || !std::isfinite(height) ||
@@ -119,7 +119,13 @@ void PlayerUiRuntime::update(float width, float height,
     // The same clipped/visibility-aware hit test is shared with Editor
     // Play Mode. UI clicks are ephemeral; a held button never repeats clicks.
     const auto visible = canvas_->layout(width, height);
+    // Consume mouse activity when the pointer is over UI or an earlier
+    // capture is still active. Gameplay Actions do not fire on UI clicks.
+    const bool captured_before=pointer_.captured()!=ui::invalid_widget;
     events_ = pointer_.update(visible, input);
+    if(captured_before || pointer_.captured()!=ui::invalid_widget ||
+       pointer_.hovered()!=ui::invalid_widget)
+        input.consume(input::Key::MouseLeft);
     for (const auto& event : events_) {
         if (event.type == ui::UiPointerEventType::Down)
             keyboard_.set_focus(visible, event.target);
@@ -136,6 +142,13 @@ void PlayerUiRuntime::update(float width, float height,
     for (const auto& event : keys)
         if (event.type == ui::UiPointerEventType::Click)
             clicked_.insert(event.target);
+    // The focused keyboard interaction belongs to UI, not the game.
+    if(keyboard_.focused()!=ui::invalid_widget) {
+        for(const auto key:{input::Key::Tab,input::Key::Enter,
+                            input::Key::Space,input::Key::Escape,
+                            input::Key::LeftShift,input::Key::RightShift})
+            input.consume(key);
+    }
     events_.insert(events_.end(), keys.begin(), keys.end());
     if (events_.size() > 128u) events_.resize(128u);
 }

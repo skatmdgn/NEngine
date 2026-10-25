@@ -23,6 +23,7 @@ std::size_t InputState::index(
 void InputState::begin_frame() noexcept {
     pressed_.fill(false);
     released_.fill(false);
+    consumed_.fill(false);
     pointer_.delta_x = 0.0f;
     pointer_.delta_y = 0.0f;
     pointer_.wheel_y = 0.0f;
@@ -55,6 +56,10 @@ void InputState::set_key(
 }
 
 void InputState::release_all() noexcept {
+    // Focus-loss is a cancellation, not a key press. Suppress any Down
+    // observed earlier in this frame before releasing held keys.
+    pressed_.fill(false);
+    consumed_.fill(false);
     for (std::size_t i = 1u;
          i < key_count;
          ++i) {
@@ -72,6 +77,26 @@ void InputState::release_all() noexcept {
     pointer_.delta_x = 0.0f;
     pointer_.delta_y = 0.0f;
     pointer_.wheel_y = 0.0f;
+}
+
+void InputState::consume(Key key) noexcept {
+    if(key!=Key::Unknown &&
+       static_cast<std::size_t>(key)<key_count)
+        consumed_[index(key)]=true;
+}
+bool InputState::consumed(Key key) const noexcept {
+    return key!=Key::Unknown &&
+           static_cast<std::size_t>(key)<key_count &&
+           consumed_[index(key)];
+}
+bool InputState::gameplay_held(Key key) const noexcept {
+    return !consumed(key)&&held(key);
+}
+bool InputState::gameplay_pressed(Key key) const noexcept {
+    return !consumed(key)&&pressed(key);
+}
+bool InputState::gameplay_released(Key key) const noexcept {
+    return !consumed(key)&&released(key);
 }
 
 bool InputState::held(
@@ -249,7 +274,7 @@ bool ActionMap::held(
         list->begin(),
         list->end(),
         [&](const auto& binding) {
-            return input.held(binding.key);
+            return input.gameplay_held(binding.key);
         });
 }
 
@@ -266,7 +291,7 @@ bool ActionMap::pressed(
         list->begin(),
         list->end(),
         [&](const auto& binding) {
-            return input.pressed(binding.key);
+            return input.gameplay_pressed(binding.key);
         });
 }
 
@@ -283,7 +308,7 @@ bool ActionMap::released(
         list->begin(),
         list->end(),
         [&](const auto& binding) {
-            return input.released(binding.key);
+            return input.gameplay_released(binding.key);
         });
 }
 
