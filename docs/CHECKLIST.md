@@ -1,10 +1,10 @@
 # NEngine 1.0 — 고정 ID 기반 수용 체크리스트
 
-**검증 기준선:** main 671cddf2d50d184b1889310f86c85a3df43306bd (2026-10-22), [Windows/Ubuntu CI 39713209272](https://github.com/skatmdgn/NEngine/actions/runs/39713209272), 양쪽 12/12 CTest 그룹 통과. 현재는 실 GPU·오디오·.NET 배포 및 Android 기기 검증을 통과했다고 주장하지 않는다.
+**검증 기준선:** main `9ab9e557673c91f692f4ad88404c603baca88db6` (2026-10-25), [Windows/Ubuntu CI 40201317565](https://github.com/skatmdgn/NEngine/actions/runs/40201317565), Windows·Ubuntu 각 Debug/Release **35/35 CTest 그룹 PASS**. 실제 GPU·오디오·.NET 배포 및 Android 기기 검증까지 통과한 것은 아니다.
 
-**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 109개, 미완료 176개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
+**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 110개, 미완료 175개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
 
-**우선 순위:** 남은 GOV-010의 릴리스 SHA 검증 강화와 WIN 실기기 수용, Android 빌드 토대를 구축. PR #29는 아직 main 미병합이므로 NAV-003은 반드시 미완료 유지. 작업 규칙은 [WORKFLOW.md](WORKFLOW.md), 근거와 저장소 조사는 [FILE_AUDIT.md](FILE_AUDIT.md)를 참고한다.
+**우선 순위:** 남은 Windows 실기기 수용과 Android 빌드 토대, NAV-004 이후의 Scene 메시 추출·자동 Bake·Agent 통합. PR #29의 triangle bake는 NAV-003의 병합·main CI 재검증을 통과했으며, 자동 Scene Bake와 실제 GPU 검증까지 완료한 것은 아니다. 작업 규칙은 [WORKFLOW.md](WORKFLOW.md), 근거와 저장소 조사는 [FILE_AUDIT.md](FILE_AUDIT.md)를 참고한다.
 
 ## GOV — 개발 관리·검증 (10/10)
 
@@ -204,13 +204,13 @@
 - [ ] UI-013 최소 UI 메뉴 게임을 Windows Player에서 직접 클릭한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] UI-014 Android 터치 UI와 safe area를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## NAV — NavMesh·AI 이동 (2/15)
+## NAV — NavMesh·AI 이동 (3/15)
 
 참조: engine/navigation; tests/navigation_tests.cpp
 
 - [x] NAV-001 NavMesh·Agent·Obstacle·Link 기본 테스트가 통과한다 — 증거: tests/navigation_tests.cpp / CI run 39713209272
 - [x] NAV-002 .nnav 경로 직렬화 기본 테스트가 통과한다 — 증거: tests/navigation_tests.cpp / CI run 39713209272
-- [ ] NAV-003 PR #29를 main에 병합하고 triangle bake 테스트를 main에서 재검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] NAV-003 PR #29를 main에 병합하고 triangle bake 테스트를 main에서 재검증한다 — 증거: PR #29 merged 9ab9e557673c91f692f4ad88404c603baca88db6; engine/navigation/src/nav_bake.cpp + tests/navigation_bake_tests.cpp; main CI run 40201317565 Windows/Ubuntu Debug·Release 35/35 CTest PASS, NEngineNavigationBakeTests PASS
 - [ ] NAV-004 Scene 메시로부터 자동 NavMesh 기하를 수집한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] NAV-005 모델 트랜스폼·좌표 변환을 Bake에 정확히 적용한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] NAV-006 지형 경사·보행 가능 영역·영역 비용 UI를 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -425,3 +425,5 @@
 - 2026-10-23: 추가 개발 목표는 20개였지만, PR #35에서는 검증 가능한 9개(ID TWOD-004, INPUT-010, PHYS-011, PLUG-007/008, BUILD-007, ASSET-003/013, QA-006)만 수용 후보로 지정. 나머지 11개는 완료로 계산하지 않는다. Windows/Ubuntu Debug/Release 결과 및 PR 병합 확인 전의 체크는 조건부이며, 실패한 ID는 반드시 미완료로 복원한다. 전체 285개 그대로 유지하고 이번 수용 후보가 전부 검증될 경우 88→97 체크 / 197→188 미완료.
 
 - 2026-10-24: 이전 20개 요청에서 보류된 11개 후속 목표를 PR #36으로 실제 개발. ASSET-009/010, TWOD-006, CS-012, QA-011/012, CORE-012, WIN-005/009, BUILD-008, UTIL-005. 2D/3D 샘플은 독립 **콘솔/헤드리스 게임 실행과 자동 승리 테스트**로 검증하며 실제 Windows Vulkan GPU 게임 화면·안드로이드 실행을 의미하지 않는다. 체크는 Windows/Ubuntu Debug+Release CI 최종 성공과 `main` 병합이 충족될 때 확정한다. 검증 실패나 범위 미달 ID는 반드시 체크를 원복한다. 총 ID 285 그대로 유지.
+
+- 2026-10-25: 오래 열린 PR #29를 최신 main에 맞춰 통합하고 병합. 30개는 NAV-003 내 개별 C++ 수용 assertion으로, 체크리스트 30개를 의미하지 않는다. 병합된 main `9ab9e557673c91f692f4ad88404c603baca88db6`에서 Windows/Ubuntu Debug·Release 35/35 CTest 및 NEngineNavigationBakeTests 통과(CI 40201317565). NAV-003 1개만 완료: 109→110개, 미완료 176→175개, 총 ID 285개 유지. 실 Scene 메시 자동 Bake·Clearance·Agent 관리형 바인딩은 여전히 미완료.

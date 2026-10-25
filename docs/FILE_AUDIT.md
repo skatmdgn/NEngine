@@ -2,6 +2,8 @@
 
 기준 커밋: `671cddf2d50d184b1889310f86c85a3df43306bd` (2026-10-22). GitHub Git tree는 **374개 항목**, **301개 파일**, **73개 디렉터리**이며 truncated=false였다. 이 목록의 파일 301개를 GitHub 파일 콘텐츠 API로 각각 읽어 본 뒤 경로·크기·역할을 대조했다. 하단 개별 SHA는 기준선의 Git blob 식별자이며 최신 main의 영구 상태는 아니다.
 
+**최신 상태 보충 (2026-10-25):** 이 파일별 인벤토리는 아래 2026-10-22 기준선 기록을 보존하며 최신 전체 파일 목록을 주장하지 않는다. PR #29의 Navigation triangle bake는 현재 main `9ab9e557673c91f692f4ad88404c603baca88db6`에 병합되었고, Windows/Ubuntu Debug·Release **35/35 CTest 그룹**을 [main CI 40201317565](https://github.com/skatmdgn/NEngine/actions/runs/40201317565)에서 확인했다. 현재 수용 개수는 [CHECKLIST.md](CHECKLIST.md)를 확인한다.
+
 **검사 범위 구분:** `읽기 확인` = 파일 전체 UTF-8 내용 API 조회 성공 + 역할/경로 대조. 이것만으로 모든 코드 라인의 논리적 정당성·취약점 전수 심층 감사·하드웨어 실행을 보증하지 않는다. **자동 검증** = [main CI run 39713209272](https://github.com/skatmdgn/NEngine/actions/runs/39713209272)에서 Ubuntu·Windows 각 **12/12 CTest 그룹 PASS** (소스 단위). **실제 Windows GPU/오디오/.NET Player와 Android 실기기 수용은 미검증**이다. 완료 여부는 [CHECKLIST.md](CHECKLIST.md)의 각 ID로만 계산한다.
 
 ## 기능-파일-자동 검증 대응
@@ -17,7 +19,7 @@
 | Input | engine/input | tests/input_tests.cpp | 게임패드/터치/Editor Action UI 미완 |
 | Audio | engine/audio | tests/audio_tests.cpp | 장치 실사용/스트리밍 디코딩 미완 |
 | UI | engine/ui, engine/player | tests/ui_tests.cpp | 한글/복잡 셰이핑/실 GPU 미완 |
-| NavMesh | engine/navigation | tests/navigation_tests.cpp | #29 베이크 미병합; Scene/managed agent 미완 |
+| NavMesh | engine/navigation | tests/navigation_tests.cpp, tests/navigation_bake_tests.cpp (현재) | 기준선 당시 #29 미병합; 2026-10-25 병합 및 main CI 검증, Scene 자동 Bake/managed agent는 미완 |
 | Windows Player | engine/player, apps/player | tests/player_tests.cpp, player_cli_smoke.cmake | 실제 Windows 번들 전체 게임 미검증 |
 | Android | (완성된 앱/빌드 타깃 없음) | (없음) | SDK/NDK/APK/AAB부터 시작 |
 | Plugins | (통합 패키지 타깃 없음) | (없음) | NuGet, DLL, AAR/JAR/SO 등 미완 |
