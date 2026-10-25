@@ -4381,6 +4381,31 @@ std::string api_stub(
         }
     }
 
+    // Small, standalone float math surface for NEngine gameplay scripts.
+    public static class Mathf
+    {
+        public const float PI = MathF.PI;
+        public const float Deg2Rad = PI / 180f;
+        public const float Rad2Deg = 180f / PI;
+
+        public static float Abs(float value) => MathF.Abs(value);
+        public static float Min(float a, float b) => MathF.Min(a, b);
+        public static float Max(float a, float b) => MathF.Max(a, b);
+        public static float Clamp(float value, float min, float max) =>
+            Math.Clamp(value, min, max);
+        public static float Clamp01(float value) => Clamp(value, 0f, 1f);
+        public static float Lerp(float a, float b, float t) =>
+            a + (b - a) * Clamp01(t);
+        public static float Sin(float radians) => MathF.Sin(radians);
+        public static float Cos(float radians) => MathF.Cos(radians);
+        public static float Sqrt(float value) => MathF.Sqrt(value);
+
+        public static bool Approximately(float a, float b) =>
+            float.IsFinite(a) && float.IsFinite(b) &&
+            MathF.Abs(a - b) <=
+                1e-5f * MathF.Max(1f, MathF.Max(MathF.Abs(a), MathF.Abs(b)));
+    }
+
     public readonly struct Vector3
     {
         public readonly float x;
@@ -4401,6 +4426,40 @@ std::string api_stub(
 
         public static Vector3 operator *(Vector3 a, float b) =>
             new Vector3(a.x * b, a.y * b, a.z * b);
+
+        public static Vector3 operator *(float a, Vector3 b) => b * a;
+
+        public static Vector3 operator -(Vector3 a, Vector3 b) =>
+            new Vector3(a.x - b.x, a.y - b.y, a.z - b.z);
+
+        public static Vector3 operator /(Vector3 a, float divisor) =>
+            new Vector3(a.x / divisor, a.y / divisor, a.z / divisor);
+
+        public float sqrMagnitude => x * x + y * y + z * z;
+        public float magnitude => MathF.Sqrt(sqrMagnitude);
+
+        public Vector3 normalized
+        {
+            get
+            {
+                float length = magnitude;
+                return length > 1e-6f && float.IsFinite(length)
+                    ? this / length
+                    : zero;
+            }
+        }
+
+        public static float Dot(Vector3 a, Vector3 b) =>
+            a.x * b.x + a.y * b.y + a.z * b.z;
+
+        public static Vector3 Cross(Vector3 a, Vector3 b) =>
+            new Vector3(
+                a.y * b.z - a.z * b.y,
+                a.z * b.x - a.x * b.z,
+                a.x * b.y - a.y * b.x);
+
+        public static float Distance(Vector3 a, Vector3 b) =>
+            (a - b).magnitude;
     }
 
     public readonly struct AssetGuid : IEquatable<AssetGuid>
@@ -4526,6 +4585,47 @@ std::string api_stub(
         }
 
         public static Quaternion identity => new Quaternion(0, 0, 0, 1);
+
+        public Quaternion normalized
+        {
+            get
+            {
+                float length = MathF.Sqrt(x * x + y * y + z * z + w * w);
+                return length > 1e-6f && float.IsFinite(length)
+                    ? new Quaternion(x / length, y / length, z / length, w / length)
+                    : identity;
+            }
+        }
+
+        // Degrees, with a right-handed axis and column-vector rotation.
+        public static Quaternion AngleAxis(float degrees, Vector3 axis)
+        {
+            Vector3 unitAxis = axis.normalized;
+            if (unitAxis.sqrMagnitude == 0f || !float.IsFinite(degrees))
+                return identity;
+            float half = degrees * Mathf.Deg2Rad * 0.5f;
+            float sine = MathF.Sin(half);
+            return new Quaternion(
+                unitAxis.x * sine,
+                unitAxis.y * sine,
+                unitAxis.z * sine,
+                MathF.Cos(half));
+        }
+
+        public static Quaternion operator *(Quaternion a, Quaternion b) =>
+            new Quaternion(
+                a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+                a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+                a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+                a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z);
+
+        public static Vector3 operator *(Quaternion rotation, Vector3 point)
+        {
+            Quaternion unit = rotation.normalized;
+            Vector3 u = new Vector3(unit.x, unit.y, unit.z);
+            Vector3 t = 2f * Vector3.Cross(u, point);
+            return point + unit.w * t + Vector3.Cross(u, t);
+        }
     }
 
     public static class Time
