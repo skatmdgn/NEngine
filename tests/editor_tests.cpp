@@ -1282,8 +1282,14 @@ int main() {
         saw_camera_component = true;
 
         check(
-            component.fields.size() == 6,
-            "generic Inspector exposes Camera properties");
+            component.fields.size() == 8 &&
+                editor::find_inspector_property_row(
+                    render_inspector, render::camera_type(),
+                    "Pixel Perfect").has_value() &&
+                editor::find_inspector_property_row(
+                    render_inspector, render::camera_type(),
+                    "Pixels Per Unit").has_value(),
+            "generic Inspector exposes all Camera fields including pixel settings");
     }
 
     check(

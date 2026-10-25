@@ -1,5 +1,7 @@
 #include "nengine/render/registration.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -273,6 +275,13 @@ bool register_component_metadata(
                 core::PropertyFlags::Serializable |
                     core::PropertyFlags::Editable
             }) && ok;
+
+    ok = registry.register_property(
+        camera_type(), {"Pixel Perfect", core::PropertyKind::Boolean,
+            core::PropertyFlags::Serializable | core::PropertyFlags::Editable}) && ok;
+    ok = registry.register_property(
+        camera_type(), {"Pixels Per Unit", core::PropertyKind::Float,
+            core::PropertyFlags::Serializable | core::PropertyFlags::Editable}) && ok;
 
     ok =
         registry.register_type(
@@ -594,7 +603,9 @@ bool register_component_serializers(
                         camera->far_clip),
                     float_property(
                         "Orthographic Size",
-                        camera->orthographic_size)
+                        camera->orthographic_size),
+                    boolean_property("Pixel Perfect", camera->pixel_perfect),
+                    float_property("Pixels Per Unit", camera->pixels_per_unit)
                 };
 
                 return data;
@@ -651,6 +662,21 @@ bool register_component_serializers(
                     return false;
                 }
 
+                // Older Scene v3 camera components had no pixel-grid fields.
+                // Accept their defaults; reject a malformed present field.
+                const auto has_field = [&](std::string_view name) {
+                    return std::any_of(data.properties.begin(), data.properties.end(),
+                        [&](const auto& p) { return p.name == name; });
+                };
+                if ((has_field("Pixel Perfect") &&
+                     !read_bool(data, "Pixel Perfect", value.pixel_perfect)) ||
+                    (has_field("Pixels Per Unit") &&
+                     !read_float(data, "Pixels Per Unit", value.pixels_per_unit)) ||
+                    !std::isfinite(value.pixels_per_unit) ||
+                    value.pixels_per_unit <= 0.0f || value.pixels_per_unit > 8192.0f) {
+                    if (error) *error = "invalid pixel-perfect Camera settings";
+                    return false;
+                }
                 value.projection =
                     static_cast<ProjectionMode>(
                         projection);

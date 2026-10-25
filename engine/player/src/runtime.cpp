@@ -15,6 +15,9 @@
 #include "nengine/scripting/dotnet_host.hpp"
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <iterator>
+#include <regex>
 
 namespace nengine::player {
 
@@ -28,12 +31,51 @@ bool PlayerRuntime::initialize_managed(std::string* error) {
     const auto gameplay = managed / (name + ".dll");
     const auto configuration = managed / (name + ".runtimeconfig.json");
     std::error_code ec;
-    if (!std::filesystem::is_regular_file(gameplay, ec) ||
-        !std::filesystem::is_regular_file(configuration, ec) ||
-        !std::filesystem::is_regular_file(managed / "NEngine.Bridge.dll", ec) ||
-        !std::filesystem::is_regular_file(managed / "NEngine.API.dll", ec)) {
-        if (error) *error = "Player managed payload missing";
+    // Check each file separately: project assembly renames and incompatible
+    // runtimeconfig versions must be diagnosable before hostfxr is invoked.
+    if (!std::filesystem::is_regular_file(gameplay, ec)) {
+        if (error) *error = "Managed assembly name mismatch: bundle expects '" +
+            name + ".dll' in Content/Managed. Rebuild and export the project " +
+            "with the same managed assembly name as NEngine.player.";
         return false;
+    }
+    if (!std::filesystem::is_regular_file(configuration, ec)) {
+        if (error) *error = "Managed runtime configuration missing: expected '" +
+            name + ".runtimeconfig.json'. Check the managed project build " +
+            "and copy the matching config alongside " + name + ".dll.";
+        return false;
+    }
+    // Verify that the requested target framework and runtimeconfig version
+    // agree before passing a mismatched pair to hostfxr.
+    const auto bytes=std::filesystem::file_size(configuration,ec);
+    if (ec || bytes > 64u*1024u) {
+        if(error)*error="Managed runtimeconfig is unreadable/oversized; rebuild the matching GameScripts runtime configuration.";
+        return false;
+    }
+    std::ifstream runtime_file(configuration,std::ios::binary);
+    const std::string config_text(
+        (std::istreambuf_iterator<char>(runtime_file)),
+        std::istreambuf_iterator<char>());
+    const std::regex target(R"regex("tfm"\s*:\s*"net([0-9]+)\.([0-9]+)")regex");
+    const std::regex framework(R"regex("version"\s*:\s*"([0-9]+)\.([0-9]+)\.[0-9]+")regex");
+    std::smatch tfm_match, version_match;
+    if (std::regex_search(config_text,tfm_match,target) &&
+        std::regex_search(config_text,version_match,framework) &&
+        (tfm_match[1] != version_match[1] ||
+         tfm_match[2] != version_match[2])) {
+        if(error)*error="Managed .NET version mismatch: target framework net" +
+            tfm_match[1].str() + "." + tfm_match[2].str() +
+            " conflicts with runtimeconfig version " +
+            version_match[1].str()+"."+version_match[2].str() +
+            "; rebuild the runtimeconfig from the same managed project.";
+        return false;
+    }
+    for (const auto* dependency : {"NEngine.Bridge.dll", "NEngine.API.dll"}) {
+        if (!std::filesystem::is_regular_file(managed / dependency, ec)) {
+            if (error) *error = std::string{"Required managed dependency missing: "} +
+                dependency + ". Re-export the NEngine managed runtime payload.";
+            return false;
+        }
     }
     std::string discovery_error;
     const auto host = scripting::discover_dotnet_host({}, &discovery_error);

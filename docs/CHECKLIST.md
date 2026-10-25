@@ -2,7 +2,7 @@
 
 **검증 기준선:** main 671cddf2d50d184b1889310f86c85a3df43306bd (2026-10-22), [Windows/Ubuntu CI 39713209272](https://github.com/skatmdgn/NEngine/actions/runs/39713209272), 양쪽 12/12 CTest 그룹 통과. 현재는 실 GPU·오디오·.NET 배포 및 Android 기기 검증을 통과했다고 주장하지 않는다.
 
-**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 98개, 미완료 187개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
+**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 109개, 미완료 176개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
 
 **우선 순위:** 남은 GOV-010의 릴리스 SHA 검증 강화와 WIN 실기기 수용, Android 빌드 토대를 구축. PR #29는 아직 main 미병합이므로 NAV-003은 반드시 미완료 유지. 작업 규칙은 [WORKFLOW.md](WORKFLOW.md), 근거와 저장소 조사는 [FILE_AUDIT.md](FILE_AUDIT.md)를 참고한다.
 
@@ -21,7 +21,7 @@
 - [x] GOV-009 실제 Android 기기 테스트 기록 형식을 검증한다 — 증거: PR #31, verify_acceptance.py Android 보고서 schema·SHA256 및 test_verify_acceptance.py, Windows/Ubuntu CI; 실제 기기 테스트 미실시
 - [x] GOV-010 릴리스 후보 SHA·실행 파일·검증 로그의 일치를 확인한다 — 증거: PR #34, tools/verify_release_candidate.py, executable SHA256/JUnit/CI checkout 일치, release-candidate-*.json artifact, Windows/Ubuntu CI
 
-## CORE — Core·Scene·Prefab (9/12)
+## CORE — Core·Scene·Prefab (10/12)
 
 참조: engine/core; tests/core_tests.cpp
 
@@ -36,7 +36,7 @@
 - [x] CORE-009 Play/Stop 뒤 Runtime World 변경사항이 편집 World에 남지 않는다 — 증거: PR #32, NEngineRoundTwoCoreTests, Editor Play/Pause/Step/Stop 월드 격리, Windows/Ubuntu CI
 - [x] CORE-010 다중 Scene 전환·로드 실패 복구가 가능하다 — 증거: PR #32, NEngineRoundTwoCoreTests, Scene A/B/A 교체·실패 rollback, Windows/Ubuntu CI
 - [x] CORE-011 Scene 저장 도중 쓰기 실패에 데이터가 보존된다 — 증거: PR #32, NEngineRoundTwoCoreTests, 씬 손상 저장·권한 실패 시 원본 보존과 atomic publish, Windows/Ubuntu CI
-- [ ] CORE-012 최소 2D·3D Scene이 Player에서 동일하게 실행된다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] CORE-012 최소 2D·3D Scene이 Player에서 동일하게 실행된다 — 증거: PR #36, both NEngineMiniRunner2D and NEngineMiniRunner3D use the same PlayerRuntime Scene serialization, export and frame loop; Windows/Ubuntu Debug+Release CI
 
 ## EDIT — Windows Editor (3/16)
 
@@ -59,7 +59,7 @@
 - [ ] EDIT-015 Play/Pause/Step/Stop을 실제 2D·3D 게임에 적용한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] EDIT-016 다중 프로젝트 전환 시 파일 감시·캐시·핸들을 안전하게 복구한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## ASSET — 에셋 파이프라인 (8/15)
+## ASSET — 에셋 파이프라인 (10/15)
 
 참조: engine/assets; engine/render/src/model_importer.cpp; tests/asset_tests.cpp
 
@@ -71,8 +71,8 @@
 - [ ] ASSET-006 PNG·JPEG·BMP·TGA의 색상 및 알파를 실제 렌더러에서 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] ASSET-007 WebP 텍스처 가져오기를 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] ASSET-008 GPU 압축 텍스처 트랜스코딩과 폴백을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] ASSET-009 멀티 머티리얼 모델의 모든 하위 에셋을 GUID로 저장한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] ASSET-010 모든 모델 메쉬·재질·텍스처가 Player로 함께 내보내진다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] ASSET-009 멀티 머티리얼 모델의 모든 하위 에셋을 GUID로 저장한다 — 증거: PR #36, NEngineMultiMaterialPlayerTests, two-material OBJ subassets GUID identity across separate exports; Windows/Ubuntu Debug+Release CI
+- [x] ASSET-010 모든 모델 메쉬·재질·텍스처가 Player로 함께 내보내진다 — 증거: PR #36, NEngineMultiMaterialPlayerTests, PlayerRuntime resolves model geometry and both cooked material/texture GUIDs; Windows/Ubuntu Debug+Release CI
 - [x] ASSET-011 텍스처·모델 크기 한도를 정의하고 과대 입력을 안전하게 거부한다 — 증거: PR #32, NEngineRoundTwoAssetTests, 33MiB glTF·9KiB meta 상한 초과 거부, Windows/Ubuntu CI
 - [x] ASSET-012 임포트·리임포트·이름 변경 뒤 에셋 GUID가 안정적이다 — 증거: PR #32, NEngineRoundTwoAssetTests, 재가져오기·이름변경·재시작 후 AssetGuid 안정성, Windows/Ubuntu CI
 - [x] ASSET-013 원본 누락·참조 오류에서 사용자에게 복구 가능한 진단을 제공한다 — 증거: PR #35, gltf_sidecars.cpp provides missing filename/repair hint; NEngineMultiExternalGltfTests missing-file failure, Windows/Ubuntu Release+Debug CI
@@ -100,7 +100,7 @@
 - [ ] REND-015 프레임 시간·드로우 콜·GPU 메모리 기준을 작성해 회귀를 막는다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] REND-016 Android Vulkan surface 렌더링을 실기기로 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## CS — C#·IDE (2/14)
+## CS — C#·IDE (3/14)
 
 참조: engine/scripting; tests/scripting_tests.cpp
 
@@ -115,7 +115,7 @@
 - [ ] CS-009 반복 Play/Stop/핫리로드에서 메모리와 핸들이 누출되지 않는다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] CS-010 Visual Studio 심볼·브레이크포인트 attach를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] CS-011 Rider 프로젝트와 디버깅 워크플로를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] CS-012 GameScripts.dll 이름·버전 불일치 오류를 명확히 진단한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] CS-012 GameScripts.dll 이름·버전 불일치 오류를 명확히 진단한다 — 증거: PR #36, NEngineFollowupAcceptanceTests, named GameScripts/runtimeconfig/API/Bridge diagnostics and .NET framework version mismatch; Windows/Ubuntu Debug+Release CI
 - [ ] CS-013 관리형 외부 라이브러리 의존성을 컴파일·실행·배포한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] CS-014 C# 공개 API에 컴파일 가능한 최소 예제와 참조 문서를 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
@@ -224,7 +224,7 @@
 - [ ] NAV-014 Windows 배포 게임에서 목적지까지 캐릭터가 이동한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] NAV-015 Android 게임에서 동일 NavMeshAgent 예제를 실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## WIN — Windows Player (5/17)
+## WIN — Windows Player (7/17)
 
 참조: engine/player; apps/player; tests/player_tests.cpp
 
@@ -232,11 +232,11 @@
 - [x] WIN-002 Player CLI 스모크가 통과한다 — 증거: tests/player_cli_smoke.cmake / CI run 39713209272
 - [ ] WIN-003 새 Windows 10 PC에 게임 번들을 배포·실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] WIN-004 새 Windows 11 PC에 게임 번들을 배포·실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] WIN-005 기본 Scene의 World·Physics·Animation을 Player에서 실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] WIN-005 기본 Scene의 World·Physics·Animation을 Player에서 실행한다 — 증거: PR #36, mini 2D Player actual World+2D Rigidbody+sprite animation, mini 3D Player World+3D Rigidbody, CTests; Windows/Ubuntu Debug+Release CI
 - [ ] WIN-006 C# 게임 스크립트를 Player에서 실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] WIN-007 실제 렌더러에 멀티 머티리얼 모델을 표시한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] WIN-008 UI·3D 렌더링·오디오를 동시에 실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] WIN-009 입력 액션을 Editor 설정대로 Player에서 실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] WIN-009 입력 액션을 Editor 설정대로 Player에서 실행한다 — 증거: PR #36, mini runners persist authoring Input.ninput MoveRight/MoveLeft and execute exported Player ActionMap; Windows/Ubuntu Debug+Release CI
 - [x] WIN-010 누락·손상 파일의 오류를 안내하고 안전 종료한다 — 증거: PR #33, Player 손상 bundle/scene 오류 설명·기존 World 보존 및 회복 NEngineRoundThreePlayerSafetyTests, Windows/Ubuntu Release CI
 - [ ] WIN-011 4K/DPI·화면 크기 변경에서 화면이 유지된다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] WIN-012 의존 DLL/런타임을 포함한 재현 가능한 번들을 배포한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -295,7 +295,7 @@
 - [ ] PLUG-017 JSON NuGet 라이브러리를 예제 C# 게임에 적용한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] PLUG-018 외부 플러그인 제거·업데이트 후 캐시와 앱이 정합적이다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## QA — 제품 수용·릴리스 (5/22)
+## QA — 제품 수용·릴리스 (7/22)
 
 참조: CMakeLists.txt; .github/workflows/ci.yml; tests
 
@@ -309,8 +309,8 @@
 - [ ] QA-008 새 Windows PC에서 2D 게임 제작·내보내기를 재현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] QA-009 새 Windows PC에서 3D 게임 제작·내보내기를 재현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] QA-010 Android 배포본 크래시 로그·심볼화를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] QA-011 최소 2D 샘플 게임과 자동 빌드 스모크를 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] QA-012 최소 3D 샘플 게임과 자동 빌드 스모크를 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] QA-011 최소 2D 샘플 게임과 자동 빌드 스모크를 제공한다 — 증거: PR #36, NEngineMiniRunner2D --self-test, independent 2D export, action control, physics, sprite animation and win state; Windows/Ubuntu Debug+Release CI
+- [x] QA-012 최소 3D 샘플 게임과 자동 빌드 스모크를 제공한다 — 증거: PR #36, NEngineMiniRunner3D --self-test, independent 3D export, action control, physics and win state; Windows/Ubuntu Debug+Release CI
 - [ ] QA-013 사용자 문서·C# SDK 예제가 릴리스와 일치한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] QA-014 Editor 설치 관리자와 제거 절차를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] QA-015 업데이트·서명·릴리스 아티팩트 재현 절차를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -334,7 +334,7 @@
 - [ ] SCN-006 Scriptable 데이터 에셋을 C# 스크립트에서 조회·변경한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] SCN-007 씬 로드·전환·추가 로드 후 엔티티 참조를 검증한다 — 증거: PR #34, engine/core/additive_scene.cpp Scene-local refs·중복 ID·unload invalid refs, NEngineAdditiveSceneTests, Windows/Ubuntu CI
 
-## TWOD — 2D 편집·Tilemap (2/7)
+## TWOD — 2D 편집·Tilemap (3/7)
 
 참조: engine/render; apps/editor
 
@@ -343,7 +343,7 @@
 - [ ] TWOD-003 Tilemap 렌더링을 Sprite 레이어 순서와 일치시킨다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] TWOD-004 Tilemap Collider를 2D Physics에 연동한다 — 증거: PR #35, engine/render/tilemap_physics.cpp, NEngineRoundFiveRuntimeTests (BoxCollider2D run-merge/rebuild/rollback), Windows/Ubuntu Release+Debug CI
 - [ ] TWOD-005 스프라이트 시트 자동·수동 슬라이싱을 Editor에 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] TWOD-006 2D 카메라의 픽셀 퍼펙트 및 픽셀 스냅을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] TWOD-006 2D 카메라의 픽셀 퍼펙트 및 픽셀 스냅을 검증한다 — 증거: PR #36, NEngineFollowupAcceptanceTests, world pixel grid snap + orthographic viewport density + Scene camera roundtrip; Windows/Ubuntu Debug+Release CI
 - [ ] TWOD-007 2D 프로젝트 시작 템플릿에서 Tilemap과 Sprite를 함께 실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
 ## VFX — 파티클·효과 (3/6)
@@ -382,7 +382,7 @@
 - [ ] EDTOOL-008 Windows·Android Build Settings Editor 화면을 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] EDTOOL-009 Android SDK/NDK/JDK 도구 경로 설정·검증 UI를 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## BUILD — 빌드 프로필·애플리케이션 메타데이터 (4/9)
+## BUILD — 빌드 프로필·애플리케이션 메타데이터 (5/9)
 
 참조: apps/player; engine/player; .github/workflows/ci.yml
 
@@ -393,10 +393,10 @@
 - [ ] BUILD-005 Android 아이콘·스플래시·패키지 이름을 APK/AAB에 반영한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] BUILD-006 Windows 게임 저장 데이터 경로와 마이그레이션 규칙을 구현한다 — 증거: PR #34, engine/player/save_data.cpp CRC·원자적 슬롯 쓰기·마이그레이션·OS 사용자 데이터 경로, NEngineGameSaveTests, Windows/Ubuntu CI
 - [x] BUILD-007 Android manifest 권한·기능·Gradle 기여와 충돌을 검출한다 — 증거: PR #35, tools/nengine_android_contributions.py Android SDK/permission/feature/Gradle conflict checks, Python unit tests, Windows/Ubuntu Release+Debug CI
-- [ ] BUILD-008 빌드 실패·서명 누락 시 사용자에게 명확한 오류를 표시한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] BUILD-008 빌드 실패·서명 누락 시 사용자에게 명확한 오류를 표시한다 — 증거: PR #36, tools/nengine_build_profiles.py Release keystore/alias/environment signing preflight diagnostics, test_nengine_signing.py; Windows/Ubuntu Debug+Release CI
 - [ ] BUILD-009 동일 커밋을 사용한 재현 가능한 빌드 결과를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## UTIL — 스크립팅 유틸리티·개발 진단 (1/5)
+## UTIL — 스크립팅 유틸리티·개발 진단 (2/5)
 
 참조: engine/scripting; engine/editor
 
@@ -404,7 +404,7 @@
 - [x] UTIL-002 C# Mathf/Vector/Quaternion 기본 수학 API를 샘플로 검증한다 — 증거: PR #37, engine/scripting/src/managed_project.cpp + tests/scripting_tests.cpp, 생성 C# API·실제 managed Start() 회귀 검증, Windows/Ubuntu Debug·Release NEngineScriptingTests 및 29/29 CTest PASS, CI run 40103756074
 - [ ] UTIL-003 C# Timer/Coroutine/WaitForSeconds 중단·취소를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] UTIL-004 프로파일 로그·크래시 로그에 엔진 및 게임 빌드 버전을 남긴다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] UTIL-005 런타임 오류 시 사용자 데이터 보호·복구 안내를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] UTIL-005 런타임 오류 시 사용자 데이터 보호·복구 안내를 검증한다 — 증거: PR #36, GameSaveStore last-good backup and read_backup recovery without mutating corrupt caller data, NEngineGameSaveRecoveryTests; Windows/Ubuntu Debug+Release CI
 
 ## 작업 기록과 변경 이력
 
@@ -423,3 +423,5 @@
 - 2026-10-23: PR #34에서 패키지 의존성/캐시, Android·Windows 빌드 프로필, Additive Scene, HLSL/셰이더 캐시, 게임 세이브·입력 번들·한글 경로, Debug/Release CI·보안 검사·릴리스 후보 SHA 증거 총 20개 기존 ID 수용 검사. 68→88개 체크 / 217→197개 미완료 / 총 285개 유지. 실기기 Android 빌드, Windows 실제 GPU, NuGet·플러그인 로딩 및 네트워크 패키지 설치 등 별도 ID는 미완료. 본 PR의 정확한 Windows/Ubuntu CI와 성공 병합을 최종 수용 증거로 삼는다.
 
 - 2026-10-23: 추가 개발 목표는 20개였지만, PR #35에서는 검증 가능한 9개(ID TWOD-004, INPUT-010, PHYS-011, PLUG-007/008, BUILD-007, ASSET-003/013, QA-006)만 수용 후보로 지정. 나머지 11개는 완료로 계산하지 않는다. Windows/Ubuntu Debug/Release 결과 및 PR 병합 확인 전의 체크는 조건부이며, 실패한 ID는 반드시 미완료로 복원한다. 전체 285개 그대로 유지하고 이번 수용 후보가 전부 검증될 경우 88→97 체크 / 197→188 미완료.
+
+- 2026-10-24: 이전 20개 요청에서 보류된 11개 후속 목표를 PR #36으로 실제 개발. ASSET-009/010, TWOD-006, CS-012, QA-011/012, CORE-012, WIN-005/009, BUILD-008, UTIL-005. 2D/3D 샘플은 독립 **콘솔/헤드리스 게임 실행과 자동 승리 테스트**로 검증하며 실제 Windows Vulkan GPU 게임 화면·안드로이드 실행을 의미하지 않는다. 체크는 Windows/Ubuntu Debug+Release CI 최종 성공과 `main` 병합이 충족될 때 확정한다. 검증 실패나 범위 미달 ID는 반드시 체크를 원복한다. 총 ID 285 그대로 유지.
