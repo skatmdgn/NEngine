@@ -23,6 +23,6 @@ cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-As of 2026-10-22, baseline main `671cddf2d50d184b1889310f86c85a3df43306bd` passed **12/12 CTest groups** on both Ubuntu and Windows in [CI run 39713209272](https://github.com/skatmdgn/NEngine/actions/runs/39713209272). This is **not** an interactive Windows GPU/audio/.NET Player test or Android device acceptance. PR #29 native navigation triangle baking is not included in this main baseline.
+As of 2026-10-25, current main `9ab9e557673c91f692f4ad88404c603baca88db6` passed **35/35 CTest groups** in Windows/Ubuntu **Debug and Release** ([CI run 40201317565](https://github.com/skatmdgn/NEngine/actions/runs/40201317565)), including the native Navigation triangle-surface baker merged via PR #29. This is **not** an interactive Windows GPU/audio/.NET Player test or Android device acceptance.
 
 All development and progress reporting should use the IDs in [docs/CHECKLIST.md](docs/CHECKLIST.md). Third-party license information remains in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
