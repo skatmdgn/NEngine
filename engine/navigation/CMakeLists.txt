@@ -3,6 +3,7 @@ add_library(NEngineNavigation STATIC
   src/nav_path.cpp
   src/nav_agent.cpp
   src/nav_serialization.cpp
+  src/nav_bake.cpp
 )
 target_include_directories(NEngineNavigation PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(NEngineNavigation PUBLIC NEngineCore)
