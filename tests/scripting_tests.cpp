@@ -1573,6 +1573,10 @@ int main() {
 
     const auto api =
         read_all(output.api_stub_path);
+    check(api.find("public sealed class NavMeshAgent")!=std::string::npos &&
+          api.find("bool SetDestination(Vector3")!=std::string::npos &&
+          api.find("NativeBool(\\\"Has Destination\\\"")!=std::string::npos,
+          "NAV-011 generated managed API exports Scene NavMeshAgent destination, movement and stop");
     check(
         api.find("public static class Mathf") != std::string::npos &&
         api.find("public static float Dot(Vector3") != std::string::npos &&

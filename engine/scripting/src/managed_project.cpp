@@ -1673,6 +1673,7 @@ std::string api_stub(
             if (type == typeof(MeshRenderer)) return "NEngine.MeshRenderer";
             if (type == typeof(SpriteRenderer)) return "NEngine.SpriteRenderer";
             if (type == typeof(SpriteAnimator)) return "NEngine.SpriteAnimator";
+            if (type == typeof(NavMeshAgent)) return "NEngine.NavMeshAgent";
             if (type == typeof(Rigidbody)) return "NEngine.Rigidbody";
             if (type == typeof(BoxCollider)) return "NEngine.BoxCollider";
             if (type == typeof(SphereCollider)) return "NEngine.SphereCollider";
@@ -2415,6 +2416,54 @@ std::string api_stub(
 
             _coroutines.RemoveAll(
                 coroutine => coroutine.stopped || coroutine.completed);
+        }
+    }
+
+
+    /// <summary>Scene-bound navigable character. The destination is persisted
+    /// in the Scene; waypoint/cache state is runtime-only.</summary>
+    public sealed class NavMeshAgent : Component
+    {
+        public bool enabled
+        {
+            get => NativeBool("Enabled", true);
+            set => SetNativeBool("Enabled", value);
+        }
+        public float speed
+        {
+            get => NativeFloat("Speed", 3.5f);
+            set => SetNativeFloat("Speed", value);
+        }
+        public float stoppingDistance
+        {
+            get => NativeFloat("Stopping Distance", 0.1f);
+            set => SetNativeFloat("Stopping Distance", value);
+        }
+        public float radius
+        {
+            get => NativeFloat("Radius", 0f);
+            set => SetNativeFloat("Radius", value);
+        }
+        public Vector3 destination
+        {
+            get => NativeVector3("Destination", Vector3.zero);
+            set => SetNativeVector3("Destination", value);
+        }
+        public bool hasDestination =>
+            NativeBool("Has Destination", false);
+        public bool SetDestination(Vector3 value)
+        {
+            if (!float.IsFinite(value.x) ||
+                !float.IsFinite(value.y) ||
+                !float.IsFinite(value.z))
+                return false;
+            destination = value;
+            SetNativeBool("Has Destination", true);
+            return hasDestination;
+        }
+        public void Stop()
+        {
+            SetNativeBool("Has Destination", false);
         }
     }
 

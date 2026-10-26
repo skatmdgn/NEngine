@@ -1,4 +1,5 @@
 #include "nengine/player/managed_properties.hpp"
+#include "nengine/navigation/components.hpp"
 #include "managed_render_properties.hpp"
 #include "managed_audio_properties.hpp"
 #include "managed_collider_properties.hpp"
@@ -96,6 +97,20 @@ bool write_rigidbody_property(Body& body, std::string_view property,
 bool read_player_transform_property(const core::World& world,
     core::Entity entity, std::string_view component,
     std::string_view property, core::PropertyValue& value) {
+
+    if(component=="NEngine.NavMeshAgent"){
+        const auto* a=world.get_component<navigation::NavAgentComponent>(
+            entity,navigation::nav_agent_type());
+        if(!a)return false;
+        if(property=="Enabled")value=a->enabled;
+        else if(property=="Has Destination")value=a->has_destination;
+        else if(property=="Destination")value=a->target;
+        else if(property=="Speed")value=double(a->speed);
+        else if(property=="Stopping Distance")value=double(a->stopping_distance);
+        else if(property=="Radius")value=double(a->radius);
+        else return false;
+        return true;
+    }
     if (component == "NEngine.AudioSource" ||
         component == "NEngine.AudioListener")
         return read_player_audio_property(world, entity, component,
@@ -134,6 +149,31 @@ bool read_player_transform_property(const core::World& world,
 bool write_player_transform_property(core::World& world,
     core::Entity entity, std::string_view component,
     std::string_view property, const core::PropertyValue& value) {
+
+    if(component=="NEngine.NavMeshAgent"){
+        auto* a=world.get_component<navigation::NavAgentComponent>(
+            entity,navigation::nav_agent_type());
+        if(!a)return false;
+        if(property=="Enabled"||property=="Has Destination"){
+            const auto* v=std::get_if<bool>(&value);
+            if(!v)return false;
+            if(property=="Enabled")a->enabled=*v;
+            else a->has_destination=*v;
+        }else if(property=="Destination"){
+            const auto* v=std::get_if<core::Vec3>(&value);
+            if(!v||!navigation::finite_position(*v))return false;
+            a->target=*v;
+        }else if(property=="Speed"||property=="Stopping Distance"||
+                 property=="Radius"){
+            const auto* v=std::get_if<double>(&value);
+            if(!v||!std::isfinite(*v)||*v<0.||*v>1000.)return false;
+            if(property=="Speed")a->speed=float(*v);
+            else if(property=="Stopping Distance")a->stopping_distance=float(*v);
+            else a->radius=float(*v);
+        }else return false;
+        a->runtime_initialized=false;
+        return true;
+    }
     if (component == "NEngine.AudioSource" ||
         component == "NEngine.AudioListener")
         return write_player_audio_property(world, entity, component,
