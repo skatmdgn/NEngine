@@ -1349,6 +1349,19 @@ int main() {
           return test_failure(41, __LINE__); }
     if (!decoded_ping || decoded_ping->sample_rate != 8000 ||
         decoded_ping->frame_count() != 1u) return test_failure(31, __LINE__);
+    // ANIM-003: the authored SpriteAnimator survives Scene serialization,
+    // full Player export/import and Player runtime entity reconstruction.
+    bool persisted_sprite_animator=false;
+    for(const auto e:runtime.world().entities()){
+        const auto* loaded=runtime.world().get_component<
+            nengine::render::SpriteAnimator>(
+                e,nengine::render::sprite_animator_type());
+        if(loaded&&loaded->clip==nanim_guid&&
+           loaded->controller==controller_guid&&loaded->enabled&&
+           loaded->playing&&loaded->time_seconds==0.f)
+            persisted_sprite_animator=true;
+    }
+    if(!persisted_sprite_animator)return test_failure(9130,__LINE__);
     const auto sprite_clip = runtime.assets().load_sprite_clip(nanim_guid);
     if (!sprite_clip || sprite_clip->frames.size() != 2u ||
         !sprite_clip->valid() ||
