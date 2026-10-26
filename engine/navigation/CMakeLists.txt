@@ -5,6 +5,8 @@ add_library(NEngineNavigation STATIC
   src/nav_serialization.cpp
   src/nav_bake.cpp
   src/nav_scene.cpp
+  src/registration.cpp
+  src/nav_scene_agent.cpp
 )
 target_include_directories(NEngineNavigation PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(NEngineNavigation PUBLIC NEngineCore NEngineRender)

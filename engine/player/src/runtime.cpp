@@ -9,6 +9,8 @@
 #include "nengine/render/asset_resources.hpp"
 #include "nengine/render/decoded_texture.hpp"
 #include "nengine/physics/registration.hpp"
+#include "nengine/navigation/registration.hpp"
+#include "nengine/navigation/nav_scene_agent.hpp"
 #include "nengine/render/registration.hpp"
 #include "nengine/scripting/registration.hpp"
 #include "nengine/scripting/components.hpp"
@@ -326,6 +328,8 @@ PlayerFrameStats PlayerRuntime::advance(float delta_seconds) {
             stats.managed_fixed_updates += script.fixed_updated;
             stats.managed_errors += script.unresolved;
         }
+        stats.navigation_agents += navigation::step_scene_agents(
+            world_, navigation_, static_cast<float>(fixed));
         const auto result = physics::step_physics(
             world_, static_cast<float>(fixed), {0, -9.81f, 0},
             &physics_cache_);
@@ -423,6 +427,7 @@ bool PlayerRuntime::load(const std::filesystem::path& root,
     core::ComponentSerializationRegistry codecs;
     if (!render::register_component_serializers(codecs) ||
         !physics::register_component_serializers(codecs) ||
+        !navigation::register_component_serializers(codecs) ||
         !audio::register_component_serializers(codecs) ||
         !scripting::register_component_serializers(codecs)) {
         if (error) *error = "player component codec registration failed";

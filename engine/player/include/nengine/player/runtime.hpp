@@ -23,6 +23,7 @@ namespace nengine::player {
 
 struct PlayerFrameStats {
     std::size_t physics_steps{0};
+    std::size_t navigation_agents{0};
     std::size_t integrated_3d{0};
     std::size_t integrated_2d{0};
     std::size_t physics_contacts{0};
