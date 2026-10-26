@@ -168,7 +168,7 @@ namespace NEngine.Internal
 
     public static class NativeBridge
     {
-        public const int AbiVersion = 18;
+        public const int AbiVersion = 19;
 
         private static readonly Dictionary<long, NEngine.Behaviour> Instances = new();
         private static long _nextHandle = 1;
@@ -203,6 +203,7 @@ namespace NEngine.Internal
             public nint physicsRaycast;
             public nint physicsOverlap;
             public nint physicsBoxCast;
+            public nint log;
         }
 
         [UnmanagedCallersOnly]
@@ -240,7 +241,8 @@ namespace NEngine.Internal
                     callbacks.setProperty,
                     callbacks.physicsRaycast,
                     callbacks.physicsOverlap,
-                    callbacks.physicsBoxCast);
+                    callbacks.physicsBoxCast,
+                    callbacks.log);
 
                 return 1;
             }
@@ -1117,7 +1119,10 @@ std::string api_stub(
         private static PropertyFn? _setProperty;
         private static PhysicsRaycastFn? _physicsRaycast;
         private static PhysicsOverlapFn? _physicsOverlap;
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int LogFn(nint context,int severity,nint msg,nint file,int line);
         private static PhysicsBoxCastFn? _physicsBoxCast;
+        private static LogFn? _log;
 
         internal static bool available =>
             _context != 0 &&
@@ -1144,7 +1149,8 @@ std::string api_stub(
             nint setProperty,
             nint physicsRaycast,
             nint physicsOverlap,
-            nint physicsBoxCast)
+            nint physicsBoxCast,
+            nint log)
         {
             _context = context;
             _create = Marshal.GetDelegateForFunctionPointer<CreateFn>(create);
@@ -1167,6 +1173,7 @@ std::string api_stub(
             _physicsRaycast = Marshal.GetDelegateForFunctionPointer<PhysicsRaycastFn>(physicsRaycast);
             _physicsOverlap = Marshal.GetDelegateForFunctionPointer<PhysicsOverlapFn>(physicsOverlap);
             _physicsBoxCast = Marshal.GetDelegateForFunctionPointer<PhysicsBoxCastFn>(physicsBoxCast);
+            _log = log == 0 ? null : Marshal.GetDelegateForFunctionPointer<LogFn>(log);
         }
 
         internal static void Clear()
@@ -1192,6 +1199,17 @@ std::string api_stub(
             _physicsRaycast = null;
             _physicsOverlap = null;
             _physicsBoxCast = null;
+            _log = null;
+        }
+        internal static void EmitLog(int level,string text,string file,int line)
+        {
+            if(_log==null)return;
+            if(text.Length>16384)text=text[..16384];
+            if(file.Length>4096)file=file[..4096];
+            nint msg=Marshal.StringToCoTaskMemUTF8(text);
+            nint src=Marshal.StringToCoTaskMemUTF8(file);
+            try { _log(_context,level,msg,src,Math.Max(0,line)); }
+            finally { Marshal.FreeCoTaskMem(src);Marshal.FreeCoTaskMem(msg); }
         }
 
         private static ulong WithUtf8Entity(
@@ -4738,9 +4756,23 @@ std::string api_stub(
 
     public static class Debug
     {
-        public static void Log(object? message) { }
-        public static void LogWarning(object? message) { }
-        public static void LogError(object? message) { }
+        private static void Write(int level,object? message,string file,int line)
+        {
+            try { NativeWorld.EmitLog(level,message?.ToString()??"null",file,line); }
+            catch { /* Logging must not abort game logic. */ }
+        }
+        public static void Log(object? message,
+            [System.Runtime.CompilerServices.CallerFilePath] string file="",
+            [System.Runtime.CompilerServices.CallerLineNumber] int line=0) =>
+            Write(0,message,file,line);
+        public static void LogWarning(object? message,
+            [System.Runtime.CompilerServices.CallerFilePath] string file="",
+            [System.Runtime.CompilerServices.CallerLineNumber] int line=0) =>
+            Write(1,message,file,line);
+        public static void LogError(object? message,
+            [System.Runtime.CompilerServices.CallerFilePath] string file="",
+            [System.Runtime.CompilerServices.CallerLineNumber] int line=0) =>
+            Write(2,message,file,line);
     }
 }
 )CS";

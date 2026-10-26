@@ -1722,7 +1722,7 @@ int main() {
             "GetAbiVersion") !=
                 std::string::npos &&
         bridge.find(
-            "AbiVersion = 18") !=
+            "AbiVersion = 19") !=
                 std::string::npos &&
         bridge.find(
             "GameplayLoadContext") !=
@@ -2263,6 +2263,7 @@ int main() {
                 << "        Coroutine nested = StartCoroutine(Nested()); StopCoroutine(nested); if (released != 2) throw new System.Exception(\"nested coroutine did not dispose\");\n"
                 << "        var root = Hold(); StartCoroutine(root); StopCoroutine(root); if (released != 3) throw new System.Exception(\"StopCoroutine IEnumerator failed\");\n"
                 << "        StartCoroutine(Hold()); StopAllCoroutines(); if (released != 4) throw new System.Exception(\"StopAllCoroutines failed\");\n"
+                << "        Debug.Log(\"UTIL-001 info\"); Debug.LogWarning(\"UTIL-001 warn\"); Debug.LogError(\"UTIL-001 error\");\n"
                 << "        StartCoroutine(Routine());\n"
                 << "    }\n"
                 << "}\n";
@@ -2377,6 +2378,14 @@ int main() {
                         "ManagedRuntime initializes generated gameplay assembly lifecycle bridge");
 
                     if (initialized) {
+                        struct ScriptLog {int level;std::string message;std::string file;int line;};
+                        std::vector<ScriptLog> captured_logs;
+                        managed_runtime.bind_logging(&captured_logs,
+                            [](void* ctx,int level,std::string_view msg,
+                               std::string_view file,int line){
+                                static_cast<std::vector<ScriptLog>*>(ctx)->push_back(
+                                    {level,std::string(msg),std::string(file),line});
+                            });
                         managed_runtime.bind_property_access(
                             nullptr,
                             &read_managed_render_property,
@@ -4006,6 +4015,14 @@ int main() {
                                     "Coroutine Started",
                                 "managed coroutine Start primes through first yield and defers continuation for one frame");
 
+                            check(captured_logs.size()>=3 &&
+                                  captured_logs[captured_logs.size()-3].level==0 &&
+                                  captured_logs[captured_logs.size()-2].level==1 &&
+                                  captured_logs.back().level==2 &&
+                                  captured_logs.back().message=="UTIL-001 error" &&
+                                  captured_logs.back().file.find("Example.cs")!=std::string::npos &&
+                                  captured_logs.back().line>0,
+                                  "UTIL-001: native C# log callbacks carry severity and caller location");
                             const auto coroutine_tick_2 =
                                 script_system.update(
                                     script_world,

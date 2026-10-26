@@ -579,6 +579,14 @@ bool EditorModel::initialize_managed_runtime(
         &input_state_);
     bind_managed_ui();
 
+    managed_runtime_.bind_logging(&console_,
+        [](void* ctx,int level,std::string_view msg,std::string_view file,int line){
+            auto* out=static_cast<ConsoleModel*>(ctx);
+            const auto source="C# "+std::string(file)+":"+std::to_string(line);
+            if(level==2)out->error(source,std::string(msg));
+            else if(level==1)out->warning(source,std::string(msg));
+            else out->info(source,std::string(msg));
+        });
     bind_managed_property_access(
         managed_runtime_,
         property_access_);
@@ -631,6 +639,14 @@ bool EditorModel::reload_managed_runtime(
         &input_state_);
     bind_managed_ui();
 
+    managed_runtime_.bind_logging(&console_,
+        [](void* ctx,int level,std::string_view msg,std::string_view file,int line){
+            auto* out=static_cast<ConsoleModel*>(ctx);
+            const auto source="C# "+std::string(file)+":"+std::to_string(line);
+            if(level==2)out->error(source,std::string(msg));
+            else if(level==1)out->warning(source,std::string(msg));
+            else out->info(source,std::string(msg));
+        });
     bind_managed_property_access(
         managed_runtime_,
         property_access_);

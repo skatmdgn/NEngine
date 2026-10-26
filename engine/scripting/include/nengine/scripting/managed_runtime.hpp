@@ -206,6 +206,8 @@ public:
         PhysicsOverlapQueryFn overlap,
         PhysicsBoxCastQueryFn box_cast) noexcept;
 
+    using ManagedLogFn = void (*)(void*, int, std::string_view, std::string_view, int);
+    void bind_logging(void* context, ManagedLogFn log) noexcept;
     void bind_world(
         core::World* world) noexcept;
 
@@ -377,6 +379,8 @@ private:
         PhysicsRaycastQueryFn physics_raycast{nullptr};
         PhysicsOverlapQueryFn physics_overlap{nullptr};
         PhysicsBoxCastQueryFn physics_box_cast{nullptr};
+        void* log_context{nullptr};
+        ManagedLogFn log_fn{nullptr};
         void* ui_context{nullptr};
         UiFindFn ui_find{nullptr};
         UiQueryFn ui_query{nullptr};
@@ -563,6 +567,7 @@ private:
             int,
             NativeBoxCastState*);
 
+    using WorldLogFn = int (*)(void*, int, const char*, const char*, int);
     struct NativeWorldCallbacks {
         void* context{nullptr};
         WorldCreateFn create{nullptr};
@@ -585,12 +590,14 @@ private:
         WorldPhysicsRaycastFn physics_raycast{nullptr};
         WorldPhysicsOverlapFn physics_overlap{nullptr};
         WorldPhysicsBoxCastFn physics_box_cast{nullptr};
+        WorldLogFn log{nullptr};
     };
 
     using ConfigureWorldCallbacksFn =
         int (*)(
             const NativeWorldCallbacks*);
 
+    static int callback_log(void*, int, const char*, const char*, int);
     static std::uint64_t callback_create(
         void* context,
         const char* name);

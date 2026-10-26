@@ -740,6 +740,20 @@ int ManagedRuntime::callback_set_property(
     }
 }
 
+int ManagedRuntime::callback_log(void* context,int severity,
+    const char* message,const char* file,int line) {
+    auto* state=static_cast<NativeWorldContext*>(context);
+    if(!state||!message||!file||severity<0||severity>2||line<0)return -1;
+    if(std::strlen(message)>16384u||std::strlen(file)>4096u)return -1;
+    if(!state->log_fn)return 0;
+    try { state->log_fn(state->log_context,severity,message,file,line);return 1; }
+    catch(...) {return -2;}
+}
+void ManagedRuntime::bind_logging(void* context,ManagedLogFn fn) noexcept {
+    if(!world_context_)world_context_=std::make_unique<NativeWorldContext>();
+    world_context_->log_context=context;
+    world_context_->log_fn=fn;
+}
 void ManagedRuntime::bind_property_access(
     void* context,
     PropertyReadFn read,
@@ -1636,9 +1650,9 @@ bool ManagedRuntime::initialize(
     const int abi_version =
         abi();
 
-    if (abi_version != 18) {
+    if (abi_version != 19) {
         diagnostic_ =
-            "managed bridge ABI mismatch: expected 18, got " +
+            "managed bridge ABI mismatch: expected 19, got " +
             std::to_string(
                 abi_version);
         shutdown();
@@ -1915,6 +1929,7 @@ bool ManagedRuntime::initialize(
         &ManagedRuntime::callback_physics_overlap;
     callbacks.physics_box_cast =
         &ManagedRuntime::callback_physics_box_cast;
+    callbacks.log = &ManagedRuntime::callback_log;
 
     if (configure_world_callbacks_(
             &callbacks) <= 0) {
