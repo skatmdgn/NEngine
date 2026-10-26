@@ -188,6 +188,53 @@ void AddComponentCommand::undo(
     }
 }
 
+bool DuplicateHierarchyCommand::execute(core::World& world){
+    if(after_){world=*after_;return true;}
+    if(roots_.empty())return false;
+    core::World staged=world.clone();
+    std::vector<core::Entity> filtered;
+    for(const auto e:roots_){
+        if(!world.is_alive(e))return false;
+        bool descendant=false;
+        for(auto p=world.transform(e)->parent;world.is_alive(p);
+            p=world.transform(p)->parent){
+            if(std::find(roots_.begin(),roots_.end(),p)!=roots_.end()){
+                descendant=true;break;
+            }
+        }
+        if(!descendant&&std::find(filtered.begin(),filtered.end(),e)==filtered.end())
+            filtered.push_back(e);
+    }
+    std::vector<core::Entity> clones;
+    for(const auto root:filtered){
+        auto clone=staged.duplicate_subtree(root);
+        if(!clone.valid())return false;
+        clones.push_back(clone);
+    }
+    before_=world.clone();after_=std::move(staged);
+    created_=std::move(clones);
+    world=*after_;
+    return true;
+}
+void DuplicateHierarchyCommand::undo(core::World& world){
+    if(before_)world=*before_;
+}
+bool ReparentHierarchyCommand::execute(core::World& world){
+    if(after_){world=*after_;return true;}
+    if(!world.is_alive(target_)||roots_.empty())return false;
+    core::World staged=world.clone();
+    for(auto e:roots_){
+        if(!staged.is_alive(e)||e==target_||!staged.set_parent(e,target_))
+            return false;
+    }
+    before_=world.clone();after_=std::move(staged);
+    world=*after_;
+    return true;
+}
+void ReparentHierarchyCommand::undo(core::World& world){
+    if(before_)world=*before_;
+}
+
 bool SetTransformCommand::execute(core::World& world) {
     auto* transform = world.transform(entity_);
     if (!transform) return false;

@@ -262,6 +262,26 @@ bool EditorModel::add_component_to_selection(core::ComponentTypeId type) {
         selection_.active(),type,&component_factories_));
 }
 
+bool EditorModel::duplicate_selected_hierarchy() {
+    if(!can_edit()||selection_.empty())return false;
+    auto command=std::make_unique<DuplicateHierarchyCommand>(
+        selection_.entities());
+    auto* ptr=command.get();
+    if(!commands_.execute(world_,std::move(command)))return false;
+    const auto created=ptr->created();
+    selection_.clear();
+    for(auto e:created)selection_.add(e);
+    return !created.empty();
+}
+bool EditorModel::reparent_selected_to_active() {
+    if(!can_edit()||selection_.entities().size()<2u)return false;
+    const auto target=selection_.active();
+    auto children=selection_.entities();
+    children.erase(std::remove(children.begin(),children.end(),target),children.end());
+    return commands_.execute(world_,std::make_unique<ReparentHierarchyCommand>(
+        std::move(children),target));
+}
+
 EditorModel::EditorModel() {
     component_registry_.register_type(
         "NEngine.Transform",
