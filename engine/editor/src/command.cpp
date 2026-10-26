@@ -235,6 +235,21 @@ void ReparentHierarchyCommand::undo(core::World& world){
     if(before_)world=*before_;
 }
 
+bool RemoveComponentCommand::execute(core::World& world) {
+    if(after_){world=*after_;return true;}
+    if(type_==core::World::transform_type||
+       !world.has_component(entity_,type_))return false;
+    auto staged=world.clone();
+    if(!staged.remove_component(entity_,type_))return false;
+    before_=world.clone();
+    after_=std::move(staged);
+    world=*after_;
+    return true;
+}
+void RemoveComponentCommand::undo(core::World& world){
+    if(before_)world=*before_;
+}
+
 bool SetTransformCommand::execute(core::World& world) {
     auto* transform = world.transform(entity_);
     if (!transform) return false;

@@ -174,6 +174,20 @@ private:
     std::optional<core::World> after_{};
 };
 
+class RemoveComponentCommand final : public EditorCommand {
+public:
+    RemoveComponentCommand(core::Entity entity,core::ComponentTypeId type)
+      :entity_(entity),type_(type){}
+    bool execute(core::World& world) override;
+    void undo(core::World& world) override;
+    std::string_view name() const noexcept override {return "Remove Component";}
+private:
+    core::Entity entity_{};
+    core::ComponentTypeId type_{core::ComponentRegistry::invalid_type};
+    std::optional<core::World> before_{};
+    std::optional<core::World> after_{};
+};
+
 class SetTransformCommand final : public EditorCommand {
 public:
     SetTransformCommand(core::Entity entity, core::Transform value)

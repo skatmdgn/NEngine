@@ -262,6 +262,13 @@ bool EditorModel::add_component_to_selection(core::ComponentTypeId type) {
         selection_.active(),type,&component_factories_));
 }
 
+bool EditorModel::remove_component_from_selection(core::ComponentTypeId type) {
+    if(!can_edit()||type==core::World::transform_type||
+       !world_.has_component(selection_.active(),type))return false;
+    return commands_.execute(world_,std::make_unique<RemoveComponentCommand>(
+        selection_.active(),type));
+}
+
 bool EditorModel::duplicate_selected_hierarchy() {
     if(!can_edit()||selection_.empty())return false;
     auto command=std::make_unique<DuplicateHierarchyCommand>(
