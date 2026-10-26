@@ -1457,6 +1457,38 @@ int main() {
 
     model.commands().clear();
 
+    // EDTOOL-003: the Win32 add-component combo and action must agree
+    // with the model's live selection, not a stale entity snapshot.
+    const auto selection_a=world.create("Add Menu A");
+    const auto selection_b=world.create("Add Menu B");
+    model.selection().set(selection_a);
+    auto available=model.available_component_types();
+    check(std::find(available.begin(),available.end(),
+                    render::light_type())!=available.end() &&
+          model.add_component_to_selection(render::light_type()) &&
+          world.has_component(selection_a,render::light_type()),
+          "EDTOOL-003 selected object owns new light component");
+    const auto remaining=model.available_component_types();
+    check(!model.add_component_to_selection(render::light_type()) &&
+          std::find(remaining.begin(),remaining.end(),
+                    render::light_type())==remaining.end(),
+          "EDTOOL-003 duplicate component is absent from menu");
+    model.selection().set(selection_b);
+    check(model.add_component_to_selection(render::camera_type()) &&
+          world.has_component(selection_b,render::camera_type()) &&
+          !world.has_component(selection_a,render::camera_type()),
+          "EDTOOL-003 selection switch changes insertion target");
+    check(model.commands().undo(world) &&
+          !world.has_component(selection_b,render::camera_type()) &&
+          model.commands().redo(world) &&
+          world.has_component(selection_b,render::camera_type()),
+          "EDTOOL-003 add menu supports Undo and Redo");
+    model.selection().clear();
+    check(model.available_component_types().empty() &&
+          !model.add_component_to_selection(render::light_type()),
+          "EDTOOL-003 no selection rejects insertion");
+    model.commands().clear();
+
     const auto capsule_property_entity =
         world.create(
             "Capsule Property Validation");

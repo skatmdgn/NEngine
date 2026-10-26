@@ -3247,28 +3247,12 @@ struct Win32EditorShell::Impl {
             return;
         }
 
-        for (const auto& descriptor :
-             editor.component_registry()
-                 .descriptors()) {
-
-            if (descriptor.id ==
-                    nengine::core::World::
-                        transform_type ||
-                !editor.component_factories()
-                    .contains(
-                        descriptor.id) ||
-                editor.world()
-                    .has_component(
-                        snapshot.entity,
-                        descriptor.id)) {
-                continue;
-            }
-
-            add_component_rows.push_back(
-                descriptor.id);
-
-            auto display =
-                descriptor.name;
+        for (const auto type :
+             editor.available_component_types()) {
+            const auto* descriptor=editor.component_registry().find(type);
+            if(!descriptor)continue;
+            add_component_rows.push_back(type);
+            auto display=descriptor->name;
 
             constexpr std::string_view
                 prefix{"NEngine."};
@@ -4454,15 +4438,7 @@ struct Win32EditorShell::Impl {
                                 type);
 
                     const bool added =
-                        editor.commands().execute(
-                            editor.world(),
-                            std::make_unique<
-                                nengine::editor::
-                                    AddComponentCommand>(
-                                        entity,
-                                        type,
-                                        &editor
-                                            .component_factories()));
+                        editor.add_component_to_selection(type);
 
                     if (added) {
                         editor.console().info(

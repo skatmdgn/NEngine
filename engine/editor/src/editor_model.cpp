@@ -239,6 +239,28 @@ void bind_managed_physics_queries(
 
 } // namespace
 
+std::vector<core::ComponentTypeId>
+EditorModel::available_component_types() const {
+    std::vector<core::ComponentTypeId> types;
+    const auto entity=selection_.active();
+    if(!can_edit()||!world_.is_alive(entity))return types;
+    for(const auto& d:component_registry_.descriptors()){
+        if(d.id==core::World::transform_type||
+           !component_factories_.contains(d.id)||
+           world_.has_component(entity,d.id))continue;
+        types.push_back(d.id);
+    }
+    return types;
+}
+
+bool EditorModel::add_component_to_selection(core::ComponentTypeId type) {
+    const auto options=available_component_types();
+    if(std::find(options.begin(),options.end(),type)==options.end())
+        return false;
+    return commands_.execute(world_,std::make_unique<AddComponentCommand>(
+        selection_.active(),type,&component_factories_));
+}
+
 EditorModel::EditorModel() {
     component_registry_.register_type(
         "NEngine.Transform",
