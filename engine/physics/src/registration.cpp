@@ -251,6 +251,7 @@ bool register_rigidbody_metadata(
                  core::PropertyKind>>{
             {"Enabled", core::PropertyKind::Boolean},
             {"Use Gravity", core::PropertyKind::Boolean},
+            {"Continuous", core::PropertyKind::Boolean},
             {"Is Kinematic", core::PropertyKind::Boolean},
             {"Allow Sleep", core::PropertyKind::Boolean},
             {"Mass", core::PropertyKind::Float},
@@ -464,6 +465,7 @@ capture_rigidbody(
         bool_property(
             "Use Gravity",
             value->use_gravity),
+        bool_property("Continuous",value->continuous),
         bool_property(
             "Is Kinematic",
             value->is_kinematic),
@@ -509,6 +511,7 @@ bool restore_rigidbody(
             data,
             "Use Gravity",
             value.use_gravity) ||
+        !read_bool(data,"Continuous",value.continuous,true) ||
         !read_bool(
             data,
             "Is Kinematic",
