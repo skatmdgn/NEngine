@@ -82,11 +82,13 @@ public:
                                      const NavQuery& query = {}) const;
     bool blocked(NavId id, float agent_radius = 0.0f) const noexcept;
     void clear() noexcept;
+    std::uint64_t revision() const noexcept { return revision_; }
 private:
     std::vector<NavPolygon> polygons_{};
     std::vector<std::pair<NavId, NavId>> edges_{};
     std::vector<NavLink> links_{};
     std::vector<NavObstacle> obstacles_{};
+    std::uint64_t revision_{1};
 };
 struct NavAgent {
     core::Vec3 position{};
@@ -97,6 +99,12 @@ struct NavAgent {
     bool arrived{true};
     std::vector<core::Vec3> route{};
     std::size_t next_waypoint{0};
+    std::optional<core::Vec3> destination{};
+    NavQuery navigation_query{};
+    std::uint64_t planned_revision{0};
+    bool set_destination(const NavMesh& mesh, core::Vec3 goal,
+                         const NavQuery& query = {});
+    bool update_navigation(const NavMesh& mesh, float delta_seconds);
     bool assign(const NavPath& path) noexcept;
     void stop() noexcept;
     bool update(float delta_seconds) noexcept;

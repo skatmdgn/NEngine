@@ -226,6 +226,40 @@ int main(){
     check(saved.polygons().empty()&&saved.links().empty()&&
           saved.obstacles().empty()&&saved.edges().empty(),
           "34 clearing the graph removes all state");
+
+    // NAV-012: dynamic navigation edits automatically invalidate/replan routes.
+    {
+        auto dynamic=chain();
+        NavAgent follower;
+        follower.position={.2f,0,.5f};
+        follower.speed=2.f;
+        check(follower.set_destination(dynamic,{2.8f,0,.5f}) &&
+              follower.destination.has_value(),
+              "NAV-012: destination planned on live navigation graph");
+        const auto revision=dynamic.revision();
+        dynamic.set_polygon_enabled(1,false);
+        check(dynamic.revision()>revision &&
+              !follower.update_navigation(dynamic,.1f) &&
+              follower.arrived && follower.route.empty() &&
+              follower.destination.has_value(),
+              "NAV-012: blocked polygon cancels stale route but keeps intent");
+        dynamic.set_polygon_enabled(1,true);
+        check(follower.update_navigation(dynamic,.1f) &&
+              !follower.arrived && !follower.route.empty(),
+              "NAV-012: unblocked polygon triggers automatic replan");
+        NavId obstacle=invalid_nav_id;
+        check(dynamic.add_obstacle({1.5f,0,.5f},.3f,&obstacle) &&
+              !follower.update_navigation(dynamic,.1f) &&
+              follower.arrived && follower.destination.has_value(),
+              "NAV-012: new obstacle invalidates route");
+        check(dynamic.remove_obstacle(obstacle) &&
+              follower.update_navigation(dynamic,.1f) &&
+              !follower.route.empty(),
+              "NAV-012: obstacle removal automatically restores path");
+        follower.stop();
+        check(!follower.destination.has_value(),
+              "NAV-012: manual stop clears destination");
+    }
     if(failed){
         std::cerr<<"NEngineNavigationTests: "<<failed
                  <<" failed, "<<passed<<" passed\n";

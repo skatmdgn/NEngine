@@ -30,6 +30,36 @@ bool NavAgent::assign(const NavPath& path) noexcept {
 }
 void NavAgent::stop() noexcept {
     route.clear();next_waypoint=0;velocity={};arrived=true;
+    destination.reset();
+}
+
+bool NavAgent::set_destination(const NavMesh& mesh, core::Vec3 goal,
+                               const NavQuery& query) {
+    if(!finite_position(position)||!finite_position(goal))return false;
+    const auto path=mesh.find_path(position,goal,query);
+    if(!path||path->status!=NavPathStatus::Complete)return false;
+    NavAgent staged=*this;
+    if(!staged.assign(*path))return false;
+    staged.destination=goal;
+    staged.navigation_query=query;
+    staged.planned_revision=mesh.revision();
+    *this=std::move(staged);
+    return true;
+}
+
+bool NavAgent::update_navigation(const NavMesh& mesh,float delta_seconds) {
+    if(destination&&planned_revision!=mesh.revision()){
+        const auto goal=*destination;
+        const auto query=navigation_query;
+        if(!set_destination(mesh,goal,query)){
+            stop();
+            destination=goal;
+            navigation_query=query;
+            planned_revision=mesh.revision();
+            return false;
+        }
+    }
+    return update(delta_seconds);
 }
 bool NavAgent::update(float dt) noexcept {
     if(!enabled||!std::isfinite(dt)||dt<0.f||dt>10.f||
