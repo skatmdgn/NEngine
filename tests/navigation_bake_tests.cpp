@@ -274,6 +274,34 @@ int main() {
               out.polygons().size()==saved,
               "NAV-008: non-manifold seams remain rejected with subdivision");
     }
+
+    // NAV-007: static clearance is accounted for at bake time rather
+    // than allowing a too-wide agent to cross an impossible portal.
+    {
+        NavBakeOptions narrow;
+        narrow.agent_radius=.51f;
+        check(bake_indexed_nav_mesh(vertices,indices,out,narrow,
+                                    1u,1.f,&report,&error) &&
+              out.polygons().size()==2u && out.edges().empty(),
+              "NAV-007: agent diameter closes inadequate width portal");
+        narrow.agent_radius=.1f;
+        check(bake_indexed_nav_mesh(vertices,indices,out,narrow,
+                                    1u,1.f,&report,&error) &&
+              out.edges().size()==1u,
+              "NAV-007: walkable seam preserved for smaller agent");
+        narrow.obstacles.push_back({{.15f,0,.8f},.15f});
+        check(bake_indexed_nav_mesh(vertices,indices,out,narrow,
+                                    1u,1.f,&report,&error) &&
+              report.filtered_clearance>=1u &&
+              !out.obstacles().empty(),
+              "NAV-007: static obstacle and inflated clearance exclude polygons");
+        const auto prior=out.polygons().size();
+        narrow.obstacles[0].radius=-1.f;
+        check(!bake_indexed_nav_mesh(vertices,indices,out,narrow,
+                                     1u,1.f,&report,&error) &&
+              out.polygons().size()==prior && !error.empty(),
+              "NAV-007: invalid clearance source is rejected transactionally");
+    }
     if (failed) {
         std::cerr << "NEngineNavigationBakeTests: " << failed
                   << " failed / " << passed << " passed\n";

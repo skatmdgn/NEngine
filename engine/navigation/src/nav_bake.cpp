@@ -47,7 +47,10 @@ bool valid_options(const NavBakeOptions& o) {
            o.weld_tolerance >= 0.f && o.weld_tolerance <= 0.01f &&
            o.allowed_area_mask != 0u &&
            o.max_input_triangles > 0u &&
-           o.max_input_triangles <= NavMesh::max_polygons;
+           o.max_input_triangles <= NavMesh::max_polygons &&
+           std::isfinite(o.agent_radius) && o.agent_radius >= 0.f &&
+           o.agent_radius <= 100.f &&
+           o.obstacles.size() <= NavMesh::max_obstacles;
 }
 core::Vec3 weld(core::Vec3 p, float tolerance) {
     if (tolerance == 0.f) return p;
@@ -215,11 +218,30 @@ bool bake_nav_triangles(std::span<const NavBakeTriangle> triangles,
             if (neighbors.size() >= 2u)
                 return fail(error, "non-manifold navigation triangle edge");
             if (!neighbors.empty() && options.connect_shared_edges) {
-                if (!staged.connect(neighbors[0], polygon.id))
-                    return fail(error, "inconsistent navigation seam");
-                ++staged_report.connected_edges;
+                const auto first=v[i], second=v[(i+1u)%3u];
+                const float width=std::hypot(first.x-second.x,
+                                             first.z-second.z);
+                if(width > options.agent_radius*2.f+0.00001f){
+                    if (!staged.connect(neighbors[0], polygon.id))
+                        return fail(error, "inconsistent navigation seam");
+                    ++staged_report.connected_edges;
+                }
             }
             neighbors.push_back(polygon.id);
+        }
+    }
+    // Static obstacles are baked conservatively by marking entire
+    // intersected polygons non-walkable. This intentionally does not claim
+    // fine-grained obstacle carving; the live NavQuery also checks clearance.
+    for(const auto& obstacle:options.obstacles) {
+        if(!staged.add_obstacle(obstacle.center,obstacle.radius))
+            return fail(error,"invalid static Navigation bake obstacle");
+    }
+    for(const auto& polygon:staged.polygons()) {
+        if(staged.blocked(polygon.id,options.agent_radius)) {
+            if(!staged.set_polygon_enabled(polygon.id,false))
+                return fail(error,"failed to exclude low-clearance polygon");
+            ++staged_report.filtered_clearance;
         }
     }
     output = std::move(staged);

@@ -18,6 +18,11 @@ struct NavBakeTriangle {
     float traversal_cost{1.0f};
 };
 
+struct NavBakeObstacle {
+    core::Vec3 center{};
+    float radius{0.5f};
+};
+
 struct NavBakeOptions {
     float max_slope_degrees{45.0f};
     float max_height_span{0.25f};
@@ -29,6 +34,9 @@ struct NavBakeOptions {
     // Split a triangle edge when another face terminates at its midpoint.
     // Disabled by default for exact compatibility with authored triangle IDs.
     bool resolve_t_junctions{false};
+    // Static bake clearance: conservative polygon exclusion + portal width.
+    float agent_radius{0.0f};
+    std::vector<NavBakeObstacle> obstacles{};
 };
 
 struct NavBakeReport {
@@ -39,6 +47,7 @@ struct NavBakeReport {
     std::size_t filtered_height{0};
     std::size_t filtered_small_area{0};
     std::size_t connected_edges{0};
+    std::size_t filtered_clearance{0};
 };
 
 // Transactional: output/report are updated only after complete validation.
