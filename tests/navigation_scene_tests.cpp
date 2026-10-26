@@ -32,7 +32,7 @@ int main() {
     auto* renderer = world.add_component<render::MeshRenderer>(
         child, render::mesh_renderer_type());
     check(renderer != nullptr, "NAV-004: attach MeshRenderer to Scene World");
-    renderer->mesh = assets::AssetGuid::from_string(
+    renderer->mesh = assets::AssetGuid::parse(
         "0123456789abcdef0123456789abcdef").value();
     auto mesh = floor_mesh();
     navigation::NavMesh baked;
