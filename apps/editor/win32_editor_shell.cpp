@@ -29,6 +29,7 @@
 #include "nengine/scripting/dotnet_host.hpp"
 #include "nengine/scripting/managed_build.hpp"
 #include "nengine/scripting/managed_project.hpp"
+#include "nengine/editor/ide_launch.hpp"
 #include "nengine/scripting/managed_runtime.hpp"
 #include "nengine/render/vulkan_context.hpp"
 #include "nengine/render/vulkan_diagnostic_scene.hpp"
@@ -3766,20 +3767,25 @@ struct Win32EditorShell::Impl {
                     packages.size()) +
                 " NuGet package reference(s).");
 
-        const auto solution =
-            output.solution_path.wstring();
-
-        const HINSTANCE launched =
-            ShellExecuteW(
-                host,
-                L"open",
-                solution.c_str(),
-                nullptr,
-                editor.project()
-                    .root()
-                    .wstring()
-                    .c_str(),
-                SW_SHOWNORMAL);
+        // Ctrl+Scripts launches Visual Studio, Shift+Scripts Rider;
+        // a plain click keeps the user's .sln file association.
+        const auto ide=(GetKeyState(VK_CONTROL)&0x8000)!=0
+            ? nengine::editor::IdeChoice::VisualStudio
+            : (GetKeyState(VK_SHIFT)&0x8000)!=0
+              ? nengine::editor::IdeChoice::Rider
+              : nengine::editor::IdeChoice::Associated;
+        const auto launch=nengine::editor::prepare_ide_launch(
+            output.solution_path,ide,{},&error);
+        if(!launch){
+            editor.console().error("Scripting","IDE launch rejected: "+error);
+            refresh_console();return false;
+        }
+        const auto executable=launch->executable.wstring();
+        const auto working=launch->working_directory.wstring();
+        const HINSTANCE launched=ShellExecuteW(
+            host,L"open",executable.c_str(),
+            launch->use_file_association?nullptr:launch->parameters.c_str(),
+            working.c_str(),SW_SHOWNORMAL);
 
         const auto result =
             reinterpret_cast<INT_PTR>(

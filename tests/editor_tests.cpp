@@ -14,6 +14,7 @@
 #include "nengine/audio/components.hpp"
 #include "nengine/core/scene.hpp"
 #include "nengine/editor/editor_model.hpp"
+#include "nengine/editor/ide_launch.hpp"
 #include "nengine/editor/project_manifest.hpp"
 #include "nengine/editor/presentation.hpp"
 #include "nengine/editor/property_command.hpp"
@@ -1487,6 +1488,43 @@ int main() {
     check(model.available_component_types().empty() &&
           !model.add_component_to_selection(render::light_type()),
           "EDTOOL-003 no selection rejects insertion");
+    // EDTOOL-004: the actual generated .sln can be safely launched with
+    // file association, Visual Studio or Rider, including Unicode paths.
+    {
+        const auto ide_root=std::filesystem::temp_directory_path()/
+            "NEngine IDE 한글 space";
+        std::filesystem::create_directories(ide_root);
+        const auto solution=ide_root/"Game Scripts.sln";
+        const auto ide_exe=ide_root/"rider test.exe";
+        {
+            std::ofstream file(solution);
+            file<<"Microsoft Visual Studio Solution File";
+            std::ofstream exe(ide_exe);
+            exe<<"fixture";
+        }
+        std::string ide_error;
+        const auto automatic=editor::prepare_ide_launch(
+            solution,editor::IdeChoice::Associated,{},&ide_error);
+        const auto vs=editor::prepare_ide_launch(
+            solution,editor::IdeChoice::VisualStudio,{},&ide_error);
+        const auto rider=editor::prepare_ide_launch(
+            solution,editor::IdeChoice::Rider,ide_exe,&ide_error);
+        check(automatic&&automatic->use_file_association&&
+              automatic->executable==solution,
+              "EDTOOL-004: Windows .sln shell association launch");
+        check(vs&&!vs->use_file_association&&
+              vs->executable==std::filesystem::path(L"devenv.exe"),
+              "EDTOOL-004: explicit Visual Studio executable plan");
+        check(rider&&!rider->use_file_association&&
+              rider->executable==ide_exe&&
+              rider->parameters.find(L"Game Scripts.sln")!=std::wstring::npos,
+              "EDTOOL-004: Rider launch safely quotes Unicode solution path");
+        check(!editor::prepare_ide_launch(
+                ide_root/"missing.sln",editor::IdeChoice::Rider,{},&ide_error) &&
+              !ide_error.empty(),
+              "EDTOOL-004: missing solution is a safe launch error");
+        std::filesystem::remove_all(ide_root);
+    }
     model.commands().clear();
 
     const auto capsule_property_entity =

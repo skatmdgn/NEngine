@@ -4,6 +4,7 @@ add_library(NEngineEditorModel STATIC
   src/component_factory.cpp
   src/console_model.cpp
   src/editor_layout.cpp
+  src/ide_launch.cpp
   src/editor_model.cpp
   src/play_session.cpp
   src/physics_integration.cpp

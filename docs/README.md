@@ -43,6 +43,10 @@ NEngine은 **Unity의 사용 경험과 개념에 익숙한 개발자가 쓸 수 
 3. [FILE_AUDIT.md](FILE_AUDIT.md)를 참고하되 실제 코드와 테스트를 다시 확인한다.
 4. [WORKFLOW.md](WORKFLOW.md) 방식으로 개발, 필요한 로컬 테스트, 최종 PR과 CI, 증거 기반 체크를 수행한다.
 
+## IDE 연결 워크플로 (EDTOOL-004)
+
+Windows 에디터에서 프로젝트를 연 뒤 상단 **Scripts**를 누르면 관리형 솔루션을 생성한다. **일반 클릭**은 사용자가 Windows에 연결한 기본 `.sln` IDE를 열고, **Ctrl+Scripts**는 `devenv.exe`(Visual Studio), **Shift+Scripts**는 `rider64.exe`(Rider)를 실행한다. 전용 IDE 명령은 해당 EXE가 PATH에 있거나 Windows에서 실행 가능해야 한다. 실패 시 Console에 경고를 남기고 프로젝트 생성물은 보존한다. 공백·한글 파일 경로는 UTF-16 및 인용된 인수로 전달한다. CI는 명령 계획과 에러 처리만 검증하며 실제 설치된 VS/Rider GUI 실행은 기기 검증이 별도로 필요하다.
+
 ## C# SDK 최소 예제 및 API 참조 (CS-014)
 
 실제 컴파일 검증 대상: [NavQuickstart.cs](../samples/managed/NavQuickstart.cs). `Assets/Scripts/NavQuickstart.cs`에 복사한 뒤, 프로젝트의 스크립트 솔루션을 생성하고 .NET SDK로 빌드한다. 에디터 상단 **Scripts** 버튼은 `.nengine/Managed`의 솔루션을 생성·연다. **Build C#**은 해당 프로젝트 DLL을 컴파일하고, 사용 가능한 .NET 호스트가 있으면 에디터에 로드한다. Windows에서 실제 게임 실행은 별도 검증이 필요하다.
