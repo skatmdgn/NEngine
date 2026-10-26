@@ -20,6 +20,7 @@ public:
     virtual bool contains(std::uint32_t entity_index) const noexcept = 0;
     virtual std::type_index value_type() const noexcept = 0;
     virtual std::unique_ptr<ComponentPoolBase> clone() const = 0;
+    virtual void duplicate_entity(std::uint32_t from,std::uint32_t to) = 0;
 };
 
 template <typename T>
@@ -64,6 +65,12 @@ public:
     }
 
     std::type_index value_type() const noexcept override { return typeid(T); }
+
+    void duplicate_entity(std::uint32_t from,std::uint32_t to) override {
+        if(from>=values_.size()||!values_[from])return;
+        if(to>=values_.size())values_.resize(std::size_t(to)+1u);
+        values_[to]=values_[from];
+    }
 
     std::unique_ptr<ComponentPoolBase> clone() const override {
         return std::make_unique<ComponentPool<T>>(*this);

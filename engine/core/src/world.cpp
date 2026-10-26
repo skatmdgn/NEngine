@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <atomic>
 #include <limits>
+#include <unordered_map>
 #include <utility>
 
 namespace nengine::core {
@@ -167,6 +168,37 @@ bool World::set_parent(Entity child, Entity parent) {
     }
     transform(child)->parent = parent;
     return true;
+}
+
+Entity World::duplicate_subtree(Entity root){
+    if(!is_alive(root))return Entity::invalid();
+    World staged{*this};
+    std::vector<Entity> subtree{root};
+    for(std::size_t i=0;i<subtree.size();++i){
+        for(const auto child:children(subtree[i]))subtree.push_back(child);
+        if(subtree.size()>alive_count_)return Entity::invalid();
+    }
+    std::unordered_map<std::uint64_t,Entity> map;
+    for(const auto previous:subtree){
+        const auto created=staged.create(std::string(name(previous))+" Copy");
+        if(!created.valid())return Entity::invalid();
+        map.emplace(previous.value,created);
+        if(!staged.set_active(created,active(previous)))return Entity::invalid();
+        for(auto& [type,pool]:staged.component_pools_)
+            if(pool->contains(previous.index()))
+                pool->duplicate_entity(previous.index(),created.index());
+    }
+    for(const auto previous:subtree){
+        const auto cloned=map.at(previous.value);
+        const auto* previous_transform=transform(previous);
+        if(!previous_transform)return Entity::invalid();
+        const auto it=map.find(previous_transform->parent.value);
+        const auto parent=it==map.end()?previous_transform->parent:it->second;
+        if(!staged.set_parent(cloned,parent))return Entity::invalid();
+    }
+    const auto result=map.at(root.value);
+    *this=std::move(staged);
+    return result;
 }
 
 std::vector<Entity> World::children(Entity parent) const {
