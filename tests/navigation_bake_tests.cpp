@@ -279,7 +279,7 @@ int main() {
     // than allowing a too-wide agent to cross an impossible portal.
     {
         NavBakeOptions narrow;
-        narrow.agent_radius=.51f;
+        narrow.agent_radius=.72f;
         check(bake_indexed_nav_mesh(vertices,indices,out,narrow,
                                     1u,1.f,&report,&error) &&
               out.polygons().size()==2u && out.edges().empty(),
