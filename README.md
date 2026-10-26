@@ -23,6 +23,6 @@ cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-As of 2026-10-25, current main `9ab9e557673c91f692f4ad88404c603baca88db6` passed **35/35 CTest groups** in Windows/Ubuntu **Debug and Release** ([CI run 40201317565](https://github.com/skatmdgn/NEngine/actions/runs/40201317565)), including the native Navigation triangle-surface baker merged via PR #29. This is **not** an interactive Windows GPU/audio/.NET Player test or Android device acceptance.
+As of 2026-10-26, PR [#39](https://github.com/skatmdgn/NEngine/pull/39) code SHA `8fe399b6b57b5c6e01b98fcd17f030ef3720eaa4` passed **37/37 CTest groups** on Windows/Ubuntu Debug and Release ([CI run 40249542956](https://github.com/skatmdgn/NEngine/actions/runs/40249542956)), adding source-tested Scene NavMesh baking and Scene/C# NavMeshAgent integration. The canonical [checklist](docs/CHECKLIST.md) tracks eight newly accepted source-level Navigation IDs (118 checked / 167 remaining out of 285). This is **not** an interactive Windows GPU/audio/.NET Player deployment test or Android device acceptance.
 
 All development and progress reporting should use the IDs in [docs/CHECKLIST.md](docs/CHECKLIST.md). Third-party license information remains in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

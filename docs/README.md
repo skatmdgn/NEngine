@@ -22,6 +22,11 @@ NEngine은 **Unity의 사용 경험과 개념에 익숙한 개발자가 쓸 수 
 - **Android 툴체인**은 버전별 SDK/NDK/JDK/Gradle 프로필로 관리한다. Windows 빌드 성공이 Android 앱 실행을 의미하지 않는다.
 - 목표는 Unity 전체 API·엔진 코드·패키지 재현이 아닌, 실제 2D/3D 게임 제작과 배포에 필요한 제한된 독립적 제품 완성이다.
 
+## 2026-10-26 현행 Navigation 수용 보충
+
+- PR [#39](https://github.com/skatmdgn/NEngine/pull/39) 코드 SHA `8fe399b6b57b5c6e01b98fcd17f030ef3720eaa4`: Scene MeshRenderer Bake, 계층 Transform, 정적 장애물 clearance, T-junction·funnel, Scene/Editor/Player 및 C# NavMeshAgent, 장애물 변경 재탐색을 Windows·Ubuntu Debug/Release 각각 **37/37 CTest PASS**로 검증([CI 40249542956](https://github.com/skatmdgn/NEngine/actions/runs/40249542956)). 1.0 수용 원장에는 **서로 다른 8개 ID만** 반영하고, 미완료 167개를 남긴다.
+- 기존 2026-10-22 기준 파일/PR 조사 결과는 **역사적 기준선**이며 현재 Open PR이나 구현 범위를 나타내지 않는다. 실제 현재 상태는 GitHub main·PR과 [CHECKLIST.md](CHECKLIST.md)에서 재확인한다. 실제 Windows GPU/Android 기기 수용은 여전히 미완료다.
+
 ## 2026-10-22 확인된 사실
 
 - 기준 `main` 커밋: `671cddf2d50d184b1889310f86c85a3df43306bd`, PR #28 병합 상태.

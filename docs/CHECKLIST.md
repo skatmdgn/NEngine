@@ -1,10 +1,10 @@
 # NEngine 1.0 — 고정 ID 기반 수용 체크리스트
 
-**검증 기준선:** main `9ab9e557673c91f692f4ad88404c603baca88db6` (2026-10-25), [Windows/Ubuntu CI 40201317565](https://github.com/skatmdgn/NEngine/actions/runs/40201317565), Windows·Ubuntu 각 Debug/Release **35/35 CTest 그룹 PASS**. 실제 GPU·오디오·.NET 배포 및 Android 기기 검증까지 통과한 것은 아니다.
+**검증 기준선:** PR #39의 정확한 코드 SHA `8fe399b6b57b5c6e01b98fcd17f030ef3720eaa4` (2026-10-26), [Windows/Ubuntu CI 40249542956](https://github.com/skatmdgn/NEngine/actions/runs/40249542956) — Windows·Ubuntu 각각 Release/Debug **37/37 CTest PASS**. 실제 Windows GPU·오디오·.NET 앱 배포와 Android 실기기 수용은 확인하지 않았다. 병합 후 `main` CI는 별도 확인한다.
 
-**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 110개, 미완료 175개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
+**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 118개, 미완료 167개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
 
-**우선 순위:** 남은 Windows 실기기 수용과 Android 빌드 토대, NAV-004 이후의 Scene 메시 추출·자동 Bake·Agent 통합. PR #29의 triangle bake는 NAV-003의 병합·main CI 재검증을 통과했으며, 자동 Scene Bake와 실제 GPU 검증까지 완료한 것은 아니다. 작업 규칙은 [WORKFLOW.md](WORKFLOW.md), 근거와 저장소 조사는 [FILE_AUDIT.md](FILE_AUDIT.md)를 참고한다.
+**우선 순위:** 1.0 제품 품질의 큰 공백인 Windows 실기기 Editor/Player·Vulkan, Android 빌드/앱 배포, 플러그인 연동. Navigation은 NAV-004/005/007/008/009/010/011/012의 소스·자동 회귀 테스트 수용( PR #39 )을 확인했지만 NAV-006 지형/영역 UI, NAV-013 다중 에이전트 회피 및 NAV-014/015 실제 배포/Android 검증은 미완료다. 작업 규칙은 [WORKFLOW.md](WORKFLOW.md), 저장소 조사는 [FILE_AUDIT.md](FILE_AUDIT.md)를 참고한다.
 
 ## GOV — 개발 관리·검증 (10/10)
 
@@ -204,22 +204,22 @@
 - [ ] UI-013 최소 UI 메뉴 게임을 Windows Player에서 직접 클릭한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] UI-014 Android 터치 UI와 safe area를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## NAV — NavMesh·AI 이동 (3/15)
+## NAV — NavMesh·AI 이동 (11/15)
 
 참조: engine/navigation; tests/navigation_tests.cpp
 
 - [x] NAV-001 NavMesh·Agent·Obstacle·Link 기본 테스트가 통과한다 — 증거: tests/navigation_tests.cpp / CI run 39713209272
 - [x] NAV-002 .nnav 경로 직렬화 기본 테스트가 통과한다 — 증거: tests/navigation_tests.cpp / CI run 39713209272
 - [x] NAV-003 PR #29를 main에 병합하고 triangle bake 테스트를 main에서 재검증한다 — 증거: PR #29 merged 9ab9e557673c91f692f4ad88404c603baca88db6; engine/navigation/src/nav_bake.cpp + tests/navigation_bake_tests.cpp; main CI run 40201317565 Windows/Ubuntu Debug·Release 35/35 CTest PASS, NEngineNavigationBakeTests PASS
-- [ ] NAV-004 Scene 메시로부터 자동 NavMesh 기하를 수집한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] NAV-005 모델 트랜스폼·좌표 변환을 Bake에 정확히 적용한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] NAV-004 Scene 메시로부터 자동 NavMesh 기하를 수집한다 — 증거: PR #39, 코드 SHA 8fe399b6b57b5c6e01b98fcd17f030ef3720eaa4, Windows/Ubuntu Debug·Release CI 40249542956 37/37 CTest PASS; NEngineNavigationTests, NEngineNavigationBakeTests, NEngineNavigationSceneTests; World의 활성 MeshRenderer/가져온 MeshData로 실제 씬 삼각형을 수집, 누락/범위오류에 대한 트랜잭션.
+- [x] NAV-005 모델 트랜스폼·좌표 변환을 Bake에 정확히 적용한다 — 증거: PR #39, 코드 SHA 8fe399b6b57b5c6e01b98fcd17f030ef3720eaa4, Windows/Ubuntu Debug·Release CI 40249542956 37/37 CTest PASS; NEngineNavigationTests, NEngineNavigationBakeTests, NEngineNavigationSceneTests; 계층 부모 TRS·비균일/미러 스케일을 Bake 월드 좌표에 반영.
 - [ ] NAV-006 지형 경사·보행 가능 영역·영역 비용 UI를 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] NAV-007 에이전트 반경·장애물 clearance를 Bake에 반영한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] NAV-008 T-junction·비매니폴드 연결을 처리한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] NAV-009 Portal/Funnel 경로 평활화를 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] NAV-010 NavMeshAgent를 Scene 컴포넌트와 연결한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] NAV-011 NavMeshAgent에 C# 목적지/이동/정지 API를 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] NAV-012 동적 장애물 변경·링크 변경 후 경로를 재계산한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] NAV-007 에이전트 반경·장애물 clearance를 Bake에 반영한다 — 증거: PR #39, 코드 SHA 8fe399b6b57b5c6e01b98fcd17f030ef3720eaa4, Windows/Ubuntu Debug·Release CI 40249542956 37/37 CTest PASS; NEngineNavigationTests, NEngineNavigationBakeTests, NEngineNavigationSceneTests; agent_radius 기반 Portal 폭과 정적 장애물 폴리곤 제외·유효성 검증.
+- [x] NAV-008 T-junction·비매니폴드 연결을 처리한다 — 증거: PR #39, 코드 SHA 8fe399b6b57b5c6e01b98fcd17f030ef3720eaa4, Windows/Ubuntu Debug·Release CI 40249542956 37/37 CTest PASS; NEngineNavigationTests, NEngineNavigationBakeTests, NEngineNavigationSceneTests; 선택적 T-junction 분할 및 비매니폴드 거부·오버플로 폴백.
+- [x] NAV-009 Portal/Funnel 경로 평활화를 구현한다 — 증거: PR #39, 코드 SHA 8fe399b6b57b5c6e01b98fcd17f030ef3720eaa4, Windows/Ubuntu Debug·Release CI 40249542956 37/37 CTest PASS; NEngineNavigationTests, NEngineNavigationBakeTests, NEngineNavigationSceneTests; 선택적 Portal/Funnel 경로 평활화, offmesh link 분리와 통로 폭 필터.
+- [x] NAV-010 NavMeshAgent를 Scene 컴포넌트와 연결한다 — 증거: PR #39, 코드 SHA 8fe399b6b57b5c6e01b98fcd17f030ef3720eaa4, Windows/Ubuntu Debug·Release CI 40249542956 37/37 CTest PASS; NEngineNavigationComponentTests, NEngineScriptingTests; Scene NavMeshAgent 컴포넌트·Editor Inspector/Factory·Scene 왕복 직렬화·Editor/Player fixed-step 이동.
+- [x] NAV-011 NavMeshAgent에 C# 목적지/이동/정지 API를 제공한다 — 증거: PR #39, 코드 SHA 8fe399b6b57b5c6e01b98fcd17f030ef3720eaa4, Windows/Ubuntu Debug·Release CI 40249542956 37/37 CTest PASS; NEngineNavigationComponentTests, NEngineScriptingTests; C# NavMeshAgent 목적지/속도/정지 API 생성과 managed Player 속성 브리지.
+- [x] NAV-012 동적 장애물 변경·링크 변경 후 경로를 재계산한다 — 증거: PR #39, 코드 SHA 8fe399b6b57b5c6e01b98fcd17f030ef3720eaa4, Windows/Ubuntu Debug·Release CI 40249542956 37/37 CTest PASS; NEngineNavigationTests, NEngineNavigationBakeTests, NEngineNavigationSceneTests; 변경 revision 기반 장애물·폴리곤·링크 변경 자동 경로 무효화·복구.
 - [ ] NAV-013 다수 에이전트 회피·충돌 및 성능을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] NAV-014 Windows 배포 게임에서 목적지까지 캐릭터가 이동한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] NAV-015 Android 게임에서 동일 NavMeshAgent 예제를 실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -427,3 +427,5 @@
 - 2026-10-24: 이전 20개 요청에서 보류된 11개 후속 목표를 PR #36으로 실제 개발. ASSET-009/010, TWOD-006, CS-012, QA-011/012, CORE-012, WIN-005/009, BUILD-008, UTIL-005. 2D/3D 샘플은 독립 **콘솔/헤드리스 게임 실행과 자동 승리 테스트**로 검증하며 실제 Windows Vulkan GPU 게임 화면·안드로이드 실행을 의미하지 않는다. 체크는 Windows/Ubuntu Debug+Release CI 최종 성공과 `main` 병합이 충족될 때 확정한다. 검증 실패나 범위 미달 ID는 반드시 체크를 원복한다. 총 ID 285 그대로 유지.
 
 - 2026-10-25: 오래 열린 PR #29를 최신 main에 맞춰 통합하고 병합. 30개는 NAV-003 내 개별 C++ 수용 assertion으로, 체크리스트 30개를 의미하지 않는다. 병합된 main `9ab9e557673c91f692f4ad88404c603baca88db6`에서 Windows/Ubuntu Debug·Release 35/35 CTest 및 NEngineNavigationBakeTests 통과(CI 40201317565). NAV-003 1개만 완료: 109→110개, 미완료 176→175개, 총 ID 285개 유지. 실 Scene 메시 자동 Bake·Clearance·Agent 관리형 바인딩은 여전히 미완료.
+
+- 2026-10-26: NAV-004/005/007/008/009/010/011/012 (8개 고정 ID)를 PR #39에서 Scene 메시 Bake, TRS·미러링, agent clearance/정적 장애물, T-junction 분할·비매니폴드 거부, portal funnel, NavMeshAgent Scene/Editor/Player 통합, C# API, 동적 재탐색으로 구현. 소스 SHA `8fe399b6b57b5c6e01b98fcd17f030ef3720eaa4`에서 Windows/Ubuntu Release·Debug 각 37/37 CTest PASS(CI 40249542956). 총계 285 유지, 완료 110→118 / 미완료 175→167. 별도 NAV-006 UI, NAV-013 군집 회피, NAV-014/015 기기 실행은 체크하지 않음. 실기기 GPU·Android 등은 CI 증거로 대체하지 않음.
