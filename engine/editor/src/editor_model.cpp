@@ -2,6 +2,7 @@
 #include "nengine/editor/audio_integration.hpp"
 #include "nengine/editor/render_integration.hpp"
 #include "nengine/editor/physics_integration.hpp"
+#include "nengine/editor/navigation_integration.hpp"
 #include "nengine/editor/scripting_integration.hpp"
 #include "nengine/physics/simulation.hpp"
 #include "nengine/navigation/registration.hpp"
@@ -412,6 +413,9 @@ EditorModel::EditorModel() {
                   entity,navigation::nav_agent_type())!=nullptr;
           })){
         console_.warning("Editor","NavMeshAgent registration failed");
+    }
+    if(!register_navigation_property_access(property_access_)){
+        console_.warning("Editor","NavMeshAgent Inspector property bindings failed");
     }
 
     managed_script_system_.bind(

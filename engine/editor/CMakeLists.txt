@@ -7,6 +7,7 @@ add_library(NEngineEditorModel STATIC
   src/editor_model.cpp
   src/play_session.cpp
   src/physics_integration.cpp
+  src/navigation_integration.cpp
   src/property_access.cpp
   src/property_command.cpp
   src/property_text.cpp
