@@ -260,6 +260,27 @@ int main(){
         check(!follower.destination.has_value(),
               "NAV-012: manual stop clears destination");
     }
+
+    // NAV-009: smooth path portals without changing the polygon corridor.
+    {
+        auto corridor=chain();
+        NavQuery query;
+        query.smooth_portals=true;
+        const auto smoothed=corridor.find_path({.2f,0,.5f},{2.8f,0,.5f},query);
+        check(smoothed&&smoothed->polygons.size()==3 &&
+              smoothed->waypoints.size()==2 &&
+              near(smoothed->waypoints.front().x,.2f) &&
+              near(smoothed->waypoints.back().x,2.8f),
+              "NAV-009: straight three-polygon corridor pulls to two endpoints");
+        query.agent_radius=.51f;
+        check(!corridor.find_path({.2f,0,.5f},{2.8f,0,.5f},query),
+              "NAV-007: agent diameter larger than seam rejects traversal");
+        query.agent_radius=.1f;
+        const auto shrunk=corridor.find_path({.2f,0,.5f},
+                                             {2.8f,0,.5f},query);
+        check(shrunk&&shrunk->waypoints.size()==2,
+              "NAV-007: feasible clearance preserves smooth traversable path");
+    }
     if(failed){
         std::cerr<<"NEngineNavigationTests: "<<failed
                  <<" failed, "<<passed<<" passed\n";

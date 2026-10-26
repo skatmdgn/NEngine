@@ -41,6 +41,9 @@ struct NavQuery {
     float agent_radius{0.0f};
     bool allow_partial{false};
     std::size_t max_expansions{4096u};
+    // Opt in to portal/funnel corner reduction; the authored centroid path
+    // remains the compatibility default for existing games and tests.
+    bool smooth_portals{false};
 };
 enum class NavPathStatus { Complete, Partial };
 struct NavPath {
