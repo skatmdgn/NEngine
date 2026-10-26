@@ -2268,6 +2268,22 @@ int main() {
                 << "}\n";
         }
 
+        // CS-014: compile the identical public quickstart shipped in samples,
+        // rather than a separately maintained test-only copy.
+        const auto quickstart_path =
+            std::filesystem::path(__FILE__).parent_path().parent_path() /
+            "samples" / "managed" / "NavQuickstart.cs";
+        const auto example_source = read_all(quickstart_path);
+        check(example_source.find("class NavQuickstart") != std::string::npos &&
+              example_source.find("SetDestination(") != std::string::npos,
+              "CS-014: public managed quickstart is present");
+        if (!example_source.empty()) {
+            std::ofstream example_output(
+                integration_root / "Assets" / "Scripts" / "NavQuickstart.cs",
+                std::ios::binary | std::ios::trunc);
+            example_output << example_source;
+        }
+
         ManagedProjectConfig
             integration_project;
 

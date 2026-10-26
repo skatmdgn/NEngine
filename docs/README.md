@@ -43,6 +43,43 @@ NEngine은 **Unity의 사용 경험과 개념에 익숙한 개발자가 쓸 수 
 3. [FILE_AUDIT.md](FILE_AUDIT.md)를 참고하되 실제 코드와 테스트를 다시 확인한다.
 4. [WORKFLOW.md](WORKFLOW.md) 방식으로 개발, 필요한 로컬 테스트, 최종 PR과 CI, 증거 기반 체크를 수행한다.
 
+## C# SDK 최소 예제 및 API 참조 (CS-014)
+
+실제 컴파일 검증 대상: [NavQuickstart.cs](../samples/managed/NavQuickstart.cs). `Assets/Scripts/NavQuickstart.cs`에 복사한 뒤, 프로젝트의 스크립트 솔루션을 생성하고 .NET SDK로 빌드한다. 에디터 상단 **Scripts** 버튼은 `.nengine/Managed`의 솔루션을 생성·연다. **Build C#**은 해당 프로젝트 DLL을 컴파일하고, 사용 가능한 .NET 호스트가 있으면 에디터에 로드한다. Windows에서 실제 게임 실행은 별도 검증이 필요하다.
+
+```csharp
+using System.Collections;
+using NEngine;
+
+public sealed class SimpleMover : Behaviour
+{
+    private Coroutine? job;
+    private void Start() { job = StartCoroutine(Go()); }
+    private IEnumerator Go()
+    {
+        yield return new WaitForSeconds(0.25f);
+        GetComponent<NavMeshAgent>()?.SetDestination(
+            new Vector3(3f, 0f, 2f));
+    }
+    private void OnDisable()
+    {
+        if (job != null) StopCoroutine(job);
+    }
+}
+```
+
+| 공개 API | 타입·동작 | 전제 |
+|---|---|---|
+| `Behaviour.StartCoroutine(IEnumerator)` | `Coroutine` 반환, Play 중 업데이트 | 스크립트가 Scene에 연결되어야 함 |
+| `Behaviour.StopCoroutine(Coroutine)` / `StopAllCoroutines()` | 대기 중 작업 취소 및 iterator finally 정리 | 종료된 객체에서는 호출 불필요 |
+| `WaitForSeconds(float)` | 게임 업데이트 누적 시간에 따라 지연 | 음수/NaN은 거부 |
+| `NavMeshAgent.SetDestination(Vector3)` | 유한한 목적지 유효성 확인 후 대상 설정 | Scene 컴포넌트와 로드된 `.nnav` 필요 |
+| `NavMeshAgent.speed/radius/stoppingDistance` | 에이전트 이동 및 clearance 설정 | 반경·속도는 0 이상 |
+| `GetComponent<T>()`, `Transform.localPosition` | native-bound Scene 컴포넌트 조회/이동 | 지원되는 NEngine native 컴포넌트만 |
+| `Time.deltaTime`, `Mathf.Clamp/Lerp`, `Vector3` | 프레임 시간 및 기초 게임 수학 | .NET API 런타임 필요 |
+
+**범위:** 이 예제는 관리형 API의 **컴파일 가능성**을 자동 테스트하며, 실제 Windows GUI GPU/오디오 배포 또는 Android 실행까지 입증하지 않는다. C# 공개 API를 확장할 때는 이 예제를 같은 빌드 체인에서 컴파일하고 문서와 함께 갱신한다.
+
 ## 프로젝트·빌드 기본 참고
 
 - CMake 3.25+, C++20, Windows Editor/Player 실사용에는 Windows 10/11 x64와 Vulkan 가능한 GPU·드라이버.
