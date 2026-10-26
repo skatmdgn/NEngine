@@ -1,10 +1,10 @@
 # NEngine 1.0 — 고정 ID 기반 수용 체크리스트
 
-**검증 기준선:** PR #39의 정확한 코드 SHA `8fe399b6b57b5c6e01b98fcd17f030ef3720eaa4` (2026-10-26), [Windows/Ubuntu CI 40249542956](https://github.com/skatmdgn/NEngine/actions/runs/40249542956) — Windows·Ubuntu 각각 Release/Debug **37/37 CTest PASS**. 실제 Windows GPU·오디오·.NET 앱 배포와 Android 실기기 수용은 확인하지 않았다. 병합 후 `main` CI는 별도 확인한다.
+**검증 기준선:** PR #40의 정확한 소스 SHA `acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7` (2026-10-26), [Windows/Ubuntu CI 40279093322](https://github.com/skatmdgn/NEngine/actions/runs/40279093322) — Windows·Ubuntu 각각 Release/Debug **38/38 CTest PASS**. C# 실제 .NET 컴파일·코루틴·Debug 로그 회귀 테스트 포함. 실제 Windows GPU/오디오·Android 실기기·설치된 Visual Studio/Rider GUI 열기는 이 CI가 증명하지 않으며 각각 별도 검증 대상이다. 병합 후 `main` CI는 별도 확인한다.
 
-**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 118개, 미완료 167개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
+**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 125개, 미완료 160개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
 
-**우선 순위:** 1.0 제품 품질의 큰 공백인 Windows 실기기 Editor/Player·Vulkan, Android 빌드/앱 배포, 플러그인 연동. Navigation은 NAV-004/005/007/008/009/010/011/012의 소스·자동 회귀 테스트 수용( PR #39 )을 확인했지만 NAV-006 지형/영역 UI, NAV-013 다중 에이전트 회피 및 NAV-014/015 실제 배포/Android 검증은 미완료다. 작업 규칙은 [WORKFLOW.md](WORKFLOW.md), 저장소 조사는 [FILE_AUDIT.md](FILE_AUDIT.md)를 참고한다.
+**우선 순위:** Windows Editor의 실제 Vulkan Scene/Game 렌더링·실기기 Player, Android APK/AAB 빌드 및 기기 실행, 외부 SDK/플러그인 연동을 우선한다. PR #40은 NavMeshAgent 다중 객체 회피·C# 코루틴·Debug 로그·컴파일 진단·C# 예제·에디터 컴포넌트 메뉴·IDE 시작 경로의 **소스·자동화 검증** 7개 ID를 추가하지만, NAV-006 보행 비용 UI/NAV-014/015 실기기 검증 및 설치된 Visual Studio/Rider 실제 GUI 실행 검증은 포함하지 않는다. 작업 규칙은 [WORKFLOW.md](WORKFLOW.md).
 
 ## GOV — 개발 관리·검증 (10/10)
 
@@ -38,7 +38,7 @@
 - [x] CORE-011 Scene 저장 도중 쓰기 실패에 데이터가 보존된다 — 증거: PR #32, NEngineRoundTwoCoreTests, 씬 손상 저장·권한 실패 시 원본 보존과 atomic publish, Windows/Ubuntu CI
 - [x] CORE-012 최소 2D·3D Scene이 Player에서 동일하게 실행된다 — 증거: PR #36, both NEngineMiniRunner2D and NEngineMiniRunner3D use the same PlayerRuntime Scene serialization, export and frame loop; Windows/Ubuntu Debug+Release CI
 
-## EDIT — Windows Editor (3/16)
+## EDIT — Windows Editor (4/16)
 
 참조: apps/editor; engine/editor; tests/editor_tests.cpp
 
@@ -55,7 +55,7 @@
 - [ ] EDIT-011 프로젝트 만들기·열기·오류 복구 UI를 완성한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] EDIT-012 Scene 뷰와 Game 뷰에서 실제 Vulkan 렌더러를 사용한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] EDIT-013 Asset Browser에서 가져오기·이름변경·삭제·재가져오기를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] EDIT-014 C# 컴파일 진단을 Console과 소스 파일 위치에 표시한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] EDIT-014 C# 컴파일 진단을 Console과 소스 파일 위치에 표시한다 — 증거: PR #40, 코드 SHA acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7, CI 40279093322 Windows/Ubuntu Debug·Release 38/38 CTest PASS; NEngineEditorTests compiler diagnostic source+line+column parser, project-root guard and Win32 Console entry double-click; raw dotnet build output captured.
 - [ ] EDIT-015 Play/Pause/Step/Stop을 실제 2D·3D 게임에 적용한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] EDIT-016 다중 프로젝트 전환 시 파일 감시·캐시·핸들을 안전하게 복구한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
@@ -100,7 +100,7 @@
 - [ ] REND-015 프레임 시간·드로우 콜·GPU 메모리 기준을 작성해 회귀를 막는다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] REND-016 Android Vulkan surface 렌더링을 실기기로 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## CS — C#·IDE (3/14)
+## CS — C#·IDE (4/14)
 
 참조: engine/scripting; tests/scripting_tests.cpp
 
@@ -117,7 +117,7 @@
 - [ ] CS-011 Rider 프로젝트와 디버깅 워크플로를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] CS-012 GameScripts.dll 이름·버전 불일치 오류를 명확히 진단한다 — 증거: PR #36, NEngineFollowupAcceptanceTests, named GameScripts/runtimeconfig/API/Bridge diagnostics and .NET framework version mismatch; Windows/Ubuntu Debug+Release CI
 - [ ] CS-013 관리형 외부 라이브러리 의존성을 컴파일·실행·배포한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] CS-014 C# 공개 API에 컴파일 가능한 최소 예제와 참조 문서를 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] CS-014 C# 공개 API에 컴파일 가능한 최소 예제와 참조 문서를 제공한다 — 증거: PR #40, 코드 SHA acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7, CI 40279093322 Windows/Ubuntu Debug·Release 38/38 CTest PASS; samples/managed/NavQuickstart.cs copied as the real .NET integration project compilation input; docs/README.md public API reference.
 
 ## PHYS — 2D/3D 물리 (11/13)
 
@@ -204,7 +204,7 @@
 - [ ] UI-013 최소 UI 메뉴 게임을 Windows Player에서 직접 클릭한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] UI-014 Android 터치 UI와 safe area를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## NAV — NavMesh·AI 이동 (11/15)
+## NAV — NavMesh·AI 이동 (12/15)
 
 참조: engine/navigation; tests/navigation_tests.cpp
 
@@ -220,7 +220,7 @@
 - [x] NAV-010 NavMeshAgent를 Scene 컴포넌트와 연결한다 — 증거: PR #39, 코드 SHA 8fe399b6b57b5c6e01b98fcd17f030ef3720eaa4, Windows/Ubuntu Debug·Release CI 40249542956 37/37 CTest PASS; NEngineNavigationComponentTests, NEngineScriptingTests; Scene NavMeshAgent 컴포넌트·Editor Inspector/Factory·Scene 왕복 직렬화·Editor/Player fixed-step 이동.
 - [x] NAV-011 NavMeshAgent에 C# 목적지/이동/정지 API를 제공한다 — 증거: PR #39, 코드 SHA 8fe399b6b57b5c6e01b98fcd17f030ef3720eaa4, Windows/Ubuntu Debug·Release CI 40249542956 37/37 CTest PASS; NEngineNavigationComponentTests, NEngineScriptingTests; C# NavMeshAgent 목적지/속도/정지 API 생성과 managed Player 속성 브리지.
 - [x] NAV-012 동적 장애물 변경·링크 변경 후 경로를 재계산한다 — 증거: PR #39, 코드 SHA 8fe399b6b57b5c6e01b98fcd17f030ef3720eaa4, Windows/Ubuntu Debug·Release CI 40249542956 37/37 CTest PASS; NEngineNavigationTests, NEngineNavigationBakeTests, NEngineNavigationSceneTests; 변경 revision 기반 장애물·폴리곤·링크 변경 자동 경로 무효화·복구.
-- [ ] NAV-013 다수 에이전트 회피·충돌 및 성능을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] NAV-013 다수 에이전트 회피·충돌 및 성능을 검증한다 — 증거: PR #40, 코드 SHA acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7, CI 40279093322 Windows/Ubuntu Debug·Release 38/38 CTest PASS; NEngineNavigationCrowdTests 64 agents×120 frames, continuous radius sweeps, deterministic sidesteps and head-on collision regression.
 - [ ] NAV-014 Windows 배포 게임에서 목적지까지 캐릭터가 이동한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] NAV-015 Android 게임에서 동일 NavMeshAgent 예제를 실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
@@ -368,14 +368,14 @@
 - [x] SHDR-005 무효/비정상 셰이더를 불러오면 원인 진단 후 안전하게 유지한다 — 증거: PR #34, tools/nengine_shaders.py invalid shader/invalid SPIR-V 진단·last-good shader pointer 유지, test_nengine_shaders.py, Windows/Ubuntu CI
 - [ ] SHDR-006 Shader variant/키워드 변경 후 Player 재질이 동일하다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## EDTOOL — Editor 생산성 도구 (0/9)
+## EDTOOL — Editor 생산성 도구 (2/9)
 
 참조: apps/editor; engine/editor
 
 - [ ] EDTOOL-001 Scene View와 분리된 Game View를 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] EDTOOL-002 Prefab 격리 편집 모드를 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] EDTOOL-003 실제 선택 객체와 연결되는 Component Add 메뉴를 완성한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] EDTOOL-004 C# 프로젝트를 Visual Studio/Rider로 여는 동작을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] EDTOOL-003 실제 선택 객체와 연결되는 Component Add 메뉴를 완성한다 — 증거: PR #40, 코드 SHA acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7, CI 40279093322 Windows/Ubuntu Debug·Release 38/38 CTest PASS; NEngineEditorTests selection-derived actual Add Component list/action, duplicate rejection and Undo/Redo, Win32 menu sharing the model command.
+- [x] EDTOOL-004 C# 프로젝트를 Visual Studio/Rider로 여는 동작을 검증한다 — 증거: PR #40, 코드 SHA acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7, CI 40279093322 Windows/Ubuntu Debug·Release 38/38 CTest PASS; Win32 Scripts .sln association/Ctrl VS/Shift Rider launch implementation, NEngineEditorTests Unicode paths/IDE selection/invalid solution; installed IDE GUI not manually confirmed.
 - [ ] EDTOOL-005 에디터 패키지 목록·설치·제거 UI를 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] EDTOOL-006 Editor/Player 실행 성능 Profiler 화면을 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] EDTOOL-007 GPU 프레임 디버거 또는 동등한 진단 도구를 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -396,13 +396,13 @@
 - [x] BUILD-008 빌드 실패·서명 누락 시 사용자에게 명확한 오류를 표시한다 — 증거: PR #36, tools/nengine_build_profiles.py Release keystore/alias/environment signing preflight diagnostics, test_nengine_signing.py; Windows/Ubuntu Debug+Release CI
 - [ ] BUILD-009 동일 커밋을 사용한 재현 가능한 빌드 결과를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## UTIL — 스크립팅 유틸리티·개발 진단 (2/5)
+## UTIL — 스크립팅 유틸리티·개발 진단 (4/5)
 
 참조: engine/scripting; engine/editor
 
-- [ ] UTIL-001 C# Debug.Log/Warning/Error 메시지와 Editor Console 위치를 연동한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] UTIL-001 C# Debug.Log/Warning/Error 메시지와 Editor Console 위치를 연동한다 — 증거: PR #40, 코드 SHA acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7, CI 40279093322 Windows/Ubuntu Debug·Release 38/38 CTest PASS; NEngineScriptingTests native C# Debug.Log/Warning/Error callback ABI v19 severity, caller file/line; Editor Console and Player sinks.
 - [x] UTIL-002 C# Mathf/Vector/Quaternion 기본 수학 API를 샘플로 검증한다 — 증거: PR #37, engine/scripting/src/managed_project.cpp + tests/scripting_tests.cpp, 생성 C# API·실제 managed Start() 회귀 검증, Windows/Ubuntu Debug·Release NEngineScriptingTests 및 29/29 CTest PASS, CI run 40103756074
-- [ ] UTIL-003 C# Timer/Coroutine/WaitForSeconds 중단·취소를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] UTIL-003 C# Timer/Coroutine/WaitForSeconds 중단·취소를 검증한다 — 증거: PR #40, 코드 SHA acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7, CI 40279093322 Windows/Ubuntu Debug·Release 38/38 CTest PASS; NEngineScriptingTests real .NET IEnumerator Stop/StopAll and nested iterator finally disposal, WaitForSeconds frame continuation.
 - [ ] UTIL-004 프로파일 로그·크래시 로그에 엔진 및 게임 빌드 버전을 남긴다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] UTIL-005 런타임 오류 시 사용자 데이터 보호·복구 안내를 검증한다 — 증거: PR #36, GameSaveStore last-good backup and read_backup recovery without mutating corrupt caller data, NEngineGameSaveRecoveryTests; Windows/Ubuntu Debug+Release CI
 
@@ -429,3 +429,5 @@
 - 2026-10-25: 오래 열린 PR #29를 최신 main에 맞춰 통합하고 병합. 30개는 NAV-003 내 개별 C++ 수용 assertion으로, 체크리스트 30개를 의미하지 않는다. 병합된 main `9ab9e557673c91f692f4ad88404c603baca88db6`에서 Windows/Ubuntu Debug·Release 35/35 CTest 및 NEngineNavigationBakeTests 통과(CI 40201317565). NAV-003 1개만 완료: 109→110개, 미완료 176→175개, 총 ID 285개 유지. 실 Scene 메시 자동 Bake·Clearance·Agent 관리형 바인딩은 여전히 미완료.
 
 - 2026-10-26: NAV-004/005/007/008/009/010/011/012 (8개 고정 ID)를 PR #39에서 Scene 메시 Bake, TRS·미러링, agent clearance/정적 장애물, T-junction 분할·비매니폴드 거부, portal funnel, NavMeshAgent Scene/Editor/Player 통합, C# API, 동적 재탐색으로 구현. 소스 SHA `8fe399b6b57b5c6e01b98fcd17f030ef3720eaa4`에서 Windows/Ubuntu Release·Debug 각 37/37 CTest PASS(CI 40249542956). 총계 285 유지, 완료 110→118 / 미완료 175→167. 별도 NAV-006 UI, NAV-013 군집 회피, NAV-014/015 기기 실행은 체크하지 않음. 실기기 GPU·Android 등은 CI 증거로 대체하지 않음.
+
+- 2026-10-26: PR #40에서 기존 7개 ID(NAV-013, UTIL-003, EDTOOL-003, CS-014, EDTOOL-004, UTIL-001, EDIT-014)의 자동화·소스 수준 구현과 회귀를 추가. 코드 SHA `acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7`, [Windows·Ubuntu Release/Debug CI 40279093322](https://github.com/skatmdgn/NEngine/actions/runs/40279093322) 각 38/38 PASS. 285개 총량 불변, 완료 118→125 / 미완료 167→160. NAV 다중 에이전트 정적 반경 기반 충돌 회피는 복잡한 ORCA/군중 시뮬레이션을 뜻하지 않는다. IDE launch는 ShellExecute 기반 앱 연결·VS/Rider 시작 명령을 구현/검사하지만 **실제 설치된 GUI를 연 실기기 검증은 수행하지 않음**. Windows GPU/오디오/Android 배포도 수용 대상 아님.

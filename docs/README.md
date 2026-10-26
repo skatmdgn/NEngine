@@ -22,6 +22,12 @@ NEngine은 **Unity의 사용 경험과 개념에 익숙한 개발자가 쓸 수 
 - **Android 툴체인**은 버전별 SDK/NDK/JDK/Gradle 프로필로 관리한다. Windows 빌드 성공이 Android 앱 실행을 의미하지 않는다.
 - 목표는 Unity 전체 API·엔진 코드·패키지 재현이 아닌, 실제 2D/3D 게임 제작과 배포에 필요한 제한된 독립적 제품 완성이다.
 
+## 2026-10-26 PR #40 — 7개 소스·자동화 수용 ID
+
+- PR [#40](https://github.com/skatmdgn/NEngine/pull/40) 소스 SHA `acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7` ([CI 40279093322](https://github.com/skatmdgn/NEngine/actions/runs/40279093322)): Windows/Ubuntu Release·Debug 모두 **38/38 CTest PASS**. NAV-013, UTIL-003, EDTOOL-003, CS-014, EDTOOL-004, UTIL-001, EDIT-014만 증거 기반 추가하여 285개 중 완료 125 / 미완료 160. 실제 설치된 VS/Rider GUI/Windows GPU 및 Android 실기기 수용 아님.
+- NAV-013 군집 회피는 결정적인 단순 반경·스윕 충돌 방지와 제한적인 회피 우회이며, 대규모 crowd/ORCA 수준 완성으로 해석하지 않는다. Debug.Log는 caller path/line 및 severity를 보존하고 Editor Console에 연결한다. C# 컴파일 오류는 프로젝트 안의 유효한 파일만 더블 클릭 열기를 허용한다.
+- 본 저장소의 1.0 요구 및 미완료 내역은 [CHECKLIST.md](CHECKLIST.md)가 유일한 원장이다.
+
 ## 2026-10-26 현행 Navigation 수용 보충
 
 - PR [#39](https://github.com/skatmdgn/NEngine/pull/39) 코드 SHA `8fe399b6b57b5c6e01b98fcd17f030ef3720eaa4`: Scene MeshRenderer Bake, 계층 Transform, 정적 장애물 clearance, T-junction·funnel, Scene/Editor/Player 및 C# NavMeshAgent, 장애물 변경 재탐색을 Windows·Ubuntu Debug/Release 각각 **37/37 CTest PASS**로 검증([CI 40249542956](https://github.com/skatmdgn/NEngine/actions/runs/40249542956)). 1.0 수용 원장에는 **서로 다른 8개 ID만** 반영하고, 미완료 167개를 남긴다.
