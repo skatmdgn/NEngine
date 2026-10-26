@@ -1488,6 +1488,9 @@ int main() {
     check(model.available_component_types().empty() &&
           !model.add_component_to_selection(render::light_type()),
           "EDTOOL-003 no selection rejects insertion");
+    model.commands().clear();
+    check(world.destroy(selection_a)&&world.destroy(selection_b),
+          "EDTOOL-003 remove additional test entities before Hierarchy checks");
     // EDTOOL-004: the actual generated .sln can be safely launched with
     // file association, Visual Studio or Rider, including Unicode paths.
     {
@@ -2597,11 +2600,14 @@ int main() {
         { std::ofstream f(broken);f<<"public class Broken {\n"; }
         const auto external=diagnostics_root.parent_path()/"outside_script.cs";
         { std::ofstream f(external);f<<"external"; }
-        const std::string file=broken.string();
+        const auto encoded=broken.u8string();
+        const std::string file(encoded.begin(),encoded.end());
         const std::string source_output=
             file+"(12,5): error CS1002: ; expected [Game.csproj]\n"+
             file+"(13,2): warning CS0168: unused variable [Game.csproj]\n"+
-            external.string()+"(1,1): error CS1003: outside [Other.csproj]\n";
+            [&](){const auto text=external.u8string();
+                  return std::string(text.begin(),text.end());}()+
+            "(1,1): error CS1003: outside [Other.csproj]\n";
         editor::ConsoleModel diagnostics;
         diagnostics.report_dotnet_build(source_output,diagnostics_root);
         check(diagnostics.entries().size()==2 &&
@@ -2611,7 +2617,8 @@ int main() {
               diagnostics.entries()[1].source_line==13 &&
               diagnostics.entries()[1].severity==editor::LogSeverity::Warning,
               "EDIT-014: managed build diagnostics reach structured Console with source line and severity");
-        check(diagnostics.entries()[0].source_file==
+        check(!diagnostics.entries().empty() &&
+              diagnostics.entries()[0].source_file==
               std::filesystem::weakly_canonical(broken) &&
               diagnostics.entries()[0].message.find("CS1002")!=std::string::npos,
               "EDIT-014: diagnostic retains absolute safe clickable script file");

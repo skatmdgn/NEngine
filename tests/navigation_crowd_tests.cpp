@@ -29,7 +29,13 @@ int main(){
         first,navigation::nav_agent_type());
     auto* b=world.add_component<navigation::NavAgentComponent>(
         second,navigation::nav_agent_type());
+    // Pool insertion can resize storage, invalidating earlier pointers.
+    a=world.get_component<navigation::NavAgentComponent>(
+        first,navigation::nav_agent_type());
+    b=world.get_component<navigation::NavAgentComponent>(
+        second,navigation::nav_agent_type());
     check(a&&b,"NAV-013: two independent Scene NavMeshAgents");
+    if(!a||!b)return EXIT_FAILURE;
     a->radius=.18f;b->radius=.18f;
     a->speed=2.f;b->speed=2.f;
     a->target={5.6f,0,1.f};b->target={.4f,0,1.f};
@@ -55,6 +61,11 @@ int main(){
         fast_a,navigation::nav_agent_type());
     auto* static_agent=fast.add_component<navigation::NavAgentComponent>(
         stationary,navigation::nav_agent_type());
+    fast_agent=fast.get_component<navigation::NavAgentComponent>(
+        fast_a,navigation::nav_agent_type());
+    static_agent=fast.get_component<navigation::NavAgentComponent>(
+        stationary,navigation::nav_agent_type());
+    if(!fast_agent||!static_agent)return EXIT_FAILURE;
     fast_agent->radius=.2f;static_agent->radius=.2f;
     fast_agent->speed=10.f;fast_agent->has_destination=true;
     fast_agent->target={5.8f,0,1.f};
