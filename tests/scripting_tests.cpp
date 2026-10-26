@@ -2256,7 +2256,15 @@ int main() {
                 << "        yield return new WaitForSeconds(0.03f);\n"
                 << "        gameObject.name = \"Coroutine Done\";\n"
                 << "    }\n"
-                << "    private void Start() { StartCoroutine(Routine()); }\n"
+                << "    private int released;\n"
+                << "    private System.Collections.IEnumerator Hold() { try { yield return new WaitForSeconds(99f); throw new System.Exception(\\"canceled coroutine resumed\\"); } finally { released++; } }\n"
+                << "    private System.Collections.IEnumerator Nested() { try { yield return Hold(); } finally { released++; } }\n"
+                << "    private void Start() {\n"
+                << "        Coroutine nested = StartCoroutine(Nested()); StopCoroutine(nested); if (released != 2) throw new System.Exception(\\"nested coroutine did not dispose\\");\n"
+                << "        var root = Hold(); StartCoroutine(root); StopCoroutine(root); if (released != 3) throw new System.Exception(\\"StopCoroutine IEnumerator failed\\");\n"
+                << "        StartCoroutine(Hold()); StopAllCoroutines(); if (released != 4) throw new System.Exception(\\"StopAllCoroutines failed\\");\n"
+                << "        StartCoroutine(Routine());\n"
+                << "    }\n"
                 << "}\n";
         }
 

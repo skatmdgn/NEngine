@@ -2251,6 +2251,7 @@ std::string api_stub(
     public sealed class Coroutine
     {
         private readonly Stack<IEnumerator> _stack = new();
+        internal IEnumerator root { get; }
         private float _waitSeconds;
         private bool _waitingSeconds;
         private bool _deferFirstAdvance = true;
@@ -2260,6 +2261,7 @@ std::string api_stub(
 
         internal Coroutine(IEnumerator routine)
         {
+            root = routine ?? throw new ArgumentNullException(nameof(routine));
             _stack.Push(
                 routine ?? throw new ArgumentNullException(nameof(routine)));
 
@@ -2269,13 +2271,20 @@ std::string api_stub(
         internal void Stop()
         {
             stopped = true;
-            _stack.Clear();
+            // Dispose nested enumerators too: iterator finally blocks release
+            // scoped game resources and must run on Stop/scene teardown.
+            while (_stack.Count != 0)
+                (_stack.Pop() as IDisposable)?.Dispose();
+            _waitSeconds = 0;
+            _waitingSeconds = false;
         }
 
         internal void Advance(float deltaTime)
         {
             if (stopped || completed)
                 return;
+            if (!float.IsFinite(deltaTime) || deltaTime < 0)
+                throw new ArgumentOutOfRangeException(nameof(deltaTime));
 
             if (_deferFirstAdvance)
             {
@@ -2305,7 +2314,7 @@ std::string api_stub(
 
                 if (!top.MoveNext())
                 {
-                    _stack.Pop();
+                    (_stack.Pop() as IDisposable)?.Dispose();
                     continue;
                 }
 
@@ -2396,7 +2405,20 @@ std::string api_stub(
         public void StopCoroutine(Coroutine coroutine)
         {
             if (coroutine == null) return;
+            if (!_coroutines.Contains(coroutine)) return;
             coroutine.Stop();
+            _coroutines.Remove(coroutine);
+        }
+
+        public void StopCoroutine(IEnumerator routine)
+        {
+            if (routine == null) return;
+            for (int i = _coroutines.Count - 1; i >= 0; --i)
+            {
+                if (!ReferenceEquals(_coroutines[i].root, routine)) continue;
+                _coroutines[i].Stop();
+                _coroutines.RemoveAt(i);
+            }
         }
 
         public void StopAllCoroutines()
