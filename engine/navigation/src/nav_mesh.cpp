@@ -84,6 +84,7 @@ bool NavMesh::add_polygon(std::vector<core::Vec3> vertices,
     const NavId id=static_cast<NavId>(polygons_.size());
     polygons_.push_back({id,std::move(vertices),center,area,cost,true});
     if(out_id) *out_id=id;
+    ++revision_;
     return true;
 }
 const NavPolygon* NavMesh::polygon(NavId id) const noexcept {
@@ -92,6 +93,7 @@ const NavPolygon* NavMesh::polygon(NavId id) const noexcept {
 bool NavMesh::set_polygon_enabled(NavId id,bool enabled) noexcept {
     if(id>=polygons_.size())return false;
     polygons_[id].enabled=enabled;
+    ++revision_;
     return true;
 }
 bool NavMesh::set_polygon_area(NavId id,std::uint32_t mask,float cost) noexcept {
@@ -99,6 +101,7 @@ bool NavMesh::set_polygon_area(NavId id,std::uint32_t mask,float cost) noexcept 
        cost<1.f||cost>100000.f)return false;
     polygons_[id].area_mask=mask;
     polygons_[id].traversal_cost=cost;
+    ++revision_;
     return true;
 }
 bool NavMesh::contains(NavId id,core::Vec3 point) const noexcept {
@@ -112,6 +115,7 @@ bool NavMesh::connect(NavId a,NavId b) {
     for(const auto& edge:edges_)
         if(edge.first==pair.first&&edge.second==pair.second)return false;
     edges_.push_back({pair.first,pair.second});
+    ++revision_;
     return true;
 }
 bool NavMesh::add_link(NavId from,NavId to,core::Vec3 enter,
@@ -122,11 +126,13 @@ bool NavMesh::add_link(NavId from,NavId to,core::Vec3 enter,
     const NavId id=static_cast<NavId>(links_.size());
     links_.push_back({id,from,to,enter,exit,cost,bidirectional,true});
     if(out_id)*out_id=id;
+    ++revision_;
     return true;
 }
 bool NavMesh::set_link_enabled(NavId id,bool enabled) noexcept {
     if(id>=links_.size())return false;
     links_[id].enabled=enabled;
+    ++revision_;
     return true;
 }
 bool NavMesh::add_obstacle(core::Vec3 center,float radius,NavId* out_id){
@@ -135,16 +141,19 @@ bool NavMesh::add_obstacle(core::Vec3 center,float radius,NavId* out_id){
     const NavId id=static_cast<NavId>(obstacles_.size());
     obstacles_.push_back({id,center,radius,true});
     if(out_id)*out_id=id;
+    ++revision_;
     return true;
 }
 bool NavMesh::remove_obstacle(NavId id) noexcept {
     if(id>=obstacles_.size()||!obstacles_[id].enabled)return false;
     obstacles_[id].enabled=false;
+    ++revision_;
     return true;
 }
 bool NavMesh::set_obstacle_enabled(NavId id,bool enabled) noexcept {
     if(id>=obstacles_.size())return false;
     obstacles_[id].enabled=enabled;
+    ++revision_;
     return true;
 }
 bool NavMesh::blocked(NavId id,float agent_radius) const noexcept {
@@ -173,5 +182,6 @@ std::optional<NavId> NavMesh::locate(core::Vec3 p,const NavQuery& q) const noexc
 }
 void NavMesh::clear() noexcept {
     polygons_.clear();edges_.clear();links_.clear();obstacles_.clear();
+    ++revision_;
 }
 } // namespace nengine::navigation

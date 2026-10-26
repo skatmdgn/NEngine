@@ -242,6 +242,66 @@ int main() {
           roundtrip.find_path({.8f,0,.2f},{.2f,0,.8f}).has_value(),
           "baked surface .nnav persistence roundtrip");
 
+
+    // NAV-008: explicitly resolve a T-junction instead of silently
+    // disconnecting the two walkable halves of a shared boundary.
+    {
+        std::vector<NavBakeTriangle> junction{
+            tri({0,0,0},{2,0,0},{0,0,1}),
+            tri({1,0,0},{2,0,0},{1,0,-1})
+        };
+        NavBakeOptions option;
+        check(bake_nav_triangles(junction,out,option) &&
+              out.edges().empty(),
+              "NAV-008: legacy mode retains original unconnected triangles");
+        option.resolve_t_junctions=true;
+        check(bake_nav_triangles(junction,out,option,&report,&error) &&
+              out.edges().size()>=1u && report.input_triangles==2u &&
+              report.accepted_triangles>=3u &&
+              out.find_path({.5f,0,.15f},{1.5f,0,-.15f}),
+              "NAV-008: T-junction is subdivided into routable full seams");
+        option.max_input_triangles=2u;
+        const auto saved=out.polygons().size();
+        check(!bake_nav_triangles(junction,out,option,&report,&error) &&
+              out.polygons().size()==saved && !error.empty(),
+              "NAV-008: T-junction budget overflow is transactional");
+        option.max_input_triangles=100u;
+        std::vector<NavBakeTriangle> nonmanifold{
+            tri(),tri({1,0,0},{0,0,0},{1,0,-1}),
+            tri({0,0,0},{1,0,0},{.5f,0,-1})
+        };
+        check(!bake_nav_triangles(nonmanifold,out,option,&report,&error) &&
+              out.polygons().size()==saved,
+              "NAV-008: non-manifold seams remain rejected with subdivision");
+    }
+
+    // NAV-007: static clearance is accounted for at bake time rather
+    // than allowing a too-wide agent to cross an impossible portal.
+    {
+        NavBakeOptions narrow;
+        narrow.agent_radius=.72f;
+        check(bake_indexed_nav_mesh(vertices,indices,out,narrow,
+                                    1u,1.f,&report,&error) &&
+              out.polygons().size()==2u && out.edges().empty(),
+              "NAV-007: agent diameter closes inadequate width portal");
+        narrow.agent_radius=.1f;
+        check(bake_indexed_nav_mesh(vertices,indices,out,narrow,
+                                    1u,1.f,&report,&error) &&
+              out.edges().size()==1u,
+              "NAV-007: walkable seam preserved for smaller agent");
+        narrow.obstacles.push_back({{.15f,0,.8f},.15f});
+        check(bake_indexed_nav_mesh(vertices,indices,out,narrow,
+                                    1u,1.f,&report,&error) &&
+              report.filtered_clearance>=1u &&
+              !out.obstacles().empty(),
+              "NAV-007: static obstacle and inflated clearance exclude polygons");
+        const auto prior=out.polygons().size();
+        narrow.obstacles[0].radius=-1.f;
+        check(!bake_indexed_nav_mesh(vertices,indices,out,narrow,
+                                     1u,1.f,&report,&error) &&
+              out.polygons().size()==prior && !error.empty(),
+              "NAV-007: invalid clearance source is rejected transactionally");
+    }
     if (failed) {
         std::cerr << "NEngineNavigationBakeTests: " << failed
                   << " failed / " << passed << " passed\n";

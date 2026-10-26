@@ -2,8 +2,12 @@
 #include "nengine/editor/audio_integration.hpp"
 #include "nengine/editor/render_integration.hpp"
 #include "nengine/editor/physics_integration.hpp"
+#include "nengine/editor/navigation_integration.hpp"
 #include "nengine/editor/scripting_integration.hpp"
 #include "nengine/physics/simulation.hpp"
+#include "nengine/navigation/registration.hpp"
+#include "nengine/navigation/components.hpp"
+#include "nengine/navigation/nav_scene_agent.hpp"
 #include "nengine/ui/canvas_serialization.hpp"
 #include <algorithm>
 #include <chrono>
@@ -399,6 +403,19 @@ EditorModel::EditorModel() {
         console_.warning(
             "Editor",
             "Scripting component factories were only partially registered.");
+    }
+
+    if(!navigation::register_component_metadata(component_registry_) ||
+       !navigation::register_component_serializers(component_serialization_) ||
+       !component_factories_.register_factory(navigation::nav_agent_type(),
+          [](core::World& world,core::Entity entity){
+              return world.add_component<navigation::NavAgentComponent>(
+                  entity,navigation::nav_agent_type())!=nullptr;
+          })){
+        console_.warning("Editor","NavMeshAgent registration failed");
+    }
+    if(!register_navigation_property_access(property_access_)){
+        console_.warning("Editor","NavMeshAgent Inspector property bindings failed");
     }
 
     managed_script_system_.bind(
@@ -1348,6 +1365,7 @@ void EditorModel::tick_runtime(
                 },
                 &animation_error);
 
+            navigation::step_scene_agents(*runtime,navigation_,fixed_delta);
             const auto physics_frame =
                 physics::step_physics(
                     *runtime,
