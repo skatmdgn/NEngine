@@ -3,6 +3,7 @@ add_library(NEngineEditorModel STATIC
   src/command.cpp
   src/component_factory.cpp
   src/console_model.cpp
+  src/dotnet_diagnostics.cpp
   src/editor_layout.cpp
   src/ide_launch.cpp
   src/editor_model.cpp

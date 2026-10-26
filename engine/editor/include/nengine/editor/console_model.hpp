@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -21,6 +22,9 @@ struct ConsoleEntry {
     std::string source{};
     std::string message{};
     std::uint32_t repeat_count{1};
+    std::filesystem::path source_file{};
+    std::uint32_t source_line{0};
+    std::uint32_t source_column{0};
 };
 
 struct ConsoleFilter {
@@ -59,6 +63,8 @@ public:
         return entries_;
     }
 
+    void report_dotnet_build(std::string_view output,
+        const std::filesystem::path& project_root);
     std::vector<ConsoleEntry> filtered(const ConsoleFilter& filter) const;
 
     std::size_t count(LogSeverity severity) const noexcept;
