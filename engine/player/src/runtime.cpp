@@ -1,4 +1,5 @@
 #include "nengine/player/runtime.hpp"
+#include <iostream>
 #include "nengine/player/managed_queries.hpp"
 #include "nengine/player/managed_properties.hpp"
 #include "nengine/input/action_map_io.hpp"
@@ -92,6 +93,12 @@ bool PlayerRuntime::initialize_managed(std::string* error) {
         if (error) *error = managed_runtime_.diagnostic();
         return false;
     }
+    managed_runtime_.bind_logging(nullptr,
+        [](void*,int level,std::string_view msg,std::string_view file,int line){
+            auto& stream=level==2?std::cerr:std::cout;
+            stream<<"[C# "<<(level==2?"ERROR":level==1?"WARN":"INFO")
+                  <<"] "<<file<<":"<<line<<" "<<msg<<"\\n";
+        });
     managed_runtime_.bind_input(&input_);
     managed_runtime_.bind_input_actions(&actions_);
     managed_runtime_.bind_ui(

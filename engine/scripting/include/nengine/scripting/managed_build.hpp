@@ -34,6 +34,7 @@ struct ManagedBuildResult {
     int exit_code{-1};
     ManagedBuildPlan plan{};
     std::string message{};
+    std::string output{}; // bounded stdout/stderr compiler diagnostics
 };
 
 std::optional<std::filesystem::path>

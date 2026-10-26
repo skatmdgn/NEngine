@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <climits>
+#include <array>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <optional>
@@ -397,38 +399,55 @@ ManagedBuildResult run_managed_build(
     }
 
 #if defined(_WIN32)
-    std::wstring command = windows_argv_quote(result.plan.executable.wstring());
-    for (const auto& argument : result.plan.arguments) {
-        const auto wide = utf8_to_wide(argument);
-        if (!wide) {
-            result.message = "managed build argument is not valid UTF-8";
-            return result;
-        }
-        command.push_back(L' ');
-        command += windows_argv_quote(*wide);
+    std::wstring command=windows_argv_quote(result.plan.executable.wstring());
+    for(const auto& arg:result.plan.arguments){
+        auto wide=utf8_to_wide(arg);
+        if(!wide){result.message="managed build argument is invalid UTF-8";return result;}
+        command.push_back(L' ');command+=windows_argv_quote(*wide);
     }
-    STARTUPINFOW startup{};
-    startup.cb = sizeof(startup);
-    PROCESS_INFORMATION process{};
-    if (!CreateProcessW(result.plan.executable.c_str(), command.data(),
-            nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
-            nullptr, nullptr, &startup, &process)) {
-        result.message = "could not launch dotnet build with CreateProcessW";
-        return result;
+    SECURITY_ATTRIBUTES security{sizeof(SECURITY_ATTRIBUTES),nullptr,TRUE};
+    HANDLE read_pipe=nullptr,write_pipe=nullptr;
+    if(!CreatePipe(&read_pipe,&write_pipe,&security,0)){
+        result.message="managed compiler output pipe creation failed";return result;
     }
-    const DWORD wait_status = WaitForSingleObject(process.hProcess, INFINITE);
-    DWORD exit_code = 0;
-    const bool finished = wait_status == WAIT_OBJECT_0 &&
-        GetExitCodeProcess(process.hProcess, &exit_code);
-    CloseHandle(process.hThread);
-    CloseHandle(process.hProcess);
-    result.exit_code = finished ? static_cast<int>(exit_code) : -1;
+    if(!SetHandleInformation(read_pipe,HANDLE_FLAG_INHERIT,0)){
+        CloseHandle(read_pipe);CloseHandle(write_pipe);
+        result.message="managed compiler output pipe isolation failed";return result;
+    }
+    STARTUPINFOW startup{};startup.cb=sizeof(startup);
+    startup.dwFlags=STARTF_USESTDHANDLES;
+    startup.hStdOutput=write_pipe;startup.hStdError=write_pipe;
+    startup.hStdInput=GetStdHandle(STD_INPUT_HANDLE);
+    PROCESS_INFORMATION proc{};
+    bool launched=CreateProcessW(result.plan.executable.c_str(),command.data(),
+        nullptr,nullptr,TRUE,CREATE_NO_WINDOW,nullptr,nullptr,&startup,&proc)!=0;
+    CloseHandle(write_pipe);
+    if(!launched){CloseHandle(read_pipe);result.message="dotnet launch failed";return result;}
+    std::array<char,4096> buffer{};DWORD got=0;
+    while(ReadFile(read_pipe,buffer.data(),static_cast<DWORD>(buffer.size()),&got,nullptr)&&got){
+        const std::size_t left=2097152u-result.output.size();
+        result.output.append(buffer.data(),std::min<std::size_t>(got,left));
+    }
+    CloseHandle(read_pipe);
+    const auto wait=WaitForSingleObject(proc.hProcess,INFINITE);
+    DWORD exit=0;
+    const bool finished=wait==WAIT_OBJECT_0&&GetExitCodeProcess(proc.hProcess,&exit);
+    CloseHandle(proc.hThread);CloseHandle(proc.hProcess);
+    result.exit_code=finished?static_cast<int>(exit):-1;
 #else
     std::ostringstream command;
-    command << shell_quote(result.plan.executable.string());
-    for (const auto& argument : result.plan.arguments)
-        command << ' ' << shell_quote(argument);
-    result.exit_code = normalize_exit_code(std::system(command.str().c_str()));
+    command<<shell_quote(result.plan.executable.string());
+    for(const auto& arg:result.plan.arguments)command<<' '<<shell_quote(arg);
+    command<<" 2>&1";
+    FILE* pipe=popen(command.str().c_str(),"r");
+    if(!pipe){result.message="dotnet output capture failed";return result;}
+    std::array<char,4096> buffer{};
+    while(std::fgets(buffer.data(),static_cast<int>(buffer.size()),pipe)){
+        const std::size_t left=2097152u-result.output.size();
+        result.output.append(buffer.data(),std::min(
+            left,std::char_traits<char>::length(buffer.data())));
+    }
+    result.exit_code=normalize_exit_code(pclose(pipe));
 #endif
 
     if (result.exit_code != 0) {

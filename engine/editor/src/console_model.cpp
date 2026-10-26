@@ -1,4 +1,5 @@
 #include "nengine/editor/console_model.hpp"
+#include "nengine/editor/dotnet_diagnostics.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -52,6 +53,18 @@ void ConsoleModel::push(
         std::move(message),
         1
     });
+}
+
+void ConsoleModel::report_dotnet_build(
+    std::string_view output,const std::filesystem::path& project_root) {
+    for(const auto& d:parse_dotnet_diagnostics(output,project_root)){
+        push(d.is_error?LogSeverity::Error:LogSeverity::Warning,
+             "C# Build",d.code+": "+d.message,false);
+        auto& entry=entries_.back();
+        entry.source_file=d.source;
+        entry.source_line=d.line;
+        entry.source_column=d.column;
+    }
 }
 
 std::vector<ConsoleEntry> ConsoleModel::filtered(

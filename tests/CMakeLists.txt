@@ -63,6 +63,11 @@ target_link_libraries(NEngineNavigationComponentTests PRIVATE NEngineEditorModel
 target_compile_features(NEngineNavigationComponentTests PRIVATE cxx_std_20)
 add_test(NAME NEngineNavigationComponentTests COMMAND NEngineNavigationComponentTests)
 
+add_executable(NEngineNavigationCrowdTests navigation_crowd_tests.cpp)
+target_link_libraries(NEngineNavigationCrowdTests PRIVATE NEngineNavigation NEngineRender)
+target_compile_features(NEngineNavigationCrowdTests PRIVATE cxx_std_20)
+add_test(NAME NEngineNavigationCrowdTests COMMAND NEngineNavigationCrowdTests)
+
 add_executable(NEngineAudioTests audio_tests.cpp)
 target_link_libraries(NEngineAudioTests PRIVATE NEngineAudio)
 target_compile_features(NEngineAudioTests PRIVATE cxx_std_20)

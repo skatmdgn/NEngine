@@ -14,6 +14,7 @@
 #include "nengine/audio/components.hpp"
 #include "nengine/core/scene.hpp"
 #include "nengine/editor/editor_model.hpp"
+#include "nengine/editor/ide_launch.hpp"
 #include "nengine/editor/project_manifest.hpp"
 #include "nengine/editor/presentation.hpp"
 #include "nengine/editor/property_command.hpp"
@@ -1457,6 +1458,78 @@ int main() {
 
     model.commands().clear();
 
+    // EDTOOL-003: the Win32 add-component combo and action must agree
+    // with the model's live selection, not a stale entity snapshot.
+    const auto selection_a=world.create("Add Menu A");
+    const auto selection_b=world.create("Add Menu B");
+    model.selection().set(selection_a);
+    auto available=model.available_component_types();
+    check(std::find(available.begin(),available.end(),
+                    render::light_type())!=available.end() &&
+          model.add_component_to_selection(render::light_type()) &&
+          world.has_component(selection_a,render::light_type()),
+          "EDTOOL-003 selected object owns new light component");
+    const auto remaining=model.available_component_types();
+    check(!model.add_component_to_selection(render::light_type()) &&
+          std::find(remaining.begin(),remaining.end(),
+                    render::light_type())==remaining.end(),
+          "EDTOOL-003 duplicate component is absent from menu");
+    model.selection().set(selection_b);
+    check(model.add_component_to_selection(render::camera_type()) &&
+          world.has_component(selection_b,render::camera_type()) &&
+          !world.has_component(selection_a,render::camera_type()),
+          "EDTOOL-003 selection switch changes insertion target");
+    check(model.commands().undo(world) &&
+          !world.has_component(selection_b,render::camera_type()) &&
+          model.commands().redo(world) &&
+          world.has_component(selection_b,render::camera_type()),
+          "EDTOOL-003 add menu supports Undo and Redo");
+    model.selection().clear();
+    check(model.available_component_types().empty() &&
+          !model.add_component_to_selection(render::light_type()),
+          "EDTOOL-003 no selection rejects insertion");
+    model.commands().clear();
+    check(world.destroy(selection_a)&&world.destroy(selection_b),
+          "EDTOOL-003 remove additional test entities before Hierarchy checks");
+    // EDTOOL-004: the actual generated .sln can be safely launched with
+    // file association, Visual Studio or Rider, including Unicode paths.
+    {
+        const auto ide_root=std::filesystem::temp_directory_path()/
+            "NEngine IDE 한글 space";
+        std::filesystem::create_directories(ide_root);
+        const auto solution=ide_root/"Game Scripts.sln";
+        const auto ide_exe=ide_root/"rider test.exe";
+        {
+            std::ofstream file(solution);
+            file<<"Microsoft Visual Studio Solution File";
+            std::ofstream exe(ide_exe);
+            exe<<"fixture";
+        }
+        std::string ide_error;
+        const auto automatic=editor::prepare_ide_launch(
+            solution,editor::IdeChoice::Associated,{},&ide_error);
+        const auto vs=editor::prepare_ide_launch(
+            solution,editor::IdeChoice::VisualStudio,{},&ide_error);
+        const auto rider=editor::prepare_ide_launch(
+            solution,editor::IdeChoice::Rider,ide_exe,&ide_error);
+        check(automatic&&automatic->use_file_association&&
+              automatic->executable==solution,
+              "EDTOOL-004: Windows .sln shell association launch");
+        check(vs&&!vs->use_file_association&&
+              vs->executable==std::filesystem::path(L"devenv.exe"),
+              "EDTOOL-004: explicit Visual Studio executable plan");
+        check(rider&&!rider->use_file_association&&
+              rider->executable==ide_exe&&
+              rider->parameters.find(L"Game Scripts.sln")!=std::wstring::npos,
+              "EDTOOL-004: Rider launch safely quotes Unicode solution path");
+        check(!editor::prepare_ide_launch(
+                ide_root/"missing.sln",editor::IdeChoice::Rider,{},&ide_error) &&
+              !ide_error.empty(),
+              "EDTOOL-004: missing solution is a safe launch error");
+        std::filesystem::remove_all(ide_root);
+    }
+    model.commands().clear();
+
     const auto capsule_property_entity =
         world.create(
             "Capsule Property Validation");
@@ -2516,6 +2589,45 @@ int main() {
     std::filesystem::remove_all(
         project_root,
         cleanup_error);
+
+    // EDIT-014: stdout/stderr compiler diagnostics retain line/column and
+    // never open arbitrary paths outside the active project.
+    {
+        auto diagnostics_root=std::filesystem::temp_directory_path()/
+            "NEngine Diagnostics 한글";
+        std::filesystem::create_directories(diagnostics_root/"Assets"/"Scripts");
+        const auto broken=diagnostics_root/"Assets"/"Scripts"/"Broken.cs";
+        { std::ofstream f(broken);f<<"public class Broken {\n"; }
+        const auto external=diagnostics_root.parent_path()/"outside_script.cs";
+        { std::ofstream f(external);f<<"external"; }
+        const auto encoded=broken.u8string();
+        const std::string file(encoded.begin(),encoded.end());
+        const std::string source_output=
+            file+"(12,5): error CS1002: ; expected [Game.csproj]\n"+
+            file+"(13,2): warning CS0168: unused variable [Game.csproj]\n"+
+            [&](){const auto text=external.u8string();
+                  return std::string(text.begin(),text.end());}()+
+            "(1,1): error CS1003: outside [Other.csproj]\n";
+        editor::ConsoleModel diagnostics;
+        diagnostics.report_dotnet_build(source_output,diagnostics_root);
+        check(diagnostics.entries().size()==2 &&
+              diagnostics.entries()[0].source_line==12 &&
+              diagnostics.entries()[0].source_column==5 &&
+              diagnostics.entries()[0].severity==editor::LogSeverity::Error &&
+              diagnostics.entries()[1].source_line==13 &&
+              diagnostics.entries()[1].severity==editor::LogSeverity::Warning,
+              "EDIT-014: managed build diagnostics reach structured Console with source line and severity");
+        check(!diagnostics.entries().empty() &&
+              diagnostics.entries()[0].source_file==
+              std::filesystem::weakly_canonical(broken) &&
+              diagnostics.entries()[0].message.find("CS1002")!=std::string::npos,
+              "EDIT-014: diagnostic retains absolute safe clickable script file");
+        check(diagnostics.entries().size()==2,
+              "EDIT-014: compiler diagnostic outside project is discarded");
+        std::error_code ec;
+        std::filesystem::remove_all(diagnostics_root,ec);
+        std::filesystem::remove(external,ec);
+    }
 
     if (failures == 0) {
         std::cout << "NEngineEditorTests: PASS\n";

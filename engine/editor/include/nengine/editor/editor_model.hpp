@@ -114,6 +114,11 @@ public:
 
     bool can_edit() const noexcept { return !play_session_.is_playing(); }
 
+    // Single source of truth for the actual selected object's Add Component
+    // menu. The Win32 combo and commands use this same validated snapshot.
+    std::vector<core::ComponentTypeId> available_component_types() const;
+    bool add_component_to_selection(core::ComponentTypeId type);
+
     // Navigation graph is an independently authored .nnav asset.
     bool load_navigation(assets::AssetGuid guid,
                          std::string* error = nullptr);

@@ -29,6 +29,7 @@
 #include "nengine/scripting/dotnet_host.hpp"
 #include "nengine/scripting/managed_build.hpp"
 #include "nengine/scripting/managed_project.hpp"
+#include "nengine/editor/ide_launch.hpp"
 #include "nengine/scripting/managed_runtime.hpp"
 #include "nengine/render/vulkan_context.hpp"
 #include "nengine/render/vulkan_diagnostic_scene.hpp"
@@ -2365,6 +2366,11 @@ struct Win32EditorShell::Impl {
             }
 
             line += entry.message;
+            if(!entry.source_file.empty()){
+                line+=" ["+wide_to_utf8(entry.source_file.wstring())+
+                    "("+std::to_string(entry.source_line)+","+
+                    std::to_string(entry.source_column)+")]";
+            }
 
             if (entry.repeat_count > 1) {
                 line += " (x" +
@@ -3247,28 +3253,12 @@ struct Win32EditorShell::Impl {
             return;
         }
 
-        for (const auto& descriptor :
-             editor.component_registry()
-                 .descriptors()) {
-
-            if (descriptor.id ==
-                    nengine::core::World::
-                        transform_type ||
-                !editor.component_factories()
-                    .contains(
-                        descriptor.id) ||
-                editor.world()
-                    .has_component(
-                        snapshot.entity,
-                        descriptor.id)) {
-                continue;
-            }
-
-            add_component_rows.push_back(
-                descriptor.id);
-
-            auto display =
-                descriptor.name;
+        for (const auto type :
+             editor.available_component_types()) {
+            const auto* descriptor=editor.component_registry().find(type);
+            if(!descriptor)continue;
+            add_component_rows.push_back(type);
+            auto display=descriptor->name;
 
             constexpr std::string_view
                 prefix{"NEngine."};
@@ -3629,6 +3619,8 @@ struct Win32EditorShell::Impl {
                 run_managed_build(
                     build_config);
 
+        editor.console().report_dotnet_build(
+            build.output,editor.project().root());
         if (!build.success) {
             editor.console().error(
                 "Scripting",
@@ -3782,20 +3774,25 @@ struct Win32EditorShell::Impl {
                     packages.size()) +
                 " NuGet package reference(s).");
 
-        const auto solution =
-            output.solution_path.wstring();
-
-        const HINSTANCE launched =
-            ShellExecuteW(
-                host,
-                L"open",
-                solution.c_str(),
-                nullptr,
-                editor.project()
-                    .root()
-                    .wstring()
-                    .c_str(),
-                SW_SHOWNORMAL);
+        // Ctrl+Scripts launches Visual Studio, Shift+Scripts Rider;
+        // a plain click keeps the user's .sln file association.
+        const auto ide=(GetKeyState(VK_CONTROL)&0x8000)!=0
+            ? nengine::editor::IdeChoice::VisualStudio
+            : (GetKeyState(VK_SHIFT)&0x8000)!=0
+              ? nengine::editor::IdeChoice::Rider
+              : nengine::editor::IdeChoice::Associated;
+        const auto launch=nengine::editor::prepare_ide_launch(
+            output.solution_path,ide,{},&error);
+        if(!launch){
+            editor.console().error("Scripting","IDE launch rejected: "+error);
+            refresh_console();return false;
+        }
+        const auto executable=launch->executable.wstring();
+        const auto working=launch->working_directory.wstring();
+        const HINSTANCE launched=ShellExecuteW(
+            host,L"open",executable.c_str(),
+            launch->use_file_association?nullptr:launch->parameters.c_str(),
+            working.c_str(),SW_SHOWNORMAL);
 
         const auto result =
             reinterpret_cast<INT_PTR>(
@@ -4273,6 +4270,20 @@ struct Win32EditorShell::Impl {
             handled = true;
             break;
 
+        case IdConsole:
+            if(notification!=LBN_DBLCLK)return false;
+            {
+                const auto index=static_cast<int>(
+                    SendMessageW(console,LB_GETCURSEL,0,0));
+                const auto& entries=editor.console().entries();
+                if(index>=0&&static_cast<std::size_t>(index)<entries.size()&&
+                   !entries[static_cast<std::size_t>(index)].source_file.empty())
+                    open_external_path(entries[static_cast<std::size_t>(index)].source_file,
+                        "C# Build");
+            }
+            handled=true;
+            break;
+
         case IdAssets:
             if (notification == LBN_SELCHANGE) {
                 refresh_generic_property_value();
@@ -4454,15 +4465,7 @@ struct Win32EditorShell::Impl {
                                 type);
 
                     const bool added =
-                        editor.commands().execute(
-                            editor.world(),
-                            std::make_unique<
-                                nengine::editor::
-                                    AddComponentCommand>(
-                                        entity,
-                                        type,
-                                        &editor
-                                            .component_factories()));
+                        editor.add_component_to_selection(type);
 
                     if (added) {
                         editor.console().info(
