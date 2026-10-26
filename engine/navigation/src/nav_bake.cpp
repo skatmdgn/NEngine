@@ -57,6 +57,71 @@ core::Vec3 weld(core::Vec3 p, float tolerance) {
     };
     return {snap(p.x), snap(p.y), snap(p.z)};
 }
+
+bool on_edge_interior(core::Vec3 p,core::Vec3 a,core::Vec3 b,double& t) {
+    const double dx=static_cast<double>(b.x)-a.x;
+    const double dy=static_cast<double>(b.y)-a.y;
+    const double dz=static_cast<double>(b.z)-a.z;
+    const double length2=dx*dx+dy*dy+dz*dz;
+    if(length2<=1e-12)return false;
+    t=((static_cast<double>(p.x)-a.x)*dx+
+       (static_cast<double>(p.y)-a.y)*dy+
+       (static_cast<double>(p.z)-a.z)*dz)/length2;
+    if(t<=1e-5||t>=1.-1e-5)return false;
+    const double ex=static_cast<double>(a.x)+t*dx-p.x;
+    const double ey=static_cast<double>(a.y)+t*dy-p.y;
+    const double ez=static_cast<double>(a.z)+t*dz-p.z;
+    return ex*ex+ey*ey+ez*ez<=1e-10;
+}
+bool subdivide_t_junctions(std::span<const NavBakeTriangle> original,
+                           std::size_t limit,
+                           std::vector<NavBakeTriangle>& expanded,
+                           std::string* error) {
+    for(const auto& face:original){
+        std::vector<core::Vec3> boundary;
+        bool split=false;
+        for(std::size_t edge=0;edge<3u;++edge){
+            const auto a=face.vertices[edge];
+            const auto b=face.vertices[(edge+1u)%3u];
+            boundary.push_back(a);
+            std::vector<std::pair<double,core::Vec3>> positions;
+            for(const auto& other:original) {
+                for(const auto point:other.vertices){
+                    double t=0.;
+                    if(on_edge_interior(point,a,b,t))positions.push_back({t,point});
+                }
+            }
+            std::sort(positions.begin(),positions.end(),[](const auto& x,const auto& y){
+                return x.first<y.first;
+            });
+            double last=-1.;
+            for(const auto& [t,p]:positions){
+                if(t-last<1e-5)continue;
+                boundary.push_back(p);
+                last=t;
+                split=true;
+            }
+        }
+        const std::size_t generated=split?boundary.size():1u;
+        if(generated>limit||expanded.size()>limit-generated)
+            return fail(error,"T-junction expansion exceeds navigation triangle budget");
+        if(!split) {
+            expanded.push_back(face);
+            continue;
+        }
+        const auto& v=face.vertices;
+        const core::Vec3 center{
+            (v[0].x+v[1].x+v[2].x)/3.f,
+            (v[0].y+v[1].y+v[2].y)/3.f,
+            (v[0].z+v[1].z+v[2].z)/3.f
+        };
+        for(std::size_t i=0;i<boundary.size();++i)
+            expanded.push_back({{center,boundary[i],
+                boundary[(i+1u)%boundary.size()]},
+                face.area_mask,face.traversal_cost});
+    }
+    return true;
+}
 } // namespace
 
 bool bake_nav_triangles(std::span<const NavBakeTriangle> triangles,
@@ -67,12 +132,19 @@ bool bake_nav_triangles(std::span<const NavBakeTriangle> triangles,
     if (triangles.size() > options.max_input_triangles)
         return fail(error, "navigation triangle input exceeds budget");
 
+    std::vector<NavBakeTriangle> expanded;
+    std::span<const NavBakeTriangle> faces_to_bake=triangles;
+    if(options.resolve_t_junctions) {
+        if(!subdivide_t_junctions(triangles,options.max_input_triangles,
+                                 expanded,error))return false;
+        faces_to_bake=expanded;
+    }
     NavMesh staged;
     NavBakeReport staged_report;
     staged_report.input_triangles = triangles.size();
     std::set<FaceKey> faces;
 
-    for (const auto& triangle : triangles) {
+    for (const auto& triangle : faces_to_bake) {
         if (triangle.area_mask == 0u ||
             !std::isfinite(triangle.traversal_cost) ||
             triangle.traversal_cost < 1.f ||

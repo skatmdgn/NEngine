@@ -26,6 +26,9 @@ struct NavBakeOptions {
     std::uint32_t allowed_area_mask{0xffffffffu};
     std::size_t max_input_triangles{NavMesh::max_polygons};
     bool connect_shared_edges{true};
+    // Split a triangle edge when another face terminates at its midpoint.
+    // Disabled by default for exact compatibility with authored triangle IDs.
+    bool resolve_t_junctions{false};
 };
 
 struct NavBakeReport {
@@ -40,7 +43,8 @@ struct NavBakeReport {
 
 // Transactional: output/report are updated only after complete validation.
 // Geometry after cooking consists of flat-or-nearly-flat convex triangles;
-// adjacency requires full matching edges (no T-junction splitting).
+// adjacency requires full matching edges; optional T-junction splitting
+// constructs compatible boundary segments before publishing the graph.
 bool bake_nav_triangles(std::span<const NavBakeTriangle> triangles,
                         NavMesh& output,
                         const NavBakeOptions& options = {},
