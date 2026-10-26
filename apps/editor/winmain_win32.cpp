@@ -11,6 +11,7 @@
 #include <thread>
 
 #include "nengine/core/scene.hpp"
+#include "nengine/core/build_identity.hpp"
 #include "nengine/editor/editor_model.hpp"
 #include "nengine/platform/window.hpp"
 #include "win32_editor_shell.hpp"
@@ -51,7 +52,7 @@ void write_log(std::string_view message) {
         std::ios::app | std::ios::binary);
     if (!stream) return;
 
-    stream << message << '\n';
+    stream << nengine::core::build_identity("Editor") << ' ' << message << '\n';
     stream.flush();
 }
 
@@ -308,11 +309,24 @@ int run_editor() {
     write_log(
         "STEP: entering Win32 event loop");
 
+    std::size_t profiler_frames=0;
+    double profiler_ms=0.0;
+    auto profiler_clock=std::chrono::steady_clock::now();
     while (window.poll_events()) {
+        const auto tick_start=std::chrono::steady_clock::now();
         editor.set_input_state(
             window.input_state());
 
         shell.tick();
+        profiler_ms += std::chrono::duration<double,std::milli>(
+            std::chrono::steady_clock::now()-tick_start).count();
+        if(++profiler_frames>=300u){
+            write_log("PROFILE avg_editor_tick_ms="+
+                std::to_string(profiler_ms/profiler_frames)+
+                " uptime_s="+std::to_string(std::chrono::duration<double>(
+                    std::chrono::steady_clock::now()-profiler_clock).count()));
+            profiler_ms=0;profiler_frames=0;
+        }
 
         std::this_thread::sleep_for(
             std::chrono::milliseconds(1));
