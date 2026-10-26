@@ -43,6 +43,10 @@ NEngine은 **Unity의 사용 경험과 개념에 익숙한 개발자가 쓸 수 
 3. [FILE_AUDIT.md](FILE_AUDIT.md)를 참고하되 실제 코드와 테스트를 다시 확인한다.
 4. [WORKFLOW.md](WORKFLOW.md) 방식으로 개발, 필요한 로컬 테스트, 최종 PR과 CI, 증거 기반 체크를 수행한다.
 
+## C# 컴파일 진단 (EDIT-014)
+
+Editor에서 **Build C#**을 실행하면 `dotnet build`의 오류와 경고 텍스트를 최대 2MiB까지 수집한다. `Assets/Scripts/파일.cs(행,열): error CSxxxx` 형식의 진단을 프로젝트 루트 안의 실제 파일로 검증하고 Console에 **심각도·CS 코드·파일·행·열**과 함께 표시한다. **Console 진단을 더블 클릭**하면 해당 C# 파일을 Windows 기본 연결 프로그램에서 연다. 줄 번호는 Console에 노출되며 연결 프로그램이 해당 행으로 자동 이동한다고 보장하지 않는다. 프로젝트 외부 파일은 자동 실행 대상으로 등록하지 않는다.
+
 ## IDE 연결 워크플로 (EDTOOL-004)
 
 Windows 에디터에서 프로젝트를 연 뒤 상단 **Scripts**를 누르면 관리형 솔루션을 생성한다. **일반 클릭**은 사용자가 Windows에 연결한 기본 `.sln` IDE를 열고, **Ctrl+Scripts**는 `devenv.exe`(Visual Studio), **Shift+Scripts**는 `rider64.exe`(Rider)를 실행한다. 전용 IDE 명령은 해당 EXE가 PATH에 있거나 Windows에서 실행 가능해야 한다. 실패 시 Console에 경고를 남기고 프로젝트 생성물은 보존한다. 공백·한글 파일 경로는 UTF-16 및 인용된 인수로 전달한다. CI는 명령 계획과 에러 처리만 검증하며 실제 설치된 VS/Rider GUI 실행은 기기 검증이 별도로 필요하다.

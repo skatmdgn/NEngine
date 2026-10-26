@@ -2587,6 +2587,41 @@ int main() {
         project_root,
         cleanup_error);
 
+    // EDIT-014: stdout/stderr compiler diagnostics retain line/column and
+    // never open arbitrary paths outside the active project.
+    {
+        auto diagnostics_root=std::filesystem::temp_directory_path()/
+            "NEngine Diagnostics 한글";
+        std::filesystem::create_directories(diagnostics_root/"Assets"/"Scripts");
+        const auto broken=diagnostics_root/"Assets"/"Scripts"/"Broken.cs";
+        { std::ofstream f(broken);f<<"public class Broken {\n"; }
+        const auto external=diagnostics_root.parent_path()/"outside_script.cs";
+        { std::ofstream f(external);f<<"external"; }
+        const std::string file=broken.string();
+        const std::string source_output=
+            file+"(12,5): error CS1002: ; expected [Game.csproj]\n"+
+            file+"(13,2): warning CS0168: unused variable [Game.csproj]\n"+
+            external.string()+"(1,1): error CS1003: outside [Other.csproj]\n";
+        editor::ConsoleModel diagnostics;
+        diagnostics.report_dotnet_build(source_output,diagnostics_root);
+        check(diagnostics.entries().size()==2 &&
+              diagnostics.entries()[0].source_line==12 &&
+              diagnostics.entries()[0].source_column==5 &&
+              diagnostics.entries()[0].severity==editor::LogSeverity::Error &&
+              diagnostics.entries()[1].source_line==13 &&
+              diagnostics.entries()[1].severity==editor::LogSeverity::Warning,
+              "EDIT-014: managed build diagnostics reach structured Console with source line and severity");
+        check(diagnostics.entries()[0].source_file==
+              std::filesystem::weakly_canonical(broken) &&
+              diagnostics.entries()[0].message.find("CS1002")!=std::string::npos,
+              "EDIT-014: diagnostic retains absolute safe clickable script file");
+        check(diagnostics.entries().size()==2,
+              "EDIT-014: compiler diagnostic outside project is discarded");
+        std::error_code ec;
+        std::filesystem::remove_all(diagnostics_root,ec);
+        std::filesystem::remove(external,ec);
+    }
+
     if (failures == 0) {
         std::cout << "NEngineEditorTests: PASS\n";
         return EXIT_SUCCESS;

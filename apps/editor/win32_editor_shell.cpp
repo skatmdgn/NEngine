@@ -2366,6 +2366,11 @@ struct Win32EditorShell::Impl {
             }
 
             line += entry.message;
+            if(!entry.source_file.empty()){
+                line+=" ["+wide_to_utf8(entry.source_file.wstring())+
+                    "("+std::to_string(entry.source_line)+","+
+                    std::to_string(entry.source_column)+")]";
+            }
 
             if (entry.repeat_count > 1) {
                 line += " (x" +
@@ -3614,6 +3619,8 @@ struct Win32EditorShell::Impl {
                 run_managed_build(
                     build_config);
 
+        editor.console().report_dotnet_build(
+            build.output,editor.project().root());
         if (!build.success) {
             editor.console().error(
                 "Scripting",
@@ -4261,6 +4268,20 @@ struct Win32EditorShell::Impl {
                 }
             }
             handled = true;
+            break;
+
+        case IdConsole:
+            if(notification!=LBN_DBLCLK)return false;
+            {
+                const auto index=static_cast<int>(
+                    SendMessageW(console,LB_GETCURSEL,0,0));
+                const auto& entries=editor.console().entries();
+                if(index>=0&&static_cast<std::size_t>(index)<entries.size()&&
+                   !entries[static_cast<std::size_t>(index)].source_file.empty())
+                    open_external_path(entries[static_cast<std::size_t>(index)].source_file,
+                        "C# Build");
+            }
+            handled=true;
             break;
 
         case IdAssets:
