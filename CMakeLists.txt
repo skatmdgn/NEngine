@@ -6,6 +6,10 @@ endif()
 
 project(NEngine VERSION 0.9.0 LANGUAGES CXX)
 
+configure_file(engine/core/include/nengine/core/build_identity.hpp.in
+ ${CMAKE_CURRENT_BINARY_DIR}/generated/nengine/core/build_identity.hpp @ONLY)
+include_directories(BEFORE ${CMAKE_CURRENT_BINARY_DIR}/generated)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)

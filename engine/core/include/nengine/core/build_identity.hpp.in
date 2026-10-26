@@ -1,0 +1,10 @@
+#pragma once
+#include <string>
+#include <string_view>
+namespace nengine::core {
+inline constexpr std::string_view engine_build_version="@PROJECT_VERSION@";
+inline std::string build_identity(std::string_view game_version) {
+    return "NEngine/" + std::string(engine_build_version) +
+        " Game/" + std::string(game_version);
+}
+}

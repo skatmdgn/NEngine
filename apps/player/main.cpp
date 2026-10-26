@@ -1,6 +1,7 @@
 #include <filesystem>
 #include <iostream>
 #include "nengine/player/runtime.hpp"
+#include "nengine/core/build_identity.hpp"
 
 int main(int argc, char** argv) {
     if (argc != 2) {
@@ -18,7 +19,8 @@ int main(int argc, char** argv) {
         std::cerr << "WARNING: " << runtime.pending_script_count()
                   << " ScriptBehaviour component(s) loaded without managed"
                      " gameplay execution; standalone bootstrap is incomplete.\n";
-    std::cout << "Player scene loaded: " << runtime.manifest().title
+    std::cout << nengine::core::build_identity(runtime.manifest().game_version)
+              << " | Player scene loaded: " << runtime.manifest().title
               << " (" << runtime.entity_count() << " entities)\n";
     return 0;
 }

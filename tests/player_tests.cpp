@@ -8,6 +8,7 @@
 #include <sstream>
 #include <iomanip>
 #include "nengine/player/bundle.hpp"
+#include "nengine/core/build_identity.hpp"
 #include "nengine/player/exporter.hpp"
 #include "nengine/player/runtime.hpp"
 #include "nengine/player/subassets.hpp"
@@ -38,14 +39,19 @@ static int test_failure(int code, int line) {
 
 int main() {
     using namespace nengine::player;
+    if(nengine::core::engine_build_version!="0.9.0"||
+       nengine::core::build_identity("2.7.9").find("Game/2.7.9")==std::string::npos)
+        return test_failure(9001,__LINE__);
     BundleManifest manifest;
     manifest.title = "Demo";
+    manifest.game_version = "2.7.9-rc1";
     std::stringstream stream;
     if (!write_bundle(stream, manifest)) return test_failure(1, __LINE__);
     BundleManifest restored;
     if (!read_bundle(stream, restored) ||
         restored.title != manifest.title ||
-        restored.scene != manifest.scene) return test_failure(2, __LINE__);
+        restored.scene != manifest.scene ||
+        restored.game_version != "2.7.9-rc1") return test_failure(2,__LINE__);
     restored.scene = "../outside.nscene";
     if (validate_bundle(restored)) return test_failure(3, __LINE__);
     restored = manifest;
@@ -53,7 +59,7 @@ int main() {
     if (validate_bundle(restored)) return test_failure(4, __LINE__);
     // Bundles v2 carry the exact managed assembly identity. v1 bundles
     // remain readable with their historical implicit GameScripts name.
-    if (manifest.version != 2u || restored.managed_assembly_name != "GameScripts")
+    if (manifest.version != 3u || restored.managed_assembly_name != "GameScripts")
         return test_failure(903, __LINE__);
     BundleManifest custom = manifest;
     custom.managed_assembly_name = "My.Game";
@@ -63,6 +69,9 @@ int main() {
         !read_bundle(custom_stream, custom_roundtrip) ||
         custom_roundtrip.managed_assembly_name != "My.Game")
         return test_failure(904, __LINE__);
+    custom.game_version="contains invalid spaces";
+    if(validate_bundle(custom))return test_failure(9031,__LINE__);
+    custom.game_version="2.7.9-rc1";
     custom.managed_assembly_name = "../Escape";
     if (validate_bundle(custom)) return test_failure(905, __LINE__);
     custom.managed_assembly_name = "My.Game";
@@ -77,6 +86,14 @@ int main() {
     if (!read_bundle(legacy_stream, legacy) || legacy.version != 1u ||
         legacy.managed_assembly_name != "GameScripts")
         return test_failure(907, __LINE__);
+    std::stringstream v2_stream;
+    v2_stream << "NENGINE_PLAYER_BUNDLE 2\n"
+                  "TITLE \"Legacy2\"\nSCENE \"Content/Main.nscene\"\n"
+                  "RESOLUTION 1280 720\nMANAGED_ASSEMBLY \"GameScripts\"\n"
+                  "END_PLAYER_BUNDLE\n";
+    BundleManifest v2;
+    if(!read_bundle(v2_stream,v2)||v2.version!=2u||
+       v2.game_version!="0.1.0")return test_failure(9032,__LINE__);
     BundleManifest sentinel = manifest;
     sentinel.title = "untouched";
     std::stringstream oversized;

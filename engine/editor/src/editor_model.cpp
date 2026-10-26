@@ -1,4 +1,5 @@
 #include "nengine/editor/editor_model.hpp"
+#include "nengine/core/build_identity.hpp"
 #include "nengine/editor/audio_integration.hpp"
 #include "nengine/editor/render_integration.hpp"
 #include "nengine/editor/physics_integration.hpp"
@@ -445,7 +446,7 @@ EditorModel::EditorModel() {
 
     console_.info(
         "Editor",
-        "EditorModel initialized.");
+        "EditorModel initialized: "+core::build_identity("Editor"));
 }
 
 
