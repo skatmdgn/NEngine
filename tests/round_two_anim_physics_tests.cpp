@@ -101,6 +101,49 @@ void filtering() {
     check(!excluded&&included&&included->is_trigger,
           "PHYS-009: trigger inclusion filtering matches cast");
 }
+void high_speed_collision() {
+    using namespace nengine;
+    // PHYS-006: a fast box crosses many widths per frame but may not
+    // tunnel through a fixed, thin blocker in continuous mode.
+    core::World world;
+    const auto bullet=world.create("High Speed Bullet");
+    const auto wall=world.create("Thin Wall");
+    world.transform(bullet)->local_position={-4.f,0,0};
+    world.transform(wall)->local_position={0,0,0};
+    auto* shape=world.add_component<physics::BoxCollider>(
+        bullet,physics::box_collider_type());
+    shape->size={.2f,.2f,.2f};
+    auto* obstacle=world.add_component<physics::BoxCollider>(
+        wall,physics::box_collider_type());
+    obstacle->size={.2f,2.f,2.f};
+    auto* rb=world.add_component<physics::Rigidbody>(
+        bullet,physics::rigidbody_type());
+    rb->linear_velocity={20,0,0};rb->use_gravity=false;
+    rb->continuous=true;
+    auto result=physics::step_physics(world,.4f,{0,0,0});
+    check(result.integration.integrated_3d==1 &&
+          world.transform(bullet)->local_position.x<0.f,
+          "PHYS-006: continuous 3D box does not tunnel across thin wall");
+    core::World world2;
+    const auto e2=world2.create("Fast 2D");
+    const auto w2=world2.create("2D Wall");
+    world2.transform(e2)->local_position={-4,0,0};
+    world2.add_component<physics::BoxCollider2D>(e2,physics::box_collider2d_type())
+        ->size={.2f,.2f,0};
+    world2.add_component<physics::BoxCollider2D>(w2,physics::box_collider2d_type())
+        ->size={.2f,2.f,0};
+    auto* dynamic=world2.add_component<physics::Rigidbody2D>(
+        e2,physics::rigidbody2d_type());
+    dynamic->linear_velocity={20,0,0};dynamic->use_gravity=false;
+    dynamic->continuous=true;
+    auto frame=physics::step_physics(world2,.4f,{0,0,0});
+    check(frame.integration.integrated_2d==1 &&
+          world2.transform(e2)->local_position.x<0.f,
+          "PHYS-006: continuous 2D box blocks high-speed crossing");
+    check(physics::step_physics(world2,std::numeric_limits<float>::quiet_NaN(),
+         {0,0,0}).integration.integrated_2d==0,
+         "PHYS-006: invalid physics dt has no effect");
+}
 void separate_domains() {
     using namespace nengine;
     core::World world;
@@ -129,7 +172,7 @@ void separate_domains() {
 }
 }
 int main(){
- animation_transitions();animation_endurance();filtering();separate_domains();
+ animation_transitions();animation_endurance();filtering();separate_domains();high_speed_collision();
  if(!failures)std::cout<<"RoundTwoAnimPhysicsAcceptanceTests PASS\n";
  return failures?EXIT_FAILURE:EXIT_SUCCESS;
 }

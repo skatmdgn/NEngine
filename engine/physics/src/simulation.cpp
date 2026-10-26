@@ -447,11 +447,10 @@ PhysicsStepStats step_rigidbodies(
     return stats;
 }
 
-PhysicsFrameResult step_physics(
-    core::World& world,
-    float delta_seconds,
-    core::Vec3 gravity,
-    ContactImpulseCache* cache) {
+// One physics microstep; existing default-frame physics stays unchanged.
+static PhysicsFrameResult step_physics_discrete(
+    core::World& world,float delta_seconds,
+    core::Vec3 gravity,ContactImpulseCache* cache) {
 
     PhysicsFrameResult result;
 
@@ -490,6 +489,61 @@ PhysicsFrameResult step_physics(
         result.collisions.overlaps,
         delta_seconds);
 
+    return result;
+}
+
+// PHYS-006: a continuous rigidbody automatically substeps enough to sample
+// even thin box obstacles between the initial and final world positions.
+// Bound work at 128 microsteps per fixed frame. Extremely high velocities
+// are safely capped to the supported substep budget, rather than silently
+// running an arbitrarily expensive pathological frame.
+PhysicsFrameResult step_physics(
+    core::World& world,float delta_seconds,
+    core::Vec3 gravity,ContactImpulseCache* cache) {
+    if(!std::isfinite(delta_seconds)||delta_seconds<=0.f)
+        return step_physics_discrete(world,delta_seconds,gravity,cache);
+    unsigned steps=1;
+    for(const auto entity:world.entities()){
+        if(!world.active(entity))continue;
+        const auto* rb=world.get_component<Rigidbody>(entity,rigidbody_type());
+        const auto* rb2=world.get_component<Rigidbody2D>(entity,rigidbody2d_type());
+        const bool is2d=rb2&&!rb;
+        if((!rb||!rb->enabled||!rb->continuous) &&
+           (!rb2||!rb2->enabled||!rb2->continuous))continue;
+        const core::Vec3 velocity=is2d?rb2->linear_velocity:rb->linear_velocity;
+        const float speed=std::hypot(velocity.x,velocity.y,is2d?0.f:velocity.z);
+        if(!std::isfinite(speed)||speed<=0.f)continue;
+        float smallest=0.25f;
+        if(is2d){
+            if(const auto* shape=world.get_component<BoxCollider2D>(
+                  entity,box_collider2d_type()))
+                smallest=std::min(shape->size.x,shape->size.y);
+        }else{
+            if(const auto* shape=world.get_component<BoxCollider>(
+                  entity,box_collider_type()))
+                smallest=std::min({shape->size.x,shape->size.y,shape->size.z});
+        }
+        if(!std::isfinite(smallest)||smallest<=0.f)continue;
+        const float allowed=std::max(0.02f,smallest*0.25f);
+        const float ratio=speed*delta_seconds/allowed;
+        if(std::isfinite(ratio))
+            steps=std::max(steps,static_cast<unsigned>(
+                std::clamp(std::ceil(ratio),1.f,128.f)));
+        else steps=128;
+    }
+    if(steps==1)return step_physics_discrete(world,delta_seconds,gravity,cache);
+    PhysicsFrameResult result;
+    const float dt=delta_seconds/static_cast<float>(steps);
+    for(unsigned i=0;i<steps;++i){
+        auto sub=step_physics_discrete(world,dt,gravity,cache);
+        // Integration stats count unique bodies per physical frame, not per
+        // collision substep. Collision statistics remain cumulative.
+        result.integration=sub.integration;
+        result.collisions=std::move(sub.collisions);
+        result.resolution.resolved_3d+=sub.resolution.resolved_3d;
+        result.resolution.resolved_2d+=sub.resolution.resolved_2d;
+        result.resolution.warm_started_contacts+=sub.resolution.warm_started_contacts;
+    }
     return result;
 }
 
