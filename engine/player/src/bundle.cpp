@@ -16,13 +16,19 @@ bool fail(std::string* error, std::string message) {
 }
 
 bool validate_bundle(const BundleManifest& manifest, std::string* error) {
-    if (manifest.version != 1u &&
+    if (manifest.version != 1u && manifest.version != 2u &&
         manifest.version != BundleManifest::current_version)
         return fail(error, "unsupported player manifest version");
     if (manifest.title.empty() || manifest.title.size() > 256 ||
         manifest.title.find('\0') != std::string::npos ||
         manifest.title.find('\n') != std::string::npos)
         return fail(error, "invalid player title");
+    const auto& v=manifest.game_version;
+    if(v.empty()||v.size()>64u||
+       !std::all_of(v.begin(),v.end(),[](unsigned char ch){
+           return (ch>='0'&&ch<='9')||(ch>='A'&&ch<='Z')||
+                  (ch>='a'&&ch<='z')||ch=='.'||ch=='-'||ch=='+';
+       }))return fail(error,"invalid game build version");
     const auto& assembly = manifest.managed_assembly_name;
     if (assembly.empty() || assembly.size() > 100u ||
         (manifest.version == 1u && assembly != "GameScripts") ||
@@ -81,6 +87,8 @@ bool write_bundle(std::ostream& output, const BundleManifest& manifest,
     if (manifest.version >= 2u)
         output << "MANAGED_ASSEMBLY "
                << std::quoted(manifest.managed_assembly_name) << '\n';
+    if(manifest.version>=3u)
+        output<<"GAME_VERSION "<<std::quoted(manifest.game_version)<<'\n';
     output << "END_PLAYER_BUNDLE\n";
     return output.good() || fail(error, "writing player manifest failed");
 }
@@ -114,10 +122,15 @@ bool read_bundle(std::istream& input, BundleManifest& manifest,
         !(fields >> key) || key != "RESOLUTION" ||
         !(fields >> candidate.width >> candidate.height))
         return fail(error, "invalid player manifest format");
-    if (candidate.version == 2u) {
+    if (candidate.version >= 2u) {
         if (!(fields >> key) || key != "MANAGED_ASSEMBLY" ||
             !(fields >> std::quoted(candidate.managed_assembly_name)))
             return fail(error, "player managed assembly field missing");
+    }
+    if(candidate.version>=3u){
+        if(!(fields>>key)||key!="GAME_VERSION"||
+           !(fields>>std::quoted(candidate.game_version)))
+            return fail(error,"game version field missing");
     }
     if (!(fields >> key) || key != "END_PLAYER_BUNDLE")
         return fail(error, "invalid player manifest terminator");

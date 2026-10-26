@@ -11,9 +11,10 @@ namespace nengine::player {
 // A portable, versioned runtime launch descriptor. A player bundle is not a
 // Unity project and never executes commands embedded in a manifest.
 struct BundleManifest {
-    static constexpr std::uint32_t current_version = 2;
+    static constexpr std::uint32_t current_version = 3;
     std::uint32_t version{current_version};
     std::string title{"NEngine Game"};
+    std::string game_version{"0.1.0"};
     // v2 persists the managed assembly identity, v1 defaults to GameScripts.
     std::string managed_assembly_name{"GameScripts"};
     std::filesystem::path scene{"Content/Main.nscene"};
