@@ -1458,6 +1458,52 @@ int main() {
 
     model.commands().clear();
 
+    // EDIT-008: multi-selection duplication includes child hierarchy and
+    // typed native payloads, while reparent and cycle failure are undo-safe.
+    {
+        editor::EditorModel multi;
+        auto& w=multi.world();
+        const auto a=w.create("Parent"), b=w.create("Sibling"), child=w.create("Child");
+        check(w.set_parent(child,a),"EDIT-008 setup child");
+        auto* light=w.add_component<render::Light>(a,render::light_type());
+        if(light)light->intensity=7.f;
+        multi.selection().set(a);
+        multi.selection().add(b);
+        check(multi.duplicate_selected_hierarchy()&&w.size()==6u,
+              "EDIT-008 two selections duplicate full subtree and sibling");
+        auto selected=multi.selection().entities();
+        bool found_child=false,found_light=false;
+        for(const auto root:selected){
+            if(const auto* payload=w.get_component<render::Light>(
+                    root,render::light_type()))
+                found_light=payload->intensity==7.f;
+            for(auto e:w.children(root))
+                if(w.name(e)=="Child Copy")found_child=true;
+        }
+        check(selected.size()==2u&&found_child&&found_light,
+              "EDIT-008 copied descendants and component property values");
+        check(multi.commands().undo(w)&&w.size()==3u &&
+              multi.commands().redo(w)&&w.size()==6u,
+              "EDIT-008 duplicate supports full Undo/Redo");
+        check(multi.commands().undo(w),"EDIT-008 restores base World");
+        multi.commands().clear();
+        multi.selection().set(b);
+        multi.selection().add(a);
+        check(multi.reparent_selected_to_active()&&
+              w.transform(b)->parent==a,"EDIT-008 multi-selection reparent");
+        check(multi.commands().undo(w)&&
+              !w.transform(b)->parent.valid()&&
+              multi.commands().redo(w)&&w.transform(b)->parent==a,
+              "EDIT-008 reparent supports Undo/Redo");
+        multi.commands().clear();
+        multi.selection().set(a);
+        multi.selection().add(child);
+        const auto size=w.size();
+        check(!multi.reparent_selected_to_active()&&
+              w.size()==size&&w.transform(a)->parent==core::Entity::invalid(),
+              "EDIT-008 cycle reparent rejects atomically");
+    }
+
     // EDTOOL-003: the Win32 add-component combo and action must agree
     // with the model's live selection, not a stale entity snapshot.
     const auto selection_a=world.create("Add Menu A");

@@ -75,6 +75,8 @@ enum ControlId : int {
     IdCanvasUndo,
     IdCanvasRedo,
     IdHierarchy,
+    IdDuplicateHierarchy,
+    IdParentHierarchy,
     IdName,
     IdActive,
     IdPosX,
@@ -347,6 +349,8 @@ struct Win32EditorShell::Impl {
     bool canvas_mode{false};
 
     HWND hierarchy{nullptr};
+    HWND duplicate_hierarchy{nullptr};
+    HWND parent_hierarchy{nullptr};
     HWND scene{nullptr};
 
     HWND inspector_title{nullptr};
@@ -995,10 +999,12 @@ struct Win32EditorShell::Impl {
             host,
             L"LISTBOX",
             L"",
-            LBS_NOTIFY | WS_BORDER | WS_VSCROLL,
+            LBS_NOTIFY | LBS_EXTENDEDSEL | WS_BORDER | WS_VSCROLL,
             IdHierarchy);
+        duplicate_hierarchy=create_control(host,L"BUTTON",L"Duplicate",BS_PUSHBUTTON,IdDuplicateHierarchy);
+        parent_hierarchy=create_control(host,L"BUTTON",L"Parent to active",BS_PUSHBUTTON,IdParentHierarchy);
 
-        if (!hierarchy) {
+        if (!hierarchy||!duplicate_hierarchy||!parent_hierarchy) {
             shell_log("attach failed: hierarchy control creation");
             return false;
         }
@@ -1946,8 +1952,13 @@ struct Win32EditorShell::Impl {
                 10,
                 left_split_x -
                     2 * kPadding),
-            content_height,
+            std::max(10,content_height-32),
             TRUE);
+        const int hierarchy_buttons_width=std::max(40,left_split_x-2*kPadding);
+        MoveWindow(duplicate_hierarchy,kPadding,bottom_split_y-30,
+            std::max(20,hierarchy_buttons_width/2-2),26,TRUE);
+        MoveWindow(parent_hierarchy,kPadding+hierarchy_buttons_width/2+2,
+            bottom_split_y-30,std::max(20,hierarchy_buttons_width/2-2),26,TRUE);
 
         const int scene_x =
             left_split_x +
@@ -2822,13 +2833,14 @@ struct Win32EditorShell::Impl {
 
             if (row.selected) {
                 selected_index = static_cast<int>(i);
+                SendMessageW(hierarchy,LB_SETSEL,TRUE,static_cast<LPARAM>(i));
             }
         }
 
         if (selected_index >= 0) {
             SendMessageW(
                 hierarchy,
-                LB_SETCURSEL,
+                LB_SETCARETINDEX,
                 selected_index,
                 0);
         }
@@ -4248,27 +4260,35 @@ struct Win32EditorShell::Impl {
             break;
 
         case IdHierarchy:
-            if (notification != LBN_SELCHANGE) return false;
+            if(notification!=LBN_SELCHANGE)return false;
             {
-                const int index =
-                    static_cast<int>(
-                        SendMessageW(
-                            hierarchy,
-                            LB_GETCURSEL,
-                            0,
-                            0));
-
-                if (index >= 0 &&
-                    static_cast<std::size_t>(index) <
-                        hierarchy_rows.size()) {
-                    editor.selection().set(
-                        hierarchy_rows[
-                            static_cast<std::size_t>(index)]
-                            .entity);
+                const int selected_count=static_cast<int>(
+                    SendMessageW(hierarchy,LB_GETSELCOUNT,0,0));
+                if(selected_count>=0&&selected_count<=static_cast<int>(hierarchy_rows.size())){
+                    std::vector<int> indexes(static_cast<std::size_t>(selected_count));
+                    SendMessageW(hierarchy,LB_GETSELITEMS,indexes.size(),
+                       reinterpret_cast<LPARAM>(indexes.data()));
+                    editor.selection().clear();
+                    for(const int i:indexes)
+                        if(i>=0&&static_cast<std::size_t>(i)<hierarchy_rows.size())
+                            editor.selection().add(hierarchy_rows[static_cast<std::size_t>(i)].entity);
+                    const int caret=static_cast<int>(SendMessageW(hierarchy,LB_GETCARETINDEX,0,0));
+                    if(caret>=0&&static_cast<std::size_t>(caret)<hierarchy_rows.size()&&
+                       SendMessageW(hierarchy,LB_GETSEL,caret,0)>0)
+                       editor.selection().add(hierarchy_rows[static_cast<std::size_t>(caret)].entity);
                 }
             }
-            handled = true;
-            break;
+            handled=true;break;
+        case IdDuplicateHierarchy:
+            if(notification!=BN_CLICKED)return false;
+            if(!editor.duplicate_selected_hierarchy())
+                editor.console().warning("Hierarchy","Nothing duplicated");
+            handled=true;break;
+        case IdParentHierarchy:
+            if(notification!=BN_CLICKED)return false;
+            if(!editor.reparent_selected_to_active())
+                editor.console().warning("Hierarchy","Choose multiple entities; the active row becomes their parent");
+            handled=true;break;
 
         case IdConsole:
             if(notification!=LBN_DBLCLK)return false;
