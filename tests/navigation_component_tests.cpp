@@ -9,6 +9,7 @@
 #include "nengine/navigation/nav_scene_agent.hpp"
 #include "nengine/navigation/registration.hpp"
 #include "nengine/core/scene.hpp"
+#include "nengine/player/managed_properties.hpp"
 using namespace nengine;
 namespace {
 int failures=0;
@@ -70,6 +71,34 @@ int main(){
     check(!core::SceneSerializer::instantiate(damaged,loaded,&error,
           &editor.component_serialization()) && loaded.size()==count,
           "NAV-010: malformed agent Scene rejects transactionally");
+
+    // NAV-011: Player-side managed property bridge uses the same native
+    // Scene agent storage as the Editor Inspector and runtime movement.
+    {
+        core::PropertyValue observed;
+        check(player::read_player_transform_property(
+                loaded,entities[0],"NEngine.NavMeshAgent","Destination",
+                observed) &&
+              std::get<core::Vec3>(observed)==core::Vec3{1.8f,0,.5f},
+              "NAV-011: managed destination read matches Scene component");
+        check(player::write_player_transform_property(
+                loaded,entities[0],"NEngine.NavMeshAgent","Has Destination",
+                core::PropertyValue{false}) &&
+              player::read_player_transform_property(
+                loaded,entities[0],"NEngine.NavMeshAgent","Has Destination",
+                observed) && !std::get<bool>(observed),
+              "NAV-011: managed Stop clears destination flag");
+        check(!player::write_player_transform_property(
+                loaded,entities[0],"NEngine.NavMeshAgent","Radius",
+                core::PropertyValue{-1.0}) &&
+              copy->radius==0.f,
+              "NAV-011: invalid C# NavMeshAgent radius rejected");
+        check(player::write_player_transform_property(
+                loaded,entities[0],"NEngine.NavMeshAgent","Speed",
+                core::PropertyValue{2.25}) &&
+              copy->speed==2.25f,
+              "NAV-011: managed speed writes native component");
+    }
     if(failures)return EXIT_FAILURE;
     std::cout<<"NEngineNavigationComponentTests PASS\n";
     return EXIT_SUCCESS;
