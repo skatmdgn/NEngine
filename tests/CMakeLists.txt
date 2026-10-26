@@ -53,6 +53,11 @@ target_link_libraries(NEngineNavigationBakeTests PRIVATE NEngineNavigation)
 target_compile_features(NEngineNavigationBakeTests PRIVATE cxx_std_20)
 add_test(NAME NEngineNavigationBakeTests COMMAND NEngineNavigationBakeTests)
 
+add_executable(NEngineNavigationSceneTests navigation_scene_tests.cpp)
+target_link_libraries(NEngineNavigationSceneTests PRIVATE NEngineNavigation NEngineRender)
+target_compile_features(NEngineNavigationSceneTests PRIVATE cxx_std_20)
+add_test(NAME NEngineNavigationSceneTests COMMAND NEngineNavigationSceneTests)
+
 add_executable(NEngineAudioTests audio_tests.cpp)
 target_link_libraries(NEngineAudioTests PRIVATE NEngineAudio)
 target_compile_features(NEngineAudioTests PRIVATE cxx_std_20)
