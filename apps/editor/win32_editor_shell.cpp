@@ -94,6 +94,7 @@ enum ControlId : int {
     IdGenericValue,
     IdAssignAsset,
     IdApplyProperty,
+    IdRemoveComponent,
     IdAddComponentList,
     IdAddComponent,
     IdAssets,
@@ -371,6 +372,7 @@ struct Win32EditorShell::Impl {
     HWND generic_value{nullptr};
     HWND assign_asset{nullptr};
     HWND apply_property{nullptr};
+    HWND remove_component{nullptr};
     HWND add_component_list{nullptr};
     HWND add_component{nullptr};
     std::vector<GenericPropertyBinding>
@@ -1094,6 +1096,9 @@ struct Win32EditorShell::Impl {
             BS_PUSHBUTTON,
             IdApplyProperty);
 
+        remove_component=create_control(host,L"BUTTON",L"Remove Component",
+            BS_PUSHBUTTON,IdRemoveComponent);
+
         add_component_list = create_control(
             host,
             L"COMBOBOX",
@@ -1118,7 +1123,7 @@ struct Win32EditorShell::Impl {
             !generic_properties ||
             !generic_value ||
             !assign_asset ||
-            !apply_property ||
+            !apply_property || !remove_component ||
             !add_component_list ||
             !add_component) {
             shell_log("attach failed: inspector control creation");
@@ -2064,11 +2069,11 @@ struct Win32EditorShell::Impl {
             MoveWindow(canvas_apply_geometry, ix, iy, iw, 26, TRUE); iy += 32;
         }
 
-        const std::array<HWND, 17> native_inspector{
+        const std::array<HWND, 18> native_inspector{
             inspector_title, label_name, name, active, label_position,
             label_rotation, label_scale, apply_transform, generic_title,
             generic_properties, generic_value, assign_asset, apply_property,
-            add_component_list, add_component, position[0], position[1]};
+            remove_component,add_component_list, add_component, position[0], position[1]};
         for (HWND control : native_inspector)
             ShowWindow(control, ui_authoring ? SW_HIDE : SW_SHOW);
         for (HWND control : position)
@@ -2250,13 +2255,9 @@ struct Win32EditorShell::Impl {
             TRUE);
         iy += 28;
 
-        MoveWindow(
-            apply_property,
-            ix,
-            iy,
-            iw,
-            27,
-            TRUE);
+        MoveWindow(apply_property,ix,iy,std::max(45,iw/2-2),27,TRUE);
+        MoveWindow(remove_component,ix+iw/2+2,iy,
+            std::max(45,iw/2-2),27,TRUE);
         iy += 34;
 
         const int add_button_width =
@@ -4425,6 +4426,20 @@ struct Win32EditorShell::Impl {
             // the click/keyboard selection to its first item.
             refresh_generic_property_value();
             return true;
+
+        case IdRemoveComponent:
+            if(notification!=BN_CLICKED)return false;
+            if(editor.can_edit()&&!generic_property_rows.empty()){
+                const auto index=static_cast<int>(
+                    SendMessageW(generic_properties,LB_GETCURSEL,0,0));
+                if(index>=0&&static_cast<std::size_t>(index)<generic_property_rows.size()){
+                    const auto type=generic_property_rows[static_cast<std::size_t>(index)].component;
+                    if(editor.remove_component_from_selection(type))
+                        editor.console().info("Inspector","Removed selected component");
+                    else editor.console().warning("Inspector","Cannot remove selected component");
+                }
+            }
+            handled=true;break;
 
         case IdApplyProperty:
             if (notification != BN_CLICKED) {

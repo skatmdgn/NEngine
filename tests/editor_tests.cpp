@@ -1504,6 +1504,34 @@ int main() {
               "EDIT-008 cycle reparent rejects atomically");
     }
 
+    // EDIT-007: Inspector creation/actual property mutation/delete/restore.
+    {
+        editor::EditorModel inspector;
+        auto& w=inspector.world();
+        const auto entity=w.create("Inspector Object");
+        inspector.selection().set(entity);
+        check(inspector.add_component_to_selection(render::light_type()),
+              "EDIT-007: Inspector adds a native Light component");
+        check(inspector.commands().execute(w,std::make_unique<
+            editor::SetPropertyCommand>(&inspector.property_access(),entity,
+            render::light_type(),"Intensity",core::PropertyValue{6.0})),
+              "EDIT-007: Inspector property update is undoable");
+        check(inspector.remove_component_from_selection(render::light_type())&&
+              !w.has_component(entity,render::light_type()),
+              "EDIT-007: Inspector removes native component");
+        check(inspector.commands().undo(w)&&
+              w.get_component<render::Light>(entity,render::light_type())&&
+              w.get_component<render::Light>(entity,render::light_type())->intensity==6.f,
+              "EDIT-007: Undo component deletion restores authored properties");
+        check(inspector.commands().undo(w)&&
+              w.get_component<render::Light>(entity,render::light_type())->intensity==1.f &&
+              inspector.commands().redo(w)&&
+              w.get_component<render::Light>(entity,render::light_type())->intensity==6.f,
+              "EDIT-007: property edit Undo/Redo");
+        check(!inspector.remove_component_from_selection(core::World::transform_type),
+              "EDIT-007: Transform cannot be removed");
+    }
+
     // EDTOOL-003: the Win32 add-component combo and action must agree
     // with the model's live selection, not a stale entity snapshot.
     const auto selection_a=world.create("Add Menu A");
