@@ -2343,22 +2343,60 @@ int main() {
                 "}\n";
         }
 
-        // PLUG-004 / PLUG-017: resolve a real JSON NuGet package through
-        // the same manifest and restore flow used by Build C# in the Editor.
+        // PLUG-004/017: build and pack a real, independently compiled
+        // JSON NuGet library into a local feed. CI must not depend on
+        // nuget.org availability or credentials to validate restore.
+        const auto json_source=integration_root/"SampleJsonPackage";
+        const auto json_feed=integration_root/"LocalNuGet";
+        std::filesystem::create_directories(json_source);
+        std::filesystem::create_directories(json_feed);
+        {
+            std::ofstream project(json_source/"Sample.Json.csproj");
+            project<<"<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup>"
+                   "<TargetFramework>net8.0</TargetFramework>"
+                   "<PackageId>Sample.Json</PackageId>"
+                   "<Version>1.0.0</Version>"
+                   "<GeneratePackageOnBuild>true</GeneratePackageOnBuild>"
+                   "<PackageOutputPath>../LocalNuGet</PackageOutputPath>"
+                   "</PropertyGroup></Project>\n";
+            std::ofstream source(json_source/"JsonCodec.cs");
+            source<<"namespace Sample.Json;\n"
+                     "public static class JsonCodec {\n"
+                     " public static string Serialize<T>(T value) => System.Text.Json.JsonSerializer.Serialize(value);\n"
+                     " public static T? Deserialize<T>(string json) => System.Text.Json.JsonSerializer.Deserialize<T>(json);\n"
+                     "}\n";
+        }
+        ManagedBuildConfig json_build;
+        json_build.project_path=json_source/"Sample.Json.csproj";
+        json_build.output_directory=json_source/"output";
+        json_build.dotnet_executable=*real_dotnet;
+        const auto json_result=run_managed_build(json_build);
+        check(json_result.success &&
+              std::filesystem::exists(json_feed/"Sample.Json.1.0.0.nupkg"),
+              "PLUG-004 independently compiled JSON NuGet package is packed to local feed");
+        if(!json_result.success)
+            std::cerr<<"JSON package build failed: "<<json_result.message
+                     <<"\n"<<json_result.output<<"\n";
+        {
+            std::ofstream config(integration_root/"NuGet.Config");
+            config<<"<configuration><packageSources><clear/>"
+                     "<add key=\"local-test-feed\" value=\"LocalNuGet\"/>"
+                     "</packageSources></configuration>\n";
+        }
         std::filesystem::create_directories(integration_root/"Packages");
         {
             std::ofstream manifest(integration_root/"Packages"/"managed-packages.txt");
-            manifest<<"Newtonsoft.Json 13.0.3\n";
+            manifest<<"Sample.Json 1.0.0\n";
         }
         {
             std::ofstream script(integration_root/"Assets"/"Scripts"/"NuGetJsonProbe.cs");
             script<<"using NEngine;\n"
-                "using Newtonsoft.Json;\n"
+                "using Sample.Json;\n"
                 "public class NuGetJsonProbe : Behaviour {\n"
                 "  public sealed class Progress { public int Score {get;set;} public string Label {get;set;} = \"\"; }\n"
                 "  private void Start() {\n"
-                "    var json = JsonConvert.SerializeObject(new Progress { Score = 42, Label = \"한글\" });\n"
-                "    var restored = JsonConvert.DeserializeObject<Progress>(json);\n"
+                "    var json = JsonCodec.Serialize(new Progress { Score = 42, Label = \"한글\" });\n"
+                "    var restored = JsonCodec.Deserialize<Progress>(json);\n"
                 "    if (restored == null || restored.Score != 42 || restored.Label != \"한글\")\n"
                 "      throw new System.Exception(\"NuGet JSON encode/decode mismatch\");\n"
                 "    gameObject.name = \"NuGet JSON Passed\";\n"
@@ -2466,8 +2504,8 @@ int main() {
 
             if (build.success) {
                 check(std::filesystem::is_regular_file(
-                    integration_build.output_directory/"Newtonsoft.Json.dll"),
-                    "PLUG-004 NuGet restore stages Newtonsoft.Json runtime DLL");
+                    integration_build.output_directory/"Sample.Json.dll"),
+                    "PLUG-004 offline NuGet restore stages real JSON runtime DLL");
 
                 std::string runtime_error;
 
@@ -2620,7 +2658,7 @@ int main() {
                                 json_entity,json_name,json_active) &&
                             json_name=="NuGet JSON Passed";
                         check(json_pass,
-                            "PLUG-017 Newtonsoft.Json NuGet DLL executes JSON roundtrip");
+                            "PLUG-017 independent JSON NuGet package executes JSON roundtrip");
                         if(json_probe.valid())managed_runtime.destroy(json_probe);
 
                         const auto library_probe=managed_runtime.create_behaviour("LibraryProbe");
