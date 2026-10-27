@@ -4825,6 +4825,21 @@ bool ManagedProjectGenerator::generate(
         return false;
     }
 
+    // Every generated C# project shares .nengine/Managed. Without an
+    // early per-project obj directory, parallel restore of GameScripts,
+    // NEngine.API and NEngine.Bridge races on obj/project.assets.json,
+    // intermittently discarding gameplay-only PackageReferences.
+    // Directory.Build.props is loaded before individual .csproj properties.
+    constexpr std::string_view build_props=R"XML(<Project>
+  <PropertyGroup>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)obj/$(MSBuildProjectName)/</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
+  </PropertyGroup>
+</Project>
+)XML";
+    if (!write_text(generated_directory/"Directory.Build.props",
+                    build_props,error)) return false;
+
     output.project_path =
         generated_directory /
         (config.project_name + ".csproj");
