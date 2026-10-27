@@ -2363,6 +2363,30 @@ int main() {
                 "}\n";
         }
 
+        // PLUG-009: use the native shared library built for the existing
+        // NativePlugin CTest, not a fake managed-only stand-in.
+        const auto native_library=std::filesystem::path{NENGINE_TEST_NATIVE_PLUGIN};
+        const auto native_dir=integration_root/"Assets"/"Plugins"/"Native";
+        std::filesystem::create_directories(native_dir);
+        std::error_code native_copy_error;
+        std::filesystem::copy_file(native_library,
+            native_dir/native_library.filename(),
+            std::filesystem::copy_options::overwrite_existing,native_copy_error);
+        check(!native_copy_error,"PLUG-009 stage real native C ABI library");
+        {
+            std::ofstream script(integration_root/"Assets"/"Scripts"/"PInvokeProbe.cs");
+            script<<"using NEngine;\n"
+                  "using System.Runtime.InteropServices;\n"
+                  "public class PInvokeProbe : Behaviour {\n"
+                  "  [DllImport(\"NEngineNativePluginFixture\", CallingConvention=CallingConvention.Cdecl)]\n"
+                  "  private static extern int nengine_plugin_smoke(int value);\n"
+                  "  private void Start() {\n"
+                  "    if (nengine_plugin_smoke(42)!=49) throw new System.Exception(\"PInvoke mismatch\");\n"
+                  "    gameObject.name = \"PInvoke Passed\";\n"
+                  "  }\n"
+                  "}\n";
+        }
+
         ManagedProjectConfig
             integration_project;
 
@@ -2560,6 +2584,21 @@ int main() {
                         check(exception_contained&&stack_reported,
                             "CS-008 managed exception is contained and original C# stack logged");
                         if(throwing.valid())managed_runtime.destroy(throwing);
+
+                        const auto native_probe=managed_runtime.create_behaviour("PInvokeProbe");
+                        nengine::core::Entity native_entity{};
+                        std::string native_name;
+                        bool native_active=false;
+                        const bool native_pass=native_probe.valid() &&
+                            managed_runtime.set_game_object(native_probe,
+                                nengine::core::Entity::make(104,1),"Native Probe",true) &&
+                            managed_runtime.start(native_probe) &&
+                            managed_runtime.get_game_object(native_probe,
+                                native_entity,native_name,native_active) &&
+                            native_name=="PInvoke Passed";
+                        check(native_pass,
+                            "PLUG-009 C# P/Invoke calls native shared library inside hosted gameplay");
+                        if(native_probe.valid())managed_runtime.destroy(native_probe);
 
                         const auto json_probe=managed_runtime.create_behaviour("NuGetJsonProbe");
                         nengine::core::Entity json_entity{};
