@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -32,6 +33,7 @@
 #include "nengine/editor/ide_launch.hpp"
 #include "nengine/editor/action_map_editor.hpp"
 #include "nengine/editor/build_settings_editor.hpp"
+#include "nengine/editor/performance_profiler.hpp"
 #include "nengine/scripting/managed_runtime.hpp"
 #include "nengine/render/vulkan_context.hpp"
 #include "nengine/render/vulkan_diagnostic_scene.hpp"
@@ -76,6 +78,7 @@ enum ControlId : int {
     IdBuildAndroid,
     IdBuildToolchain,
     IdBuildApply,
+    IdProfiler,
     IdCanvasEdit,
     IdCanvasName,
     IdCanvasText,
@@ -333,6 +336,11 @@ struct Win32EditorShell::Impl {
     HWND step{nullptr};
     HWND stop{nullptr};
     HWND vulkan_preview{nullptr};
+    HWND profiler_toggle{nullptr};
+    HWND profiler_list{nullptr};
+    bool profiler_visible{false};
+    ULONGLONG next_profiler_refresh{0};
+    nengine::editor::PerformanceProfiler profiler_samples{};
     HWND build_toggle{nullptr};
     HWND build_name{nullptr};
     HWND build_windows{nullptr};
@@ -963,6 +971,7 @@ struct Win32EditorShell::Impl {
         game_toggle = create_control(host,L"BUTTON",L"Game View",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdGameView);
         action_toggle = create_control(host,L"BUTTON",L"Input Actions",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdActionEditor);
         build_toggle = create_control(host,L"BUTTON",L"Build Settings",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdBuildSettings);
+        profiler_toggle = create_control(host,L"BUTTON",L"Profiler",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdProfiler);
         vulkan_preview = create_control(
             host,
             L"BUTTON",
@@ -970,7 +979,7 @@ struct Win32EditorShell::Impl {
             BS_AUTOCHECKBOX | BS_PUSHLIKE,
             IdVulkanPreview);
 
-        if (!game_toggle || !action_toggle || !build_toggle || !open_scene || !save_scene || !new_entity || !delete_entity ||
+        if (!game_toggle || !action_toggle || !build_toggle || !profiler_toggle || !open_scene || !save_scene || !new_entity || !delete_entity ||
             !refresh_assets || !scripts || !build_scripts || !undo || !redo ||
             !play || !pause || !step || !stop ||
             !vulkan_preview) {
@@ -1311,12 +1320,14 @@ struct Win32EditorShell::Impl {
             SendMessageW(action_key,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(label));
         }
         SendMessageW(action_key,CB_SETCURSEL,0,0);
+        profiler_list=create_control(host,L"LISTBOX",L"",
+            WS_BORDER | WS_VSCROLL | WS_HSCROLL,0);
         build_name=create_control(host,L"EDIT",L"",WS_BORDER|ES_AUTOHSCROLL,IdBuildName);
         build_windows=create_control(host,L"BUTTON",L"Windows Player",BS_AUTOCHECKBOX,IdBuildWindows);
         build_android=create_control(host,L"BUTTON",L"Android (toolchain profile)",BS_AUTOCHECKBOX,IdBuildAndroid);
         build_toolchain=create_control(host,L"EDIT",L"",WS_BORDER|ES_AUTOHSCROLL,IdBuildToolchain);
         build_apply=create_control(host,L"BUTTON",L"Save Target Settings",BS_PUSHBUTTON,IdBuildApply);
-        if(!build_name||!build_windows||!build_android||!build_toolchain||!build_apply||
+        if(!profiler_list||!build_name||!build_windows||!build_android||!build_toolchain||!build_apply||
             !action_list || !action_name || !action_key || !action_add ||
             !action_remove || !action_save ||
             !assets_list || !console) {
@@ -1566,8 +1577,21 @@ struct Win32EditorShell::Impl {
         last_runtime_tick =
             now;
 
-        editor.tick_runtime(
-            runtime_elapsed_seconds);
+        const auto profile_start=std::chrono::steady_clock::now();
+        editor.tick_runtime(runtime_elapsed_seconds);
+        const double simulation_ms=
+            std::chrono::duration<double,std::milli>(
+                std::chrono::steady_clock::now()-profile_start).count();
+        profiler_samples.sample({
+            runtime_elapsed_seconds*1000.0,simulation_ms,
+            editor.presentation_world().entities().size(),
+            editor.play_session().is_playing()});
+        if(game_view&&game_view_visible)
+            InvalidateRect(game_view,nullptr,FALSE);
+        if(profiler_visible&&now>=next_profiler_refresh){
+            next_profiler_refresh=now+250;
+            refresh_profiler();
+        }
 
         RECT rect{};
         if (!GetClientRect(parent, &rect)) {
@@ -1976,6 +2000,7 @@ struct Win32EditorShell::Impl {
         MoveWindow(game_toggle,kPadding,38,110,26,TRUE);
         MoveWindow(action_toggle,kPadding+116,38,120,26,TRUE);
         MoveWindow(build_toggle,kPadding+242,38,122,26,TRUE);
+        MoveWindow(profiler_toggle,kPadding+370,38,110,26,TRUE);
         const int content_top =
             kToolbarHeight;
 
@@ -2404,7 +2429,7 @@ struct Win32EditorShell::Impl {
                 kPadding,
             bottom_h,
             TRUE);
-        const bool tool_open=action_editor_visible||build_settings_visible;
+        const bool tool_open=action_editor_visible||build_settings_visible||profiler_visible;
         ShowWindow(assets_list,tool_open?SW_HIDE:SW_SHOW);
         ShowWindow(console,tool_open?SW_HIDE:SW_SHOW);
         const auto action_controls=std::array<HWND,6>{
@@ -2413,6 +2438,9 @@ struct Win32EditorShell::Impl {
         const auto build_controls=std::array<HWND,5>{
             build_name,build_windows,build_android,build_toolchain,build_apply};
         for(auto ctrl:build_controls)ShowWindow(ctrl,build_settings_visible?SW_SHOW:SW_HIDE);
+        ShowWindow(profiler_list,profiler_visible?SW_SHOW:SW_HIDE);
+        if(profiler_visible)
+            MoveWindow(profiler_list,kPadding,bottom_y,width-2*kPadding,bottom_h,TRUE);
         if(build_settings_visible){
             const int w=std::max(160,width-3*kPadding);
             MoveWindow(build_name,kPadding,bottom_y,w/2,24,TRUE);
@@ -2517,6 +2545,26 @@ struct Win32EditorShell::Impl {
                 static_cast<WPARAM>(
                     count - 1),
                 0);
+        }
+    }
+
+    void refresh_profiler() {
+        if(!profiler_list)return;
+        const auto stats=profiler_samples.summary();
+        SendMessageW(profiler_list,LB_RESETCONTENT,0,0);
+        std::vector<std::string> rows={
+            std::string("Execution: ")+(stats.playing?"Game (Play Mode)":"Editor (Edit Mode)"),
+            "CPU frame average: "+std::to_string(stats.average_ms)+" ms",
+            "CPU frame peak: "+std::to_string(stats.peak_ms)+" ms",
+            "Simulation CPU average: "+std::to_string(stats.average_simulation_ms)+" ms",
+            "Scene entities: "+std::to_string(stats.entity_count),
+            "Samples: "+std::to_string(stats.samples)+" (ring cap 240)",
+            "GPU time/VRAM not instrumented; standalone Player hardware unverified"
+        };
+        for(const auto& row:rows){
+            const auto label=utf8_to_wide(row);
+            SendMessageW(profiler_list,LB_ADDSTRING,0,
+                         reinterpret_cast<LPARAM>(label.c_str()));
         }
     }
 
@@ -4309,6 +4357,8 @@ struct Win32EditorShell::Impl {
             if(notification!=BN_CLICKED)return false;
             action_editor_visible=SendMessageW(action_toggle,BM_GETCHECK,0,0)==BST_CHECKED;
             if(action_editor_visible){
+                profiler_visible=false;
+                SendMessageW(profiler_toggle,BM_SETCHECK,BST_UNCHECKED,0);
                 build_settings_visible=false;
                 SendMessageW(build_toggle,BM_SETCHECK,BST_UNCHECKED,0);
                 std::string error;
@@ -4325,10 +4375,28 @@ struct Win32EditorShell::Impl {
                 layout(rect.right,rect.bottom);
             }
             handled=true;break;
+        case IdProfiler:
+            if(notification!=BN_CLICKED)return false;
+            profiler_visible=SendMessageW(profiler_toggle,BM_GETCHECK,0,0)==BST_CHECKED;
+            if(profiler_visible){
+                action_editor_visible=false;
+                build_settings_visible=false;
+                SendMessageW(action_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                SendMessageW(build_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                refresh_profiler();
+            }
+            {
+                RECT rect{};GetClientRect(host,&rect);
+                layout(rect.right,rect.bottom);
+            }
+            handled=true;break;
+
         case IdBuildSettings:
             if(notification!=BN_CLICKED)return false;
             build_settings_visible=SendMessageW(build_toggle,BM_GETCHECK,0,0)==BST_CHECKED;
             if(build_settings_visible){
+                profiler_visible=false;
+                SendMessageW(profiler_toggle,BM_SETCHECK,BST_UNCHECKED,0);
                 action_editor_visible=false;
                 SendMessageW(action_toggle,BM_SETCHECK,BST_UNCHECKED,0);
                 if(!editor.project().is_open()){
