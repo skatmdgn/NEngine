@@ -4970,6 +4970,57 @@ bool ManagedProjectGenerator::generate(
         project<<"  </ItemGroup>\n";
     }
 
+    // PLUG-009: opt-in project-local P/Invoke libraries for gameplay.
+    // Stage native payloads in the managed output beside the .NET DLL,
+    // independent of platform-specific engine host discovery.
+    const auto native_plugins=config.project_root/"Assets"/"Plugins"/"Native";
+    std::error_code native_error;
+    const auto native_status=std::filesystem::symlink_status(native_plugins,native_error);
+    if(native_error==std::errc::no_such_file_or_directory)
+        native_error.clear();
+    if(native_error){set_error(error,"cannot inspect native plugin directory");return false;}
+    std::vector<std::string> native_names;
+    if(std::filesystem::exists(native_status)){
+        if(std::filesystem::is_symlink(native_status)||
+           !std::filesystem::is_directory(native_status)){
+            set_error(error,"native plugin directory must be a real directory");
+            return false;
+        }
+        for(const auto& entry:std::filesystem::directory_iterator(native_plugins,native_error)){
+            if(native_error){set_error(error,"native plugin scan failed");return false;}
+            const auto ext=entry.path().extension().string();
+            if(ext!=".dll"&&ext!=".so"&&ext!=".dylib")continue;
+            const auto name=entry.path().filename().string();
+            const bool valid=name.size()>=5u&&name.size()<=128u&&
+                name.front()!='.'&&
+                std::all_of(name.begin(),name.end(),[](unsigned char ch){
+                    return (ch>='A'&&ch<='Z')||(ch>='a'&&ch<='z')||
+                           (ch>='0'&&ch<='9')||ch=='_'||ch=='-'||ch=='.';
+                });
+            if(!valid||entry.is_symlink(native_error)||native_error||
+                !entry.is_regular_file(native_error)||native_error||
+                entry.file_size(native_error)>64u*1024u*1024u||native_error){
+                set_error(error,"unsafe native plugin payload: "+name);return false;
+            }
+            native_names.push_back(name);
+            if(native_names.size()>128u){
+                set_error(error,"too many native plugin libraries");return false;
+            }
+        }
+        if(native_error){set_error(error,"native plugin scan failed");return false;}
+    }
+    std::sort(native_names.begin(),native_names.end());
+    if(!native_names.empty()){
+        project<<"  <ItemGroup>\n";
+        for(const auto& name:native_names){
+            project<<"    <None Include=\"../../Assets/Plugins/Native/"
+                   <<xml_escape(name)
+                   <<"\"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>"
+                   <<"<TargetPath>"<<xml_escape(name)<<"</TargetPath></None>\n";
+        }
+        project<<"  </ItemGroup>\n";
+    }
+
     if (!config.packages.empty()) {
         project << "  <ItemGroup>\n";
 
