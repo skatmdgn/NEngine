@@ -2302,10 +2302,10 @@ int main() {
             std::ofstream project_file(external_root/"ExternalHelper.csproj");
             project_file<<"<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup>"
                         <<"<TargetFramework>net8.0</TargetFramework>"
-                        <<"</PropertyGroup></Project>\\n";
+                        <<"</PropertyGroup></Project>\n";
             std::ofstream source_file(external_root/"ExternalHelper.cs");
             source_file<<"public static class ExternalHelper { "
-                          "public static int Answer() => 42; }\\n";
+                          "public static int Answer() => 42; }\n";
         }
         ManagedBuildConfig external_build;
         external_build.project_path=external_root/"ExternalHelper.csproj";
@@ -2323,13 +2323,13 @@ int main() {
         }
         {
             std::ofstream script(integration_root/"Assets"/"Scripts"/"LibraryProbe.cs");
-            script<<"using NEngine;\\n"
-                    "public class LibraryProbe : Behaviour {\\n"
-                    "  private void Start() {\\n"
-                    "    if (ExternalHelper.Answer() != 42) throw new System.Exception(\\\"external dependency mismatch\\\");\\n"
-                    "    gameObject.name = \\\"External DLL Loaded\\\";\\n"
-                    "  }\\n"
-                    "}\\n";
+            script<<"using NEngine;\n"
+                    "public class LibraryProbe : Behaviour {\n"
+                    "  private void Start() {\n"
+                    "    if (ExternalHelper.Answer() != 42) throw new System.Exception(\"external dependency mismatch\");\n"
+                    "    gameObject.name = \"External DLL Loaded\";\n"
+                    "  }\n"
+                    "}\n";
         }
 
         ManagedProjectConfig
