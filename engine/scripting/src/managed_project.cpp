@@ -1,7 +1,9 @@
 #include "nengine/scripting/managed_project.hpp"
 #include "nengine/scripting/dotnet_host.hpp"
 
+#include <algorithm>
 #include <fstream>
+#include <system_error>
 #include <iomanip>
 #include <sstream>
 #include <utility>
@@ -4906,6 +4908,58 @@ bool ManagedProjectGenerator::generate(
         << "    <ProjectReference Include=\"NEngine.API.csproj\" />\n"
         << "  </ItemGroup>\n"
         << "</Project>\n";
+
+    // PLUG-006: register project-local managed assemblies in MSBuild.
+    // A successful build private-copies them beside the gameplay DLL.
+    const auto plugins=config.project_root/"Assets"/"Plugins"/"Managed";
+    std::error_code plugins_error;
+    const auto status=std::filesystem::symlink_status(plugins,plugins_error);
+    if(plugins_error==std::errc::no_such_file_or_directory)
+        plugins_error.clear();
+    if(plugins_error){set_error(error,"cannot inspect managed plugins");return false;}
+    std::vector<std::string> plugin_names;
+    if(std::filesystem::exists(status)){
+        if(std::filesystem::is_symlink(status)||!std::filesystem::is_directory(status)){
+            set_error(error,"managed plugin directory must be a real directory");
+            return false;
+        }
+        for(const auto& entry:std::filesystem::directory_iterator(plugins,plugins_error)){
+            if(plugins_error){set_error(error,"managed plugin scan failed");return false;}
+            if(entry.path().extension()!=".dll")continue;
+            const auto name=entry.path().filename().string();
+            const auto valid=name.size()>=5u&&name.size()<=128u&&
+                name.front()!='.'&&
+                std::all_of(name.begin(),name.end(),[](unsigned char ch){
+                    return (ch>='a'&&ch<='z')||(ch>='A'&&ch<='Z')||
+                           (ch>='0'&&ch<='9')||ch=='.'||ch=='_'||ch=='-';
+                });
+            if(!valid||entry.is_symlink(plugins_error)||plugins_error||
+               !entry.is_regular_file(plugins_error)||plugins_error||
+               entry.file_size(plugins_error)>64u*1024u*1024u||plugins_error||
+               name=="NEngine.API.dll"||name=="NEngine.Bridge.dll"||
+               name==config.project_name+".dll"){
+                set_error(error,"invalid managed plugin DLL: "+name);
+                return false;
+            }
+            plugin_names.push_back(name);
+            if(plugin_names.size()>128u){
+                set_error(error,"too many managed plugin DLLs");return false;
+            }
+        }
+        if(plugins_error){set_error(error,"managed plugin scan failed");return false;}
+    }
+    std::sort(plugin_names.begin(),plugin_names.end());
+    if(!plugin_names.empty()){
+        project<<"  <ItemGroup>\n";
+        for(const auto& name:plugin_names){
+            project<<"    <Reference Include=\""
+                   <<xml_escape(name.substr(0,name.size()-4u))
+                   <<"\"><HintPath>../../Assets/Plugins/Managed/"
+                   <<xml_escape(name)
+                   <<"</HintPath><Private>true</Private></Reference>\n";
+        }
+        project<<"  </ItemGroup>\n";
+    }
 
     if (!config.packages.empty()) {
         project << "  <ItemGroup>\n";
