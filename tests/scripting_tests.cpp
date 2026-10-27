@@ -4331,6 +4331,10 @@ int main() {
                                 "Library" /
                                 "ManagedBuild" /
                                 "Reload";
+                            // Hot reload changes output destination, not NuGet
+                            // package references. Preserve the resolved assets
+                            // from the already-validated initial restore.
+                            reload_build.restore = false;
 
                             const auto rebuilt =
                                 run_managed_build(
