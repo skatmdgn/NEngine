@@ -2474,6 +2474,11 @@ int main() {
 
     auto* runtime = model.play_session().runtime_world();
     check(runtime && runtime->is_alive(child), "runtime clone preserves entity handles");
+    // EDTOOL-001: Scene View reads the source World while the independent
+    // Game View presents the PlaySession runtime clone.
+    check(&model.presentation_world()==runtime &&
+          &model.presentation_world()!=&world,
+          "EDTOOL-001 separate Game View uses runtime instead of authoring World");
     runtime->set_name(child, "Runtime Only");
     check(world.name(child) == "Renamed", "runtime mutations do not alter editor world");
 
@@ -2510,6 +2515,8 @@ int main() {
     check(model.play_session().resume(), "play session resumes");
     check(model.play_session().stop(), "play session stops");
     check(model.play_session().runtime_world() == nullptr, "runtime world discarded on stop");
+    check(&model.presentation_world()==&world,
+          "EDTOOL-001 Game View safely returns to authoring state after Stop");
     check(model.can_edit(), "editing re-enabled after stop");
 
     const auto restored_inspector = editor::build_inspector(model);
