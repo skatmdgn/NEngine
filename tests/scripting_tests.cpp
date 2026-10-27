@@ -2438,6 +2438,7 @@ int main() {
                     integration_build);
             if(!build.success){
                 std::cerr<<"Managed integration build failed: "<<build.message
+                         <<"\nPROJECT FILE:\n"<<read_all(integration_output.project_path)
                          <<"\n"<<build.output<<"\n";
             }
 
