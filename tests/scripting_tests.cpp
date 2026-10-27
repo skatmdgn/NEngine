@@ -1458,6 +1458,11 @@ int main() {
         std::filesystem::exists(
             output.project_path),
         "csproj generated");
+    const auto build_props=read_all(
+        output.project_path.parent_path()/"Directory.Build.props");
+    check(build_props.find("obj/$(MSBuildProjectName)/")!=std::string::npos,
+          "PLUG-004 generated projects isolate per-project restore assets");
+
 
     check(
         std::filesystem::exists(
@@ -2500,6 +2505,17 @@ int main() {
                         .output_directory /
                     "NEngine.Bridge.dll"),
                 "real dotnet SDK builds gameplay assembly plus dedicated API and stable Bridge dependencies into deterministic output");
+            // Restore assets for all three projects must not overwrite one
+            // another. NuGet PackageReference belongs to gameplay only.
+            const auto obj_root=integration_output.project_path.parent_path()/"obj";
+            const auto game_assets=read_all(obj_root/"IntegrationScripts"/"project.assets.json");
+            const auto api_assets=read_all(obj_root/"NEngine.API"/"project.assets.json");
+            const auto bridge_assets=read_all(obj_root/"NEngine.Bridge"/"project.assets.json");
+            check(game_assets.find("Sample.Json/1.0.0")!=std::string::npos &&
+                  !api_assets.empty() && !bridge_assets.empty() &&
+                  api_assets.find("Sample.Json/1.0.0")==std::string::npos,
+                  "PLUG-004 three independent restore graphs preserve gameplay NuGet package");
+
 
 
             if (build.success) {
