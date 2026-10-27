@@ -2340,6 +2340,29 @@ int main() {
                 "}\n";
         }
 
+        // PLUG-004 / PLUG-017: resolve a real JSON NuGet package through
+        // the same manifest and restore flow used by Build C# in the Editor.
+        std::filesystem::create_directories(integration_root/"Packages");
+        {
+            std::ofstream manifest(integration_root/"Packages"/"managed-packages.txt");
+            manifest<<"Newtonsoft.Json 13.0.3\n";
+        }
+        {
+            std::ofstream script(integration_root/"Assets"/"Scripts"/"NuGetJsonProbe.cs");
+            script<<"using NEngine;\n"
+                "using Newtonsoft.Json;\n"
+                "public class NuGetJsonProbe : Behaviour {\n"
+                "  private sealed class Progress { public int Score {get;set;} public string Label {get;set;} = \"\"; }\n"
+                "  private void Start() {\n"
+                "    var json = JsonConvert.SerializeObject(new Progress { Score = 42, Label = \"한글\" });\n"
+                "    var restored = JsonConvert.DeserializeObject<Progress>(json);\n"
+                "    if (restored == null || restored.Score != 42 || restored.Label != \"한글\")\n"
+                "      throw new System.Exception(\"NuGet JSON encode/decode mismatch\");\n"
+                "    gameObject.name = \"NuGet JSON Passed\";\n"
+                "  }\n"
+                "}\n";
+        }
+
         ManagedProjectConfig
             integration_project;
 
@@ -2347,6 +2370,13 @@ int main() {
             "IntegrationScripts";
         integration_project.project_root =
             integration_root;
+        std::string nuget_error;
+        integration_project.packages=
+            ManagedProjectGenerator::load_package_manifest(
+                integration_root/"Packages"/"managed-packages.txt",&nuget_error);
+        check(nuget_error.empty()&&integration_project.packages.size()==1u,
+              "PLUG-004 NuGet manifest loaded into production project generator");
+
 
         ManagedProjectOutput
             integration_output;
@@ -2403,6 +2433,10 @@ int main() {
 
 
             if (build.success) {
+                check(std::filesystem::is_regular_file(
+                    integration_build.output_directory/"Newtonsoft.Json.dll"),
+                    "PLUG-004 NuGet restore stages Newtonsoft.Json runtime DLL");
+
                 std::string runtime_error;
 
                 const auto runtime =
@@ -2526,6 +2560,21 @@ int main() {
                         check(exception_contained&&stack_reported,
                             "CS-008 managed exception is contained and original C# stack logged");
                         if(throwing.valid())managed_runtime.destroy(throwing);
+
+                        const auto json_probe=managed_runtime.create_behaviour("NuGetJsonProbe");
+                        nengine::core::Entity json_entity{};
+                        std::string json_name;
+                        bool json_active=false;
+                        const bool json_pass=json_probe.valid() &&
+                            managed_runtime.set_game_object(json_probe,
+                                nengine::core::Entity::make(103,1),"JSON Probe",true) &&
+                            managed_runtime.start(json_probe) &&
+                            managed_runtime.get_game_object(json_probe,
+                                json_entity,json_name,json_active) &&
+                            json_name=="NuGet JSON Passed";
+                        check(json_pass,
+                            "PLUG-017 Newtonsoft.Json NuGet DLL executes JSON roundtrip");
+                        if(json_probe.valid())managed_runtime.destroy(json_probe);
 
                         const auto library_probe=managed_runtime.create_behaviour("LibraryProbe");
                         nengine::core::Entity library_entity{};
