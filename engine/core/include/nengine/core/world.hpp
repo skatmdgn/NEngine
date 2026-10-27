@@ -50,6 +50,9 @@ public:
     const Transform* transform(Entity entity) const;
 
     bool set_parent(Entity child, Entity parent);
+    // Atomically duplicate a complete authored hierarchy and every native
+    // component, remapping only the new subtree's parent references.
+    Entity duplicate_subtree(Entity root);
     std::vector<Entity> children(Entity parent) const;
 
     template <typename T, typename... Args>

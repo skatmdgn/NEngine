@@ -16,6 +16,7 @@ struct ExportSettings {
     std::filesystem::path managed_directory{};
     std::string managed_assembly_name{"GameScripts"};
     std::string title{"NEngine Game"};
+    std::string game_version{"0.1.0"};
     std::uint32_t width{1280};
     std::uint32_t height{720};
 };

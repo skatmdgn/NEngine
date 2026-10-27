@@ -125,6 +125,7 @@ public:
         std::string_view action) const;
 
     std::size_t action_count() const noexcept { return bindings_.size(); }
+    std::vector<std::string> action_names() const;
 
     bool held(
         std::string_view action,

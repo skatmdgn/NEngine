@@ -101,6 +101,95 @@ void filtering() {
     check(!excluded&&included&&included->is_trigger,
           "PHYS-009: trigger inclusion filtering matches cast");
 }
+void high_speed_collision() {
+    using namespace nengine;
+    // PHYS-006: a fast box crosses many widths per frame but may not
+    // tunnel through a fixed, thin blocker in continuous mode.
+    core::World world;
+    const auto bullet=world.create("High Speed Bullet");
+    const auto wall=world.create("Thin Wall");
+    world.transform(bullet)->local_position={-4.f,0,0};
+    world.transform(wall)->local_position={0,0,0};
+    auto* shape=world.add_component<physics::BoxCollider>(
+        bullet,physics::box_collider_type());
+    shape->size={.2f,.2f,.2f};
+    auto* obstacle=world.add_component<physics::BoxCollider>(
+        wall,physics::box_collider_type());
+    obstacle->size={.2f,2.f,2.f};
+    auto* rb=world.add_component<physics::Rigidbody>(
+        bullet,physics::rigidbody_type());
+    rb->linear_velocity={20,0,0};rb->use_gravity=false;
+    rb->continuous=true;
+    auto result=physics::step_physics(world,.4f,{0,0,0});
+    check(result.integration.integrated_3d==1 &&
+          world.transform(bullet)->local_position.x<0.f,
+          "PHYS-006: continuous 3D box does not tunnel across thin wall");
+    core::World world2;
+    const auto e2=world2.create("Fast 2D");
+    const auto w2=world2.create("2D Wall");
+    world2.transform(e2)->local_position={-4,0,0};
+    world2.add_component<physics::BoxCollider2D>(e2,physics::box_collider2d_type())
+        ->size={.2f,.2f,0};
+    world2.add_component<physics::BoxCollider2D>(w2,physics::box_collider2d_type())
+        ->size={.2f,2.f,0};
+    auto* dynamic=world2.add_component<physics::Rigidbody2D>(
+        e2,physics::rigidbody2d_type());
+    dynamic->linear_velocity={20,0,0};dynamic->use_gravity=false;
+    dynamic->continuous=true;
+    auto frame=physics::step_physics(world2,.4f,{0,0,0});
+    check(frame.integration.integrated_2d==1 &&
+          world2.transform(e2)->local_position.x<0.f,
+          "PHYS-006: continuous 2D box blocks high-speed crossing");
+    check(physics::step_physics(world2,std::numeric_limits<float>::quiet_NaN(),
+         {0,0,0}).integration.integrated_2d==0,
+         "PHYS-006: invalid physics dt has no effect");
+
+    // A trigger must deliver an Enter candidate even if the high-speed
+    // body has already passed through it by the end of the fixed frame.
+    // This guards the PlayerRuntime/Editor frame-level contact tracker.
+    core::World crossing;
+    const auto mover=crossing.create("Trigger Crossing");
+    const auto trigger=crossing.create("Thin Trigger");
+    crossing.transform(mover)->local_position={-4.f,0,0};
+    crossing.add_component<physics::BoxCollider>(
+        mover,physics::box_collider_type())->size={.2f,.2f,.2f};
+    crossing.add_component<physics::BoxCollider>(
+        trigger,physics::box_collider_type())->is_trigger=true;
+    auto* crossing_rb=crossing.add_component<physics::Rigidbody>(
+        mover,physics::rigidbody_type());
+    crossing_rb->linear_velocity={20,0,0};
+    crossing_rb->use_gravity=false;
+    crossing_rb->continuous=true;
+    const auto transient=physics::step_physics(crossing,.4f,{0,0,0});
+    check(crossing.transform(mover)->local_position.x>3.f &&
+          transient.collisions.overlaps.size()==1u &&
+          transient.collisions.overlaps[0].is_trigger,
+          "PHYS-006: preserve a transient 3D trigger within substeps");
+    // Broadphase stats count only candidates in overlapping x-intervals,
+    // not all microsteps. More than one hit proves accumulation.
+    check(transient.collisions.tested_pairs_3d>1u,
+          "PHYS-006: cumulative collision stats cover transient candidates");
+
+    core::World crossing2d;
+    const auto mover2=crossing2d.create("2D Trigger Crossing");
+    const auto trigger2=crossing2d.create("Thin 2D Trigger");
+    crossing2d.transform(mover2)->local_position={-4.f,0,0};
+    crossing2d.add_component<physics::BoxCollider2D>(
+        mover2,physics::box_collider2d_type())->size={.2f,.2f,0};
+    crossing2d.add_component<physics::BoxCollider2D>(
+        trigger2,physics::box_collider2d_type())->is_trigger=true;
+    auto* crossing_rb2=crossing2d.add_component<physics::Rigidbody2D>(
+        mover2,physics::rigidbody2d_type());
+    crossing_rb2->linear_velocity={20,0,0};
+    crossing_rb2->use_gravity=false;
+    crossing_rb2->continuous=true;
+    const auto transient2=physics::step_physics(crossing2d,.4f,{0,0,0});
+    check(crossing2d.transform(mover2)->local_position.x>3.f &&
+          transient2.collisions.overlaps.size()==1u &&
+          transient2.collisions.overlaps[0].is_trigger &&
+          transient2.collisions.overlaps[0].is_2d,
+          "PHYS-006: preserve a transient 2D trigger within substeps");
+}
 void separate_domains() {
     using namespace nengine;
     core::World world;
@@ -129,7 +218,7 @@ void separate_domains() {
 }
 }
 int main(){
- animation_transitions();animation_endurance();filtering();separate_domains();
+ animation_transitions();animation_endurance();filtering();separate_domains();high_speed_collision();
  if(!failures)std::cout<<"RoundTwoAnimPhysicsAcceptanceTests PASS\n";
  return failures?EXIT_FAILURE:EXIT_SUCCESS;
 }

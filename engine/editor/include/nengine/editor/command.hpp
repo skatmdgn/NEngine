@@ -143,6 +143,51 @@ private:
         factories_{nullptr};
 };
 
+// Undo-stable snapshots for hierarchy duplication/reparent; snapshots retain
+// component payloads and avoid hand-coded per-component special cases.
+class DuplicateHierarchyCommand final : public EditorCommand {
+public:
+    explicit DuplicateHierarchyCommand(std::vector<core::Entity> roots)
+      : roots_(std::move(roots)) {}
+    bool execute(core::World& world) override;
+    void undo(core::World& world) override;
+    std::string_view name() const noexcept override {return "Duplicate Hierarchy";}
+    const std::vector<core::Entity>& created() const noexcept {return created_;}
+private:
+    std::vector<core::Entity> roots_{};
+    std::vector<core::Entity> created_{};
+    std::optional<core::World> before_{};
+    std::optional<core::World> after_{};
+};
+
+class ReparentHierarchyCommand final : public EditorCommand {
+public:
+    ReparentHierarchyCommand(std::vector<core::Entity> roots,core::Entity target)
+      : roots_(std::move(roots)),target_(target) {}
+    bool execute(core::World& world) override;
+    void undo(core::World& world) override;
+    std::string_view name() const noexcept override {return "Reparent Hierarchy";}
+private:
+    std::vector<core::Entity> roots_{};
+    core::Entity target_{};
+    std::optional<core::World> before_{};
+    std::optional<core::World> after_{};
+};
+
+class RemoveComponentCommand final : public EditorCommand {
+public:
+    RemoveComponentCommand(core::Entity entity,core::ComponentTypeId type)
+      :entity_(entity),type_(type){}
+    bool execute(core::World& world) override;
+    void undo(core::World& world) override;
+    std::string_view name() const noexcept override {return "Remove Component";}
+private:
+    core::Entity entity_{};
+    core::ComponentTypeId type_{core::ComponentRegistry::invalid_type};
+    std::optional<core::World> before_{};
+    std::optional<core::World> after_{};
+};
+
 class SetTransformCommand final : public EditorCommand {
 public:
     SetTransformCommand(core::Entity entity, core::Transform value)

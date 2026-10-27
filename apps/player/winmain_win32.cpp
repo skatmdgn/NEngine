@@ -8,12 +8,29 @@
 
 #include "nengine/platform/window.hpp"
 #include "nengine/player/runtime.hpp"
+#include "player_cpu_profiler_win32.hpp"
+#include "nengine/core/build_identity.hpp"
+#include <fstream>
 #include "nengine/render/vulkan_context.hpp"
 #include "nengine/render/vulkan_diagnostic_scene.hpp"
 #include "nengine/audio/audio_device.hpp"
 #include "nengine/audio/mix_snapshot.hpp"
 
 namespace {
+std::string current_game_build_version="unknown";
+void diagnostic(std::string_view message) {
+    wchar_t base[MAX_PATH]{};
+    const auto size=GetEnvironmentVariableW(
+        L"LOCALAPPDATA",base,static_cast<DWORD>(std::size(base)));
+    if(size==0||size>=std::size(base))return;
+    auto directory=std::filesystem::path(base)/L"NEngine"/L"Logs";
+    std::error_code ec;
+    std::filesystem::create_directories(directory,ec);
+    if(ec)return;
+    std::ofstream stream(directory/L"player.log",std::ios::binary|std::ios::app);
+    if(stream)stream<<nengine::core::build_identity(current_game_build_version)
+                    <<" "<<message<<"\n";
+}
 std::filesystem::path executable_directory() {
     wchar_t name[32768]{};
     const auto count = GetModuleFileNameW(
@@ -22,6 +39,7 @@ std::filesystem::path executable_directory() {
     return std::filesystem::path(name).parent_path();
 }
 void message(std::string_view text) {
+    diagnostic(std::string("ERROR: ")+std::string(text));
     const auto wide = std::wstring(text.begin(), text.end());
     MessageBoxW(nullptr, wide.c_str(), L"NEngine Player",
                 MB_OK | MB_ICONERROR);
@@ -32,6 +50,8 @@ int run() {
     nengine::player::PlayerRuntime runtime;
     std::string error;
     if (!runtime.load(root, &error)) { message(error); return 3; }
+    current_game_build_version=runtime.manifest().game_version;
+    diagnostic("START: Windows Player build identity");
 
     const auto gameplay_path =
         root / "Content" / "Managed" /
@@ -90,6 +110,8 @@ int run() {
             scene.initialize(renderer);
     };
     auto last_frame = std::chrono::steady_clock::now();
+    double profile_ms=0.;std::size_t profile_frames=0;
+    nengine::app::PlayerCpuProfiler cpu_profiler;
     while (window.poll_events()) {
         const auto now = std::chrono::steady_clock::now();
         const auto delta = std::chrono::duration<float>(now - last_frame).count();
@@ -146,7 +168,16 @@ int run() {
                           static_cast<float>(window.client_height()), focused);
         // The stand-alone Player World advances independently of Editor Play.
         // PlayerRuntime limits large frame stalls to eight fixed steps.
-        runtime.advance(delta);
+        const auto profile_begin=std::chrono::steady_clock::now();
+        const auto profile_frame=runtime.advance(delta);
+        profile_ms+=std::chrono::duration<double,std::milli>(
+             std::chrono::steady_clock::now()-profile_begin).count();
+        if(++profile_frames>=300){
+            diagnostic("PROFILE avg_player_update_ms="+
+                std::to_string(profile_ms/profile_frames)+
+                " world_entities="+std::to_string(runtime.entity_count()));
+            profile_ms=0.;profile_frames=0;
+        }
         if (audio_ready) {
             const auto mix = nengine::audio::build_mix_snapshot(runtime.world());
             std::string pump_error;
@@ -184,6 +215,7 @@ int run() {
         };
         const auto* overlay_ptr =
             overlay_view.valid() ? &overlay_view : nullptr;
+        const auto render_start=std::chrono::steady_clock::now();
         if (width && height && !scene.present_world(
                 renderer, runtime.world(),
                 [&runtime](nengine::assets::AssetGuid guid) {
@@ -201,6 +233,14 @@ int run() {
             message(scene.diagnostic());
             return 7;
         }
+        const auto render_end=std::chrono::steady_clock::now();
+        const auto elapsed_ms=[](auto start,auto end){
+            return std::chrono::duration<double,std::milli>(end-start).count();
+        };
+        cpu_profiler.sample(elapsed_ms(now,render_end),
+            elapsed_ms(profile_begin,render_start),
+            elapsed_ms(render_start,render_end),
+            profile_frame,runtime.world().entities().size());
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     audio_device.close();

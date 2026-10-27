@@ -22,6 +22,12 @@ NEngine은 **Unity의 사용 경험과 개념에 익숙한 개발자가 쓸 수 
 - **Android 툴체인**은 버전별 SDK/NDK/JDK/Gradle 프로필로 관리한다. Windows 빌드 성공이 Android 앱 실행을 의미하지 않는다.
 - 목표는 Unity 전체 API·엔진 코드·패키지 재현이 아닌, 실제 2D/3D 게임 제작과 배포에 필요한 제한된 독립적 제품 완성이다.
 
+## 2026-10-27 PR #41 — 10개 소스 수용 후보와 후속 충돌 수정
+
+- [PR #41](https://github.com/skatmdgn/NEngine/pull/41): CORE-005, EDIT-007/008, PHYS-006, ANIM-003, INPUT-003, EDTOOL-001/006/008, UTIL-004. 소스 HEAD `f6160c138fc0669e834f8d48a5c2e960239300dd` 기준 자동 검증과 Windows/Ubuntu Release·Debug 최종 CI가 모두 성공해야 병합 가능하다. 체크리스트 285개 중 135개 완료/150개 미완료는 해당 최종 CI 성공을 조건으로 하는 소스·자동화 수용치다.
+- 기존 기능 코드 `7f8039b1d38359e8de251961263fa4188e71a387`에서는 [CI 40427979420](https://github.com/skatmdgn/NEngine/actions/runs/40427979420) Windows/Ubuntu Release·Debug 성공. 이후 **microstep 중간에서만 생긴 Trigger 접촉이 버려지는 문제**를 수정하고 2D/3D 회귀를 추가했으므로 이 이전 성공 로그로 수정 HEAD 검증을 대체하지 않는다.
+- 범위 주의: PHYS-006은 최대 128 substep의 opt-in Box 고속 충돌이며 임의 속도·모든 Collider의 완전한 swept CCD가 아니다. EDTOOL-006은 CPU 프로파일러이고 EDTOOL-008은 빌드 타깃 설정 화면이지 Android APK 생성기능은 아니다. 실제 Windows GUI·GPU·오디오·Android 실기기 실행은 별도 수용 대상이다.
+
 ## 2026-10-26 PR #40 — 7개 소스·자동화 수용 ID
 
 - PR [#40](https://github.com/skatmdgn/NEngine/pull/40) 소스 SHA `acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7` ([CI 40279093322](https://github.com/skatmdgn/NEngine/actions/runs/40279093322)): Windows/Ubuntu Release·Debug 모두 **38/38 CTest PASS**. NAV-013, UTIL-003, EDTOOL-003, CS-014, EDTOOL-004, UTIL-001, EDIT-014만 증거 기반 추가하여 285개 중 완료 125 / 미완료 160. 실제 설치된 VS/Rider GUI/Windows GPU 및 Android 실기기 수용 아님.

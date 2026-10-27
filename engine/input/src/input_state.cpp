@@ -175,6 +175,13 @@ void InputState::add_wheel(
     }
 }
 
+std::vector<std::string> ActionMap::action_names() const {
+    std::vector<std::string> names;
+    names.reserve(bindings_.size());
+    for(const auto& [name,bindings]:bindings_)names.push_back(name);
+    std::sort(names.begin(),names.end());
+    return names;
+}
 bool ActionMap::bind(
     std::string action,
     Key key) {

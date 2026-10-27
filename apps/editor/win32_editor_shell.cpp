@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -30,6 +31,9 @@
 #include "nengine/scripting/managed_build.hpp"
 #include "nengine/scripting/managed_project.hpp"
 #include "nengine/editor/ide_launch.hpp"
+#include "nengine/editor/action_map_editor.hpp"
+#include "nengine/editor/build_settings_editor.hpp"
+#include "nengine/editor/performance_profiler.hpp"
 #include "nengine/scripting/managed_runtime.hpp"
 #include "nengine/render/vulkan_context.hpp"
 #include "nengine/render/vulkan_diagnostic_scene.hpp"
@@ -41,7 +45,7 @@ constexpr wchar_t kHostClassName[] = L"NEngine.EditorHost";
 constexpr wchar_t kSceneClassName[] = L"NEngine.SceneView";
 constexpr wchar_t kSplitterClassName[] = L"NEngine.Splitter";
 
-constexpr int kToolbarHeight = 38;
+constexpr int kToolbarHeight = 70;
 constexpr int kSplitterSize = 6;
 constexpr int kPadding = 8;
 
@@ -60,6 +64,21 @@ enum ControlId : int {
     IdStep,
     IdStop,
     IdVulkanPreview,
+    IdGameView,
+    IdActionEditor,
+    IdActionList,
+    IdActionName,
+    IdActionKey,
+    IdActionAdd,
+    IdActionRemove,
+    IdActionSave,
+    IdBuildSettings,
+    IdBuildName,
+    IdBuildWindows,
+    IdBuildAndroid,
+    IdBuildToolchain,
+    IdBuildApply,
+    IdProfiler,
     IdCanvasEdit,
     IdCanvasName,
     IdCanvasText,
@@ -75,6 +94,8 @@ enum ControlId : int {
     IdCanvasUndo,
     IdCanvasRedo,
     IdHierarchy,
+    IdDuplicateHierarchy,
+    IdParentHierarchy,
     IdName,
     IdActive,
     IdPosX,
@@ -92,6 +113,7 @@ enum ControlId : int {
     IdGenericValue,
     IdAssignAsset,
     IdApplyProperty,
+    IdRemoveComponent,
     IdAddComponentList,
     IdAddComponent,
     IdAssets,
@@ -314,6 +336,32 @@ struct Win32EditorShell::Impl {
     HWND step{nullptr};
     HWND stop{nullptr};
     HWND vulkan_preview{nullptr};
+    HWND profiler_toggle{nullptr};
+    HWND profiler_list{nullptr};
+    bool profiler_visible{false};
+    ULONGLONG next_profiler_refresh{0};
+    nengine::editor::PerformanceProfiler profiler_samples{};
+    HWND build_toggle{nullptr};
+    HWND build_name{nullptr};
+    HWND build_windows{nullptr};
+    HWND build_android{nullptr};
+    HWND build_toolchain{nullptr};
+    HWND build_apply{nullptr};
+    bool build_settings_visible{false};
+    HWND action_toggle{nullptr};
+    HWND action_list{nullptr};
+    HWND action_name{nullptr};
+    HWND action_key{nullptr};
+    HWND action_add{nullptr};
+    HWND action_remove{nullptr};
+    HWND action_save{nullptr};
+    std::vector<std::string> action_names{};
+    std::vector<nengine::input::Key> action_key_options{};
+    nengine::editor::ActionMapEditor action_document{};
+    bool action_editor_visible{false};
+    HWND game_toggle{nullptr};
+    HWND game_view{nullptr};
+    bool game_view_visible{true};
     HWND canvas_edit_toggle{nullptr};
     HWND canvas_name{nullptr};
     HWND canvas_text{nullptr};
@@ -347,6 +395,8 @@ struct Win32EditorShell::Impl {
     bool canvas_mode{false};
 
     HWND hierarchy{nullptr};
+    HWND duplicate_hierarchy{nullptr};
+    HWND parent_hierarchy{nullptr};
     HWND scene{nullptr};
 
     HWND inspector_title{nullptr};
@@ -367,6 +417,7 @@ struct Win32EditorShell::Impl {
     HWND generic_value{nullptr};
     HWND assign_asset{nullptr};
     HWND apply_property{nullptr};
+    HWND remove_component{nullptr};
     HWND add_component_list{nullptr};
     HWND add_component{nullptr};
     std::vector<GenericPropertyBinding>
@@ -680,7 +731,7 @@ struct Win32EditorShell::Impl {
             PAINTSTRUCT paint{};
             HDC dc = BeginPaint(hwnd, &paint);
 
-            if (!self->vulkan_preview_enabled) {
+            if(hwnd==self->game_view || !self->vulkan_preview_enabled) {
                 self->paint_scene(dc, hwnd);
             }
 
@@ -917,6 +968,10 @@ struct Win32EditorShell::Impl {
         pause = create_control(host, L"BUTTON", L"Pause", BS_PUSHBUTTON, IdPause);
         step = create_control(host, L"BUTTON", L"Step", BS_PUSHBUTTON, IdStep);
         stop = create_control(host, L"BUTTON", L"Stop", BS_PUSHBUTTON, IdStop);
+        game_toggle = create_control(host,L"BUTTON",L"Game View",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdGameView);
+        action_toggle = create_control(host,L"BUTTON",L"Input Actions",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdActionEditor);
+        build_toggle = create_control(host,L"BUTTON",L"Build Settings",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdBuildSettings);
+        profiler_toggle = create_control(host,L"BUTTON",L"Profiler",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdProfiler);
         vulkan_preview = create_control(
             host,
             L"BUTTON",
@@ -924,7 +979,7 @@ struct Win32EditorShell::Impl {
             BS_AUTOCHECKBOX | BS_PUSHLIKE,
             IdVulkanPreview);
 
-        if (!open_scene || !save_scene || !new_entity || !delete_entity ||
+        if (!game_toggle || !action_toggle || !build_toggle || !profiler_toggle || !open_scene || !save_scene || !new_entity || !delete_entity ||
             !refresh_assets || !scripts || !build_scripts || !undo || !redo ||
             !play || !pause || !step || !stop ||
             !vulkan_preview) {
@@ -995,10 +1050,12 @@ struct Win32EditorShell::Impl {
             host,
             L"LISTBOX",
             L"",
-            LBS_NOTIFY | WS_BORDER | WS_VSCROLL,
+            LBS_NOTIFY | LBS_EXTENDEDSEL | WS_BORDER | WS_VSCROLL,
             IdHierarchy);
+        duplicate_hierarchy=create_control(host,L"BUTTON",L"Duplicate",BS_PUSHBUTTON,IdDuplicateHierarchy);
+        parent_hierarchy=create_control(host,L"BUTTON",L"Parent to active",BS_PUSHBUTTON,IdParentHierarchy);
 
-        if (!hierarchy) {
+        if (!hierarchy||!duplicate_hierarchy||!parent_hierarchy) {
             shell_log("attach failed: hierarchy control creation");
             return false;
         }
@@ -1024,6 +1081,11 @@ struct Win32EditorShell::Impl {
             return false;
         }
 
+        game_view = CreateWindowExW(0,kSceneClassName,L"Game View",
+            WS_CHILD | WS_VISIBLE | WS_BORDER,
+            0,0,10,10,host,nullptr,GetModuleHandleW(nullptr),this);
+        if(!game_view) {shell_log("attach failed: Game View window");return false;}
+        SendMessageW(game_toggle,BM_SETCHECK,BST_CHECKED,0);
         shell_log("creating inspector controls");
         inspector_title = create_control(host, L"STATIC", L"Inspector", SS_LEFT);
         label_name = create_control(host, L"STATIC", L"Name", SS_LEFT);
@@ -1088,6 +1150,9 @@ struct Win32EditorShell::Impl {
             BS_PUSHBUTTON,
             IdApplyProperty);
 
+        remove_component=create_control(host,L"BUTTON",L"Remove Component",
+            BS_PUSHBUTTON,IdRemoveComponent);
+
         add_component_list = create_control(
             host,
             L"COMBOBOX",
@@ -1112,7 +1177,7 @@ struct Win32EditorShell::Impl {
             !generic_properties ||
             !generic_value ||
             !assign_asset ||
-            !apply_property ||
+            !apply_property || !remove_component ||
             !add_component_list ||
             !add_component) {
             shell_log("attach failed: inspector control creation");
@@ -1235,7 +1300,37 @@ struct Win32EditorShell::Impl {
             LBS_NOTIFY | WS_BORDER | WS_VSCROLL | WS_HSCROLL,
             IdConsole);
 
-        if (!assets_list || !console) {
+        action_list = create_control(host,L"LISTBOX",L"",
+            LBS_NOTIFY | WS_BORDER | WS_VSCROLL,IdActionList);
+        action_name = create_control(host,L"EDIT",L"",
+            WS_BORDER | ES_AUTOHSCROLL,IdActionName);
+        action_key = create_control(host,L"COMBOBOX",L"",
+            CBS_DROPDOWNLIST | WS_VSCROLL,IdActionKey);
+        action_add = create_control(host,L"BUTTON",L"Add Binding",BS_PUSHBUTTON,IdActionAdd);
+        action_remove = create_control(host,L"BUTTON",L"Remove Action",BS_PUSHBUTTON,IdActionRemove);
+        action_save = create_control(host,L"BUTTON",L"Save Actions",BS_PUSHBUTTON,IdActionSave);
+        action_key_options.push_back(nengine::input::Key::Space);
+        SendMessageW(action_key,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(L"Space"));
+        action_key_options.push_back(nengine::input::Key::Enter);
+        SendMessageW(action_key,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(L"Enter"));
+        for(int i=0;i<26;++i) {
+            action_key_options.push_back(static_cast<nengine::input::Key>(
+                static_cast<int>(nengine::input::Key::A)+i));
+            wchar_t label[2]{static_cast<wchar_t>(L'A'+i),0};
+            SendMessageW(action_key,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(label));
+        }
+        SendMessageW(action_key,CB_SETCURSEL,0,0);
+        profiler_list=create_control(host,L"LISTBOX",L"",
+            WS_BORDER | WS_VSCROLL | WS_HSCROLL,0);
+        build_name=create_control(host,L"EDIT",L"",WS_BORDER|ES_AUTOHSCROLL,IdBuildName);
+        build_windows=create_control(host,L"BUTTON",L"Windows Player",BS_AUTOCHECKBOX,IdBuildWindows);
+        build_android=create_control(host,L"BUTTON",L"Android (toolchain profile)",BS_AUTOCHECKBOX,IdBuildAndroid);
+        build_toolchain=create_control(host,L"EDIT",L"",WS_BORDER|ES_AUTOHSCROLL,IdBuildToolchain);
+        build_apply=create_control(host,L"BUTTON",L"Save Target Settings",BS_PUSHBUTTON,IdBuildApply);
+        if(!profiler_list||!build_name||!build_windows||!build_android||!build_toolchain||!build_apply||
+            !action_list || !action_name || !action_key || !action_add ||
+            !action_remove || !action_save ||
+            !assets_list || !console) {
             shell_log("attach failed: bottom panel control creation");
             return false;
         }
@@ -1482,8 +1577,21 @@ struct Win32EditorShell::Impl {
         last_runtime_tick =
             now;
 
-        editor.tick_runtime(
-            runtime_elapsed_seconds);
+        const auto profile_start=std::chrono::steady_clock::now();
+        editor.tick_runtime(runtime_elapsed_seconds);
+        const double simulation_ms=
+            std::chrono::duration<double,std::milli>(
+                std::chrono::steady_clock::now()-profile_start).count();
+        profiler_samples.sample({
+            runtime_elapsed_seconds*1000.0,simulation_ms,
+            editor.presentation_world().entities().size(),
+            editor.play_session().is_playing()});
+        if(game_view&&game_view_visible)
+            InvalidateRect(game_view,nullptr,FALSE);
+        if(profiler_visible&&now>=next_profiler_refresh){
+            next_profiler_refresh=now+250;
+            refresh_profiler();
+        }
 
         RECT rect{};
         if (!GetClientRect(parent, &rect)) {
@@ -1889,6 +1997,10 @@ struct Win32EditorShell::Impl {
             button_height,
             TRUE);
 
+        MoveWindow(game_toggle,kPadding,38,110,26,TRUE);
+        MoveWindow(action_toggle,kPadding+116,38,120,26,TRUE);
+        MoveWindow(build_toggle,kPadding+242,38,122,26,TRUE);
+        MoveWindow(profiler_toggle,kPadding+370,38,110,26,TRUE);
         const int content_top =
             kToolbarHeight;
 
@@ -1946,23 +2058,26 @@ struct Win32EditorShell::Impl {
                 10,
                 left_split_x -
                     2 * kPadding),
-            content_height,
+            std::max(10,content_height-32),
             TRUE);
+        const int hierarchy_buttons_width=std::max(40,left_split_x-2*kPadding);
+        MoveWindow(duplicate_hierarchy,kPadding,bottom_split_y-30,
+            std::max(20,hierarchy_buttons_width/2-2),26,TRUE);
+        MoveWindow(parent_hierarchy,kPadding+hierarchy_buttons_width/2+2,
+            bottom_split_y-30,std::max(20,hierarchy_buttons_width/2-2),26,TRUE);
 
         const int scene_x =
             left_split_x +
             kSplitterSize;
 
-        MoveWindow(
-            scene,
-            scene_x,
-            content_top,
-            std::max(
-                10,
-                right_split_x -
-                    scene_x),
-            content_height,
-            TRUE);
+        const int available_scene_width = std::max(20,right_split_x-scene_x);
+        const int edit_width = game_view_visible ?
+            std::max(10,(available_scene_width-6)/2):available_scene_width;
+        MoveWindow(scene,scene_x,content_top,edit_width,content_height,TRUE);
+        ShowWindow(game_view,game_view_visible?SW_SHOW:SW_HIDE);
+        if(game_view_visible)
+            MoveWindow(game_view,scene_x+edit_width+6,content_top,
+                std::max(10,available_scene_width-edit_width-6),content_height,TRUE);
 
         int iy =
             content_top + 8;
@@ -2053,11 +2168,11 @@ struct Win32EditorShell::Impl {
             MoveWindow(canvas_apply_geometry, ix, iy, iw, 26, TRUE); iy += 32;
         }
 
-        const std::array<HWND, 17> native_inspector{
+        const std::array<HWND, 18> native_inspector{
             inspector_title, label_name, name, active, label_position,
             label_rotation, label_scale, apply_transform, generic_title,
             generic_properties, generic_value, assign_asset, apply_property,
-            add_component_list, add_component, position[0], position[1]};
+            remove_component,add_component_list, add_component, position[0], position[1]};
         for (HWND control : native_inspector)
             ShowWindow(control, ui_authoring ? SW_HIDE : SW_SHOW);
         for (HWND control : position)
@@ -2239,13 +2354,9 @@ struct Win32EditorShell::Impl {
             TRUE);
         iy += 28;
 
-        MoveWindow(
-            apply_property,
-            ix,
-            iy,
-            iw,
-            27,
-            TRUE);
+        MoveWindow(apply_property,ix,iy,std::max(45,iw/2-2),27,TRUE);
+        MoveWindow(remove_component,ix+iw/2+2,iy,
+            std::max(45,iw/2-2),27,TRUE);
         iy += 34;
 
         const int add_button_width =
@@ -2318,6 +2429,36 @@ struct Win32EditorShell::Impl {
                 kPadding,
             bottom_h,
             TRUE);
+        const bool tool_open=action_editor_visible||build_settings_visible||profiler_visible;
+        ShowWindow(assets_list,tool_open?SW_HIDE:SW_SHOW);
+        ShowWindow(console,tool_open?SW_HIDE:SW_SHOW);
+        const auto action_controls=std::array<HWND,6>{
+            action_list,action_name,action_key,action_add,action_remove,action_save};
+        for(auto ctrl:action_controls)ShowWindow(ctrl,action_editor_visible?SW_SHOW:SW_HIDE);
+        const auto build_controls=std::array<HWND,5>{
+            build_name,build_windows,build_android,build_toolchain,build_apply};
+        for(auto ctrl:build_controls)ShowWindow(ctrl,build_settings_visible?SW_SHOW:SW_HIDE);
+        ShowWindow(profiler_list,profiler_visible?SW_SHOW:SW_HIDE);
+        if(profiler_visible)
+            MoveWindow(profiler_list,kPadding,bottom_y,width-2*kPadding,bottom_h,TRUE);
+        if(build_settings_visible){
+            const int w=std::max(160,width-3*kPadding);
+            MoveWindow(build_name,kPadding,bottom_y,w/2,24,TRUE);
+            MoveWindow(build_windows,kPadding+w/2+8,bottom_y,w/4,24,TRUE);
+            MoveWindow(build_android,kPadding+w*3/4,bottom_y,w/4,24,TRUE);
+            MoveWindow(build_toolchain,kPadding,bottom_y+33,w*2/3,25,TRUE);
+            MoveWindow(build_apply,kPadding+w*2/3+8,bottom_y+33,w/3-8,25,TRUE);
+        }
+        if(action_editor_visible){
+            const int x0=kPadding, w0=std::max(120,width/2-16);
+            MoveWindow(action_list,x0,bottom_y,w0,bottom_h,TRUE);
+            const int x1=x0+w0+8, w1=std::max(140,width-x1-kPadding);
+            MoveWindow(action_name,x1,bottom_y,w1/2,25,TRUE);
+            MoveWindow(action_key,x1+w1/2+4,bottom_y,w1/2-4,220,TRUE);
+            MoveWindow(action_add,x1,bottom_y+29,w1/2-2,25,TRUE);
+            MoveWindow(action_remove,x1+w1/2+4,bottom_y+29,w1/2-4,25,TRUE);
+            MoveWindow(action_save,x1,bottom_y+61,w1,25,TRUE);
+        }
     }
 
     void log_line(std::wstring_view message) {
@@ -2404,6 +2545,39 @@ struct Win32EditorShell::Impl {
                 static_cast<WPARAM>(
                     count - 1),
                 0);
+        }
+    }
+
+    void refresh_profiler() {
+        if(!profiler_list)return;
+        const auto stats=profiler_samples.summary();
+        SendMessageW(profiler_list,LB_RESETCONTENT,0,0);
+        std::vector<std::string> rows={
+            std::string("Execution: ")+(stats.playing?"Game (Play Mode)":"Editor (Edit Mode)"),
+            "CPU frame average: "+std::to_string(stats.average_ms)+" ms",
+            "CPU frame peak: "+std::to_string(stats.peak_ms)+" ms",
+            "Simulation CPU average: "+std::to_string(stats.average_simulation_ms)+" ms",
+            "Scene entities: "+std::to_string(stats.entity_count),
+            "Samples: "+std::to_string(stats.samples)+" (ring cap 240)",
+            "GPU time/VRAM not instrumented; standalone Player hardware unverified"
+        };
+        for(const auto& row:rows){
+            const auto label=utf8_to_wide(row);
+            SendMessageW(profiler_list,LB_ADDSTRING,0,
+                         reinterpret_cast<LPARAM>(label.c_str()));
+        }
+    }
+
+    void refresh_action_editor() {
+        if(!action_list)return;
+        action_names=action_document.actions();
+        SendMessageW(action_list,LB_RESETCONTENT,0,0);
+        for(const auto& name:action_names){
+            auto display=name;
+            if(const auto* keys=action_document.map().bindings(name))
+                display+=" ("+std::to_string(keys->size())+" bindings)";
+            const auto wide=utf8_to_wide(display);
+            SendMessageW(action_list,LB_ADDSTRING,0,reinterpret_cast<LPARAM>(wide.c_str()));
         }
     }
 
@@ -2635,9 +2809,8 @@ struct Win32EditorShell::Impl {
         refresh_window_title();
 
         shell_log("refresh scene invalidate");
-        if (scene) {
-            InvalidateRect(scene, nullptr, TRUE);
-        }
+        if(scene)InvalidateRect(scene,nullptr,TRUE);
+        if(game_view&&game_view_visible)InvalidateRect(game_view,nullptr,TRUE);
 
         shell_log("refresh complete");
         refreshing = false;
@@ -2822,13 +2995,14 @@ struct Win32EditorShell::Impl {
 
             if (row.selected) {
                 selected_index = static_cast<int>(i);
+                SendMessageW(hierarchy,LB_SETSEL,TRUE,static_cast<LPARAM>(i));
             }
         }
 
         if (selected_index >= 0) {
             SendMessageW(
                 hierarchy,
-                LB_SETCURSEL,
+                LB_SETCARETINDEX,
                 selected_index,
                 0);
         }
@@ -4179,6 +4353,137 @@ struct Win32EditorShell::Impl {
             handled = true;
             break;
 
+        case IdActionEditor:
+            if(notification!=BN_CLICKED)return false;
+            action_editor_visible=SendMessageW(action_toggle,BM_GETCHECK,0,0)==BST_CHECKED;
+            if(action_editor_visible){
+                profiler_visible=false;
+                SendMessageW(profiler_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                build_settings_visible=false;
+                SendMessageW(build_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                std::string error;
+                if(!editor.project().is_open()||
+                   !action_document.open(editor.project().root(),&error)){
+                    action_editor_visible=false;
+                    SendMessageW(action_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                    editor.console().warning("Input Actions",error.empty()?
+                       "Open a project first":error);
+                }else refresh_action_editor();
+            }
+            {
+                RECT rect{};GetClientRect(host,&rect);
+                layout(rect.right,rect.bottom);
+            }
+            handled=true;break;
+        case IdProfiler:
+            if(notification!=BN_CLICKED)return false;
+            profiler_visible=SendMessageW(profiler_toggle,BM_GETCHECK,0,0)==BST_CHECKED;
+            if(profiler_visible){
+                action_editor_visible=false;
+                build_settings_visible=false;
+                SendMessageW(action_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                SendMessageW(build_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                refresh_profiler();
+            }
+            {
+                RECT rect{};GetClientRect(host,&rect);
+                layout(rect.right,rect.bottom);
+            }
+            handled=true;break;
+
+        case IdBuildSettings:
+            if(notification!=BN_CLICKED)return false;
+            build_settings_visible=SendMessageW(build_toggle,BM_GETCHECK,0,0)==BST_CHECKED;
+            if(build_settings_visible){
+                profiler_visible=false;
+                SendMessageW(profiler_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                action_editor_visible=false;
+                SendMessageW(action_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                if(!editor.project().is_open()){
+                    build_settings_visible=false;
+                    SendMessageW(build_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                    editor.console().warning("Build Settings","Open a project before editing targets");
+                }else {
+                    const auto draft=nengine::editor::read_build_settings(editor.project());
+                    const auto title=utf8_to_wide(draft.project_name);
+                    const auto tool=utf8_to_wide(draft.android_toolchain);
+                    SetWindowTextW(build_name,title.c_str());
+                    SetWindowTextW(build_toolchain,tool.c_str());
+                    SendMessageW(build_windows,BM_SETCHECK,draft.windows?BST_CHECKED:BST_UNCHECKED,0);
+                    SendMessageW(build_android,BM_SETCHECK,draft.android?BST_CHECKED:BST_UNCHECKED,0);
+                }
+            }
+            {
+                RECT rect{};GetClientRect(host,&rect);
+                layout(rect.right,rect.bottom);
+            }
+            handled=true;break;
+        case IdBuildApply:
+            if(notification!=BN_CLICKED)return false;
+            {
+                wchar_t project_name[200]{},toolchain[200]{};
+                GetWindowTextW(build_name,project_name,200);
+                GetWindowTextW(build_toolchain,toolchain,200);
+                nengine::editor::BuildSettingsDraft draft{
+                    wide_to_utf8(project_name),
+                    SendMessageW(build_windows,BM_GETCHECK,0,0)==BST_CHECKED,
+                    SendMessageW(build_android,BM_GETCHECK,0,0)==BST_CHECKED,
+                    wide_to_utf8(toolchain)};
+                std::string error;
+                if(nengine::editor::apply_build_settings(editor.project(),draft,&error))
+                    editor.console().info("Build Settings",
+                        "Windows/Android target configuration saved; APK execution still requires Android backend");
+                else editor.console().warning("Build Settings",error);
+            }
+            handled=true;break;
+        case IdActionList:
+            if(notification!=LBN_SELCHANGE)return false;
+            {
+                const auto i=SendMessageW(action_list,LB_GETCURSEL,0,0);
+                if(i>=0&&static_cast<std::size_t>(i)<action_names.size()) {
+                    const auto label=utf8_to_wide(action_names[static_cast<std::size_t>(i)]);
+                    SetWindowTextW(action_name,label.c_str());
+                }
+            }
+            handled=true;break;
+        case IdActionAdd:
+        case IdActionRemove:
+        case IdActionSave:
+            if(notification!=BN_CLICKED)return false;
+            {
+                std::string err;
+                bool ok=true;
+                if(id==IdActionAdd||id==IdActionRemove){
+                    wchar_t name[100]{};
+                    GetWindowTextW(action_name,name,100);
+                    const std::string action=wide_to_utf8(name);
+                    if(id==IdActionRemove)ok=action_document.erase(action,&err);
+                    else {
+                        const auto index=SendMessageW(action_key,CB_GETCURSEL,0,0);
+                        ok=index>=0&&static_cast<std::size_t>(index)<action_key_options.size()&&
+                           action_document.bind(action,action_key_options[static_cast<std::size_t>(index)],&err);
+                    }
+                }
+                if(ok)ok=action_document.save(&err);
+                if(ok) {
+                    refresh_action_editor();
+                    editor.console().info("Input Actions","Project action-map saved");
+                }else editor.console().warning("Input Actions",err);
+            }
+            handled=true;break;
+
+        case IdGameView:
+            if(notification!=BN_CLICKED)return false;
+            game_view_visible = SendMessageW(game_toggle,BM_GETCHECK,0,0)==BST_CHECKED;
+            {
+                RECT r{};GetClientRect(host,&r);
+                layout(r.right-r.left,r.bottom-r.top);
+                InvalidateRect(scene,nullptr,FALSE);
+                InvalidateRect(game_view,nullptr,FALSE);
+            }
+            handled=true;
+            break;
+
         case IdVulkanPreview:
             if (notification != BN_CLICKED) return false;
             {
@@ -4248,27 +4553,35 @@ struct Win32EditorShell::Impl {
             break;
 
         case IdHierarchy:
-            if (notification != LBN_SELCHANGE) return false;
+            if(notification!=LBN_SELCHANGE)return false;
             {
-                const int index =
-                    static_cast<int>(
-                        SendMessageW(
-                            hierarchy,
-                            LB_GETCURSEL,
-                            0,
-                            0));
-
-                if (index >= 0 &&
-                    static_cast<std::size_t>(index) <
-                        hierarchy_rows.size()) {
-                    editor.selection().set(
-                        hierarchy_rows[
-                            static_cast<std::size_t>(index)]
-                            .entity);
+                const int selected_count=static_cast<int>(
+                    SendMessageW(hierarchy,LB_GETSELCOUNT,0,0));
+                if(selected_count>=0&&selected_count<=static_cast<int>(hierarchy_rows.size())){
+                    std::vector<int> indexes(static_cast<std::size_t>(selected_count));
+                    SendMessageW(hierarchy,LB_GETSELITEMS,indexes.size(),
+                       reinterpret_cast<LPARAM>(indexes.data()));
+                    editor.selection().clear();
+                    for(const int i:indexes)
+                        if(i>=0&&static_cast<std::size_t>(i)<hierarchy_rows.size())
+                            editor.selection().add(hierarchy_rows[static_cast<std::size_t>(i)].entity);
+                    const int caret=static_cast<int>(SendMessageW(hierarchy,LB_GETCARETINDEX,0,0));
+                    if(caret>=0&&static_cast<std::size_t>(caret)<hierarchy_rows.size()&&
+                       SendMessageW(hierarchy,LB_GETSEL,caret,0)>0)
+                       editor.selection().add(hierarchy_rows[static_cast<std::size_t>(caret)].entity);
                 }
             }
-            handled = true;
-            break;
+            handled=true;break;
+        case IdDuplicateHierarchy:
+            if(notification!=BN_CLICKED)return false;
+            if(!editor.duplicate_selected_hierarchy())
+                editor.console().warning("Hierarchy","Nothing duplicated");
+            handled=true;break;
+        case IdParentHierarchy:
+            if(notification!=BN_CLICKED)return false;
+            if(!editor.reparent_selected_to_active())
+                editor.console().warning("Hierarchy","Choose multiple entities; the active row becomes their parent");
+            handled=true;break;
 
         case IdConsole:
             if(notification!=LBN_DBLCLK)return false;
@@ -4405,6 +4718,20 @@ struct Win32EditorShell::Impl {
             // the click/keyboard selection to its first item.
             refresh_generic_property_value();
             return true;
+
+        case IdRemoveComponent:
+            if(notification!=BN_CLICKED)return false;
+            if(editor.can_edit()&&!generic_property_rows.empty()){
+                const auto index=static_cast<int>(
+                    SendMessageW(generic_properties,LB_GETCURSEL,0,0));
+                if(index>=0&&static_cast<std::size_t>(index)<generic_property_rows.size()){
+                    const auto type=generic_property_rows[static_cast<std::size_t>(index)].component;
+                    if(editor.remove_component_from_selection(type))
+                        editor.console().info("Inspector","Removed selected component");
+                    else editor.console().warning("Inspector","Cannot remove selected component");
+                }
+            }
+            handled=true;break;
 
         case IdApplyProperty:
             if (notification != BN_CLICKED) {
@@ -4812,11 +5139,14 @@ struct Win32EditorShell::Impl {
         SelectObject(dc, old_pen);
         DeleteObject(grid_pen);
 
-        const auto& world =
-            editor.presentation_world();
+        const auto& world = hwnd==game_view ? editor.presentation_world() : editor.world();
 
-        const auto selected =
-            editor.selection().active();
+        const auto selected = hwnd==game_view ?
+            nengine::core::Entity::invalid() : editor.selection().active();
+        SetBkMode(dc,TRANSPARENT);
+        SetTextColor(dc,RGB(240,240,240));
+        const wchar_t* title=hwnd==game_view?L"Game View (runtime)":L"Scene View (authoring)";
+        TextOutW(dc,8,7,title,static_cast<int>(wcslen(title)));
 
         for (const auto entity :
              world.entities()) {

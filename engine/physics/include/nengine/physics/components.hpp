@@ -10,6 +10,7 @@ namespace nengine::physics {
 struct Rigidbody {
     bool enabled{true};
     bool use_gravity{true};
+    bool continuous{false}; // Opt-in bounded collision microsteps for fast bodies.
     bool is_kinematic{false};
     bool allow_sleep{true};
     bool sleeping{false};
@@ -59,6 +60,7 @@ struct CapsuleCollider {
 struct Rigidbody2D {
     bool enabled{true};
     bool use_gravity{true};
+    bool continuous{false}; // Opt-in bounded collision microsteps for fast bodies.
     bool is_kinematic{false};
     bool allow_sleep{true};
     bool sleeping{false};

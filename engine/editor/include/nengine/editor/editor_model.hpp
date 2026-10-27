@@ -118,6 +118,9 @@ public:
     // menu. The Win32 combo and commands use this same validated snapshot.
     std::vector<core::ComponentTypeId> available_component_types() const;
     bool add_component_to_selection(core::ComponentTypeId type);
+    bool remove_component_from_selection(core::ComponentTypeId type);
+    bool duplicate_selected_hierarchy();
+    bool reparent_selected_to_active();
 
     // Navigation graph is an independently authored .nnav asset.
     bool load_navigation(assets::AssetGuid guid,

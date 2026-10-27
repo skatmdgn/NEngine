@@ -14,6 +14,9 @@
 #include "nengine/audio/components.hpp"
 #include "nengine/core/scene.hpp"
 #include "nengine/editor/editor_model.hpp"
+#include "nengine/editor/action_map_editor.hpp"
+#include "nengine/editor/build_settings_editor.hpp"
+#include "nengine/editor/performance_profiler.hpp"
 #include "nengine/editor/ide_launch.hpp"
 #include "nengine/editor/project_manifest.hpp"
 #include "nengine/editor/presentation.hpp"
@@ -1458,6 +1461,80 @@ int main() {
 
     model.commands().clear();
 
+    // EDIT-008: multi-selection duplication includes child hierarchy and
+    // typed native payloads, while reparent and cycle failure are undo-safe.
+    {
+        editor::EditorModel multi;
+        auto& w=multi.world();
+        const auto a=w.create("Parent"), b=w.create("Sibling"), child=w.create("Child");
+        check(w.set_parent(child,a),"EDIT-008 setup child");
+        auto* light=w.add_component<render::Light>(a,render::light_type());
+        if(light)light->intensity=7.f;
+        multi.selection().set(a);
+        multi.selection().add(b);
+        check(multi.duplicate_selected_hierarchy()&&w.size()==6u,
+              "EDIT-008 two selections duplicate full subtree and sibling");
+        auto selected=multi.selection().entities();
+        bool found_child=false,found_light=false;
+        for(const auto root:selected){
+            if(const auto* payload=w.get_component<render::Light>(
+                    root,render::light_type()))
+                found_light=payload->intensity==7.f;
+            for(auto e:w.children(root))
+                if(w.name(e)=="Child Copy")found_child=true;
+        }
+        check(selected.size()==2u&&found_child&&found_light,
+              "EDIT-008 copied descendants and component property values");
+        check(multi.commands().undo(w)&&w.size()==3u &&
+              multi.commands().redo(w)&&w.size()==6u,
+              "EDIT-008 duplicate supports full Undo/Redo");
+        check(multi.commands().undo(w),"EDIT-008 restores base World");
+        multi.commands().clear();
+        multi.selection().set(b);
+        multi.selection().add(a);
+        check(multi.reparent_selected_to_active()&&
+              w.transform(b)->parent==a,"EDIT-008 multi-selection reparent");
+        check(multi.commands().undo(w)&&
+              !w.transform(b)->parent.valid()&&
+              multi.commands().redo(w)&&w.transform(b)->parent==a,
+              "EDIT-008 reparent supports Undo/Redo");
+        multi.commands().clear();
+        multi.selection().set(a);
+        multi.selection().add(child);
+        const auto size=w.size();
+        check(!multi.reparent_selected_to_active()&&
+              w.size()==size&&w.transform(a)->parent==core::Entity::invalid(),
+              "EDIT-008 cycle reparent rejects atomically");
+    }
+
+    // EDIT-007: Inspector creation/actual property mutation/delete/restore.
+    {
+        editor::EditorModel inspector;
+        auto& w=inspector.world();
+        const auto entity=w.create("Inspector Object");
+        inspector.selection().set(entity);
+        check(inspector.add_component_to_selection(render::light_type()),
+              "EDIT-007: Inspector adds a native Light component");
+        check(inspector.commands().execute(w,std::make_unique<
+            editor::SetPropertyCommand>(&inspector.property_access(),entity,
+            render::light_type(),"Intensity",core::PropertyValue{6.0})),
+              "EDIT-007: Inspector property update is undoable");
+        check(inspector.remove_component_from_selection(render::light_type())&&
+              !w.has_component(entity,render::light_type()),
+              "EDIT-007: Inspector removes native component");
+        check(inspector.commands().undo(w)&&
+              w.get_component<render::Light>(entity,render::light_type())&&
+              w.get_component<render::Light>(entity,render::light_type())->intensity==6.f,
+              "EDIT-007: Undo component deletion restores authored properties");
+        check(inspector.commands().undo(w)&&
+              w.get_component<render::Light>(entity,render::light_type())->intensity==1.f &&
+              inspector.commands().redo(w)&&
+              w.get_component<render::Light>(entity,render::light_type())->intensity==6.f,
+              "EDIT-007: property edit Undo/Redo");
+        check(!inspector.remove_component_from_selection(core::World::transform_type),
+              "EDIT-007: Transform cannot be removed");
+    }
+
     // EDTOOL-003: the Win32 add-component combo and action must agree
     // with the model's live selection, not a stale entity snapshot.
     const auto selection_a=world.create("Add Menu A");
@@ -2397,6 +2474,11 @@ int main() {
 
     auto* runtime = model.play_session().runtime_world();
     check(runtime && runtime->is_alive(child), "runtime clone preserves entity handles");
+    // EDTOOL-001: Scene View reads the source World while the independent
+    // Game View presents the PlaySession runtime clone.
+    check(&model.presentation_world()==runtime &&
+          &model.presentation_world()!=&world,
+          "EDTOOL-001 separate Game View uses runtime instead of authoring World");
     runtime->set_name(child, "Runtime Only");
     check(world.name(child) == "Renamed", "runtime mutations do not alter editor world");
 
@@ -2433,6 +2515,8 @@ int main() {
     check(model.play_session().resume(), "play session resumes");
     check(model.play_session().stop(), "play session stops");
     check(model.play_session().runtime_world() == nullptr, "runtime world discarded on stop");
+    check(&model.presentation_world()==&world,
+          "EDTOOL-001 Game View safely returns to authoring state after Stop");
     check(model.can_edit(), "editing re-enabled after stop");
 
     const auto restored_inspector = editor::build_inspector(model);
@@ -2627,6 +2711,96 @@ int main() {
         std::error_code ec;
         std::filesystem::remove_all(diagnostics_root,ec);
         std::filesystem::remove(external,ec);
+    }
+
+    // INPUT-003: the exact GUI-facing map editor writes the same portable
+    // atomic .naction format as the Player and handles reload/edit/delete.
+    {
+        const auto project=std::filesystem::temp_directory_path()/
+            "NEngine-InputMap-Editor-Test";
+        std::error_code ec;std::filesystem::remove_all(project,ec);
+        std::filesystem::create_directories(project/"ProjectSettings");
+        editor::ActionMapEditor author;
+        std::string err;
+        check(author.open(project,&err)&&
+              author.bind("Jump",input::Key::Space,&err)&&
+              author.bind("Fire",input::Key::F,&err)&&author.save(&err),
+              "INPUT-003 visual editor creates validated project actions");
+        editor::ActionMapEditor reopen;
+        check(reopen.open(project,&err)&&
+              reopen.map().contains("Jump")&&
+              reopen.actions().size()==2 &&
+              reopen.actions()[0]=="Fire",
+              "INPUT-003 UI document roundtrips and sorts action list");
+        check(reopen.erase("Fire",&err)&&
+              !reopen.bind("../unsafe",input::Key::F,&err)&&
+              reopen.save(&err),
+              "INPUT-003 visual edit rejects unsafe action names and removes keys");
+        editor::ActionMapEditor third;
+        check(third.open(project,&err)&&
+              !third.map().contains("Fire")&&third.map().contains("Jump"),
+              "INPUT-003 persisted delete is visible after project reload");
+        std::filesystem::remove_all(project,ec);
+    }
+
+    // EDTOOL-008: the UI model applies validated Windows/Android target
+    // options transactionally and survives a ProjectSession reopen.
+    {
+        std::error_code ec;
+        const auto project_root=std::filesystem::temp_directory_path()/
+            "NEngine-BuildSettings-Editor-Test";
+        std::filesystem::remove_all(project_root,ec);
+        editor::ProjectSession project;
+        std::string error;
+        check(project.open(project_root,&error),
+              "EDTOOL-008 new project provides build targets");
+        auto next=editor::read_build_settings(project);
+        next.project_name="DemoTarget";
+        next.windows=true;next.android=false;
+        check(editor::apply_build_settings(project,next,&error)&&
+              !project.manifest().target_android,
+              "EDTOOL-008 Windows-only build target saves");
+        next.windows=false;next.android=false;
+        check(!editor::apply_build_settings(project,next,&error)&&
+              project.manifest().target_windows,
+              "EDTOOL-008 invalid all-disabled targets leave existing setting");
+        next.windows=false;next.android=true;
+        next.android_toolchain="sdk-api35-ndk27-jdk17";
+        check(editor::apply_build_settings(project,next,&error),
+              "EDTOOL-008 Android target profile saves");
+        project.close();
+        check(project.open(project_root,&error)&&
+              project.manifest().target_android&&
+              !project.manifest().target_windows&&
+              project.manifest().android_toolchain=="sdk-api35-ndk27-jdk17",
+              "EDTOOL-008 build target and toolchain roundtrip project reopen");
+        project.close();
+        std::filesystem::remove_all(project_root,ec);
+    }
+
+    // EDTOOL-006: bounded live Editor/Game profile averages and peaks;
+    // reject invalid samples before they can poison Profiler UI.
+    {
+        editor::PerformanceProfiler profiler;
+        profiler.sample({16.,4.,42,false});
+        profiler.sample({32.,8.,84,true});
+        const auto q=profiler.summary();
+        check(q.samples==2 && q.average_ms==24. &&
+              q.peak_ms==32. && q.average_simulation_ms==6. &&
+              q.playing && q.entity_count==84,
+              "EDTOOL-006 profiler reports actual editor and running-game timing");
+        profiler.sample({std::numeric_limits<double>::quiet_NaN(),1,0,false});
+        check(profiler.size()==2,
+              "EDTOOL-006 profilers reject invalid hardware timing");
+        for(std::size_t i=0;i<1000;++i)
+            profiler.sample({10.,2.,i,true});
+        check(profiler.size()==240&&
+              profiler.summary().average_ms==10. &&
+              profiler.summary().entity_count==999,
+              "EDTOOL-006 bounded 240-frame ring prevents unbounded UI growth");
+        profiler.clear();
+        check(profiler.summary().samples==0,
+              "EDTOOL-006 profile reset has no stale frame statistics");
     }
 
     if (failures == 0) {
