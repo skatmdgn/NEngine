@@ -344,7 +344,8 @@ bool export_player_data(const ExportSettings& settings,
         std::uintmax_t extra_bytes=0u;
         for(const auto& entry:std::filesystem::directory_iterator(managed_root,ec)){
             if(ec){cleanup();return fail(error,"cannot enumerate managed dependencies");}
-            if(entry.path().extension()!=".dll")continue;
+            const auto ext=entry.path().extension().string();
+            if(ext!=".dll"&&ext!=".so"&&ext!=".dylib")continue;
             const std::string filename=entry.path().filename().string();
             const bool safe=filename.size()>=5u&&filename.size()<=128u&&
                 filename.front()!='.'&&
