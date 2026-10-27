@@ -4866,6 +4866,7 @@ bool ManagedProjectGenerator::generate(
         << "    <LangVersion>latest</LangVersion>\n"
         << "    <Nullable>enable</Nullable>\n"
         << "    <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>\n"
+        << "    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>\n"
         << "    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>\n"
         << "    <AssemblyName>"
         << xml_escape(config.project_name)
