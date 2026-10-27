@@ -2352,7 +2352,7 @@ int main() {
             script<<"using NEngine;\n"
                 "using Newtonsoft.Json;\n"
                 "public class NuGetJsonProbe : Behaviour {\n"
-                "  private sealed class Progress { public int Score {get;set;} public string Label {get;set;} = \"\"; }\n"
+                "  public sealed class Progress { public int Score {get;set;} public string Label {get;set;} = \"\"; }\n"
                 "  private void Start() {\n"
                 "    var json = JsonConvert.SerializeObject(new Progress { Score = 42, Label = \"한글\" });\n"
                 "    var restored = JsonConvert.DeserializeObject<Progress>(json);\n"
