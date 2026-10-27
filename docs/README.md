@@ -25,7 +25,7 @@ NEngine은 **Unity의 사용 경험과 개념에 익숙한 개발자가 쓸 수 
 ## 2026-10-27 PR #42 — 외부 C# 라이브러리/패키지 파이프라인
 
 - [PR #42](https://github.com/skatmdgn/NEngine/pull/42): PLUG-004/005/006/009/017 및 CS-005/006/007/008/013의 정확히 10개 기존 소스 수용 후보. 기존 `main` 135/285와 구별해서, PR 브랜치는 최종 Windows/Ubuntu CI 성공을 조건으로 145/285를 기록한다.
-- `Packages/managed-packages.txt`의 NuGet 패키지 참조를 .NET 빌드에 전달하여 실제 Newtonsoft.Json을 restore/실행한다. `Assets/Plugins/Managed/*.dll`은 관리형 참조 및 복사, `Assets/Plugins/Native/*.{dll,so,dylib}`은 OS별 P/Invoke 공유 라이브러리 복사 대상으로 제한한다. `Content/Managed` 내보내기는 프로젝트 DLL·API/Bridge와 추가 런타임 라이브러리를 검증된 파일명/개수/크기 정책에 따라 스테이징한다.
+- `Packages/managed-packages.txt`의 NuGet 패키지 참조를 .NET 빌드에 전달하여 외부 네트워크에 의존하지 않도록 독립적으로 pack한 `Sample.Json` NuGet 예제를 로컬 피드에서 복원·실행한다. 공개 nuget.org 패키지 다운로드 자체는 별도 수용 대상이다. `Assets/Plugins/Managed/*.dll`은 관리형 참조 및 복사, `Assets/Plugins/Native/*.{dll,so,dylib}`은 OS별 P/Invoke 공유 라이브러리 복사 대상으로 제한한다. `Content/Managed` 내보내기는 프로젝트 DLL·API/Bridge와 추가 런타임 라이브러리를 검증된 파일명/개수/크기 정책에 따라 스테이징한다.
 - C# 생명주기 예외는 원본 .NET 스택과 함께 콘솔 로그를 남기고 네이티브 호스트를 보호한다. C# World Transform·Component 속성·Time/Coroutine 실행은 실제 관리형 통합 테스트로 검증한다. CI 통과가 Windows GPU·실기기 GUI·Android 호환성의 증거는 아니다.
 
 ## 2026-10-27 PR #41 — 10개 소스 수용 후보와 후속 충돌 수정

@@ -23,7 +23,7 @@ cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-As of 2026-10-27, PR [#42](https://github.com/skatmdgn/NEngine/pull/42) proposes 10 additional managed integration/plugin source-acceptance IDs (PLUG-004/005/006/009/017, CS-005/006/007/008/013). **145/285 accepted / 140 remaining is provisional until final Windows/Ubuntu Debug+Release CI and merge.** The merged main baseline remains 135/285 accepted. This is not evidence of Windows GPU/GUI or Android device acceptance.
+As of 2026-10-27, PR [#42](https://github.com/skatmdgn/NEngine/pull/42) proposes 10 existing managed integration/plugin source-acceptance IDs (PLUG-004/005/006/009/017, CS-005/006/007/008/013). **145/285 accepted / 140 remaining is provisional until final Windows/Ubuntu Debug+Release CI and merge.** The merged main baseline remains 135/285 accepted. This is not evidence of Windows GPU/GUI or Android device acceptance.
 
 As of 2026-10-27, PR [#41](https://github.com/skatmdgn/NEngine/pull/41) carries ten additional **source/automated acceptance candidates** (CORE-005, EDIT-007/008, PHYS-006, ANIM-003, INPUT-003, EDTOOL-001/006/008, UTIL-004). Its checklist shows **135/285 accepted and 150 remaining**, conditional on a successful final-HEAD Windows/Ubuntu Debug+Release CI and merge. The previously merged main baseline is 125/285 accepted. Hardware Windows GUI/GPU/audio and Android APK/device acceptance are excluded. See [docs/CHECKLIST.md](docs/CHECKLIST.md) for exact evidence and scope.
 
