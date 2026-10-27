@@ -499,8 +499,17 @@ namespace NEngine.Internal
                 method.Invoke(instance, null);
                 return 1;
             }
-            catch
+            catch (Exception exception)
             {
+                // CS-008: never let a managed callback escape across the C ABI.
+                // Preserve the original C# stack, not just the reflection wrapper.
+                try
+                {
+                    NEngine.Debug.LogError("C# lifecycle exception in " + methodName +
+                        ": " + (exception is TargetInvocationException invocation
+                            ? invocation.InnerException ?? invocation : exception));
+                }
+                catch { /* Logging failures must not terminate the native host. */ }
                 return -2;
             }
         }
