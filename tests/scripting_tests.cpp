@@ -3697,6 +3697,24 @@ int main() {
                                 native_transform->local_position.z == 6.0f,
                                 "managed Transform synchronization accumulates across World ticks");
 
+                            // CS-005: source-of-truth native Transform changes mid-play
+                            // must be observed by managed Update on the next tick.
+                            if(native_transform)
+                                native_transform->local_position={-9.0f,4.0f,5.0f};
+                            const auto native_changed=script_system.update(
+                                script_world,1.0f/60.0f,&system_error);
+                            check(native_changed.updated==1u &&
+                                  native_changed.unresolved==0u &&
+                                  native_transform &&
+                                  native_transform->local_position.x==-8.0f &&
+                                  native_transform->local_position.y==6.0f &&
+                                  native_transform->local_position.z==8.0f,
+                                  "CS-005 native-to-managed-to-native Transform writes agree");
+                            // Restore the baseline so downstream lifecycle tests
+                            // remain independent of this bidirectional check.
+                            if(native_transform)
+                                native_transform->local_position={7.0f,4.0f,6.0f};
+
                             script_component->enabled =
                                 false;
 
