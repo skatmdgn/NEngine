@@ -536,10 +536,32 @@ PhysicsFrameResult step_physics(
     const float dt=delta_seconds/static_cast<float>(steps);
     for(unsigned i=0;i<steps;++i){
         auto sub=step_physics_discrete(world,dt,gravity,cache);
-        // Integration stats count unique bodies per physical frame, not per
-        // collision substep. Collision statistics remain cumulative.
-        result.integration=sub.integration;
-        result.collisions=std::move(sub.collisions);
+        // A fast trigger may overlap midway through the fixed frame and
+        // separate before its final microstep. Preserve each unique contact
+        // for the frame-level tracker, updating the manifold on later hits.
+        // Returning only the last microstep silently drops Enter events.
+        result.integration.integrated_3d=std::max(
+            result.integration.integrated_3d,sub.integration.integrated_3d);
+        result.integration.integrated_2d=std::max(
+            result.integration.integrated_2d,sub.integration.integrated_2d);
+        result.integration.gravity_applied=std::max(
+            result.integration.gravity_applied,sub.integration.gravity_applied);
+        result.collisions.tested_pairs_3d+=sub.collisions.tested_pairs_3d;
+        result.collisions.tested_pairs_2d+=sub.collisions.tested_pairs_2d;
+        for(auto& overlap:sub.collisions.overlaps){
+            const auto match=std::find_if(
+                result.collisions.overlaps.begin(),result.collisions.overlaps.end(),
+                [&](const BoxOverlap& previous){
+                    return previous.first==overlap.first &&
+                           previous.second==overlap.second &&
+                           previous.is_2d==overlap.is_2d &&
+                           previous.first_shape==overlap.first_shape &&
+                           previous.second_shape==overlap.second_shape;
+                });
+            if(match==result.collisions.overlaps.end())
+                result.collisions.overlaps.push_back(std::move(overlap));
+            else *match=std::move(overlap);
+        }
         result.resolution.resolved_3d+=sub.resolution.resolved_3d;
         result.resolution.resolved_2d+=sub.resolution.resolved_2d;
         result.resolution.warm_started_contacts+=sub.resolution.warm_started_contacts;
