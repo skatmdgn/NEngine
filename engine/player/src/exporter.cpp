@@ -338,6 +338,35 @@ bool export_player_data(const ExportSettings& settings,
             if (ec) { cleanup(); return fail(error, "failed to copy managed payload"); }
             ++managed_files;
         }
+        // PLUG-005: ship flat managed runtime dependencies alongside the game DLL.
+        // .deps.json and AssemblyDependencyResolver rely on sibling assemblies.
+        std::size_t extra_count=0u;
+        std::uintmax_t extra_bytes=0u;
+        for(const auto& entry:std::filesystem::directory_iterator(managed_root,ec)){
+            if(ec){cleanup();return fail(error,"cannot enumerate managed dependencies");}
+            if(entry.path().extension()!=".dll")continue;
+            const std::string filename=entry.path().filename().string();
+            const bool safe=filename.size()>=5u&&filename.size()<=128u&&
+                filename.front()!='.'&&
+                std::all_of(filename.begin(),filename.end(),[](unsigned char ch){
+                    return (ch>='a'&&ch<='z')||(ch>='A'&&ch<='Z')||
+                           (ch>='0'&&ch<='9')||ch=='.'||ch=='_'||ch=='-';
+                });
+            if(!safe||entry.is_symlink(ec)||ec||!entry.is_regular_file(ec)||ec){
+                cleanup();return fail(error,"unsafe managed dependency: "+filename);
+            }
+            if(std::find(names.begin(),names.end(),filename)!=names.end())continue;
+            const auto size=entry.file_size(ec);
+            if(ec||size==0u||size>64u*1024u*1024u||
+               ++extra_count>128u||(extra_bytes+=size)>256u*1024u*1024u){
+                cleanup();return fail(error,"managed dependency limit exceeded");
+            }
+            std::filesystem::copy_file(entry.path(),target/filename,
+                std::filesystem::copy_options::none,ec);
+            if(ec){cleanup();return fail(error,"managed dependency copy failed");}
+            ++managed_files;
+        }
+        if(ec){cleanup();return fail(error,"managed directory enumeration failed");}
     }
     if (!settings.player_executable.empty()) {
         const auto executable = std::filesystem::canonical(
