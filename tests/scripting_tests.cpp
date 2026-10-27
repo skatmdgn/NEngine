@@ -2332,6 +2332,14 @@ int main() {
                     "}\n";
         }
 
+        {
+            std::ofstream throw_script(integration_root/"Assets"/"Scripts"/"ThrowingProbe.cs");
+            throw_script<<"using NEngine;\n"
+                "public class ThrowingProbe : Behaviour {\n"
+                "  private void Start() { throw new System.InvalidOperationException(\"CS-008 deliberate failure\"); }\n"
+                "}\n";
+        }
+
         ManagedProjectConfig
             integration_project;
 
@@ -2501,6 +2509,23 @@ int main() {
                                 ui.image_guid = guid;
                                 return true;
                             });
+
+                        const auto throwing=managed_runtime.create_behaviour("ThrowingProbe");
+                        const bool exception_contained=throwing.valid() &&
+                            managed_runtime.set_game_object(throwing,
+                                nengine::core::Entity::make(102,1),
+                                "Exception Target",true) &&
+                            !managed_runtime.start(throwing);
+                        const bool stack_reported=std::any_of(
+                            captured_logs.begin(),captured_logs.end(),
+                            [](const auto& log){
+                                return log.level==2 &&
+                                    log.message.find("InvalidOperationException")!=std::string::npos &&
+                                    log.message.find("ThrowingProbe")!=std::string::npos;
+                            });
+                        check(exception_contained&&stack_reported,
+                            "CS-008 managed exception is contained and original C# stack logged");
+                        if(throwing.valid())managed_runtime.destroy(throwing);
 
                         const auto library_probe=managed_runtime.create_behaviour("LibraryProbe");
                         nengine::core::Entity library_entity{};
