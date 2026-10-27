@@ -1501,7 +1501,7 @@ int main() {
             "13.0.3") !=
             std::string::npos,
         "csproj includes NuGet PackageReference");
-    check(project.find("<Reference Include=\\\"Sample.Library\\\">")!=std::string::npos &&
+    check(project.find("<Reference Include=\"Sample.Library\">")!=std::string::npos &&
           project.find("../../Assets/Plugins/Managed/Sample.Library.dll")!=std::string::npos,
           "PLUG-006 managed DLL appears in generated MSBuild private references");
 
