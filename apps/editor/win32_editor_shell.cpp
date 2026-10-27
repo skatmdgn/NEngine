@@ -31,6 +31,7 @@
 #include "nengine/scripting/managed_project.hpp"
 #include "nengine/editor/ide_launch.hpp"
 #include "nengine/editor/action_map_editor.hpp"
+#include "nengine/editor/build_settings_editor.hpp"
 #include "nengine/scripting/managed_runtime.hpp"
 #include "nengine/render/vulkan_context.hpp"
 #include "nengine/render/vulkan_diagnostic_scene.hpp"
@@ -69,6 +70,12 @@ enum ControlId : int {
     IdActionAdd,
     IdActionRemove,
     IdActionSave,
+    IdBuildSettings,
+    IdBuildName,
+    IdBuildWindows,
+    IdBuildAndroid,
+    IdBuildToolchain,
+    IdBuildApply,
     IdCanvasEdit,
     IdCanvasName,
     IdCanvasText,
@@ -326,6 +333,13 @@ struct Win32EditorShell::Impl {
     HWND step{nullptr};
     HWND stop{nullptr};
     HWND vulkan_preview{nullptr};
+    HWND build_toggle{nullptr};
+    HWND build_name{nullptr};
+    HWND build_windows{nullptr};
+    HWND build_android{nullptr};
+    HWND build_toolchain{nullptr};
+    HWND build_apply{nullptr};
+    bool build_settings_visible{false};
     HWND action_toggle{nullptr};
     HWND action_list{nullptr};
     HWND action_name{nullptr};
@@ -948,6 +962,7 @@ struct Win32EditorShell::Impl {
         stop = create_control(host, L"BUTTON", L"Stop", BS_PUSHBUTTON, IdStop);
         game_toggle = create_control(host,L"BUTTON",L"Game View",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdGameView);
         action_toggle = create_control(host,L"BUTTON",L"Input Actions",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdActionEditor);
+        build_toggle = create_control(host,L"BUTTON",L"Build Settings",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdBuildSettings);
         vulkan_preview = create_control(
             host,
             L"BUTTON",
@@ -955,7 +970,7 @@ struct Win32EditorShell::Impl {
             BS_AUTOCHECKBOX | BS_PUSHLIKE,
             IdVulkanPreview);
 
-        if (!game_toggle || !action_toggle || !open_scene || !save_scene || !new_entity || !delete_entity ||
+        if (!game_toggle || !action_toggle || !build_toggle || !open_scene || !save_scene || !new_entity || !delete_entity ||
             !refresh_assets || !scripts || !build_scripts || !undo || !redo ||
             !play || !pause || !step || !stop ||
             !vulkan_preview) {
@@ -1296,7 +1311,13 @@ struct Win32EditorShell::Impl {
             SendMessageW(action_key,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(label));
         }
         SendMessageW(action_key,CB_SETCURSEL,0,0);
-        if (!action_list || !action_name || !action_key || !action_add ||
+        build_name=create_control(host,L"EDIT",L"",WS_BORDER|ES_AUTOHSCROLL,IdBuildName);
+        build_windows=create_control(host,L"BUTTON",L"Windows Player",BS_AUTOCHECKBOX,IdBuildWindows);
+        build_android=create_control(host,L"BUTTON",L"Android (toolchain profile)",BS_AUTOCHECKBOX,IdBuildAndroid);
+        build_toolchain=create_control(host,L"EDIT",L"",WS_BORDER|ES_AUTOHSCROLL,IdBuildToolchain);
+        build_apply=create_control(host,L"BUTTON",L"Save Target Settings",BS_PUSHBUTTON,IdBuildApply);
+        if(!build_name||!build_windows||!build_android||!build_toolchain||!build_apply||
+            !action_list || !action_name || !action_key || !action_add ||
             !action_remove || !action_save ||
             !assets_list || !console) {
             shell_log("attach failed: bottom panel control creation");
@@ -1954,6 +1975,7 @@ struct Win32EditorShell::Impl {
 
         MoveWindow(game_toggle,kPadding,38,110,26,TRUE);
         MoveWindow(action_toggle,kPadding+116,38,120,26,TRUE);
+        MoveWindow(build_toggle,kPadding+242,38,122,26,TRUE);
         const int content_top =
             kToolbarHeight;
 
@@ -2382,11 +2404,23 @@ struct Win32EditorShell::Impl {
                 kPadding,
             bottom_h,
             TRUE);
-        ShowWindow(assets_list,action_editor_visible?SW_HIDE:SW_SHOW);
-        ShowWindow(console,action_editor_visible?SW_HIDE:SW_SHOW);
+        const bool tool_open=action_editor_visible||build_settings_visible;
+        ShowWindow(assets_list,tool_open?SW_HIDE:SW_SHOW);
+        ShowWindow(console,tool_open?SW_HIDE:SW_SHOW);
         const auto action_controls=std::array<HWND,6>{
             action_list,action_name,action_key,action_add,action_remove,action_save};
         for(auto ctrl:action_controls)ShowWindow(ctrl,action_editor_visible?SW_SHOW:SW_HIDE);
+        const auto build_controls=std::array<HWND,5>{
+            build_name,build_windows,build_android,build_toolchain,build_apply};
+        for(auto ctrl:build_controls)ShowWindow(ctrl,build_settings_visible?SW_SHOW:SW_HIDE);
+        if(build_settings_visible){
+            const int w=std::max(160,width-3*kPadding);
+            MoveWindow(build_name,kPadding,bottom_y,w/2,24,TRUE);
+            MoveWindow(build_windows,kPadding+w/2+8,bottom_y,w/4,24,TRUE);
+            MoveWindow(build_android,kPadding+w*3/4,bottom_y,w/4,24,TRUE);
+            MoveWindow(build_toolchain,kPadding,bottom_y+33,w*2/3,25,TRUE);
+            MoveWindow(build_apply,kPadding+w*2/3+8,bottom_y+33,w/3-8,25,TRUE);
+        }
         if(action_editor_visible){
             const int x0=kPadding, w0=std::max(120,width/2-16);
             MoveWindow(action_list,x0,bottom_y,w0,bottom_h,TRUE);
@@ -4275,6 +4309,8 @@ struct Win32EditorShell::Impl {
             if(notification!=BN_CLICKED)return false;
             action_editor_visible=SendMessageW(action_toggle,BM_GETCHECK,0,0)==BST_CHECKED;
             if(action_editor_visible){
+                build_settings_visible=false;
+                SendMessageW(build_toggle,BM_SETCHECK,BST_UNCHECKED,0);
                 std::string error;
                 if(!editor.project().is_open()||
                    !action_document.open(editor.project().root(),&error)){
@@ -4287,6 +4323,49 @@ struct Win32EditorShell::Impl {
             {
                 RECT rect{};GetClientRect(host,&rect);
                 layout(rect.right,rect.bottom);
+            }
+            handled=true;break;
+        case IdBuildSettings:
+            if(notification!=BN_CLICKED)return false;
+            build_settings_visible=SendMessageW(build_toggle,BM_GETCHECK,0,0)==BST_CHECKED;
+            if(build_settings_visible){
+                action_editor_visible=false;
+                SendMessageW(action_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                if(!editor.project().is_open()){
+                    build_settings_visible=false;
+                    SendMessageW(build_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                    editor.console().warning("Build Settings","Open a project before editing targets");
+                }else {
+                    const auto draft=nengine::editor::read_build_settings(editor.project());
+                    const auto title=utf8_to_wide(draft.project_name);
+                    const auto tool=utf8_to_wide(draft.android_toolchain);
+                    SetWindowTextW(build_name,title.c_str());
+                    SetWindowTextW(build_toolchain,tool.c_str());
+                    SendMessageW(build_windows,BM_SETCHECK,draft.windows?BST_CHECKED:BST_UNCHECKED,0);
+                    SendMessageW(build_android,BM_SETCHECK,draft.android?BST_CHECKED:BST_UNCHECKED,0);
+                }
+            }
+            {
+                RECT rect{};GetClientRect(host,&rect);
+                layout(rect.right,rect.bottom);
+            }
+            handled=true;break;
+        case IdBuildApply:
+            if(notification!=BN_CLICKED)return false;
+            {
+                wchar_t project_name[200]{},toolchain[200]{};
+                GetWindowTextW(build_name,project_name,200);
+                GetWindowTextW(build_toolchain,toolchain,200);
+                nengine::editor::BuildSettingsDraft draft{
+                    wide_to_utf8(project_name),
+                    SendMessageW(build_windows,BM_GETCHECK,0,0)==BST_CHECKED,
+                    SendMessageW(build_android,BM_GETCHECK,0,0)==BST_CHECKED,
+                    wide_to_utf8(toolchain)};
+                std::string error;
+                if(nengine::editor::apply_build_settings(editor.project(),draft,&error))
+                    editor.console().info("Build Settings",
+                        "Windows/Android target configuration saved; APK execution still requires Android backend");
+                else editor.console().warning("Build Settings",error);
             }
             handled=true;break;
         case IdActionList:
