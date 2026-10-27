@@ -2292,6 +2292,46 @@ int main() {
             example_output << example_source;
         }
 
+        // PLUG-006 / CS-013: build a real independent .NET DLL without
+        // requiring network NuGet restore, then reference it from gameplay.
+        const auto external_root=integration_root/"ExternalHelperProject";
+        const auto external_plugins=integration_root/"Assets"/"Plugins"/"Managed";
+        std::filesystem::create_directories(external_root);
+        std::filesystem::create_directories(external_plugins);
+        {
+            std::ofstream project_file(external_root/"ExternalHelper.csproj");
+            project_file<<"<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup>"
+                        <<"<TargetFramework>net8.0</TargetFramework>"
+                        <<"</PropertyGroup></Project>\\n";
+            std::ofstream source_file(external_root/"ExternalHelper.cs");
+            source_file<<"public static class ExternalHelper { "
+                          "public static int Answer() => 42; }\\n";
+        }
+        ManagedBuildConfig external_build;
+        external_build.project_path=external_root/"ExternalHelper.csproj";
+        external_build.output_directory=external_root/"output";
+        external_build.dotnet_executable=*real_dotnet;
+        const auto external_result=run_managed_build(external_build);
+        check(external_result.success,"PLUG-006 real managed extension builds");
+        if(external_result.success){
+            std::error_code copy_error;
+            std::filesystem::copy_file(
+                external_result.plan.assembly_path,
+                external_plugins/"ExternalHelper.dll",
+                std::filesystem::copy_options::overwrite_existing,copy_error);
+            check(!copy_error,"PLUG-006 managed extension staged in project Plugins");
+        }
+        {
+            std::ofstream script(integration_root/"Assets"/"Scripts"/"LibraryProbe.cs");
+            script<<"using NEngine;\\n"
+                    "public class LibraryProbe : Behaviour {\\n"
+                    "  private void Start() {\\n"
+                    "    if (ExternalHelper.Answer() != 42) throw new System.Exception(\\\"external dependency mismatch\\\");\\n"
+                    "    gameObject.name = \\\"External DLL Loaded\\\";\\n"
+                    "  }\\n"
+                    "}\\n";
+        }
+
         ManagedProjectConfig
             integration_project;
 
@@ -2461,6 +2501,23 @@ int main() {
                                 ui.image_guid = guid;
                                 return true;
                             });
+
+                        const auto library_probe=managed_runtime.create_behaviour("LibraryProbe");
+                        nengine::core::Entity library_entity{};
+                        std::string library_name;
+                        bool library_active=false;
+                        const bool library_pass=
+                            library_probe.valid() &&
+                            managed_runtime.set_game_object(library_probe,
+                                nengine::core::Entity::make(101,1),
+                                "Library Probe",true) &&
+                            managed_runtime.start(library_probe) &&
+                            managed_runtime.get_game_object(library_probe,
+                                library_entity,library_name,library_active) &&
+                            library_name=="External DLL Loaded";
+                        check(library_pass,
+                            "CS-013 managed gameplay executes independently built local DLL");
+                        if(library_probe.valid())managed_runtime.destroy(library_probe);
 
                         const auto ui_probe = managed_runtime.create_behaviour("UIProbe");
                         nengine::core::Entity probe_entity{};
