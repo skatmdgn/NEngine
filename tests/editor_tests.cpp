@@ -16,6 +16,7 @@
 #include "nengine/editor/editor_model.hpp"
 #include "nengine/editor/action_map_editor.hpp"
 #include "nengine/editor/build_settings_editor.hpp"
+#include "nengine/editor/performance_profiler.hpp"
 #include "nengine/editor/ide_launch.hpp"
 #include "nengine/editor/project_manifest.hpp"
 #include "nengine/editor/presentation.hpp"
@@ -2768,6 +2769,31 @@ int main() {
               "EDTOOL-008 build target and toolchain roundtrip project reopen");
         project.close();
         std::filesystem::remove_all(project_root,ec);
+    }
+
+    // EDTOOL-006: bounded live Editor/Game profile averages and peaks;
+    // reject invalid samples before they can poison Profiler UI.
+    {
+        editor::PerformanceProfiler profiler;
+        profiler.sample({16.,4.,42,false});
+        profiler.sample({32.,8.,84,true});
+        const auto q=profiler.summary();
+        check(q.samples==2 && q.average_ms==24. &&
+              q.peak_ms==32. && q.average_simulation_ms==6. &&
+              q.playing && q.entity_count==84,
+              "EDTOOL-006 profiler reports actual editor and running-game timing");
+        profiler.sample({std::numeric_limits<double>::quiet_NaN(),1,0,false});
+        check(profiler.size()==2,
+              "EDTOOL-006 profilers reject invalid hardware timing");
+        for(std::size_t i=0;i<1000;++i)
+            profiler.sample({10.,2.,i,true});
+        check(profiler.size()==240&&
+              profiler.summary().average_ms==10. &&
+              profiler.summary().entity_count==999,
+              "EDTOOL-006 bounded 240-frame ring prevents unbounded UI growth");
+        profiler.clear();
+        check(profiler.summary().samples==0,
+              "EDTOOL-006 profile reset has no stale frame statistics");
     }
 
     if (failures == 0) {
