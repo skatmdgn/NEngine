@@ -167,6 +167,10 @@ add_test(NAME NEngineUntrustedInputTests COMMAND NEngineUntrustedInputTests)
 # Round Five: native plugin binary, gameplay input consumption, 2D tilemap
 # collision and fixed-step time scaling. Both CI OS run fixture .dll/.so.
 add_library(NEngineNativePluginFixture SHARED native_plugin_fixture.cpp)
+add_dependencies(NEngineScriptingTests NEngineNativePluginFixture)
+target_compile_definitions(NEngineScriptingTests PRIVATE
+  NENGINE_TEST_NATIVE_PLUGIN="$<TARGET_FILE:NEngineNativePluginFixture>")
+
 add_executable(NEngineNativePluginTests native_plugin_tests.cpp)
 target_link_libraries(NEngineNativePluginTests PRIVATE NEngineScripting)
 target_compile_features(NEngineNativePluginTests PRIVATE cxx_std_20)
