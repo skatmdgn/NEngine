@@ -41,7 +41,7 @@ constexpr wchar_t kHostClassName[] = L"NEngine.EditorHost";
 constexpr wchar_t kSceneClassName[] = L"NEngine.SceneView";
 constexpr wchar_t kSplitterClassName[] = L"NEngine.Splitter";
 
-constexpr int kToolbarHeight = 38;
+constexpr int kToolbarHeight = 70;
 constexpr int kSplitterSize = 6;
 constexpr int kPadding = 8;
 
@@ -60,6 +60,7 @@ enum ControlId : int {
     IdStep,
     IdStop,
     IdVulkanPreview,
+    IdGameView,
     IdCanvasEdit,
     IdCanvasName,
     IdCanvasText,
@@ -317,6 +318,9 @@ struct Win32EditorShell::Impl {
     HWND step{nullptr};
     HWND stop{nullptr};
     HWND vulkan_preview{nullptr};
+    HWND game_toggle{nullptr};
+    HWND game_view{nullptr};
+    bool game_view_visible{true};
     HWND canvas_edit_toggle{nullptr};
     HWND canvas_name{nullptr};
     HWND canvas_text{nullptr};
@@ -686,7 +690,7 @@ struct Win32EditorShell::Impl {
             PAINTSTRUCT paint{};
             HDC dc = BeginPaint(hwnd, &paint);
 
-            if (!self->vulkan_preview_enabled) {
+            if(hwnd==self->game_view || !self->vulkan_preview_enabled) {
                 self->paint_scene(dc, hwnd);
             }
 
@@ -923,6 +927,7 @@ struct Win32EditorShell::Impl {
         pause = create_control(host, L"BUTTON", L"Pause", BS_PUSHBUTTON, IdPause);
         step = create_control(host, L"BUTTON", L"Step", BS_PUSHBUTTON, IdStep);
         stop = create_control(host, L"BUTTON", L"Stop", BS_PUSHBUTTON, IdStop);
+        game_toggle = create_control(host,L"BUTTON",L"Game View",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdGameView);
         vulkan_preview = create_control(
             host,
             L"BUTTON",
@@ -930,7 +935,7 @@ struct Win32EditorShell::Impl {
             BS_AUTOCHECKBOX | BS_PUSHLIKE,
             IdVulkanPreview);
 
-        if (!open_scene || !save_scene || !new_entity || !delete_entity ||
+        if (!game_toggle || !open_scene || !save_scene || !new_entity || !delete_entity ||
             !refresh_assets || !scripts || !build_scripts || !undo || !redo ||
             !play || !pause || !step || !stop ||
             !vulkan_preview) {
@@ -1032,6 +1037,11 @@ struct Win32EditorShell::Impl {
             return false;
         }
 
+        game_view = CreateWindowExW(0,kSceneClassName,L"Game View",
+            WS_CHILD | WS_VISIBLE | WS_BORDER,
+            0,0,10,10,host,nullptr,GetModuleHandleW(nullptr),this);
+        if(!game_view) {shell_log("attach failed: Game View window");return false;}
+        SendMessageW(game_toggle,BM_SETCHECK,BST_CHECKED,0);
         shell_log("creating inspector controls");
         inspector_title = create_control(host, L"STATIC", L"Inspector", SS_LEFT);
         label_name = create_control(host, L"STATIC", L"Name", SS_LEFT);
@@ -1900,6 +1910,7 @@ struct Win32EditorShell::Impl {
             button_height,
             TRUE);
 
+        MoveWindow(game_toggle,kPadding,38,110,26,TRUE);
         const int content_top =
             kToolbarHeight;
 
@@ -1969,16 +1980,14 @@ struct Win32EditorShell::Impl {
             left_split_x +
             kSplitterSize;
 
-        MoveWindow(
-            scene,
-            scene_x,
-            content_top,
-            std::max(
-                10,
-                right_split_x -
-                    scene_x),
-            content_height,
-            TRUE);
+        const int available_scene_width = std::max(20,right_split_x-scene_x);
+        const int edit_width = game_view_visible ?
+            std::max(10,(available_scene_width-6)/2):available_scene_width;
+        MoveWindow(scene,scene_x,content_top,edit_width,content_height,TRUE);
+        ShowWindow(game_view,game_view_visible?SW_SHOW:SW_HIDE);
+        if(game_view_visible)
+            MoveWindow(game_view,scene_x+edit_width+6,content_top,
+                std::max(10,available_scene_width-edit_width-6),content_height,TRUE);
 
         int iy =
             content_top + 8;
@@ -4192,6 +4201,18 @@ struct Win32EditorShell::Impl {
             handled = true;
             break;
 
+        case IdGameView:
+            if(notification!=BN_CLICKED)return false;
+            game_view_visible = SendMessageW(game_toggle,BM_GETCHECK,0,0)==BST_CHECKED;
+            {
+                RECT r{};GetClientRect(host,&r);
+                layout(r.right-r.left,r.bottom-r.top);
+                InvalidateRect(scene,nullptr,FALSE);
+                InvalidateRect(game_view,nullptr,FALSE);
+            }
+            handled=true;
+            break;
+
         case IdVulkanPreview:
             if (notification != BN_CLICKED) return false;
             {
@@ -4847,11 +4868,14 @@ struct Win32EditorShell::Impl {
         SelectObject(dc, old_pen);
         DeleteObject(grid_pen);
 
-        const auto& world =
-            editor.presentation_world();
+        const auto& world = hwnd==game_view ? editor.presentation_world() : editor.world();
 
-        const auto selected =
-            editor.selection().active();
+        const auto selected = hwnd==game_view ?
+            nengine::core::Entity::invalid() : editor.selection().active();
+        SetBkMode(dc,TRANSPARENT);
+        SetTextColor(dc,RGB(240,240,240));
+        const wchar_t* title=hwnd==game_view?L"Game View (runtime)":L"Scene View (authoring)";
+        TextOutW(dc,8,7,title,static_cast<int>(wcslen(title)));
 
         for (const auto entity :
              world.entities()) {
