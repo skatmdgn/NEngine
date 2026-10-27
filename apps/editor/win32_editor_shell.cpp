@@ -30,6 +30,7 @@
 #include "nengine/scripting/managed_build.hpp"
 #include "nengine/scripting/managed_project.hpp"
 #include "nengine/editor/ide_launch.hpp"
+#include "nengine/editor/action_map_editor.hpp"
 #include "nengine/scripting/managed_runtime.hpp"
 #include "nengine/render/vulkan_context.hpp"
 #include "nengine/render/vulkan_diagnostic_scene.hpp"
@@ -61,6 +62,13 @@ enum ControlId : int {
     IdStop,
     IdVulkanPreview,
     IdGameView,
+    IdActionEditor,
+    IdActionList,
+    IdActionName,
+    IdActionKey,
+    IdActionAdd,
+    IdActionRemove,
+    IdActionSave,
     IdCanvasEdit,
     IdCanvasName,
     IdCanvasText,
@@ -318,6 +326,17 @@ struct Win32EditorShell::Impl {
     HWND step{nullptr};
     HWND stop{nullptr};
     HWND vulkan_preview{nullptr};
+    HWND action_toggle{nullptr};
+    HWND action_list{nullptr};
+    HWND action_name{nullptr};
+    HWND action_key{nullptr};
+    HWND action_add{nullptr};
+    HWND action_remove{nullptr};
+    HWND action_save{nullptr};
+    std::vector<std::string> action_names{};
+    std::vector<nengine::input::Key> action_key_options{};
+    nengine::editor::ActionMapEditor action_document{};
+    bool action_editor_visible{false};
     HWND game_toggle{nullptr};
     HWND game_view{nullptr};
     bool game_view_visible{true};
@@ -928,6 +947,7 @@ struct Win32EditorShell::Impl {
         step = create_control(host, L"BUTTON", L"Step", BS_PUSHBUTTON, IdStep);
         stop = create_control(host, L"BUTTON", L"Stop", BS_PUSHBUTTON, IdStop);
         game_toggle = create_control(host,L"BUTTON",L"Game View",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdGameView);
+        action_toggle = create_control(host,L"BUTTON",L"Input Actions",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdActionEditor);
         vulkan_preview = create_control(
             host,
             L"BUTTON",
@@ -935,7 +955,7 @@ struct Win32EditorShell::Impl {
             BS_AUTOCHECKBOX | BS_PUSHLIKE,
             IdVulkanPreview);
 
-        if (!game_toggle || !open_scene || !save_scene || !new_entity || !delete_entity ||
+        if (!game_toggle || !action_toggle || !open_scene || !save_scene || !new_entity || !delete_entity ||
             !refresh_assets || !scripts || !build_scripts || !undo || !redo ||
             !play || !pause || !step || !stop ||
             !vulkan_preview) {
@@ -1256,7 +1276,29 @@ struct Win32EditorShell::Impl {
             LBS_NOTIFY | WS_BORDER | WS_VSCROLL | WS_HSCROLL,
             IdConsole);
 
-        if (!assets_list || !console) {
+        action_list = create_control(host,L"LISTBOX",L"",
+            LBS_NOTIFY | WS_BORDER | WS_VSCROLL,IdActionList);
+        action_name = create_control(host,L"EDIT",L"",
+            WS_BORDER | ES_AUTOHSCROLL,IdActionName);
+        action_key = create_control(host,L"COMBOBOX",L"",
+            CBS_DROPDOWNLIST | WS_VSCROLL,IdActionKey);
+        action_add = create_control(host,L"BUTTON",L"Add Binding",BS_PUSHBUTTON,IdActionAdd);
+        action_remove = create_control(host,L"BUTTON",L"Remove Action",BS_PUSHBUTTON,IdActionRemove);
+        action_save = create_control(host,L"BUTTON",L"Save Actions",BS_PUSHBUTTON,IdActionSave);
+        action_key_options.push_back(nengine::input::Key::Space);
+        SendMessageW(action_key,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(L"Space"));
+        action_key_options.push_back(nengine::input::Key::Enter);
+        SendMessageW(action_key,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(L"Enter"));
+        for(int i=0;i<26;++i) {
+            action_key_options.push_back(static_cast<nengine::input::Key>(
+                static_cast<int>(nengine::input::Key::A)+i));
+            wchar_t label[2]{static_cast<wchar_t>(L'A'+i),0};
+            SendMessageW(action_key,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(label));
+        }
+        SendMessageW(action_key,CB_SETCURSEL,0,0);
+        if (!action_list || !action_name || !action_key || !action_add ||
+            !action_remove || !action_save ||
+            !assets_list || !console) {
             shell_log("attach failed: bottom panel control creation");
             return false;
         }
@@ -1911,6 +1953,7 @@ struct Win32EditorShell::Impl {
             TRUE);
 
         MoveWindow(game_toggle,kPadding,38,110,26,TRUE);
+        MoveWindow(action_toggle,kPadding+116,38,120,26,TRUE);
         const int content_top =
             kToolbarHeight;
 
@@ -2339,6 +2382,21 @@ struct Win32EditorShell::Impl {
                 kPadding,
             bottom_h,
             TRUE);
+        ShowWindow(assets_list,action_editor_visible?SW_HIDE:SW_SHOW);
+        ShowWindow(console,action_editor_visible?SW_HIDE:SW_SHOW);
+        const auto action_controls=std::array<HWND,6>{
+            action_list,action_name,action_key,action_add,action_remove,action_save};
+        for(auto ctrl:action_controls)ShowWindow(ctrl,action_editor_visible?SW_SHOW:SW_HIDE);
+        if(action_editor_visible){
+            const int x0=kPadding, w0=std::max(120,width/2-16);
+            MoveWindow(action_list,x0,bottom_y,w0,bottom_h,TRUE);
+            const int x1=x0+w0+8, w1=std::max(140,width-x1-kPadding);
+            MoveWindow(action_name,x1,bottom_y,w1/2,25,TRUE);
+            MoveWindow(action_key,x1+w1/2+4,bottom_y,w1/2-4,220,TRUE);
+            MoveWindow(action_add,x1,bottom_y+29,w1/2-2,25,TRUE);
+            MoveWindow(action_remove,x1+w1/2+4,bottom_y+29,w1/2-4,25,TRUE);
+            MoveWindow(action_save,x1,bottom_y+61,w1,25,TRUE);
+        }
     }
 
     void log_line(std::wstring_view message) {
@@ -2425,6 +2483,19 @@ struct Win32EditorShell::Impl {
                 static_cast<WPARAM>(
                     count - 1),
                 0);
+        }
+    }
+
+    void refresh_action_editor() {
+        if(!action_list)return;
+        action_names=action_document.actions();
+        SendMessageW(action_list,LB_RESETCONTENT,0,0);
+        for(const auto& name:action_names){
+            auto display=name;
+            if(const auto* keys=action_document.map().bindings(name))
+                display+=" ("+std::to_string(keys->size())+" bindings)";
+            const auto wide=utf8_to_wide(display);
+            SendMessageW(action_list,LB_ADDSTRING,0,reinterpret_cast<LPARAM>(wide.c_str()));
         }
     }
 
@@ -2656,9 +2727,8 @@ struct Win32EditorShell::Impl {
         refresh_window_title();
 
         shell_log("refresh scene invalidate");
-        if (scene) {
-            InvalidateRect(scene, nullptr, TRUE);
-        }
+        if(scene)InvalidateRect(scene,nullptr,TRUE);
+        if(game_view&&game_view_visible)InvalidateRect(game_view,nullptr,TRUE);
 
         shell_log("refresh complete");
         refreshing = false;
@@ -4200,6 +4270,60 @@ struct Win32EditorShell::Impl {
             editor.stop_play_mode();
             handled = true;
             break;
+
+        case IdActionEditor:
+            if(notification!=BN_CLICKED)return false;
+            action_editor_visible=SendMessageW(action_toggle,BM_GETCHECK,0,0)==BST_CHECKED;
+            if(action_editor_visible){
+                std::string error;
+                if(!editor.project().is_open()||
+                   !action_document.open(editor.project().root(),&error)){
+                    action_editor_visible=false;
+                    SendMessageW(action_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                    editor.console().warning("Input Actions",error.empty()?
+                       "Open a project first":error);
+                }else refresh_action_editor();
+            }
+            {
+                RECT rect{};GetClientRect(host,&rect);
+                layout(rect.right,rect.bottom);
+            }
+            handled=true;break;
+        case IdActionList:
+            if(notification!=LBN_SELCHANGE)return false;
+            {
+                const auto i=SendMessageW(action_list,LB_GETCURSEL,0,0);
+                if(i>=0&&static_cast<std::size_t>(i)<action_names.size()) {
+                    const auto label=utf8_to_wide(action_names[static_cast<std::size_t>(i)]);
+                    SetWindowTextW(action_name,label.c_str());
+                }
+            }
+            handled=true;break;
+        case IdActionAdd:
+        case IdActionRemove:
+        case IdActionSave:
+            if(notification!=BN_CLICKED)return false;
+            {
+                std::string err;
+                bool ok=true;
+                if(id==IdActionAdd||id==IdActionRemove){
+                    wchar_t name[100]{};
+                    GetWindowTextW(action_name,name,100);
+                    const std::string action=wide_to_utf8(name);
+                    if(id==IdActionRemove)ok=action_document.erase(action,&err);
+                    else {
+                        const auto index=SendMessageW(action_key,CB_GETCURSEL,0,0);
+                        ok=index>=0&&static_cast<std::size_t>(index)<action_key_options.size()&&
+                           action_document.bind(action,action_key_options[static_cast<std::size_t>(index)],&err);
+                    }
+                }
+                if(ok)ok=action_document.save(&err);
+                if(ok) {
+                    refresh_action_editor();
+                    editor.console().info("Input Actions","Project action-map saved");
+                }else editor.console().warning("Input Actions",err);
+            }
+            handled=true;break;
 
         case IdGameView:
             if(notification!=BN_CLICKED)return false;
