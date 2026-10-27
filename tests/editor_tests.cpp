@@ -14,6 +14,7 @@
 #include "nengine/audio/components.hpp"
 #include "nengine/core/scene.hpp"
 #include "nengine/editor/editor_model.hpp"
+#include "nengine/editor/action_map_editor.hpp"
 #include "nengine/editor/ide_launch.hpp"
 #include "nengine/editor/project_manifest.hpp"
 #include "nengine/editor/presentation.hpp"
@@ -2701,6 +2702,36 @@ int main() {
         std::error_code ec;
         std::filesystem::remove_all(diagnostics_root,ec);
         std::filesystem::remove(external,ec);
+    }
+
+    // INPUT-003: the exact GUI-facing map editor writes the same portable
+    // atomic .naction format as the Player and handles reload/edit/delete.
+    {
+        const auto project=std::filesystem::temp_directory_path()/
+            "NEngine-InputMap-Editor-Test";
+        std::error_code ec;std::filesystem::remove_all(project,ec);
+        std::filesystem::create_directories(project/"ProjectSettings");
+        editor::ActionMapEditor author;
+        std::string err;
+        check(author.open(project,&err)&&
+              author.bind("Jump",input::Key::Space,&err)&&
+              author.bind("Fire",input::Key::F,&err)&&author.save(&err),
+              "INPUT-003 visual editor creates validated project actions");
+        editor::ActionMapEditor reopen;
+        check(reopen.open(project,&err)&&
+              reopen.map().contains("Jump")&&
+              reopen.actions().size()==2 &&
+              reopen.actions()[0]=="Fire",
+              "INPUT-003 UI document roundtrips and sorts action list");
+        check(reopen.erase("Fire",&err)&&
+              !reopen.bind("../unsafe",input::Key::F,&err)&&
+              reopen.save(&err),
+              "INPUT-003 visual edit rejects unsafe action names and removes keys");
+        editor::ActionMapEditor third;
+        check(third.open(project,&err)&&
+              !third.map().contains("Fire")&&third.map().contains("Jump"),
+              "INPUT-003 persisted delete is visible after project reload");
+        std::filesystem::remove_all(project,ec);
     }
 
     if (failures == 0) {

@@ -1,4 +1,5 @@
 add_library(NEngineEditorModel STATIC
+  src/action_map_editor.cpp
   src/audio_integration.cpp
   src/command.cpp
   src/component_factory.cpp
