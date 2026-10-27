@@ -8,6 +8,7 @@
 
 #include "nengine/platform/window.hpp"
 #include "nengine/player/runtime.hpp"
+#include "player_cpu_profiler_win32.hpp"
 #include "nengine/core/build_identity.hpp"
 #include <fstream>
 #include "nengine/render/vulkan_context.hpp"
@@ -110,6 +111,7 @@ int run() {
     };
     auto last_frame = std::chrono::steady_clock::now();
     double profile_ms=0.;std::size_t profile_frames=0;
+    nengine::app::PlayerCpuProfiler cpu_profiler;
     while (window.poll_events()) {
         const auto now = std::chrono::steady_clock::now();
         const auto delta = std::chrono::duration<float>(now - last_frame).count();
@@ -167,7 +169,7 @@ int run() {
         // The stand-alone Player World advances independently of Editor Play.
         // PlayerRuntime limits large frame stalls to eight fixed steps.
         const auto profile_begin=std::chrono::steady_clock::now();
-        runtime.advance(delta);
+        const auto profile_frame=runtime.advance(delta);
         profile_ms+=std::chrono::duration<double,std::milli>(
              std::chrono::steady_clock::now()-profile_begin).count();
         if(++profile_frames>=300){
@@ -213,6 +215,7 @@ int run() {
         };
         const auto* overlay_ptr =
             overlay_view.valid() ? &overlay_view : nullptr;
+        const auto render_start=std::chrono::steady_clock::now();
         if (width && height && !scene.present_world(
                 renderer, runtime.world(),
                 [&runtime](nengine::assets::AssetGuid guid) {
@@ -230,6 +233,14 @@ int run() {
             message(scene.diagnostic());
             return 7;
         }
+        const auto render_end=std::chrono::steady_clock::now();
+        const auto elapsed_ms=[](auto start,auto end){
+            return std::chrono::duration<double,std::milli>(end-start).count();
+        };
+        cpu_profiler.sample(elapsed_ms(now,render_end),
+            elapsed_ms(profile_begin,render_start),
+            elapsed_ms(render_start,render_end),
+            profile_frame,runtime.world().entities().size());
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     audio_device.close();
