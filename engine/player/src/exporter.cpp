@@ -357,6 +357,16 @@ bool export_player_data(const ExportSettings& settings,
                 cleanup();return fail(error,"unsafe managed dependency: "+filename);
             }
             if(std::find(names.begin(),names.end(),filename)!=names.end())continue;
+            // A second assembly with its own runtimeconfig is a stale
+            // standalone game entrypoint, not a library dependency.
+            // Renaming GameScripts must not export the old game alongside it.
+            if(ext==".dll" &&
+               std::filesystem::exists(managed_root/
+                   (entry.path().stem().string()+".runtimeconfig.json"),ec)){
+                if(ec){cleanup();return fail(error,"cannot inspect managed entrypoint");}
+                continue;
+            }
+            if(ec){cleanup();return fail(error,"cannot inspect managed entrypoint");}
             const auto size=entry.file_size(ec);
             if(ec||size==0u||size>64u*1024u*1024u||
                ++extra_count>128u||(extra_bytes+=size)>256u*1024u*1024u){
