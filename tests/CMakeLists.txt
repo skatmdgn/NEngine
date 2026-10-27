@@ -169,7 +169,7 @@ add_test(NAME NEngineUntrustedInputTests COMMAND NEngineUntrustedInputTests)
 add_library(NEngineNativePluginFixture SHARED native_plugin_fixture.cpp)
 add_dependencies(NEngineScriptingTests NEngineNativePluginFixture)
 target_compile_definitions(NEngineScriptingTests PRIVATE
-  NENGINE_TEST_NATIVE_PLUGIN="$<TARGET_FILE:NEngineNativePluginFixture>")
+  NENGINE_TEST_NATIVE_PLUGIN=\"$<TARGET_FILE:NEngineNativePluginFixture>\")
 
 add_executable(NEngineNativePluginTests native_plugin_tests.cpp)
 target_link_libraries(NEngineNativePluginTests PRIVATE NEngineScripting)
