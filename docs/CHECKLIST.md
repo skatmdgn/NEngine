@@ -2,9 +2,11 @@
 
 **검증 기준선:** PR #40의 정확한 소스 SHA `acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7` (2026-10-26), [Windows/Ubuntu CI 40279093322](https://github.com/skatmdgn/NEngine/actions/runs/40279093322) — Windows·Ubuntu 각각 Release/Debug **38/38 CTest PASS**. C# 실제 .NET 컴파일·코루틴·Debug 로그 회귀 테스트 포함. 실제 Windows GPU/오디오·Android 실기기·설치된 Visual Studio/Rider GUI 열기는 이 CI가 증명하지 않으며 각각 별도 검증 대상이다. 병합 후 `main` CI는 별도 확인한다.
 
-**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 125개, 미완료 160개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
+**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 135개, 미완료 150개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
 
 **우선 순위:** Windows Editor의 실제 Vulkan Scene/Game 렌더링·실기기 Player, Android APK/AAB 빌드 및 기기 실행, 외부 SDK/플러그인 연동을 우선한다. PR #40은 NavMeshAgent 다중 객체 회피·C# 코루틴·Debug 로그·컴파일 진단·C# 예제·에디터 컴포넌트 메뉴·IDE 시작 경로의 **소스·자동화 검증** 7개 ID를 추가하지만, NAV-006 보행 비용 UI/NAV-014/015 실기기 검증 및 설치된 Visual Studio/Rider 실제 GUI 실행 검증은 포함하지 않는다. 작업 규칙은 [WORKFLOW.md](WORKFLOW.md).
+
+**2026-10-27 PR #41 수용 범위:** 10개 기존 ID의 소스·자동화 수용 후보가 추가됨. PR #41의 최종 HEAD에 대한 Windows/Ubuntu Debug·Release CI가 성공한 경우에만 이 체크를 확정한다. 초기 기능 소스 `7f8039b1d38359e8de251961263fa4188e71a387`의 [CI 40427979420](https://github.com/skatmdgn/NEngine/actions/runs/40427979420)는 통과했으나, 이후 물리 미세단계 임시 접촉 이벤트 누락 수정(`f6160c138fc0669e834f8d48a5c2e960239300dd`)은 **새로운 최종 CI**로 재검증해야 한다. Win32 GUI 조작·GPU/오디오·Android 실기기 미검증은 별도 ID로 남는다.
 
 ## GOV — 개발 관리·검증 (10/10)
 
@@ -21,7 +23,7 @@
 - [x] GOV-009 실제 Android 기기 테스트 기록 형식을 검증한다 — 증거: PR #31, verify_acceptance.py Android 보고서 schema·SHA256 및 test_verify_acceptance.py, Windows/Ubuntu CI; 실제 기기 테스트 미실시
 - [x] GOV-010 릴리스 후보 SHA·실행 파일·검증 로그의 일치를 확인한다 — 증거: PR #34, tools/verify_release_candidate.py, executable SHA256/JUnit/CI checkout 일치, release-candidate-*.json artifact, Windows/Ubuntu CI
 
-## CORE — Core·Scene·Prefab (10/12)
+## CORE — Core·Scene·Prefab (11/12)
 
 참조: engine/core; tests/core_tests.cpp
 
@@ -29,7 +31,7 @@
 - [x] CORE-002 Scene 저장과 복원 기본 테스트가 통과한다 — 증거: tests/core_tests.cpp / CI run 39713209272
 - [x] CORE-003 Prefab 기본 테스트가 통과한다 — 증거: tests/core_tests.cpp / CI run 39713209272
 - [x] CORE-004 트랜스폼 부모 변경과 계층 순환 오류를 통합 테스트한다 — 증거: PR #31, NEngineCoreAcceptanceTests 계층 재부모·순환·해제·stale parent 검증, Windows/Ubuntu CI
-- [ ] CORE-005 Scene의 모든 핵심 컴포넌트가 왕복 직렬화된다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] CORE-005 Scene의 모든 핵심 컴포넌트가 왕복 직렬화된다 — 증거: PR #41, 코드 SHA f6160c138fc0669e834f8d48a5c2e960239300dd; NEngineCoreComponentRoundtripTests 17종(Scene 캡처/쓰기/읽기/재인스턴스·Player 호환 serializer, 연속 물리 옵션 보존); Windows/Ubuntu Debug·Release 최종 PR HEAD CI 및 CTest 수용 게이트(실기기 별도).
 - [x] CORE-006 Scene의 손상·절단·과대 파일을 거부하면서 현재 World를 보존한다 — 증거: PR #31, NEngineCoreAcceptanceTests 손상·절단·33MiB 파일 거부 및 World 보존, Windows/Ubuntu CI
 - [ ] CORE-007 프리팹 중첩/오버라이드/리버트를 실제 Editor에서 확인한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] CORE-008 엔티티 참조가 복제·삭제·재로드 뒤에도 안전하다 — 증거: PR #31, NEngineCoreAcceptanceTests 복제·삭제·slot 재사용·Scene 재로드 stale 참조 검증, Windows/Ubuntu CI
@@ -38,7 +40,7 @@
 - [x] CORE-011 Scene 저장 도중 쓰기 실패에 데이터가 보존된다 — 증거: PR #32, NEngineRoundTwoCoreTests, 씬 손상 저장·권한 실패 시 원본 보존과 atomic publish, Windows/Ubuntu CI
 - [x] CORE-012 최소 2D·3D Scene이 Player에서 동일하게 실행된다 — 증거: PR #36, both NEngineMiniRunner2D and NEngineMiniRunner3D use the same PlayerRuntime Scene serialization, export and frame loop; Windows/Ubuntu Debug+Release CI
 
-## EDIT — Windows Editor (4/16)
+## EDIT — Windows Editor (6/16)
 
 참조: apps/editor; engine/editor; tests/editor_tests.cpp
 
@@ -48,8 +50,8 @@
 - [ ] EDIT-004 Windows 10 에디터 실기기 시작·종료를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] EDIT-005 Windows 11 에디터 실기기 시작·종료를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] EDIT-006 Scene View 2D/3D 피킹·기즈모 조작을 실기기로 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] EDIT-007 Inspector에서 컴포넌트 생성·삭제·속성 수정·복원을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] EDIT-008 Hierarchy 다중 선택·자식 이동·복제를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] EDIT-007 Inspector에서 컴포넌트 생성·삭제·속성 수정·복원을 검증한다 — 증거: PR #41, 코드 SHA f6160c138fc0669e834f8d48a5c2e960239300dd; NEngineEditorTests Inspector 컴포넌트 추가·삭제·속성 수정·Undo/Redo, Win32 Remove Component 실제 버튼 경로; Windows/Ubuntu Debug·Release 최종 PR HEAD CI 및 CTest 수용 게이트(실기기 별도).
+- [x] EDIT-008 Hierarchy 다중 선택·자식 이동·복제를 검증한다 — 증거: PR #41, 코드 SHA f6160c138fc0669e834f8d48a5c2e960239300dd; NEngineEditorTests 복수 선택·계층 자손 복제·부모 변경·순환 거부·Undo/Redo, Win32 Hierarchy 버튼 연결; Windows/Ubuntu Debug·Release 최종 PR HEAD CI 및 CTest 수용 게이트(실기기 별도).
 - [ ] EDIT-009 자유 도킹/탭/패널 분리와 배치 복원을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] EDIT-010 DPI·멀티 모니터 변경 때 에디터 레이아웃을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] EDIT-011 프로젝트 만들기·열기·오류 복구 UI를 완성한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -119,7 +121,7 @@
 - [ ] CS-013 관리형 외부 라이브러리 의존성을 컴파일·실행·배포한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] CS-014 C# 공개 API에 컴파일 가능한 최소 예제와 참조 문서를 제공한다 — 증거: PR #40, 코드 SHA acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7, CI 40279093322 Windows/Ubuntu Debug·Release 38/38 CTest PASS; samples/managed/NavQuickstart.cs copied as the real .NET integration project compilation input; docs/README.md public API reference.
 
-## PHYS — 2D/3D 물리 (11/13)
+## PHYS — 2D/3D 물리 (12/13)
 
 참조: engine/physics; tests/physics_tests.cpp
 
@@ -128,7 +130,7 @@
 - [x] PHYS-003 Raycast/BoxCast/Overlap 기본 테스트가 통과한다 — 증거: tests/physics_tests.cpp / CI run 39713209272
 - [x] PHYS-004 SphereCast 쿼리를 구현·검증한다 — 증거: PR #33, sphere_cast 연속 충돌·거리·트리거·레이어·비정상 입력 검증 NEngineRoundThreeFeatureTests, Windows/Ubuntu Release CI
 - [x] PHYS-005 CapsuleCast 쿼리를 구현·검증한다 — 증거: PR #33, capsule_cast 연속 충돌·capsule/box·유효성 검증 NEngineRoundThreeFeatureTests, Windows/Ubuntu Release CI
-- [ ] PHYS-006 고속 충돌 검출에서 터널링을 방지한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] PHYS-006 고속 충돌 검출에서 터널링을 방지한다 — 증거: PR #41, 코드 SHA f6160c138fc0669e834f8d48a5c2e960239300dd; NEngineRoundTwoAnimPhysicsTests 연속 모드 2D/3D 빠른 Box 충돌·프레임 중간 Trigger 이벤트·통계, 최대 128 microsteps; 임의 속도·모든 collider 완전 CCD가 아님; Windows/Ubuntu Debug·Release 최종 PR HEAD CI 및 CTest 수용 게이트(실기기 별도).
 - [x] PHYS-007 장시간 쌓인 동적 물체의 안정성과 수치 발산을 검증한다 — 증거: PR #33, 8개 적층 동적 물체의 3600프레임 안정성·접촉 유효성 NEngineRoundThreeFeatureTests, Windows/Ubuntu Release CI
 - [ ] PHYS-008 Trigger/Collision 이벤트가 C#·Editor·Player에서 일치한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] PHYS-009 레이어 마스크·필터가 물리 쿼리마다 동일하다 — 증거: PR #32, NEngineRoundTwoAnimPhysicsTests, 3D overlap/raycast 계층 mask 및 trigger, Windows/Ubuntu CI
@@ -154,13 +156,13 @@
 - [ ] AUD-011 C# AudioSource Play/Stop/Loop/Volume이 Player에서 동작한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] AUD-012 소리 장치 실패 시 안전하게 폴백하고 오류를 표시한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## INPUT — Input (6/11)
+## INPUT — Input (7/11)
 
 참조: engine/input; tests/input_tests.cpp
 
 - [x] INPUT-001 키보드·마우스 입력 회귀 테스트가 통과한다 — 증거: tests/input_tests.cpp / CI run 39713209272
 - [x] INPUT-002 Input.ninput 액션 맵 회귀 테스트가 통과한다 — 증거: tests/input_tests.cpp / CI run 39713209272
-- [ ] INPUT-003 Editor에서 Action Map을 시각적으로 생성·수정·삭제한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] INPUT-003 Editor에서 Action Map을 시각적으로 생성·수정·삭제한다 — 증거: PR #41, 코드 SHA f6160c138fc0669e834f8d48a5c2e960239300dd; NEngineEditorTests .naction 키 바인딩 생성/갱신/삭제·재로드와 원자적 저장, Windows Input Actions 패널 연결; Windows/Ubuntu Debug·Release 최종 PR HEAD CI 및 CTest 수용 게이트(실기기 별도).
 - [x] INPUT-004 Action Map 변경이 Windows Player 번들까지 전달된다 — 증거: PR #34, NEngineInputBundleAcceptanceTests 편집 ActionMap 변경→Player export→runtime 새 액션 적용과 이전 번들 불변, Windows/Ubuntu CI
 - [ ] INPUT-005 C# 액션 입력과 물리 키 상태가 실제 키보드에서 일치한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] INPUT-006 마우스 버튼·좌표·스크롤이 DPI 변경 시 정상 동작한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -170,13 +172,13 @@
 - [x] INPUT-010 UI가 소비한 입력을 게임플레이가 중복 처리하지 않는다 — 증거: PR #35, InputState gameplay-consumed mask, PlayerUiRuntime pointer/keyboard routing, C# raw key callbacks, NEngineRoundFiveRuntimeTests, Windows/Ubuntu Release+Debug CI
 - [x] INPUT-011 입력맵 부재·손상 오류를 안전하게 처리한다 — 증거: PR #32, NEngineRoundTwoInputUiTests, 악성·누락·과대 ActionMap 거부·기존 Action 보존, Windows/Ubuntu CI
 
-## ANIM — Animation (3/10)
+## ANIM — Animation (4/10)
 
 참조: engine/render/src/animation_controller.cpp; tests/render_tests.cpp
 
 - [x] ANIM-001 SpriteAnimation과 Controller 기본 회귀 테스트가 통과한다 — 증거: tests/render_tests.cpp / CI run 39713209272
 - [ ] ANIM-002 스프라이트 시트·클립·타임라인 Editor를 완성한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] ANIM-003 2D SpriteAnimator 클립을 Scene 저장 후 Player에서 재생한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] ANIM-003 2D SpriteAnimator 클립을 Scene 저장 후 Player에서 재생한다 — 증거: PR #41, 코드 SHA f6160c138fc0669e834f8d48a5c2e960239300dd; NEnginePlayerTests Scene SpriteAnimator clip 직렬화와 Player 번들 로드/프레임 재생; Windows/Ubuntu Debug·Release 최종 PR HEAD CI 및 CTest 수용 게이트(실기기 별도).
 - [x] ANIM-004 애니메이션 상태 머신 Transition 조건을 검증한다 — 증거: PR #32, NEngineRoundTwoAnimPhysicsTests, 상태머신 전이 조건·exit 시간·복귀·잘못된 참조 검증, Windows/Ubuntu CI
 - [ ] ANIM-005 Blend Tree 보간과 중단·재진입을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] ANIM-006 애니메이션 이벤트를 ScriptBehaviour에 전달한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -368,18 +370,18 @@
 - [x] SHDR-005 무효/비정상 셰이더를 불러오면 원인 진단 후 안전하게 유지한다 — 증거: PR #34, tools/nengine_shaders.py invalid shader/invalid SPIR-V 진단·last-good shader pointer 유지, test_nengine_shaders.py, Windows/Ubuntu CI
 - [ ] SHDR-006 Shader variant/키워드 변경 후 Player 재질이 동일하다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## EDTOOL — Editor 생산성 도구 (2/9)
+## EDTOOL — Editor 생산성 도구 (5/9)
 
 참조: apps/editor; engine/editor
 
-- [ ] EDTOOL-001 Scene View와 분리된 Game View를 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] EDTOOL-001 Scene View와 분리된 Game View를 제공한다 — 증거: PR #41, 코드 SHA f6160c138fc0669e834f8d48a5c2e960239300dd; NEngineEditorTests PlaySession runtime World와 authoring World 분리; Win32 Scene View와 별도 Game View 창; Windows/Ubuntu Debug·Release 최종 PR HEAD CI 및 CTest 수용 게이트(실기기 별도).
 - [ ] EDTOOL-002 Prefab 격리 편집 모드를 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] EDTOOL-003 실제 선택 객체와 연결되는 Component Add 메뉴를 완성한다 — 증거: PR #40, 코드 SHA acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7, CI 40279093322 Windows/Ubuntu Debug·Release 38/38 CTest PASS; NEngineEditorTests selection-derived actual Add Component list/action, duplicate rejection and Undo/Redo, Win32 menu sharing the model command.
 - [x] EDTOOL-004 C# 프로젝트를 Visual Studio/Rider로 여는 동작을 검증한다 — 증거: PR #40, 코드 SHA acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7, CI 40279093322 Windows/Ubuntu Debug·Release 38/38 CTest PASS; Win32 Scripts .sln association/Ctrl VS/Shift Rider launch implementation, NEngineEditorTests Unicode paths/IDE selection/invalid solution; installed IDE GUI not manually confirmed.
 - [ ] EDTOOL-005 에디터 패키지 목록·설치·제거 UI를 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] EDTOOL-006 Editor/Player 실행 성능 Profiler 화면을 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] EDTOOL-006 Editor/Player 실행 성능 Profiler 화면을 제공한다 — 증거: PR #41, 코드 SHA f6160c138fc0669e834f8d48a5c2e960239300dd; NEngineEditorTests 240-frame CPU 샘플·평균/피크·비정상 입력 방지, Windows Editor/Player Profiler 표시; GPU 프로파일링 제외; Windows/Ubuntu Debug·Release 최종 PR HEAD CI 및 CTest 수용 게이트(실기기 별도).
 - [ ] EDTOOL-007 GPU 프레임 디버거 또는 동등한 진단 도구를 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] EDTOOL-008 Windows·Android Build Settings Editor 화면을 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] EDTOOL-008 Windows·Android Build Settings Editor 화면을 제공한다 — 증거: PR #41, 코드 SHA f6160c138fc0669e834f8d48a5c2e960239300dd; NEngineEditorTests Build Settings 모델 Windows/Android 타깃·툴체인 저장/복원·유효성 검증, Win32 설정 화면; Android APK 생성 검증 아님; Windows/Ubuntu Debug·Release 최종 PR HEAD CI 및 CTest 수용 게이트(실기기 별도).
 - [ ] EDTOOL-009 Android SDK/NDK/JDK 도구 경로 설정·검증 UI를 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
 ## BUILD — 빌드 프로필·애플리케이션 메타데이터 (5/9)
@@ -396,14 +398,14 @@
 - [x] BUILD-008 빌드 실패·서명 누락 시 사용자에게 명확한 오류를 표시한다 — 증거: PR #36, tools/nengine_build_profiles.py Release keystore/alias/environment signing preflight diagnostics, test_nengine_signing.py; Windows/Ubuntu Debug+Release CI
 - [ ] BUILD-009 동일 커밋을 사용한 재현 가능한 빌드 결과를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## UTIL — 스크립팅 유틸리티·개발 진단 (4/5)
+## UTIL — 스크립팅 유틸리티·개발 진단 (5/5)
 
 참조: engine/scripting; engine/editor
 
 - [x] UTIL-001 C# Debug.Log/Warning/Error 메시지와 Editor Console 위치를 연동한다 — 증거: PR #40, 코드 SHA acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7, CI 40279093322 Windows/Ubuntu Debug·Release 38/38 CTest PASS; NEngineScriptingTests native C# Debug.Log/Warning/Error callback ABI v19 severity, caller file/line; Editor Console and Player sinks.
 - [x] UTIL-002 C# Mathf/Vector/Quaternion 기본 수학 API를 샘플로 검증한다 — 증거: PR #37, engine/scripting/src/managed_project.cpp + tests/scripting_tests.cpp, 생성 C# API·실제 managed Start() 회귀 검증, Windows/Ubuntu Debug·Release NEngineScriptingTests 및 29/29 CTest PASS, CI run 40103756074
 - [x] UTIL-003 C# Timer/Coroutine/WaitForSeconds 중단·취소를 검증한다 — 증거: PR #40, 코드 SHA acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7, CI 40279093322 Windows/Ubuntu Debug·Release 38/38 CTest PASS; NEngineScriptingTests real .NET IEnumerator Stop/StopAll and nested iterator finally disposal, WaitForSeconds frame continuation.
-- [ ] UTIL-004 프로파일 로그·크래시 로그에 엔진 및 게임 빌드 버전을 남긴다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] UTIL-004 프로파일 로그·크래시 로그에 엔진 및 게임 빌드 버전을 남긴다 — 증거: PR #41, 코드 SHA f6160c138fc0669e834f8d48a5c2e960239300dd; NEnginePlayerTests engine/game build identity 및 bundle v2→v3 마이그레이션, Editor/Player 진단 문자열; Windows/Ubuntu Debug·Release 최종 PR HEAD CI 및 CTest 수용 게이트(실기기 별도).
 - [x] UTIL-005 런타임 오류 시 사용자 데이터 보호·복구 안내를 검증한다 — 증거: PR #36, GameSaveStore last-good backup and read_backup recovery without mutating corrupt caller data, NEngineGameSaveRecoveryTests; Windows/Ubuntu Debug+Release CI
 
 ## 작업 기록과 변경 이력
@@ -431,3 +433,5 @@
 - 2026-10-26: NAV-004/005/007/008/009/010/011/012 (8개 고정 ID)를 PR #39에서 Scene 메시 Bake, TRS·미러링, agent clearance/정적 장애물, T-junction 분할·비매니폴드 거부, portal funnel, NavMeshAgent Scene/Editor/Player 통합, C# API, 동적 재탐색으로 구현. 소스 SHA `8fe399b6b57b5c6e01b98fcd17f030ef3720eaa4`에서 Windows/Ubuntu Release·Debug 각 37/37 CTest PASS(CI 40249542956). 총계 285 유지, 완료 110→118 / 미완료 175→167. 별도 NAV-006 UI, NAV-013 군집 회피, NAV-014/015 기기 실행은 체크하지 않음. 실기기 GPU·Android 등은 CI 증거로 대체하지 않음.
 
 - 2026-10-26: PR #40에서 기존 7개 ID(NAV-013, UTIL-003, EDTOOL-003, CS-014, EDTOOL-004, UTIL-001, EDIT-014)의 자동화·소스 수준 구현과 회귀를 추가. 코드 SHA `acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7`, [Windows·Ubuntu Release/Debug CI 40279093322](https://github.com/skatmdgn/NEngine/actions/runs/40279093322) 각 38/38 PASS. 285개 총량 불변, 완료 118→125 / 미완료 167→160. NAV 다중 에이전트 정적 반경 기반 충돌 회피는 복잡한 ORCA/군중 시뮬레이션을 뜻하지 않는다. IDE launch는 ShellExecute 기반 앱 연결·VS/Rider 시작 명령을 구현/검사하지만 **실제 설치된 GUI를 연 실기기 검증은 수행하지 않음**. Windows GPU/오디오/Android 배포도 수용 대상 아님.
+
+- 2026-10-27: PR #41에서 기존 고정 ID 10개(CORE-005, EDIT-007/008, PHYS-006, INPUT-003, ANIM-003, EDTOOL-001/006/008, UTIL-004)를 좁은 소스·자동화 수용 범위로 추가. 코드 SHA `f6160c138fc0669e834f8d48a5c2e960239300dd`는 frame 중간 물리 Trigger 접촉을 aggregate하는 후속 결함 수정을 포함. GitHub PR #41의 최종 HEAD Windows/Ubuntu Release·Debug 및 CTest 성공을 병합 승인 조건으로 삼으며, 완료 수 125→135 / 미완료 160→150 / 총 285 유지. 실기기 GUI·GPU·Android·전체 범위의 연속 충돌 CCD는 여기서 수용하지 않음.
