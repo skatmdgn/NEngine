@@ -1427,6 +1427,10 @@ int main() {
             << "public class Player : Behaviour {}\n";
     }
 
+    const auto managed_plugins=root/"Assets"/"Plugins"/"Managed";
+    std::filesystem::create_directories(managed_plugins);
+    { std::ofstream plugin(managed_plugins/"Sample.Library.dll",std::ios::binary);
+      plugin<<"registered fixture"; }
     ManagedProjectConfig config;
     config.project_name = "GameScripts";
     config.project_root = root;
@@ -1497,6 +1501,9 @@ int main() {
             "13.0.3") !=
             std::string::npos,
         "csproj includes NuGet PackageReference");
+    check(project.find("<Reference Include=\\\"Sample.Library\\\">")!=std::string::npos &&
+          project.find("../../Assets/Plugins/Managed/Sample.Library.dll")!=std::string::npos,
+          "PLUG-006 managed DLL appears in generated MSBuild private references");
 
 
     check(
