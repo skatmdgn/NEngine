@@ -1427,6 +1427,10 @@ int main() {
             << "public class Player : Behaviour {}\n";
     }
 
+    const auto managed_plugins=root/"Assets"/"Plugins"/"Managed";
+    std::filesystem::create_directories(managed_plugins);
+    { std::ofstream plugin(managed_plugins/"Sample.Library.dll",std::ios::binary);
+      plugin<<"registered fixture"; }
     ManagedProjectConfig config;
     config.project_name = "GameScripts";
     config.project_root = root;
@@ -1454,6 +1458,11 @@ int main() {
         std::filesystem::exists(
             output.project_path),
         "csproj generated");
+    const auto build_props=read_all(
+        output.project_path.parent_path()/"Directory.Build.props");
+    check(build_props.find("obj/$(MSBuildProjectName)/")!=std::string::npos,
+          "PLUG-004 generated projects isolate per-project restore assets");
+
 
     check(
         std::filesystem::exists(
@@ -1497,6 +1506,12 @@ int main() {
             "13.0.3") !=
             std::string::npos,
         "csproj includes NuGet PackageReference");
+    check(project.find("<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>")!=std::string::npos,
+          "PLUG-005 generated managed project copies runtime NuGet libraries");
+
+    check(project.find("<Reference Include=\"Sample.Library\">")!=std::string::npos &&
+          project.find("../../Assets/Plugins/Managed/Sample.Library.dll")!=std::string::npos,
+          "PLUG-006 managed DLL appears in generated MSBuild private references");
 
 
     check(
@@ -2285,6 +2300,139 @@ int main() {
             example_output << example_source;
         }
 
+        // PLUG-006 / CS-013: build a real independent .NET DLL without
+        // requiring network NuGet restore, then reference it from gameplay.
+        const auto external_root=integration_root/"ExternalHelperProject";
+        const auto external_plugins=integration_root/"Assets"/"Plugins"/"Managed";
+        std::filesystem::create_directories(external_root);
+        std::filesystem::create_directories(external_plugins);
+        {
+            std::ofstream project_file(external_root/"ExternalHelper.csproj");
+            project_file<<"<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup>"
+                        <<"<TargetFramework>net8.0</TargetFramework>"
+                        <<"</PropertyGroup></Project>\n";
+            std::ofstream source_file(external_root/"ExternalHelper.cs");
+            source_file<<"public static class ExternalHelper { "
+                          "public static int Answer() => 42; }\n";
+        }
+        ManagedBuildConfig external_build;
+        external_build.project_path=external_root/"ExternalHelper.csproj";
+        external_build.output_directory=external_root/"output";
+        external_build.dotnet_executable=*real_dotnet;
+        const auto external_result=run_managed_build(external_build);
+        check(external_result.success,"PLUG-006 real managed extension builds");
+        if(external_result.success){
+            std::error_code copy_error;
+            std::filesystem::copy_file(
+                external_result.plan.assembly_path,
+                external_plugins/"ExternalHelper.dll",
+                std::filesystem::copy_options::overwrite_existing,copy_error);
+            check(!copy_error,"PLUG-006 managed extension staged in project Plugins");
+        }
+        {
+            std::ofstream script(integration_root/"Assets"/"Scripts"/"LibraryProbe.cs");
+            script<<"using NEngine;\n"
+                    "public class LibraryProbe : Behaviour {\n"
+                    "  private void Start() {\n"
+                    "    if (ExternalHelper.Answer() != 42) throw new System.Exception(\"external dependency mismatch\");\n"
+                    "    gameObject.name = \"External DLL Loaded\";\n"
+                    "  }\n"
+                    "}\n";
+        }
+
+        {
+            std::ofstream throw_script(integration_root/"Assets"/"Scripts"/"ThrowingProbe.cs");
+            throw_script<<"using NEngine;\n"
+                "public class ThrowingProbe : Behaviour {\n"
+                "  private void Start() { throw new System.InvalidOperationException(\"CS-008 deliberate failure\"); }\n"
+                "}\n";
+        }
+
+        // PLUG-004/017: build and pack a real, independently compiled
+        // JSON NuGet library into a local feed. CI must not depend on
+        // nuget.org availability or credentials to validate restore.
+        const auto json_source=integration_root/"SampleJsonPackage";
+        const auto json_feed=integration_root/"LocalNuGet";
+        std::filesystem::create_directories(json_source);
+        std::filesystem::create_directories(json_feed);
+        {
+            std::ofstream project(json_source/"Sample.Json.csproj");
+            project<<"<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup>"
+                   "<TargetFramework>net8.0</TargetFramework>"
+                   "<PackageId>Sample.Json</PackageId>"
+                   "<Version>1.0.0</Version>"
+                   "<GeneratePackageOnBuild>true</GeneratePackageOnBuild>"
+                   "<PackageOutputPath>../LocalNuGet</PackageOutputPath>"
+                   "</PropertyGroup></Project>\n";
+            std::ofstream source(json_source/"JsonCodec.cs");
+            source<<"namespace Sample.Json;\n"
+                     "public static class JsonCodec {\n"
+                     " public static string Serialize<T>(T value) => System.Text.Json.JsonSerializer.Serialize(value);\n"
+                     " public static T? Deserialize<T>(string json) => System.Text.Json.JsonSerializer.Deserialize<T>(json);\n"
+                     "}\n";
+        }
+        ManagedBuildConfig json_build;
+        json_build.project_path=json_source/"Sample.Json.csproj";
+        json_build.output_directory=json_source/"output";
+        json_build.dotnet_executable=*real_dotnet;
+        const auto json_result=run_managed_build(json_build);
+        check(json_result.success &&
+              std::filesystem::exists(json_feed/"Sample.Json.1.0.0.nupkg"),
+              "PLUG-004 independently compiled JSON NuGet package is packed to local feed");
+        if(!json_result.success)
+            std::cerr<<"JSON package build failed: "<<json_result.message
+                     <<"\n"<<json_result.output<<"\n";
+        {
+            std::ofstream config(integration_root/"NuGet.Config");
+            config<<"<configuration><packageSources><clear/>"
+                     "<add key=\"local-test-feed\" value=\"LocalNuGet\"/>"
+                     "</packageSources></configuration>\n";
+        }
+        std::filesystem::create_directories(integration_root/"Packages");
+        {
+            std::ofstream manifest(integration_root/"Packages"/"managed-packages.txt");
+            manifest<<"Sample.Json 1.0.0\n";
+        }
+        {
+            std::ofstream script(integration_root/"Assets"/"Scripts"/"NuGetJsonProbe.cs");
+            script<<"using NEngine;\n"
+                "using Sample.Json;\n"
+                "public class NuGetJsonProbe : Behaviour {\n"
+                "  public sealed class Progress { public int Score {get;set;} public string Label {get;set;} = \"\"; }\n"
+                "  private void Start() {\n"
+                "    var json = JsonCodec.Serialize(new Progress { Score = 42, Label = \"한글\" });\n"
+                "    var restored = JsonCodec.Deserialize<Progress>(json);\n"
+                "    if (restored == null || restored.Score != 42 || restored.Label != \"한글\")\n"
+                "      throw new System.Exception(\"NuGet JSON encode/decode mismatch\");\n"
+                "    gameObject.name = \"NuGet JSON Passed\";\n"
+                "  }\n"
+                "}\n";
+        }
+
+        // PLUG-009: use the native shared library built for the existing
+        // NativePlugin CTest, not a fake managed-only stand-in.
+        const auto native_library=std::filesystem::path{NENGINE_TEST_NATIVE_PLUGIN};
+        const auto native_dir=integration_root/"Assets"/"Plugins"/"Native";
+        std::filesystem::create_directories(native_dir);
+        std::error_code native_copy_error;
+        std::filesystem::copy_file(native_library,
+            native_dir/native_library.filename(),
+            std::filesystem::copy_options::overwrite_existing,native_copy_error);
+        check(!native_copy_error,"PLUG-009 stage real native C ABI library");
+        {
+            std::ofstream script(integration_root/"Assets"/"Scripts"/"PInvokeProbe.cs");
+            script<<"using NEngine;\n"
+                  "using System.Runtime.InteropServices;\n"
+                  "public class PInvokeProbe : Behaviour {\n"
+                  "  [DllImport(\"NEngineNativePluginFixture\", CallingConvention=CallingConvention.Cdecl)]\n"
+                  "  private static extern int nengine_plugin_smoke(int value);\n"
+                  "  private void Start() {\n"
+                  "    if (nengine_plugin_smoke(42)!=49) throw new System.Exception(\"PInvoke mismatch\");\n"
+                  "    gameObject.name = \"PInvoke Passed\";\n"
+                  "  }\n"
+                  "}\n";
+        }
+
         ManagedProjectConfig
             integration_project;
 
@@ -2292,6 +2440,13 @@ int main() {
             "IntegrationScripts";
         integration_project.project_root =
             integration_root;
+        std::string nuget_error;
+        integration_project.packages=
+            ManagedProjectGenerator::load_package_manifest(
+                integration_root/"Packages"/"managed-packages.txt",&nuget_error);
+        check(nuget_error.empty()&&integration_project.packages.size()==1u,
+              "PLUG-004 NuGet manifest loaded into production project generator");
+
 
         ManagedProjectOutput
             integration_output;
@@ -2327,6 +2482,11 @@ int main() {
             const auto build =
                 run_managed_build(
                     integration_build);
+            if(!build.success){
+                std::cerr<<"Managed integration build failed: "<<build.message
+                         <<"\nPROJECT FILE:\n"<<read_all(integration_output.project_path)
+                         <<"\n"<<build.output<<"\n";
+            }
 
             check(
                 build.success &&
@@ -2345,9 +2505,24 @@ int main() {
                         .output_directory /
                     "NEngine.Bridge.dll"),
                 "real dotnet SDK builds gameplay assembly plus dedicated API and stable Bridge dependencies into deterministic output");
+            // Restore assets for all three projects must not overwrite one
+            // another. NuGet PackageReference belongs to gameplay only.
+            const auto obj_root=integration_output.project_path.parent_path()/"obj";
+            const auto game_assets=read_all(obj_root/"IntegrationScripts"/"project.assets.json");
+            const auto api_assets=read_all(obj_root/"NEngine.API"/"project.assets.json");
+            const auto bridge_assets=read_all(obj_root/"NEngine.Bridge"/"project.assets.json");
+            check(game_assets.find("Sample.Json/1.0.0")!=std::string::npos &&
+                  !api_assets.empty() && !bridge_assets.empty() &&
+                  api_assets.find("Sample.Json/1.0.0")==std::string::npos,
+                  "PLUG-004 three independent restore graphs preserve gameplay NuGet package");
+
 
 
             if (build.success) {
+                check(std::filesystem::is_regular_file(
+                    integration_build.output_directory/"Sample.Json.dll"),
+                    "PLUG-004 offline NuGet restore stages real JSON runtime DLL");
+
                 std::string runtime_error;
 
                 const auto runtime =
@@ -2454,6 +2629,70 @@ int main() {
                                 ui.image_guid = guid;
                                 return true;
                             });
+
+                        const auto throwing=managed_runtime.create_behaviour("ThrowingProbe");
+                        const bool exception_contained=throwing.valid() &&
+                            managed_runtime.set_game_object(throwing,
+                                nengine::core::Entity::make(102,1),
+                                "Exception Target",true) &&
+                            !managed_runtime.start(throwing);
+                        const bool stack_reported=std::any_of(
+                            captured_logs.begin(),captured_logs.end(),
+                            [](const auto& log){
+                                return log.level==2 &&
+                                    log.message.find("InvalidOperationException")!=std::string::npos &&
+                                    log.message.find("ThrowingProbe")!=std::string::npos;
+                            });
+                        check(exception_contained&&stack_reported,
+                            "CS-008 managed exception is contained and original C# stack logged");
+                        if(throwing.valid())managed_runtime.destroy(throwing);
+
+                        const auto native_probe=managed_runtime.create_behaviour("PInvokeProbe");
+                        nengine::core::Entity native_entity{};
+                        std::string native_name;
+                        bool native_active=false;
+                        const bool native_pass=native_probe.valid() &&
+                            managed_runtime.set_game_object(native_probe,
+                                nengine::core::Entity::make(104,1),"Native Probe",true) &&
+                            managed_runtime.start(native_probe) &&
+                            managed_runtime.get_game_object(native_probe,
+                                native_entity,native_name,native_active) &&
+                            native_name=="PInvoke Passed";
+                        check(native_pass,
+                            "PLUG-009 C# P/Invoke calls native shared library inside hosted gameplay");
+                        if(native_probe.valid())managed_runtime.destroy(native_probe);
+
+                        const auto json_probe=managed_runtime.create_behaviour("NuGetJsonProbe");
+                        nengine::core::Entity json_entity{};
+                        std::string json_name;
+                        bool json_active=false;
+                        const bool json_pass=json_probe.valid() &&
+                            managed_runtime.set_game_object(json_probe,
+                                nengine::core::Entity::make(103,1),"JSON Probe",true) &&
+                            managed_runtime.start(json_probe) &&
+                            managed_runtime.get_game_object(json_probe,
+                                json_entity,json_name,json_active) &&
+                            json_name=="NuGet JSON Passed";
+                        check(json_pass,
+                            "PLUG-017 independent JSON NuGet package executes JSON roundtrip");
+                        if(json_probe.valid())managed_runtime.destroy(json_probe);
+
+                        const auto library_probe=managed_runtime.create_behaviour("LibraryProbe");
+                        nengine::core::Entity library_entity{};
+                        std::string library_name;
+                        bool library_active=false;
+                        const bool library_pass=
+                            library_probe.valid() &&
+                            managed_runtime.set_game_object(library_probe,
+                                nengine::core::Entity::make(101,1),
+                                "Library Probe",true) &&
+                            managed_runtime.start(library_probe) &&
+                            managed_runtime.get_game_object(library_probe,
+                                library_entity,library_name,library_active) &&
+                            library_name=="External DLL Loaded";
+                        check(library_pass,
+                            "CS-013 managed gameplay executes independently built local DLL");
+                        if(library_probe.valid())managed_runtime.destroy(library_probe);
 
                         const auto ui_probe = managed_runtime.create_behaviour("UIProbe");
                         nengine::core::Entity probe_entity{};
@@ -4108,10 +4347,17 @@ int main() {
                                 "Library" /
                                 "ManagedBuild" /
                                 "Reload";
+                            // Hot reload changes output destination, not NuGet
+                            // package references. Preserve the resolved assets
+                            // from the already-validated initial restore.
+                            reload_build.restore = false;
 
                             const auto rebuilt =
                                 run_managed_build(
                                     reload_build);
+                            if(!rebuilt.success)
+                                std::cerr<<"Managed reload build failed: "
+                                         <<rebuilt.message<<"\n"<<rebuilt.output<<"\n";
 
                             check(
                                 rebuilt.success &&

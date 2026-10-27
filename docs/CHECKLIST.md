@@ -2,11 +2,13 @@
 
 **검증 기준선:** PR #40의 정확한 소스 SHA `acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7` (2026-10-26), [Windows/Ubuntu CI 40279093322](https://github.com/skatmdgn/NEngine/actions/runs/40279093322) — Windows·Ubuntu 각각 Release/Debug **38/38 CTest PASS**. C# 실제 .NET 컴파일·코루틴·Debug 로그 회귀 테스트 포함. 실제 Windows GPU/오디오·Android 실기기·설치된 Visual Studio/Rider GUI 열기는 이 CI가 증명하지 않으며 각각 별도 검증 대상이다. 병합 후 `main` CI는 별도 확인한다.
 
-**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 135개, 미완료 150개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
+**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 145개, 미완료 140개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
 
 **우선 순위:** Windows Editor의 실제 Vulkan Scene/Game 렌더링·실기기 Player, Android APK/AAB 빌드 및 기기 실행, 외부 SDK/플러그인 연동을 우선한다. PR #40은 NavMeshAgent 다중 객체 회피·C# 코루틴·Debug 로그·컴파일 진단·C# 예제·에디터 컴포넌트 메뉴·IDE 시작 경로의 **소스·자동화 검증** 7개 ID를 추가하지만, NAV-006 보행 비용 UI/NAV-014/015 실기기 검증 및 설치된 Visual Studio/Rider 실제 GUI 실행 검증은 포함하지 않는다. 작업 규칙은 [WORKFLOW.md](WORKFLOW.md).
 
 **2026-10-27 PR #41 수용 범위:** 10개 기존 ID의 소스·자동화 수용 후보가 추가됨. PR #41의 최종 HEAD에 대한 Windows/Ubuntu Debug·Release CI가 성공한 경우에만 이 체크를 확정한다. 초기 기능 소스 `7f8039b1d38359e8de251961263fa4188e71a387`의 [CI 40427979420](https://github.com/skatmdgn/NEngine/actions/runs/40427979420)는 통과했으나, 이후 물리 미세단계 임시 접촉 이벤트 누락 수정(`f6160c138fc0669e834f8d48a5c2e960239300dd`)은 **새로운 최종 CI**로 재검증해야 한다. Win32 GUI 조작·GPU/오디오·Android 실기기 미검증은 별도 ID로 남는다.
+
+**2026-10-27 PR #42 소스 수용 후보:** PLUG-004/005/006/009/017 및 CS-005/006/007/008/013 총 10개 기존 ID. 실제 NuGet restore, 외부 managed DLL, native P/Invoke, C# 예외 스택, 기존 속성/코루틴 통합의 Windows/Ubuntu Debug·Release 최종 CI가 성공해야만 병합할 수 있다. `main`의 확정 집계는 병합 전 135/150이며 PR 브랜치의 145/140은 조건부다. Windows GPU/실기기/Android 실행을 이 수치로 대체하지 않는다.
 
 ## GOV — 개발 관리·검증 (10/10)
 
@@ -102,7 +104,7 @@
 - [ ] REND-015 프레임 시간·드로우 콜·GPU 메모리 기준을 작성해 회귀를 막는다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] REND-016 Android Vulkan surface 렌더링을 실기기로 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## CS — C#·IDE (4/14)
+## CS — C#·IDE (9/14)
 
 참조: engine/scripting; tests/scripting_tests.cpp
 
@@ -110,15 +112,15 @@
 - [x] CS-002 hostfxr/Bridge/ScriptBehaviour 기본 테스트가 통과한다 — 증거: tests/scripting_tests.cpp / CI run 39713209272
 - [ ] CS-003 새로운 Windows 프로젝트에서 C# 스크립트를 만들고 Play한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] CS-004 Windows Player가 같은 C# 스크립트를 번들에서 실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] CS-005 GameObject/Transform/Component 변경이 managed/native 양쪽에서 같다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] CS-006 Camera/Renderer/Audio/Collider 속성이 C#에서 동작한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] CS-007 코루틴·Time·스크립트 실행 순서를 실제 게임으로 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] CS-008 C# 예외가 호스트를 종료하지 않고 스택을 출력한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] CS-005 GameObject/Transform/Component 변경이 managed/native 양쪽에서 같다 — 증거: PR #42, 코드 SHA 9109a28bef4eb529c086740cf1919a2204d4aedd; World↔managed Transform/GameObject/component synchronization through existing ScriptBehaviour lifecycle tests, NEngineScriptingTests; Windows/Ubuntu Release·Debug 최종 PR HEAD CI 성공을 조건으로 한 소스/자동화 수용(Windows GUI/GPU/Android 실기기 미검증).
+- [x] CS-006 Camera/Renderer/Audio/Collider 속성이 C#에서 동작한다 — 증거: PR #42, 코드 SHA 9109a28bef4eb529c086740cf1919a2204d4aedd; real managed Camera/Renderer/Audio/Collider property roundtrip and native property fixtures, NEngineScriptingTests; Windows/Ubuntu Release·Debug 최종 PR HEAD CI 성공을 조건으로 한 소스/자동화 수용(Windows GUI/GPU/Android 실기기 미검증).
+- [x] CS-007 코루틴·Time·스크립트 실행 순서를 실제 게임으로 검증한다 — 증거: PR #42, 코드 SHA 9109a28bef4eb529c086740cf1919a2204d4aedd; C# Coroutine WaitForSeconds/Time/Start/Update order through ScriptBehaviour World ticks, NEngineScriptingTests; Windows/Ubuntu Release·Debug 최종 PR HEAD CI 성공을 조건으로 한 소스/자동화 수용(Windows GUI/GPU/Android 실기기 미검증).
+- [x] CS-008 C# 예외가 호스트를 종료하지 않고 스택을 출력한다 — 증거: PR #42, 코드 SHA 9109a28bef4eb529c086740cf1919a2204d4aedd; managed reflection callback exception caught with original C# inner stack logged, followed by healthy script invocation, NEngineScriptingTests; Windows/Ubuntu Release·Debug 최종 PR HEAD CI 성공을 조건으로 한 소스/자동화 수용(Windows GUI/GPU/Android 실기기 미검증).
 - [ ] CS-009 반복 Play/Stop/핫리로드에서 메모리와 핸들이 누출되지 않는다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] CS-010 Visual Studio 심볼·브레이크포인트 attach를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] CS-011 Rider 프로젝트와 디버깅 워크플로를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] CS-012 GameScripts.dll 이름·버전 불일치 오류를 명확히 진단한다 — 증거: PR #36, NEngineFollowupAcceptanceTests, named GameScripts/runtimeconfig/API/Bridge diagnostics and .NET framework version mismatch; Windows/Ubuntu Debug+Release CI
-- [ ] CS-013 관리형 외부 라이브러리 의존성을 컴파일·실행·배포한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] CS-013 관리형 외부 라이브러리 의존성을 컴파일·실행·배포한다 — 증거: PR #42, 코드 SHA 9109a28bef4eb529c086740cf1919a2204d4aedd; independent .NET ExternalHelper.dll built, loaded, called by NEngine gameplay, NEngineScriptingTests; Windows/Ubuntu Release·Debug 최종 PR HEAD CI 성공을 조건으로 한 소스/자동화 수용(Windows GUI/GPU/Android 실기기 미검증).
 - [x] CS-014 C# 공개 API에 컴파일 가능한 최소 예제와 참조 문서를 제공한다 — 증거: PR #40, 코드 SHA acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7, CI 40279093322 Windows/Ubuntu Debug·Release 38/38 CTest PASS; samples/managed/NavQuickstart.cs copied as the real .NET integration project compilation input; docs/README.md public API reference.
 
 ## PHYS — 2D/3D 물리 (12/13)
@@ -274,19 +276,19 @@
 - [ ] AND-020 두 개 이상 Android 하드웨어/OS 환경에서 동작한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] AND-021 Windows와 Android에서 동일 게임 Scene·C# 동작을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## PLUG — 패키지·외부 SDK (5/18)
+## PLUG — 패키지·외부 SDK (10/18)
 
 참조: engine/scripting; engine/player
 
 - [x] PLUG-001 패키지 매니페스트·버전 지정 형식을 정의한다 — 증거: PR #34, tools/nengine_packages.py validate manifest v1 schema/semver/sha256, test_nengine_packages.py, Windows/Ubuntu CI
 - [x] PLUG-002 종속성 그래프·버전 충돌 검출을 구현한다 — 증거: PR #34, tools/nengine_packages.py deterministic topo resolver/버전 충돌/순환/결손 검출, test_nengine_packages.py, Windows/Ubuntu CI
 - [x] PLUG-003 패키지 캐시·체크섬·잠금파일을 구현한다 — 증거: PR #34, tools/nengine_packages.py SHA256 address cache·atomic lockfile·symlink 차단, test_nengine_packages.py, Windows/Ubuntu CI
-- [ ] PLUG-004 NuGet restore를 Editor·C# 빌드에 통합한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] PLUG-005 NuGet managed DLL을 Windows Player에 패키징한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] PLUG-006 임의 managed DLL 플러그인을 Editor에서 등록한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] PLUG-004 NuGet restore를 Editor·C# 빌드에 통합한다 — 증거: PR #42, 코드 SHA 9109a28bef4eb529c086740cf1919a2204d4aedd; independently packed Sample.Json 1.0.0 package via local NuGet feed → MSBuild restore → runtime DLL, NEngineScriptingTests; Windows/Ubuntu Release·Debug 최종 PR HEAD CI 성공을 조건으로 한 소스/자동화 수용(Windows GUI/GPU/Android 실기기 미검증).
+- [x] PLUG-005 NuGet managed DLL을 Windows Player에 패키징한다 — 증거: PR #42, 코드 SHA 9109a28bef4eb529c086740cf1919a2204d4aedd; bounded additional managed DLL Player export; malicious name rejection, NEnginePlayerTests; Windows/Ubuntu Release·Debug 최종 PR HEAD CI 성공을 조건으로 한 소스/자동화 수용(Windows GUI/GPU/Android 실기기 미검증).
+- [x] PLUG-006 임의 managed DLL 플러그인을 Editor에서 등록한다 — 증거: PR #42, 코드 SHA 9109a28bef4eb529c086740cf1919a2204d4aedd; project-local Assets/Plugins/Managed DLL MSBuild Reference/CopyLocal; compile and run real ExternalHelper.dll, NEngineScriptingTests; Windows/Ubuntu Release·Debug 최종 PR HEAD CI 성공을 조건으로 한 소스/자동화 수용(Windows GUI/GPU/Android 실기기 미검증).
 - [x] PLUG-007 Windows native DLL 플러그인 로딩을 구현한다 — 증거: PR #35, NativePlugin LoadLibraryExW/dlopen/exports/unload with compiled fixture, NEngineNativePluginTests, Windows/Ubuntu Release+Debug CI
 - [x] PLUG-008 native DLL 보안 경로·오류 처리를 검증한다 — 증거: PR #35, NativePlugin symlink/path escape, missing DLL and duplicate handle rejects, NEngineNativePluginTests, Windows/Ubuntu Release+Debug CI
-- [ ] PLUG-009 P/Invoke 기반 외부 C# 플러그인을 실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] PLUG-009 P/Invoke 기반 외부 C# 플러그인을 실행한다 — 증거: PR #42, 코드 SHA 9109a28bef4eb529c086740cf1919a2204d4aedd; real native C ABI fixture built by CMake, project-local P/Invoke DLL/SO packaging and managed call, NEngineScriptingTests; Windows/Ubuntu Release·Debug 최종 PR HEAD CI 성공을 조건으로 한 소스/자동화 수용(Windows GUI/GPU/Android 실기기 미검증).
 - [ ] PLUG-010 Android AAR 의존성을 앱 빌드에 통합한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] PLUG-011 Android JAR과 C#-Java 호출 브리지를 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] PLUG-012 Android .so ABI별 패키징을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -294,7 +296,7 @@
 - [ ] PLUG-014 Android 외부 SDK 초기화·종료와 권한 흐름을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] PLUG-015 Steamworks.NET 계열 실제 Windows 플러그인 샘플을 실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] PLUG-016 AdMob 계열 실제 Android 플러그인 샘플을 실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] PLUG-017 JSON NuGet 라이브러리를 예제 C# 게임에 적용한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] PLUG-017 JSON NuGet 라이브러리를 예제 C# 게임에 적용한다 — 증거: PR #42, 코드 SHA 9109a28bef4eb529c086740cf1919a2204d4aedd; real local NuGet Sample.Json package game script serialize/deserialize Korean Unicode JSON through hosted .NET, NEngineScriptingTests; Windows/Ubuntu Release·Debug 최종 PR HEAD CI 성공을 조건으로 한 소스/자동화 수용(Windows GUI/GPU/Android 실기기 미검증).
 - [ ] PLUG-018 외부 플러그인 제거·업데이트 후 캐시와 앱이 정합적이다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
 ## QA — 제품 수용·릴리스 (7/22)
@@ -435,3 +437,5 @@
 - 2026-10-26: PR #40에서 기존 7개 ID(NAV-013, UTIL-003, EDTOOL-003, CS-014, EDTOOL-004, UTIL-001, EDIT-014)의 자동화·소스 수준 구현과 회귀를 추가. 코드 SHA `acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7`, [Windows·Ubuntu Release/Debug CI 40279093322](https://github.com/skatmdgn/NEngine/actions/runs/40279093322) 각 38/38 PASS. 285개 총량 불변, 완료 118→125 / 미완료 167→160. NAV 다중 에이전트 정적 반경 기반 충돌 회피는 복잡한 ORCA/군중 시뮬레이션을 뜻하지 않는다. IDE launch는 ShellExecute 기반 앱 연결·VS/Rider 시작 명령을 구현/검사하지만 **실제 설치된 GUI를 연 실기기 검증은 수행하지 않음**. Windows GPU/오디오/Android 배포도 수용 대상 아님.
 
 - 2026-10-27: PR #41에서 기존 고정 ID 10개(CORE-005, EDIT-007/008, PHYS-006, INPUT-003, ANIM-003, EDTOOL-001/006/008, UTIL-004)를 좁은 소스·자동화 수용 범위로 추가. 코드 SHA `f6160c138fc0669e834f8d48a5c2e960239300dd`는 frame 중간 물리 Trigger 접촉을 aggregate하는 후속 결함 수정을 포함. GitHub PR #41의 최종 HEAD Windows/Ubuntu Release·Debug 및 CTest 성공을 병합 승인 조건으로 삼으며, 완료 수 125→135 / 미완료 160→150 / 총 285 유지. 실기기 GUI·GPU·Android·전체 범위의 연속 충돌 CCD는 여기서 수용하지 않음.
+
+- 2026-10-27: PR #42에서 기존 10개 고정 ID(PLUG-004/005/006/009/017, CS-005/006/007/008/013) 소스·자동화 범위 후보. 소스 SHA `9109a28bef4eb529c086740cf1919a2204d4aedd`, NEngineScriptingTests / NEnginePlayerTests 및 최종 동일 HEAD Windows/Ubuntu Release+Debug CTest·Python governance 검증이 모두 성공할 때만 완료. 285 총량 유지, 135→145 체크/150→140 미완료. 오프라인 로컬 NuGet 패키지 restore·실행 검증을 포함하며 공개 레지스트리 접속은 별도이고 실제 PC GUI·Android APK/기기 테스트는 포함하지 않음.

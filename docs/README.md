@@ -22,6 +22,13 @@ NEngine은 **Unity의 사용 경험과 개념에 익숙한 개발자가 쓸 수 
 - **Android 툴체인**은 버전별 SDK/NDK/JDK/Gradle 프로필로 관리한다. Windows 빌드 성공이 Android 앱 실행을 의미하지 않는다.
 - 목표는 Unity 전체 API·엔진 코드·패키지 재현이 아닌, 실제 2D/3D 게임 제작과 배포에 필요한 제한된 독립적 제품 완성이다.
 
+## 2026-10-27 PR #42 — 외부 C# 라이브러리/패키지 파이프라인
+
+- [PR #42](https://github.com/skatmdgn/NEngine/pull/42): PLUG-004/005/006/009/017 및 CS-005/006/007/008/013의 정확히 10개 기존 소스 수용 후보. 기존 `main` 135/285와 구별해서, PR 브랜치는 최종 Windows/Ubuntu CI 성공을 조건으로 145/285를 기록한다.
+- `Packages/managed-packages.txt`의 NuGet 패키지 참조를 .NET 빌드에 전달하여 외부 네트워크에 의존하지 않도록 독립적으로 pack한 `Sample.Json` NuGet 예제를 로컬 피드에서 복원·실행한다. 공개 nuget.org 패키지 다운로드 자체는 별도 수용 대상이다. `Assets/Plugins/Managed/*.dll`은 관리형 참조 및 복사, `Assets/Plugins/Native/*.{dll,so,dylib}`은 OS별 P/Invoke 공유 라이브러리 복사 대상으로 제한한다. `Content/Managed` 내보내기는 프로젝트 DLL·API/Bridge와 추가 런타임 라이브러리를 검증된 파일명/개수/크기 정책에 따라 스테이징한다.
+- 추가 검증: 생성된 게임/API/Bridge .csproj는 각기 다른 `obj/<MSBuildProjectName>/project.assets.json`을 사용해 NuGet 그래프를 덮어쓰지 않는다. 외부 NuGet 라이브러리로 최초 C# 빌드가 성공한 뒤 게임 코드만 변경하여 hot reload하면 최초 복원된 assets와 함께 `--no-restore` 빌드로 새로운 출력 경로를 생성한다. 동일 의존성을 불필요하게 재복원하지 않는다.
+- C# 생명주기 예외는 원본 .NET 스택과 함께 콘솔 로그를 남기고 네이티브 호스트를 보호한다. C# World Transform·Component 속성·Time/Coroutine 실행은 실제 관리형 통합 테스트로 검증한다. CI 통과가 Windows GPU·실기기 GUI·Android 호환성의 증거는 아니다.
+
 ## 2026-10-27 PR #41 — 10개 소스 수용 후보와 후속 충돌 수정
 
 - [PR #41](https://github.com/skatmdgn/NEngine/pull/41): CORE-005, EDIT-007/008, PHYS-006, ANIM-003, INPUT-003, EDTOOL-001/006/008, UTIL-004. 소스 HEAD `f6160c138fc0669e834f8d48a5c2e960239300dd` 기준 자동 검증과 Windows/Ubuntu Release·Debug 최종 CI가 모두 성공해야 병합 가능하다. 체크리스트 285개 중 135개 완료/150개 미완료는 해당 최종 CI 성공을 조건으로 하는 소스·자동화 수용치다.
