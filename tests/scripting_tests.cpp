@@ -2436,6 +2436,10 @@ int main() {
             const auto build =
                 run_managed_build(
                     integration_build);
+            if(!build.success){
+                std::cerr<<"Managed integration build failed: "<<build.message
+                         <<"\n"<<build.output<<"\n";
+            }
 
             check(
                 build.success &&
