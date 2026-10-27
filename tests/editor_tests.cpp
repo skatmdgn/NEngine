@@ -15,6 +15,7 @@
 #include "nengine/core/scene.hpp"
 #include "nengine/editor/editor_model.hpp"
 #include "nengine/editor/action_map_editor.hpp"
+#include "nengine/editor/build_settings_editor.hpp"
 #include "nengine/editor/ide_launch.hpp"
 #include "nengine/editor/project_manifest.hpp"
 #include "nengine/editor/presentation.hpp"
@@ -2732,6 +2733,41 @@ int main() {
               !third.map().contains("Fire")&&third.map().contains("Jump"),
               "INPUT-003 persisted delete is visible after project reload");
         std::filesystem::remove_all(project,ec);
+    }
+
+    // EDTOOL-008: the UI model applies validated Windows/Android target
+    // options transactionally and survives a ProjectSession reopen.
+    {
+        std::error_code ec;
+        const auto project_root=std::filesystem::temp_directory_path()/
+            "NEngine-BuildSettings-Editor-Test";
+        std::filesystem::remove_all(project_root,ec);
+        editor::ProjectSession project;
+        std::string error;
+        check(project.open(project_root,&error),
+              "EDTOOL-008 new project provides build targets");
+        auto next=editor::read_build_settings(project);
+        next.project_name="DemoTarget";
+        next.windows=true;next.android=false;
+        check(editor::apply_build_settings(project,next,&error)&&
+              !project.manifest().target_android,
+              "EDTOOL-008 Windows-only build target saves");
+        next.windows=false;next.android=false;
+        check(!editor::apply_build_settings(project,next,&error)&&
+              project.manifest().target_windows,
+              "EDTOOL-008 invalid all-disabled targets leave existing setting");
+        next.windows=false;next.android=true;
+        next.android_toolchain="sdk-api35-ndk27-jdk17";
+        check(editor::apply_build_settings(project,next,&error),
+              "EDTOOL-008 Android target profile saves");
+        project.close();
+        check(project.open(project_root,&error)&&
+              project.manifest().target_android&&
+              !project.manifest().target_windows&&
+              project.manifest().android_toolchain=="sdk-api35-ndk27-jdk17",
+              "EDTOOL-008 build target and toolchain roundtrip project reopen");
+        project.close();
+        std::filesystem::remove_all(project_root,ec);
     }
 
     if (failures == 0) {
