@@ -143,6 +143,50 @@ void high_speed_collision() {
     check(physics::step_physics(world2,std::numeric_limits<float>::quiet_NaN(),
          {0,0,0}).integration.integrated_2d==0,
          "PHYS-006: invalid physics dt has no effect");
+
+    // A trigger must deliver an Enter candidate even if the high-speed
+    // body has already passed through it by the end of the fixed frame.
+    // This guards the PlayerRuntime/Editor frame-level contact tracker.
+    core::World crossing;
+    const auto mover=crossing.create("Trigger Crossing");
+    const auto trigger=crossing.create("Thin Trigger");
+    crossing.transform(mover)->local_position={-4.f,0,0};
+    crossing.add_component<physics::BoxCollider>(
+        mover,physics::box_collider_type())->size={.2f,.2f,.2f};
+    crossing.add_component<physics::BoxCollider>(
+        trigger,physics::box_collider_type())->is_trigger=true;
+    auto* crossing_rb=crossing.add_component<physics::Rigidbody>(
+        mover,physics::rigidbody_type());
+    crossing_rb->linear_velocity={20,0,0};
+    crossing_rb->use_gravity=false;
+    crossing_rb->continuous=true;
+    const auto transient=physics::step_physics(crossing,.4f,{0,0,0});
+    check(crossing.transform(mover)->local_position.x>3.f &&
+          transient.collisions.overlaps.size()==1u &&
+          transient.collisions.overlaps[0].is_trigger,
+          "PHYS-006: preserve a transient 3D trigger within substeps");
+    check(transient.collisions.tested_pairs_3d>=128u,
+          "PHYS-006: cumulative collision stats cover all substeps");
+
+    core::World crossing2d;
+    const auto mover2=crossing2d.create("2D Trigger Crossing");
+    const auto trigger2=crossing2d.create("Thin 2D Trigger");
+    crossing2d.transform(mover2)->local_position={-4.f,0,0};
+    crossing2d.add_component<physics::BoxCollider2D>(
+        mover2,physics::box_collider2d_type())->size={.2f,.2f,0};
+    crossing2d.add_component<physics::BoxCollider2D>(
+        trigger2,physics::box_collider2d_type())->is_trigger=true;
+    auto* crossing_rb2=crossing2d.add_component<physics::Rigidbody2D>(
+        mover2,physics::rigidbody2d_type());
+    crossing_rb2->linear_velocity={20,0,0};
+    crossing_rb2->use_gravity=false;
+    crossing_rb2->continuous=true;
+    const auto transient2=physics::step_physics(crossing2d,.4f,{0,0,0});
+    check(crossing2d.transform(mover2)->local_position.x>3.f &&
+          transient2.collisions.overlaps.size()==1u &&
+          transient2.collisions.overlaps[0].is_trigger &&
+          transient2.collisions.overlaps[0].is_2d,
+          "PHYS-006: preserve a transient 2D trigger within substeps");
 }
 void separate_domains() {
     using namespace nengine;
