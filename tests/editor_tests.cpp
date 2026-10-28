@@ -2857,6 +2857,40 @@ int main() {
         std::filesystem::remove_all(root,ec);
     }
 
+    // EDIT-013: end-to-end ProjectSession asset operations through stable GUID.
+    {
+        std::error_code ec;
+        const auto root=std::filesystem::temp_directory_path()/"NEngine-Browser-Operations";
+        std::filesystem::remove_all(root,ec);
+        std::filesystem::create_directories(root,ec);
+        const auto external=root/"external.txt";
+        {std::ofstream x(external);x<<"external fixture";}
+        editor::ProjectSession project;
+        std::string error;
+        check(project.open(root/"project",&error),"EDIT-013 open project");
+        nengine::assets::AssetGuid guid;
+        check(project.import_external_asset(external,&guid,&error) &&
+              guid.valid() && project.assets().find(guid),
+              "EDIT-013 import creates indexed GUID and meta");
+        const auto old=project.assets().find(guid);
+        const auto oldpath=old?old->source_path:std::filesystem::path{};
+        check(project.rename_asset(guid,"renamed asset",&error) &&
+              project.assets().find(guid) &&
+              project.assets().find(guid)->source_path!=oldpath,
+              "EDIT-013 rename preserves imported GUID");
+        check(!project.rename_asset(guid,"../escape",&error) &&
+              !project.rename_asset(guid,"bad/name",&error) &&
+              project.assets().find(guid),
+              "EDIT-013 unsafe rename refused without modifying indexed source");
+        check(project.import_asset(guid).success,
+              "EDIT-013 explicit reimport resolves existing GUID");
+        check(project.delete_asset(guid,&error) &&
+              !project.assets().find(guid),
+              "EDIT-013 delete removes meta and indexed source");
+        project.close();
+        std::filesystem::remove_all(root,ec);
+    }
+
     // EDTOOL-006: bounded live Editor/Game profile averages and peaks;
     // reject invalid samples before they can poison Profiler UI.
     {
