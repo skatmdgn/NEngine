@@ -213,7 +213,7 @@ bool edit_managed_package(ProjectSession& project,std::string id,
     {
         std::ofstream file(temp,std::ios::binary|std::ios::trunc);
         if(!file)return tool_error(error,"cannot write NuGet manifest");
-        for(const auto& p:rows)file<<p.id<<" "<<p.version<<"\\n";
+        for(const auto& p:rows)file<<p.id<<" "<<p.version<<"\n";
         if(!file.good())return tool_error(error,"NuGet manifest write failed");
     }
 #ifdef _WIN32
