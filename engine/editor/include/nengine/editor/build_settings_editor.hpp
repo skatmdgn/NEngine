@@ -3,6 +3,8 @@
 #include <string>
 #include <string_view>
 #include "nengine/editor/project_session.hpp"
+#include "nengine/scripting/managed_project.hpp"
+#include <vector>
 namespace nengine::editor {
 struct BuildSettingsDraft {
     std::string project_name{};
@@ -30,4 +32,11 @@ bool save_android_tool_paths(const ProjectSession& project,
 bool load_android_tool_paths(const ProjectSession& project,
                              AndroidToolPaths& paths,
                              std::string* error=nullptr);
+
+using ManagedPackageRows=std::vector<nengine::scripting::NuGetPackageReference>;
+// EDTOOL-005: source-backed NuGet manifest edit operations used by Editor UI.
+bool load_managed_packages(const ProjectSession& project,ManagedPackageRows& rows,
+                           std::string* error=nullptr);
+bool edit_managed_package(ProjectSession& project,std::string id,
+                          std::string version,std::string* error=nullptr);
 }
