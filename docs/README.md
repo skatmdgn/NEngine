@@ -22,6 +22,11 @@ NEngine은 **Unity의 사용 경험과 개념에 익숙한 개발자가 쓸 수 
 - **Android 툴체인**은 버전별 SDK/NDK/JDK/Gradle 프로필로 관리한다. Windows 빌드 성공이 Android 앱 실행을 의미하지 않는다.
 - 목표는 Unity 전체 API·엔진 코드·패키지 재현이 아닌, 실제 2D/3D 게임 제작과 배포에 필요한 제한된 독립적 제품 완성이다.
 
+## 2026-10-28 PR #43 — 8개 소스 수용 후보
+
+- `main`의 145/285 검증 기준을 바탕으로 Editor Asset Browser 가져오기·이름변경·삭제, SpriteAnimator bool Inspector, Android SDK/NDK/JDK 경로 설정, NuGet Packages UI, SHA256 검증 기반 관리형 DLL 교체/삭제, Android ABI별 Gradle jniLibs 스테이징, Player 번들 콘텐츠 재현성, C# SDK 사용자 가이드와 API 계약 테스트의 8개 기존 ID를 추가.
+- 검증 게이트는 동일 최종 PR HEAD의 Windows/Ubuntu Release·Debug CI·CTest와 Python 테스트 전체 성공이다. Android `jniLibs` 배치는 APK 빌드가 아니고, Player 번들 내용 바이트 비교는 전체 Windows 실행 파일의 재현성을 증명하지 않는다. GUI 실기기 수용은 별도로 남는다.
+
 ## 현재 검증 기준 — 2026-10-28
 
 2026-10-27 [PR #42](https://github.com/skatmdgn/NEngine/pull/42)가 `main`의 `880376e3c8a20647d2d3b896e300cda2d16b63dd`로 병합되었다. 같은 코드 트리에서 Windows/Ubuntu Release·Debug [CI 40477625560](https://github.com/skatmdgn/NEngine/actions/runs/40477625560) 성공을 확인했다. 현재 정식 원장은 285개 중 소스·자동화 수용 145개/미완료 140개다. 과거 아래의 '수용 후보' 숫자는 당시 PR 상태를 설명하는 역사적 기록이며 최신 상태가 아니다.

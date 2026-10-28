@@ -2,13 +2,15 @@
 
 **검증 기준선:** PR #40의 정확한 소스 SHA `acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7` (2026-10-26), [Windows/Ubuntu CI 40279093322](https://github.com/skatmdgn/NEngine/actions/runs/40279093322) — Windows·Ubuntu 각각 Release/Debug **38/38 CTest PASS**. C# 실제 .NET 컴파일·코루틴·Debug 로그 회귀 테스트 포함. 실제 Windows GPU/오디오·Android 실기기·설치된 Visual Studio/Rider GUI 열기는 이 CI가 증명하지 않으며 각각 별도 검증 대상이다. 병합 후 `main` CI는 별도 확인한다.
 
-**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 145개, 미완료 140개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
+**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 153개, 미완료 132개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
 
 **우선 순위:** Windows Editor의 실제 Vulkan Scene/Game 렌더링·실기기 Player, Android APK/AAB 빌드 및 기기 실행, 외부 SDK/플러그인 연동을 우선한다. PR #40은 NavMeshAgent 다중 객체 회피·C# 코루틴·Debug 로그·컴파일 진단·C# 예제·에디터 컴포넌트 메뉴·IDE 시작 경로의 **소스·자동화 검증** 7개 ID를 추가하지만, NAV-006 보행 비용 UI/NAV-014/015 실기기 검증 및 설치된 Visual Studio/Rider 실제 GUI 실행 검증은 포함하지 않는다. 작업 규칙은 [WORKFLOW.md](WORKFLOW.md).
 
 **2026-10-27 PR #41 수용 범위:** 10개 기존 ID의 소스·자동화 수용 후보가 추가됨. PR #41의 최종 HEAD에 대한 Windows/Ubuntu Debug·Release CI가 성공한 경우에만 이 체크를 확정한다. 초기 기능 소스 `7f8039b1d38359e8de251961263fa4188e71a387`의 [CI 40427979420](https://github.com/skatmdgn/NEngine/actions/runs/40427979420)는 통과했으나, 이후 물리 미세단계 임시 접촉 이벤트 누락 수정(`f6160c138fc0669e834f8d48a5c2e960239300dd`)은 **새로운 최종 CI**로 재검증해야 한다. Win32 GUI 조작·GPU/오디오·Android 실기기 미검증은 별도 ID로 남는다.
 
 **2026-10-27 PR #42 소스 수용 후보:** PLUG-004/005/006/009/017 및 CS-005/006/007/008/013 총 10개 기존 ID. 실제 NuGet restore, 외부 managed DLL, native P/Invoke, C# 예외 스택, 기존 속성/코루틴 통합의 Windows/Ubuntu Debug·Release 최종 CI가 성공해야만 병합할 수 있다. `main`의 확정 집계는 병합 전 135/150이며 PR 브랜치의 145/140은 조건부다. Windows GPU/실기기/Android 실행을 이 수치로 대체하지 않는다.
+
+**2026-10-28 PR #43 조건부 소스 수용:** 기존 고정 ID 8개 EDIT-013, ANIM-009, PLUG-012, PLUG-018, QA-013, EDTOOL-005/009, BUILD-009. 현재 PR 브랜치가 153/285 체크 후보인 것은 최종 정확한 HEAD Windows/Ubuntu Debug·Release 빌드·CTest·Python 회귀 모두 성공함을 전제로 한다. 병합 전 `main`은 여전히 145/285, 미완료 140. Android APK/AAB, 실제 GPU/오디오/Win32 GUI 조작, 실제 네이티브 플러그인 앱 핫리로드, 모든 실행 파일의 비트 동일성은 이 PR로 검증되지 않는다.
 
 ## GOV — 개발 관리·검증 (10/10)
 
@@ -42,7 +44,7 @@
 - [x] CORE-011 Scene 저장 도중 쓰기 실패에 데이터가 보존된다 — 증거: PR #32, NEngineRoundTwoCoreTests, 씬 손상 저장·권한 실패 시 원본 보존과 atomic publish, Windows/Ubuntu CI
 - [x] CORE-012 최소 2D·3D Scene이 Player에서 동일하게 실행된다 — 증거: PR #36, both NEngineMiniRunner2D and NEngineMiniRunner3D use the same PlayerRuntime Scene serialization, export and frame loop; Windows/Ubuntu Debug+Release CI
 
-## EDIT — Windows Editor (6/16)
+## EDIT — Windows Editor (7/16)
 
 참조: apps/editor; engine/editor; tests/editor_tests.cpp
 
@@ -58,7 +60,7 @@
 - [ ] EDIT-010 DPI·멀티 모니터 변경 때 에디터 레이아웃을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] EDIT-011 프로젝트 만들기·열기·오류 복구 UI를 완성한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] EDIT-012 Scene 뷰와 Game 뷰에서 실제 Vulkan 렌더러를 사용한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] EDIT-013 Asset Browser에서 가져오기·이름변경·삭제·재가져오기를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] EDIT-013 Asset Browser에서 가져오기·이름변경·삭제·재가져오기를 검증한다 — 증거: PR #43, 개발 소스 3da41744b85ce1b5364bc80ac329be3da884c627; ProjectSession GUID-preserving import/rename/delete/reimport + Win32 Asset Browser controls, NEngineEditorTests negative path tests; 최종 PR HEAD Windows/Ubuntu Release·Debug CI·CTest·Python 테스트 성공 조건의 소스/자동화 범위
 - [x] EDIT-014 C# 컴파일 진단을 Console과 소스 파일 위치에 표시한다 — 증거: PR #40, 코드 SHA acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7, CI 40279093322 Windows/Ubuntu Debug·Release 38/38 CTest PASS; NEngineEditorTests compiler diagnostic source+line+column parser, project-root guard and Win32 Console entry double-click; raw dotnet build output captured.
 - [ ] EDIT-015 Play/Pause/Step/Stop을 실제 2D·3D 게임에 적용한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] EDIT-016 다중 프로젝트 전환 시 파일 감시·캐시·핸들을 안전하게 복구한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -174,7 +176,7 @@
 - [x] INPUT-010 UI가 소비한 입력을 게임플레이가 중복 처리하지 않는다 — 증거: PR #35, InputState gameplay-consumed mask, PlayerUiRuntime pointer/keyboard routing, C# raw key callbacks, NEngineRoundFiveRuntimeTests, Windows/Ubuntu Release+Debug CI
 - [x] INPUT-011 입력맵 부재·손상 오류를 안전하게 처리한다 — 증거: PR #32, NEngineRoundTwoInputUiTests, 악성·누락·과대 ActionMap 거부·기존 Action 보존, Windows/Ubuntu CI
 
-## ANIM — Animation (4/10)
+## ANIM — Animation (5/10)
 
 참조: engine/render/src/animation_controller.cpp; tests/render_tests.cpp
 
@@ -186,7 +188,7 @@
 - [ ] ANIM-006 애니메이션 이벤트를 ScriptBehaviour에 전달한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] ANIM-007 3D 스켈레탈 애니메이션 가져오기·스키닝을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] ANIM-008 Root Motion과 시간 배율을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] ANIM-009 Inspector에서 애니메이션 파라미터를 조작·관찰한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] ANIM-009 Inspector에서 애니메이션 파라미터를 조작·관찰한다 — 증거: PR #43, 개발 소스 3da41744b85ce1b5364bc80ac329be3da884c627; Win32 Inspector runtime SpriteAnimator bool parameter list and apply to PlaySession, existing controller runtime tests; hardware UI clicking not claimed; 최종 PR HEAD Windows/Ubuntu Release·Debug CI·CTest·Python 테스트 성공 조건의 소스/자동화 범위
 - [x] ANIM-010 중단·재시작·루프·장시간 재생의 안정성을 검증한다 — 증거: PR #32, NEngineRoundTwoAnimPhysicsTests, 1만 프레임 루프·클립 종료·재시작·비정상 시간, Windows/Ubuntu CI
 
 ## UI — Canvas·런타임 UI (3/14)
@@ -276,7 +278,7 @@
 - [ ] AND-020 두 개 이상 Android 하드웨어/OS 환경에서 동작한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] AND-021 Windows와 Android에서 동일 게임 Scene·C# 동작을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## PLUG — 패키지·외부 SDK (10/18)
+## PLUG — 패키지·외부 SDK (12/18)
 
 참조: engine/scripting; engine/player
 
@@ -291,15 +293,15 @@
 - [x] PLUG-009 P/Invoke 기반 외부 C# 플러그인을 실행한다 — 증거: PR #42, 코드 SHA 9109a28bef4eb529c086740cf1919a2204d4aedd; real native C ABI fixture built by CMake, project-local P/Invoke DLL/SO packaging and managed call, NEngineScriptingTests; Windows/Ubuntu Release·Debug 최종 PR HEAD CI 성공을 조건으로 한 소스/자동화 수용(Windows GUI/GPU/Android 실기기 미검증).
 - [ ] PLUG-010 Android AAR 의존성을 앱 빌드에 통합한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] PLUG-011 Android JAR과 C#-Java 호출 브리지를 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] PLUG-012 Android .so ABI별 패키징을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] PLUG-012 Android .so ABI별 패키징을 구현한다 — 증거: PR #43, 개발 소스 3da41744b85ce1b5364bc80ac329be3da884c627; validated arm64-v8a native .so staging into Gradle src/main/jniLibs, test_nengine_android_native.py; APK signing/device not claimed; 최종 PR HEAD Windows/Ubuntu Release·Debug CI·CTest·Python 테스트 성공 조건의 소스/자동화 범위
 - [ ] PLUG-013 Maven 의존성·Gradle 병합을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] PLUG-014 Android 외부 SDK 초기화·종료와 권한 흐름을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] PLUG-015 Steamworks.NET 계열 실제 Windows 플러그인 샘플을 실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] PLUG-016 AdMob 계열 실제 Android 플러그인 샘플을 실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] PLUG-017 JSON NuGet 라이브러리를 예제 C# 게임에 적용한다 — 증거: PR #42, 코드 SHA 9109a28bef4eb529c086740cf1919a2204d4aedd; real local NuGet Sample.Json package game script serialize/deserialize Korean Unicode JSON through hosted .NET, NEngineScriptingTests; Windows/Ubuntu Release·Debug 최종 PR HEAD CI 성공을 조건으로 한 소스/자동화 수용(Windows GUI/GPU/Android 실기기 미검증).
-- [ ] PLUG-018 외부 플러그인 제거·업데이트 후 캐시와 앱이 정합적이다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] PLUG-018 외부 플러그인 제거·업데이트 후 캐시와 앱이 정합적이다 — 증거: PR #43, 개발 소스 3da41744b85ce1b5364bc80ac329be3da884c627; SHA256-checked immutable offline package cache and transactional managed DLL install/update/remove, test_nengine_packages.py; no hot loaded SDK plugin migration claimed; 최종 PR HEAD Windows/Ubuntu Release·Debug CI·CTest·Python 테스트 성공 조건의 소스/자동화 범위
 
-## QA — 제품 수용·릴리스 (7/22)
+## QA — 제품 수용·릴리스 (8/22)
 
 참조: CMakeLists.txt; .github/workflows/ci.yml; tests
 
@@ -315,7 +317,7 @@
 - [ ] QA-010 Android 배포본 크래시 로그·심볼화를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] QA-011 최소 2D 샘플 게임과 자동 빌드 스모크를 제공한다 — 증거: PR #36, NEngineMiniRunner2D --self-test, independent 2D export, action control, physics, sprite animation and win state; Windows/Ubuntu Debug+Release CI
 - [x] QA-012 최소 3D 샘플 게임과 자동 빌드 스모크를 제공한다 — 증거: PR #36, NEngineMiniRunner3D --self-test, independent 3D export, action control, physics and win state; Windows/Ubuntu Debug+Release CI
-- [ ] QA-013 사용자 문서·C# SDK 예제가 릴리스와 일치한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] QA-013 사용자 문서·C# SDK 예제가 릴리스와 일치한다 — 증거: PR #43, 개발 소스 3da41744b85ce1b5364bc80ac329be3da884c627; samples/managed/README.md and NavQuickstart.cs, test_sdk_docs.py API/version/documentation contract, existing .NET compile integration; 최종 PR HEAD Windows/Ubuntu Release·Debug CI·CTest·Python 테스트 성공 조건의 소스/자동화 범위
 - [ ] QA-014 Editor 설치 관리자와 제거 절차를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] QA-015 업데이트·서명·릴리스 아티팩트 재현 절차를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] QA-016 에셋 파서·불신 입력·플러그인 경로 보안 테스트를 수행한다 — 증거: PR #34, NEngineUntrustedInputTests Scene/Tilemap/Scriptable/ActionMap fuzz·glTF hostile URI, package/toolchain symlink/path tests, Windows/Ubuntu CI
@@ -372,7 +374,7 @@
 - [x] SHDR-005 무효/비정상 셰이더를 불러오면 원인 진단 후 안전하게 유지한다 — 증거: PR #34, tools/nengine_shaders.py invalid shader/invalid SPIR-V 진단·last-good shader pointer 유지, test_nengine_shaders.py, Windows/Ubuntu CI
 - [ ] SHDR-006 Shader variant/키워드 변경 후 Player 재질이 동일하다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## EDTOOL — Editor 생산성 도구 (5/9)
+## EDTOOL — Editor 생산성 도구 (7/9)
 
 참조: apps/editor; engine/editor
 
@@ -380,13 +382,13 @@
 - [ ] EDTOOL-002 Prefab 격리 편집 모드를 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] EDTOOL-003 실제 선택 객체와 연결되는 Component Add 메뉴를 완성한다 — 증거: PR #40, 코드 SHA acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7, CI 40279093322 Windows/Ubuntu Debug·Release 38/38 CTest PASS; NEngineEditorTests selection-derived actual Add Component list/action, duplicate rejection and Undo/Redo, Win32 menu sharing the model command.
 - [x] EDTOOL-004 C# 프로젝트를 Visual Studio/Rider로 여는 동작을 검증한다 — 증거: PR #40, 코드 SHA acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7, CI 40279093322 Windows/Ubuntu Debug·Release 38/38 CTest PASS; Win32 Scripts .sln association/Ctrl VS/Shift Rider launch implementation, NEngineEditorTests Unicode paths/IDE selection/invalid solution; installed IDE GUI not manually confirmed.
-- [ ] EDTOOL-005 에디터 패키지 목록·설치·제거 UI를 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] EDTOOL-005 에디터 패키지 목록·설치·제거 UI를 제공한다 — 증거: PR #43, 개발 소스 3da41744b85ce1b5364bc80ac329be3da884c627; Win32 NuGet Packages list/add/update/remove via atomic project manifest model, NEngineEditorTests; no native GUI hardware check; 최종 PR HEAD Windows/Ubuntu Release·Debug CI·CTest·Python 테스트 성공 조건의 소스/자동화 범위
 - [x] EDTOOL-006 Editor/Player 실행 성능 Profiler 화면을 제공한다 — 증거: PR #41, 코드 SHA f6160c138fc0669e834f8d48a5c2e960239300dd; NEngineEditorTests 240-frame CPU 샘플·평균/피크·비정상 입력 방지, Windows Editor/Player Profiler 표시; GPU 프로파일링 제외; Windows/Ubuntu Debug·Release 최종 PR HEAD CI 및 CTest 수용 게이트(실기기 별도).
 - [ ] EDTOOL-007 GPU 프레임 디버거 또는 동등한 진단 도구를 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] EDTOOL-008 Windows·Android Build Settings Editor 화면을 제공한다 — 증거: PR #41, 코드 SHA f6160c138fc0669e834f8d48a5c2e960239300dd; NEngineEditorTests Build Settings 모델 Windows/Android 타깃·툴체인 저장/복원·유효성 검증, Win32 설정 화면; Android APK 생성 검증 아님; Windows/Ubuntu Debug·Release 최종 PR HEAD CI 및 CTest 수용 게이트(실기기 별도).
-- [ ] EDTOOL-009 Android SDK/NDK/JDK 도구 경로 설정·검증 UI를 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] EDTOOL-009 Android SDK/NDK/JDK 도구 경로 설정·검증 UI를 제공한다 — 증거: PR #43, 개발 소스 3da41744b85ce1b5364bc80ac329be3da884c627; Win32 SDK/NDK/JDK path settings and checked atomic persistence, NEngineEditorTests fixture; no Android APK/device validation; 최종 PR HEAD Windows/Ubuntu Release·Debug CI·CTest·Python 테스트 성공 조건의 소스/자동화 범위
 
-## BUILD — 빌드 프로필·애플리케이션 메타데이터 (5/9)
+## BUILD — 빌드 프로필·애플리케이션 메타데이터 (6/9)
 
 참조: apps/player; engine/player; .github/workflows/ci.yml
 
@@ -398,7 +400,7 @@
 - [x] BUILD-006 Windows 게임 저장 데이터 경로와 마이그레이션 규칙을 구현한다 — 증거: PR #34, engine/player/save_data.cpp CRC·원자적 슬롯 쓰기·마이그레이션·OS 사용자 데이터 경로, NEngineGameSaveTests, Windows/Ubuntu CI
 - [x] BUILD-007 Android manifest 권한·기능·Gradle 기여와 충돌을 검출한다 — 증거: PR #35, tools/nengine_android_contributions.py Android SDK/permission/feature/Gradle conflict checks, Python unit tests, Windows/Ubuntu Release+Debug CI
 - [x] BUILD-008 빌드 실패·서명 누락 시 사용자에게 명확한 오류를 표시한다 — 증거: PR #36, tools/nengine_build_profiles.py Release keystore/alias/environment signing preflight diagnostics, test_nengine_signing.py; Windows/Ubuntu Debug+Release CI
-- [ ] BUILD-009 동일 커밋을 사용한 재현 가능한 빌드 결과를 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] BUILD-009 동일 커밋을 사용한 재현 가능한 빌드 결과를 검증한다 — 증거: PR #43, 개발 소스 3da41744b85ce1b5364bc80ac329be3da884c627; NEnginePlayerTests two independently exported Player data bundles compared by identical relative file sets and exact bytes; executables not proven bit reproducible; 최종 PR HEAD Windows/Ubuntu Release·Debug CI·CTest·Python 테스트 성공 조건의 소스/자동화 범위
 
 ## UTIL — 스크립팅 유틸리티·개발 진단 (5/5)
 
@@ -439,3 +441,5 @@
 - 2026-10-27: PR #41에서 기존 고정 ID 10개(CORE-005, EDIT-007/008, PHYS-006, INPUT-003, ANIM-003, EDTOOL-001/006/008, UTIL-004)를 좁은 소스·자동화 수용 범위로 추가. 코드 SHA `f6160c138fc0669e834f8d48a5c2e960239300dd`는 frame 중간 물리 Trigger 접촉을 aggregate하는 후속 결함 수정을 포함. GitHub PR #41의 최종 HEAD Windows/Ubuntu Release·Debug 및 CTest 성공을 병합 승인 조건으로 삼으며, 완료 수 125→135 / 미완료 160→150 / 총 285 유지. 실기기 GUI·GPU·Android·전체 범위의 연속 충돌 CCD는 여기서 수용하지 않음.
 
 - 2026-10-27: PR #42에서 기존 10개 고정 ID(PLUG-004/005/006/009/017, CS-005/006/007/008/013) 소스·자동화 범위 후보. 소스 SHA `9109a28bef4eb529c086740cf1919a2204d4aedd`, NEngineScriptingTests / NEnginePlayerTests 및 최종 동일 HEAD Windows/Ubuntu Release+Debug CTest·Python governance 검증이 모두 성공할 때만 완료. 285 총량 유지, 135→145 체크/150→140 미완료. 오프라인 로컬 NuGet 패키지 restore·실행 검증을 포함하며 공개 레지스트리 접속은 별도이고 실제 PC GUI·Android APK/기기 테스트는 포함하지 않음.
+
+- 2026-10-28: PR #43 기존 8개 고정 ID EDIT-013, ANIM-009, PLUG-012, PLUG-018, QA-013, EDTOOL-005, EDTOOL-009, BUILD-009의 소스·자동화 수용 후보. 시작 main `880376e3c8a20647d2d3b896e300cda2d16b63dd`, 소스 3da41744b85ce1b5364bc80ac329be3da884c627, 최종 PR HEAD 동일 Windows/Ubuntu Release/Debug CI 성공 필수. 총 285개 유지, 145→153 체크/140→132 미완료. 실제 hardware/Android APK 및 완제품 일괄 수용 아님.
