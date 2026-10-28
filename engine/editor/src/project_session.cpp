@@ -407,7 +407,7 @@ bool asset_edit_error(std::string* error,const std::string& why){
 bool safe_asset_stem(const std::string& stem){
     if(stem.empty()||stem.size()>128u||stem=="."||stem=="..")return false;
     for(unsigned char c:stem){
-        if(c<32u||c=='/'||c=='\\\\'||c==':'||c=='*'||c=='?'||
+        if(c<32u||c=='/'||c=='\\'||c==':'||c=='*'||c=='?'||
            c=='"'||c=='<'||c=='>'||c=='|')return false;
     }
     return stem.back()!='.'&&stem.back()!=' ';
