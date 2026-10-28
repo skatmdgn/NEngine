@@ -24,3 +24,5 @@ The generated project is temporary and is removed after the program exits.
 **Important scope:** This sample demonstrates input, Scene/Player parity and
 gameplay logic, but it does not show textured graphics or an interactive Vulkan
 window; those remain independent acceptance requirements.
+
+C# gameplay tutorial and toolchain limitations: [managed/README.md](managed/README.md) and [managed/NavQuickstart.cs](managed/NavQuickstart.cs). Both follow the current NEngine 0.9.0-dev API; see the canonical docs checklist for exact acceptance scope.

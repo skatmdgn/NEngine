@@ -36,6 +36,7 @@
 #include "nengine/editor/performance_profiler.hpp"
 #include "nengine/scripting/managed_runtime.hpp"
 #include "nengine/render/vulkan_context.hpp"
+#include "nengine/render/components.hpp"
 #include "nengine/render/vulkan_diagnostic_scene.hpp"
 
 namespace nengine::app {
@@ -78,6 +79,20 @@ enum ControlId : int {
     IdBuildAndroid,
     IdBuildToolchain,
     IdBuildApply,
+    IdAndroidSdkPath,
+    IdAndroidNdkPath,
+    IdAndroidJdkPath,
+    IdAndroidPathsApply,
+    IdPackages,
+    IdPackageList,
+    IdPackageId,
+    IdPackageVersion,
+    IdPackageAdd,
+    IdPackageRemove,
+    IdAnimParameterList,
+    IdAnimParameterName,
+    IdAnimParameterValue,
+    IdAnimParameterApply,
     IdProfiler,
     IdCanvasEdit,
     IdCanvasName,
@@ -117,6 +132,11 @@ enum ControlId : int {
     IdAddComponentList,
     IdAddComponent,
     IdAssets,
+    IdAssetImport,
+    IdAssetRename,
+    IdAssetDelete,
+    IdAssetReimport,
+    IdAssetRenameName,
     IdConsole,
     IdSplitHierarchy,
     IdSplitInspector,
@@ -341,12 +361,24 @@ struct Win32EditorShell::Impl {
     bool profiler_visible{false};
     ULONGLONG next_profiler_refresh{0};
     nengine::editor::PerformanceProfiler profiler_samples{};
+    HWND package_toggle{nullptr};
+    HWND package_list{nullptr};
+    HWND package_id{nullptr};
+    HWND package_version{nullptr};
+    HWND package_add{nullptr};
+    HWND package_remove{nullptr};
+    bool package_editor_visible{false};
+    nengine::editor::ManagedPackageRows package_rows{};
     HWND build_toggle{nullptr};
     HWND build_name{nullptr};
     HWND build_windows{nullptr};
     HWND build_android{nullptr};
     HWND build_toolchain{nullptr};
     HWND build_apply{nullptr};
+    HWND android_sdk_path{nullptr};
+    HWND android_ndk_path{nullptr};
+    HWND android_jdk_path{nullptr};
+    HWND android_paths_apply{nullptr};
     bool build_settings_visible{false};
     HWND action_toggle{nullptr};
     HWND action_list{nullptr};
@@ -399,6 +431,11 @@ struct Win32EditorShell::Impl {
     HWND parent_hierarchy{nullptr};
     HWND scene{nullptr};
 
+    HWND anim_parameter_list{nullptr};
+    HWND anim_parameter_name{nullptr};
+    HWND anim_parameter_value{nullptr};
+    HWND anim_parameter_apply{nullptr};
+    std::vector<std::string> anim_parameter_rows{};
     HWND inspector_title{nullptr};
     HWND label_name{nullptr};
     HWND label_position{nullptr};
@@ -428,6 +465,11 @@ struct Win32EditorShell::Impl {
         nengine::core::Entity::invalid()};
 
     HWND assets_list{nullptr};
+    HWND asset_import_button{nullptr};
+    HWND asset_rename_button{nullptr};
+    HWND asset_delete_button{nullptr};
+    HWND asset_reimport_button{nullptr};
+    HWND asset_rename_name{nullptr};
     HWND console{nullptr};
 
     HWND split_hierarchy{nullptr};
@@ -971,6 +1013,7 @@ struct Win32EditorShell::Impl {
         game_toggle = create_control(host,L"BUTTON",L"Game View",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdGameView);
         action_toggle = create_control(host,L"BUTTON",L"Input Actions",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdActionEditor);
         build_toggle = create_control(host,L"BUTTON",L"Build Settings",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdBuildSettings);
+        package_toggle = create_control(host,L"BUTTON",L"Packages",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdPackages);
         profiler_toggle = create_control(host,L"BUTTON",L"Profiler",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdProfiler);
         vulkan_preview = create_control(
             host,
@@ -979,7 +1022,7 @@ struct Win32EditorShell::Impl {
             BS_AUTOCHECKBOX | BS_PUSHLIKE,
             IdVulkanPreview);
 
-        if (!game_toggle || !action_toggle || !build_toggle || !profiler_toggle || !open_scene || !save_scene || !new_entity || !delete_entity ||
+        if (!package_toggle || !game_toggle || !action_toggle || !build_toggle || !profiler_toggle || !open_scene || !save_scene || !new_entity || !delete_entity ||
             !refresh_assets || !scripts || !build_scripts || !undo || !redo ||
             !play || !pause || !step || !stop ||
             !vulkan_preview) {
@@ -1088,6 +1131,16 @@ struct Win32EditorShell::Impl {
         SendMessageW(game_toggle,BM_SETCHECK,BST_CHECKED,0);
         shell_log("creating inspector controls");
         inspector_title = create_control(host, L"STATIC", L"Inspector", SS_LEFT);
+        anim_parameter_list=create_control(host,L"LISTBOX",L"",
+            WS_BORDER|LBS_NOTIFY|WS_VSCROLL,IdAnimParameterList);
+        anim_parameter_name=create_control(host,L"EDIT",L"",
+            WS_BORDER|ES_AUTOHSCROLL,IdAnimParameterName);
+        anim_parameter_value=create_control(host,L"BUTTON",L"True",
+            BS_AUTOCHECKBOX,IdAnimParameterValue);
+        anim_parameter_apply=create_control(host,L"BUTTON",L"Apply Anim Bool",
+            BS_PUSHBUTTON,IdAnimParameterApply);
+        if(!anim_parameter_list||!anim_parameter_name||!anim_parameter_value||!anim_parameter_apply)
+            return false;
         label_name = create_control(host, L"STATIC", L"Name", SS_LEFT);
         name = create_control(host, L"EDIT", L"", WS_BORDER | ES_AUTOHSCROLL, IdName);
         active = create_control(host, L"BUTTON", L"Active", BS_AUTOCHECKBOX, IdActive);
@@ -1292,6 +1345,13 @@ struct Win32EditorShell::Impl {
             L"",
             LBS_NOTIFY | WS_BORDER | WS_VSCROLL | WS_HSCROLL,
             IdAssets);
+        asset_import_button=create_control(host,L"BUTTON",L"Import",BS_PUSHBUTTON,IdAssetImport);
+        asset_rename_button=create_control(host,L"BUTTON",L"Rename",BS_PUSHBUTTON,IdAssetRename);
+        asset_delete_button=create_control(host,L"BUTTON",L"Delete",BS_PUSHBUTTON,IdAssetDelete);
+        asset_reimport_button=create_control(host,L"BUTTON",L"Reimport",BS_PUSHBUTTON,IdAssetReimport);
+        asset_rename_name=create_control(host,L"EDIT",L"",WS_BORDER|ES_AUTOHSCROLL,IdAssetRenameName);
+        if(!asset_import_button||!asset_rename_button||!asset_delete_button||
+           !asset_reimport_button||!asset_rename_name)return false;
 
         console = create_control(
             host,
@@ -1327,7 +1387,18 @@ struct Win32EditorShell::Impl {
         build_android=create_control(host,L"BUTTON",L"Android (toolchain profile)",BS_AUTOCHECKBOX,IdBuildAndroid);
         build_toolchain=create_control(host,L"EDIT",L"",WS_BORDER|ES_AUTOHSCROLL,IdBuildToolchain);
         build_apply=create_control(host,L"BUTTON",L"Save Target Settings",BS_PUSHBUTTON,IdBuildApply);
-        if(!profiler_list||!build_name||!build_windows||!build_android||!build_toolchain||!build_apply||
+        android_sdk_path=create_control(host,L"EDIT",L"",WS_BORDER|ES_AUTOHSCROLL,IdAndroidSdkPath);
+        android_ndk_path=create_control(host,L"EDIT",L"",WS_BORDER|ES_AUTOHSCROLL,IdAndroidNdkPath);
+        android_jdk_path=create_control(host,L"EDIT",L"",WS_BORDER|ES_AUTOHSCROLL,IdAndroidJdkPath);
+        android_paths_apply=create_control(host,L"BUTTON",L"Validate and Save SDK / NDK / JDK",BS_PUSHBUTTON,IdAndroidPathsApply);
+        package_list=create_control(host,L"LISTBOX",L"",WS_BORDER|LBS_NOTIFY|WS_VSCROLL,IdPackageList);
+        package_id=create_control(host,L"EDIT",L"",WS_BORDER|ES_AUTOHSCROLL,IdPackageId);
+        package_version=create_control(host,L"EDIT",L"",WS_BORDER|ES_AUTOHSCROLL,IdPackageVersion);
+        package_add=create_control(host,L"BUTTON",L"Install / Update",BS_PUSHBUTTON,IdPackageAdd);
+        package_remove=create_control(host,L"BUTTON",L"Remove",BS_PUSHBUTTON,IdPackageRemove);
+        if(!package_list||!package_id||!package_version||!package_add||!package_remove||
+            !android_sdk_path||!android_ndk_path||!android_jdk_path||!android_paths_apply||
+            !profiler_list||!build_name||!build_windows||!build_android||!build_toolchain||!build_apply||
             !action_list || !action_name || !action_key || !action_add ||
             !action_remove || !action_save ||
             !assets_list || !console) {
@@ -2001,6 +2072,7 @@ struct Win32EditorShell::Impl {
         MoveWindow(action_toggle,kPadding+116,38,120,26,TRUE);
         MoveWindow(build_toggle,kPadding+242,38,122,26,TRUE);
         MoveWindow(profiler_toggle,kPadding+370,38,110,26,TRUE);
+        MoveWindow(package_toggle,kPadding+486,38,110,26,TRUE);
         const int content_top =
             kToolbarHeight;
 
@@ -2168,11 +2240,12 @@ struct Win32EditorShell::Impl {
             MoveWindow(canvas_apply_geometry, ix, iy, iw, 26, TRUE); iy += 32;
         }
 
-        const std::array<HWND, 18> native_inspector{
+        const std::array<HWND, 22> native_inspector{
             inspector_title, label_name, name, active, label_position,
             label_rotation, label_scale, apply_transform, generic_title,
             generic_properties, generic_value, assign_asset, apply_property,
-            remove_component,add_component_list, add_component, position[0], position[1]};
+            remove_component,add_component_list, add_component, position[0], position[1],
+            anim_parameter_list,anim_parameter_name,anim_parameter_value,anim_parameter_apply};
         for (HWND control : native_inspector)
             ShowWindow(control, ui_authoring ? SW_HIDE : SW_SHOW);
         for (HWND control : position)
@@ -2312,7 +2385,7 @@ struct Win32EditorShell::Impl {
                 60,
                 inspector_bottom -
                     iy -
-                    96);
+                    173);
 
         MoveWindow(
             generic_properties,
@@ -2388,7 +2461,11 @@ struct Win32EditorShell::Impl {
             add_button_width,
             24,
             TRUE);
-
+        iy+=28;
+        MoveWindow(anim_parameter_list,ix,iy,iw,54,TRUE);iy+=57;
+        MoveWindow(anim_parameter_name,ix,iy,iw/2,24,TRUE);
+        MoveWindow(anim_parameter_value,ix+iw/2+3,iy,iw/2-3,24,TRUE);iy+=28;
+        MoveWindow(anim_parameter_apply,ix,iy,iw,24,TRUE);
         }
         const int bottom_y =
             bottom_split_y +
@@ -2412,12 +2489,17 @@ struct Win32EditorShell::Impl {
             assets_w +
             kPadding;
 
+        MoveWindow(asset_import_button,kPadding,bottom_y,65,24,TRUE);
+        MoveWindow(asset_rename_name,kPadding+69,bottom_y,assets_w-271,24,TRUE);
+        MoveWindow(asset_rename_button,kPadding+assets_w-198,bottom_y,60,24,TRUE);
+        MoveWindow(asset_reimport_button,kPadding+assets_w-134,bottom_y,70,24,TRUE);
+        MoveWindow(asset_delete_button,kPadding+assets_w-60,bottom_y,60,24,TRUE);
         MoveWindow(
             assets_list,
             kPadding,
-            bottom_y,
+            bottom_y+27,
             assets_w,
-            bottom_h,
+            std::max(30,bottom_h-27),
             TRUE);
 
         MoveWindow(
@@ -2429,15 +2511,31 @@ struct Win32EditorShell::Impl {
                 kPadding,
             bottom_h,
             TRUE);
-        const bool tool_open=action_editor_visible||build_settings_visible||profiler_visible;
+        const bool tool_open=action_editor_visible||build_settings_visible||profiler_visible||package_editor_visible;
         ShowWindow(assets_list,tool_open?SW_HIDE:SW_SHOW);
+        for(HWND control:std::array<HWND,5>{
+            asset_import_button,asset_rename_button,asset_delete_button,
+            asset_reimport_button,asset_rename_name})
+            ShowWindow(control,tool_open?SW_HIDE:SW_SHOW);
         ShowWindow(console,tool_open?SW_HIDE:SW_SHOW);
         const auto action_controls=std::array<HWND,6>{
             action_list,action_name,action_key,action_add,action_remove,action_save};
         for(auto ctrl:action_controls)ShowWindow(ctrl,action_editor_visible?SW_SHOW:SW_HIDE);
-        const auto build_controls=std::array<HWND,5>{
-            build_name,build_windows,build_android,build_toolchain,build_apply};
+        const auto build_controls=std::array<HWND,9>{
+            build_name,build_windows,build_android,build_toolchain,build_apply,
+            android_sdk_path,android_ndk_path,android_jdk_path,android_paths_apply};
         for(auto ctrl:build_controls)ShowWindow(ctrl,build_settings_visible?SW_SHOW:SW_HIDE);
+        const auto package_controls=std::array<HWND,5>{
+            package_list,package_id,package_version,package_add,package_remove};
+        for(auto ctrl:package_controls)ShowWindow(ctrl,package_editor_visible?SW_SHOW:SW_HIDE);
+        if(package_editor_visible){
+            const int pw=std::max(380,width-3*kPadding), half=pw/2;
+            MoveWindow(package_list,kPadding,bottom_y,half-12,bottom_h,TRUE);
+            MoveWindow(package_id,kPadding+half,bottom_y,pw-half,25,TRUE);
+            MoveWindow(package_version,kPadding+half,bottom_y+34,pw-half,25,TRUE);
+            MoveWindow(package_add,kPadding+half,bottom_y+68,(pw-half)/2-4,26,TRUE);
+            MoveWindow(package_remove,kPadding+half+(pw-half)/2,bottom_y+68,(pw-half)/2,26,TRUE);
+        }
         ShowWindow(profiler_list,profiler_visible?SW_SHOW:SW_HIDE);
         if(profiler_visible)
             MoveWindow(profiler_list,kPadding,bottom_y,width-2*kPadding,bottom_h,TRUE);
@@ -2448,6 +2546,10 @@ struct Win32EditorShell::Impl {
             MoveWindow(build_android,kPadding+w*3/4,bottom_y,w/4,24,TRUE);
             MoveWindow(build_toolchain,kPadding,bottom_y+33,w*2/3,25,TRUE);
             MoveWindow(build_apply,kPadding+w*2/3+8,bottom_y+33,w/3-8,25,TRUE);
+            MoveWindow(android_sdk_path,kPadding,bottom_y+66,w,24,TRUE);
+            MoveWindow(android_ndk_path,kPadding,bottom_y+96,w,24,TRUE);
+            MoveWindow(android_jdk_path,kPadding,bottom_y+126,w,24,TRUE);
+            MoveWindow(android_paths_apply,kPadding,bottom_y+156,w,24,TRUE);
         }
         if(action_editor_visible){
             const int x0=kPadding, w0=std::max(120,width/2-16);
@@ -3503,6 +3605,10 @@ struct Win32EditorShell::Impl {
         }
 
         if (!snapshot.valid) {
+            SendMessageW(anim_parameter_list,LB_RESETCONTENT,0,0);
+            anim_parameter_rows.clear();
+            EnableWindow(anim_parameter_list,FALSE);
+            EnableWindow(anim_parameter_apply,FALSE);
             set_text(name, "");
 
             SendMessageW(
@@ -3593,6 +3699,26 @@ struct Win32EditorShell::Impl {
         set_float(
             scale[2],
             transform->local_scale.z);
+
+        // ANIM-009: inspect current Play Mode controller bools on selected
+        // entity; these reflect the runtime World, not the authoring Scene.
+        anim_parameter_rows.clear();
+        SendMessageW(anim_parameter_list,LB_RESETCONTENT,0,0);
+        const auto* animator=world.get_component<nengine::render::SpriteAnimator>(
+            snapshot.entity,nengine::render::sprite_animator_type());
+        if(animator && editor.play_session().is_playing()){
+            for(const auto& kv:animator->bool_parameters)
+                anim_parameter_rows.push_back(kv.first);
+            std::sort(anim_parameter_rows.begin(),anim_parameter_rows.end());
+            for(const auto& key:anim_parameter_rows){
+                const auto display=utf8_to_wide(key+
+                    (animator->bool_parameters.at(key)?" = true":" = false"));
+                SendMessageW(anim_parameter_list,LB_ADDSTRING,0,
+                    reinterpret_cast<LPARAM>(display.c_str()));
+            }
+        }
+        EnableWindow(anim_parameter_list,animator!=nullptr && editor.play_session().is_playing());
+        EnableWindow(anim_parameter_apply,animator!=nullptr && editor.play_session().is_playing());
 
         refresh_generic_property_editor(
             snapshot);
@@ -4359,6 +4485,8 @@ struct Win32EditorShell::Impl {
             if(action_editor_visible){
                 profiler_visible=false;
                 SendMessageW(profiler_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                package_editor_visible=false;
+                SendMessageW(package_toggle,BM_SETCHECK,BST_UNCHECKED,0);
                 build_settings_visible=false;
                 SendMessageW(build_toggle,BM_SETCHECK,BST_UNCHECKED,0);
                 std::string error;
@@ -4381,6 +4509,8 @@ struct Win32EditorShell::Impl {
             if(profiler_visible){
                 action_editor_visible=false;
                 build_settings_visible=false;
+                package_editor_visible=false;
+                SendMessageW(package_toggle,BM_SETCHECK,BST_UNCHECKED,0);
                 SendMessageW(action_toggle,BM_SETCHECK,BST_UNCHECKED,0);
                 SendMessageW(build_toggle,BM_SETCHECK,BST_UNCHECKED,0);
                 refresh_profiler();
@@ -4395,6 +4525,8 @@ struct Win32EditorShell::Impl {
             if(notification!=BN_CLICKED)return false;
             build_settings_visible=SendMessageW(build_toggle,BM_GETCHECK,0,0)==BST_CHECKED;
             if(build_settings_visible){
+                package_editor_visible=false;
+                SendMessageW(package_toggle,BM_SETCHECK,BST_UNCHECKED,0);
                 profiler_visible=false;
                 SendMessageW(profiler_toggle,BM_SETCHECK,BST_UNCHECKED,0);
                 action_editor_visible=false;
@@ -4409,6 +4541,13 @@ struct Win32EditorShell::Impl {
                     const auto tool=utf8_to_wide(draft.android_toolchain);
                     SetWindowTextW(build_name,title.c_str());
                     SetWindowTextW(build_toolchain,tool.c_str());
+                    nengine::editor::AndroidToolPaths paths;
+                    std::string load_error;
+                    if(nengine::editor::load_android_tool_paths(editor.project(),paths,&load_error)){
+                        SetWindowTextW(android_sdk_path,utf8_to_wide(paths.sdk.generic_string()).c_str());
+                        SetWindowTextW(android_ndk_path,utf8_to_wide(paths.ndk.generic_string()).c_str());
+                        SetWindowTextW(android_jdk_path,utf8_to_wide(paths.jdk.generic_string()).c_str());
+                    }else editor.console().warning("Android tool paths",load_error);
                     SendMessageW(build_windows,BM_SETCHECK,draft.windows?BST_CHECKED:BST_UNCHECKED,0);
                     SendMessageW(build_android,BM_SETCHECK,draft.android?BST_CHECKED:BST_UNCHECKED,0);
                 }
@@ -4434,6 +4573,115 @@ struct Win32EditorShell::Impl {
                     editor.console().info("Build Settings",
                         "Windows/Android target configuration saved; APK execution still requires Android backend");
                 else editor.console().warning("Build Settings",error);
+            }
+            handled=true;break;
+        case IdAnimParameterList:
+            if(notification!=LBN_SELCHANGE)return false;
+            {
+                const auto index=SendMessageW(anim_parameter_list,LB_GETCURSEL,0,0);
+                if(index>=0&&static_cast<std::size_t>(index)<anim_parameter_rows.size()){
+                    const auto& key=anim_parameter_rows[static_cast<std::size_t>(index)];
+                    SetWindowTextW(anim_parameter_name,utf8_to_wide(key).c_str());
+                    const auto entity=editor.selection().active();
+                    const auto* animator=editor.presentation_world().
+                        get_component<nengine::render::SpriteAnimator>(
+                            entity,nengine::render::sprite_animator_type());
+                    if(animator){
+                        const auto it=animator->bool_parameters.find(key);
+                        SendMessageW(anim_parameter_value,BM_SETCHECK,
+                            it!=animator->bool_parameters.end()&&it->second?
+                            BST_CHECKED:BST_UNCHECKED,0);
+                    }
+                }
+            }
+            handled=true;break;
+        case IdAnimParameterApply:
+            if(notification!=BN_CLICKED)return false;
+            {
+                wchar_t field[256]{};
+                GetWindowTextW(anim_parameter_name,field,256);
+                const bool value=SendMessageW(anim_parameter_value,BM_GETCHECK,0,0)==BST_CHECKED;
+                if(editor.set_sprite_controller_bool(editor.selection().active(),
+                       wide_to_utf8(field),value))
+                    editor.console().info("Animator","Play Mode bool parameter updated");
+                else editor.console().warning("Animator","Select an active SpriteAnimator controller");
+                refresh_inspector();
+                refresh_console();
+            }
+            handled=true;break;
+        case IdPackages:
+            if(notification!=BN_CLICKED)return false;
+            package_editor_visible=SendMessageW(package_toggle,BM_GETCHECK,0,0)==BST_CHECKED;
+            if(package_editor_visible){
+                build_settings_visible=false;
+                action_editor_visible=false;
+                profiler_visible=false;
+                SendMessageW(build_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                SendMessageW(action_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                SendMessageW(profiler_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                std::string error;
+                if(!nengine::editor::load_managed_packages(editor.project(),package_rows,&error)){
+                    package_editor_visible=false;
+                    SendMessageW(package_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                    editor.console().warning("Packages",error);
+                }else{
+                    SendMessageW(package_list,LB_RESETCONTENT,0,0);
+                    for(const auto& p:package_rows){
+                        const auto display=utf8_to_wide(p.id+" @ "+p.version);
+                        SendMessageW(package_list,LB_ADDSTRING,0,reinterpret_cast<LPARAM>(display.c_str()));
+                    }
+                }
+            }
+            {RECT rect{};GetClientRect(host,&rect);layout(rect.right,rect.bottom);}
+            handled=true;break;
+        case IdPackageList:
+            if(notification!=LBN_SELCHANGE)return false;
+            {
+                const auto i=SendMessageW(package_list,LB_GETCURSEL,0,0);
+                if(i>=0 && static_cast<std::size_t>(i)<package_rows.size()){
+                    SetWindowTextW(package_id,utf8_to_wide(package_rows[static_cast<std::size_t>(i)].id).c_str());
+                    SetWindowTextW(package_version,utf8_to_wide(package_rows[static_cast<std::size_t>(i)].version).c_str());
+                }
+            }
+            handled=true;break;
+        case IdPackageAdd:
+        case IdPackageRemove:
+            if(notification!=BN_CLICKED)return false;
+            {
+                wchar_t package_id_text[200]{},version[200]{};
+                GetWindowTextW(package_id,package_id_text,200);
+                GetWindowTextW(package_version,version,200);
+                std::string error;
+                const auto value=(id==IdPackageRemove)?std::string{}:wide_to_utf8(version);
+                if(nengine::editor::edit_managed_package(editor.project(),wide_to_utf8(package_id_text),value,&error) &&
+                   nengine::editor::load_managed_packages(editor.project(),package_rows,&error)){
+                    SendMessageW(package_list,LB_RESETCONTENT,0,0);
+                    for(const auto& p:package_rows){
+                        const auto display=utf8_to_wide(p.id+" @ "+p.version);
+                        SendMessageW(package_list,LB_ADDSTRING,0,reinterpret_cast<LPARAM>(display.c_str()));
+                    }
+                    editor.console().info("Packages","NuGet manifest saved; select Build C# to restore packages");
+                }else editor.console().warning("Packages",error);
+                refresh_console();
+            }
+            handled=true;break;
+        case IdAndroidPathsApply:
+            if(notification!=BN_CLICKED)return false;
+            {
+                wchar_t sdk[4096]{},ndk[4096]{},jdk[4096]{};
+                GetWindowTextW(android_sdk_path,sdk,4096);
+                GetWindowTextW(android_ndk_path,ndk,4096);
+                GetWindowTextW(android_jdk_path,jdk,4096);
+                nengine::editor::AndroidToolPaths paths{
+                    std::filesystem::path(sdk),
+                    std::filesystem::path(ndk),
+                    std::filesystem::path(jdk)};
+                std::string error;
+                if(nengine::editor::save_android_tool_paths(editor.project(),paths,&error))
+                    editor.console().info("Android tool paths",
+                        "SDK android-35, NDK 27.x and JDK bin/java validated and saved (not APK proof)");
+                else editor.console().warning("Android tool paths",error);
+                refresh_console();
             }
             handled=true;break;
         case IdActionList:
@@ -4597,6 +4845,54 @@ struct Win32EditorShell::Impl {
             handled=true;
             break;
 
+        case IdAssetImport:
+        case IdAssetRename:
+        case IdAssetDelete:
+        case IdAssetReimport:
+            if(notification!=BN_CLICKED)return false;
+            {
+                if(!editor.project().is_open()||!editor.can_edit()){
+                    editor.console().warning("Assets","Open a project and stop Play before changing assets");
+                    refresh_console();handled=true;break;
+                }
+                std::string error;
+                bool ok=false;
+                if(id==IdAssetImport){
+                    wchar_t buffer[32768]{};
+                    OPENFILENAMEW dialog{};
+                    dialog.lStructSize=sizeof(dialog);
+                    dialog.hwndOwner=host;
+                    dialog.lpstrFile=buffer;
+                    dialog.nMaxFile=static_cast<DWORD>(std::size(buffer));
+                    dialog.lpstrFilter=L"All Files\0*.*\0\0";
+                    dialog.Flags=OFN_EXPLORER|OFN_PATHMUSTEXIST|OFN_FILEMUSTEXIST;
+                    if(GetOpenFileNameW(&dialog))
+                        ok=editor.project().import_external_asset(
+                            std::filesystem::path(buffer),nullptr,&error);
+                    else {handled=true;break;}
+                }else{
+                    const auto index=SendMessageW(assets_list,LB_GETCURSEL,0,0);
+                    if(index>=0&&static_cast<std::size_t>(index)<asset_rows.size()){
+                        const auto guid=asset_rows[static_cast<std::size_t>(index)].guid;
+                        if(id==IdAssetDelete)
+                            ok=editor.project().delete_asset(guid,&error);
+                        else if(id==IdAssetReimport)
+                            ok=editor.project().import_asset(guid).success;
+                        else {
+                            wchar_t stem[256]{};
+                            GetWindowTextW(asset_rename_name,stem,256);
+                            ok=editor.project().rename_asset(guid,wide_to_utf8(stem),&error);
+                        }
+                    }else error="Select an asset first";
+                }
+                if(ok){
+                    editor.console().info("Assets","Asset operation completed");
+                    refresh_assets_panel();
+                }else editor.console().warning("Assets",error.empty()?
+                    "Asset operation failed":error);
+                refresh_console();
+            }
+            handled=true;break;
         case IdAssets:
             if (notification == LBN_SELCHANGE) {
                 refresh_generic_property_value();

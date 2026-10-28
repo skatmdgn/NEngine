@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import sys
 import tempfile
 
@@ -236,6 +237,84 @@ def verify_lock(lock, cache_root):
     return True
 
 
+def sync_managed_plugins(lock, cache_root: Path, managed_dir: Path):
+    """PLUG-018: transactionally update/remove package-owned managed DLLs.
+
+    Installed files are the byte-for-byte SHA-verified archives (DLL payloads),
+    not executed by this tool. Non-package-managed plugin DLLs survive upgrades.
+    A failed validation/copy leaves the previous installed directory intact.
+    """
+    verify_lock(lock, cache_root)
+    managed_dir = Path(managed_dir)
+    if managed_dir.is_symlink() or managed_dir.parent.is_symlink() or not managed_dir.parent.is_dir():
+        raise PackageError("unsafe managed plugin installation root")
+    if managed_dir.exists() and not managed_dir.is_dir():
+        raise PackageError("managed plugin target is not a directory")
+    state_name = ".nengine-managed-packages.json"
+    old_files = set()
+    if managed_dir.exists():
+        for entry in managed_dir.iterdir():
+            if entry.is_symlink() or not entry.is_file():
+                raise PackageError("unsafe existing managed plugin entry")
+        state = managed_dir / state_name
+        if state.exists():
+            recorded = _read_json(state)
+            if not isinstance(recorded, dict) or set(recorded) != {"schema", "managed"} or recorded["schema"] != 1:
+                raise PackageError("invalid existing managed plugin state")
+            if not isinstance(recorded["managed"], list) or len(recorded["managed"]) > MAX_DEPENDENCIES:
+                raise PackageError("invalid installed package inventory")
+            for name in recorded["managed"]:
+                if not isinstance(name, str) or not name.endswith(".dll") or not _valid_name(name[:-4]):
+                    raise PackageError("malformed installed DLL name")
+                if name in old_files:
+                    raise PackageError("duplicate installed DLL name")
+                old_files.add(name)
+    new_files = {}
+    for item in lock["packages"]:
+        name = item["name"] + ".dll"
+        if not _valid_name(item["name"]) or name in new_files:
+            raise PackageError("invalid or duplicate managed plugin name")
+        source = cache_root / item["sha256"][:2] / item["sha256"]
+        if _sha256_file(source) != item["sha256"]:
+            raise PackageError("managed plugin cache corruption")
+        if managed_dir.exists() and (managed_dir / name).exists() and name not in old_files:
+            raise PackageError("package would overwrite unmanaged user DLL")
+        new_files[name] = source
+    stage = Path(tempfile.mkdtemp(dir=managed_dir.parent, prefix=".nengine-plugins-stage-"))
+    backup = None
+    try:
+        if managed_dir.exists():
+            for entry in managed_dir.iterdir():
+                if entry.name != state_name and entry.name not in old_files:
+                    shutil.copy2(entry, stage / entry.name, follow_symlinks=False)
+        for name, source in sorted(new_files.items()):
+            shutil.copyfile(source, stage / name)
+            if _sha256_file(stage / name) != _sha256_file(source):
+                raise PackageError("staged managed plugin integrity failure")
+        atomic_write(stage / state_name, (json.dumps({
+            "schema": 1, "managed": sorted(new_files)
+        }, sort_keys=True, indent=2) + "\n").encode("utf-8"))
+        if managed_dir.exists():
+            backup = Path(tempfile.mkdtemp(dir=managed_dir.parent, prefix=".nengine-plugins-backup-"))
+            backup.rmdir()
+            managed_dir.rename(backup)
+        try:
+            stage.rename(managed_dir)
+        except OSError:
+            if backup is not None:
+                backup.rename(managed_dir)
+                backup = None
+            raise
+        if backup is not None:
+            shutil.rmtree(backup)
+            backup = None
+        return sorted(new_files)
+    finally:
+        if stage.exists():
+            shutil.rmtree(stage)
+        # If publication succeeds but backup deletion fails, retaining a
+        # backup is safer than deleting the installed directory.
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="NEngine offline package metadata and cache")
     sub = ap.add_subparsers(dest="command", required=True)
@@ -252,6 +331,10 @@ def main(argv=None):
     verify = sub.add_parser("verify")
     verify.add_argument("lock_file", type=Path)
     verify.add_argument("directory", type=Path)
+    installed = sub.add_parser("sync-managed")
+    installed.add_argument("lock_file", type=Path)
+    installed.add_argument("cache_directory", type=Path)
+    installed.add_argument("managed_plugin_directory", type=Path)
     args = ap.parse_args(argv)
     try:
         if args.command == "validate":
@@ -268,6 +351,10 @@ def main(argv=None):
         elif args.command == "verify":
             if verify_lock(_read_json(args.lock_file), args.directory):
                 print("PASS cached package archive integrity")
+        elif args.command == "sync-managed":
+            installed_files = sync_managed_plugins(_read_json(args.lock_file),
+                args.cache_directory, args.managed_plugin_directory)
+            print(f"PASS installed {len(installed_files)} managed plug-in DLLs")
         return 0
     except (PackageError, OSError) as exc:
         print(f"Package error: {exc}", file=sys.stderr)

@@ -2778,6 +2778,119 @@ int main() {
         std::filesystem::remove_all(project_root,ec);
     }
 
+    // EDTOOL-009: actual SDK/NDK/JDK discovery, validation, and persistent
+    // Win32 Build Settings model. Files are fixtures, not real APK tooling.
+    {
+        std::error_code ec;
+        const auto root=std::filesystem::temp_directory_path()/"NEngine-Android-Paths";
+        std::filesystem::remove_all(root,ec);
+        auto sdk=root/"sdk",ndk=root/"ndk",jdk=root/"jdk";
+        std::filesystem::create_directories(sdk/"platforms"/"android-35",ec);
+        std::filesystem::create_directories(ndk/"build"/"cmake",ec);
+        std::filesystem::create_directories(jdk/"bin",ec);
+        { std::ofstream x(sdk/"platforms"/"android-35"/"android.jar");x<<"sdk"; }
+        { std::ofstream x(ndk/"source.properties");x<<"Pkg.Revision = 27.2.0\n"; }
+        { std::ofstream x(ndk/"build"/"cmake"/"android.toolchain.cmake");x<<"ndk"; }
+#ifdef _WIN32
+        { std::ofstream x(jdk/"bin"/"java.exe");x<<"java"; }
+#else
+        { std::ofstream x(jdk/"bin"/"java");x<<"java"; }
+#endif
+        editor::AndroidToolPaths paths{sdk,ndk,jdk};
+        std::string error;
+        check(editor::validate_android_tool_paths(paths,&error),
+              "EDTOOL-009 complete toolchain fixtures validate");
+        editor::ProjectSession project;
+        check(project.open(root/"game",&error),
+              "EDTOOL-009 project opens for paths settings");
+        check(editor::save_android_tool_paths(project,paths,&error),
+              "EDTOOL-009 Android toolchain paths saved");
+        editor::AndroidToolPaths restored;
+        check(editor::load_android_tool_paths(project,restored,&error) &&
+              restored.sdk==sdk && restored.ndk==ndk && restored.jdk==jdk,
+              "EDTOOL-009 SDK NDK JDK paths survive project reload");
+        auto bad=paths;bad.ndk=root/"absent";
+        check(!editor::save_android_tool_paths(project,bad,&error),
+              "EDTOOL-009 rejects missing NDK without overwriting saved paths");
+        restored={};
+        check(editor::load_android_tool_paths(project,restored,&error)&&
+              restored.ndk==ndk,
+              "EDTOOL-009 invalid edit leaves previous paths intact");
+        project.close();
+        std::filesystem::remove_all(root,ec);
+    }
+
+    // EDTOOL-005: manifest UI model lists, installs, updates and removes
+    // NuGet references; invalid changes must not corrupt the saved manifest.
+    {
+        std::error_code ec;
+        const auto root=std::filesystem::temp_directory_path()/"NEngine-Packages-Editor-Test";
+        std::filesystem::remove_all(root,ec);
+        editor::ProjectSession project;
+        std::string error;
+        check(project.open(root,&error),"EDTOOL-005 project opens");
+        editor::ManagedPackageRows rows;
+        check(editor::load_managed_packages(project,rows,&error)&&rows.empty(),
+              "EDTOOL-005 starts with empty package list");
+        check(editor::edit_managed_package(project,"Newtonsoft.Json","13.0.3",&error) &&
+              editor::edit_managed_package(project,"Alpha.Tool","1.2.0",&error) &&
+              editor::load_managed_packages(project,rows,&error) && rows.size()==2u &&
+              rows[0].id=="Alpha.Tool" && rows[1].id=="Newtonsoft.Json",
+              "EDTOOL-005 install and sorted package list");
+        check(editor::edit_managed_package(project,"Alpha.Tool","2.0.0",&error) &&
+              editor::load_managed_packages(project,rows,&error) &&
+              rows[0].version=="2.0.0",
+              "EDTOOL-005 update package version persists");
+        check(!editor::edit_managed_package(project,"../unsafe","1.0.0",&error) &&
+              !editor::edit_managed_package(project,"Alpha.Tool","version with space",&error),
+              "EDTOOL-005 invalid package metadata rejected");
+        check(editor::edit_managed_package(project,"Newtonsoft.Json","",&error) &&
+              editor::load_managed_packages(project,rows,&error) &&
+              rows.size()==1u&&rows[0].id=="Alpha.Tool",
+              "EDTOOL-005 remove package without retaining stale reference");
+        project.close();
+        check(project.open(root,&error) &&
+              editor::load_managed_packages(project,rows,&error) &&
+              rows.size()==1u && rows[0].version=="2.0.0",
+              "EDTOOL-005 package listing persists across editor reopen");
+        project.close();
+        std::filesystem::remove_all(root,ec);
+    }
+
+    // EDIT-013: end-to-end ProjectSession asset operations through stable GUID.
+    {
+        std::error_code ec;
+        const auto root=std::filesystem::temp_directory_path()/"NEngine-Browser-Operations";
+        std::filesystem::remove_all(root,ec);
+        std::filesystem::create_directories(root,ec);
+        const auto external=root/"external.nscene";
+        {std::ofstream x(external);x<<"external fixture";}
+        editor::ProjectSession project;
+        std::string error;
+        check(project.open(root/"project",&error),"EDIT-013 open project");
+        nengine::assets::AssetGuid guid;
+        check(project.import_external_asset(external,&guid,&error) &&
+              guid.valid() && project.assets().find(guid),
+              "EDIT-013 import creates indexed GUID and meta");
+        const auto old=project.assets().find(guid);
+        const auto oldpath=old?old->source_path:std::filesystem::path{};
+        check(project.rename_asset(guid,"renamed asset",&error) &&
+              project.assets().find(guid) &&
+              project.assets().find(guid)->source_path!=oldpath,
+              "EDIT-013 rename preserves imported GUID");
+        check(!project.rename_asset(guid,"../escape",&error) &&
+              !project.rename_asset(guid,"bad/name",&error) &&
+              project.assets().find(guid),
+              "EDIT-013 unsafe rename refused without modifying indexed source");
+        check(project.import_asset(guid).success,
+              "EDIT-013 explicit reimport resolves existing GUID");
+        check(project.delete_asset(guid,&error) &&
+              !project.assets().find(guid),
+              "EDIT-013 delete removes meta and indexed source");
+        project.close();
+        std::filesystem::remove_all(root,ec);
+    }
+
     // EDTOOL-006: bounded live Editor/Game profile averages and peaks;
     // reject invalid samples before they can poison Profiler UI.
     {

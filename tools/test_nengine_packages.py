@@ -6,7 +6,7 @@ import unittest
 
 from nengine_packages import (
     PackageError, validate_manifest, resolve, build_lock, lock_json, atomic_write,
-    read_manifest, cache_archive, verify_lock,
+    read_manifest, cache_archive, verify_lock, sync_managed_plugins,
 )
 
 
@@ -99,6 +99,61 @@ class PackageCacheTests(unittest.TestCase):
             archive.write_bytes(b"\0"*(64*1024*1024+1))
             with self.assertRaisesRegex(PackageError,"exceeds"):
                 cache_archive(archive,hashlib.sha256(b"evil").hexdigest(),cache_root)
+
+
+    def test_managed_plugin_upgrade_remove_and_rollback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            cache=root/"cache";cache.mkdir()
+            managed=root/"Assets"/"Plugins"/"Managed"
+            managed.parent.mkdir(parents=True)
+            managed.mkdir()
+            (managed/"UserCustom.dll").write_bytes(b"user-plugin")
+            def package(name, contents, version="1.0.0"):
+                archive=root/(name+"-archive")
+                archive.write_bytes(contents)
+                sha=hashlib.sha256(contents).hexdigest()
+                cache_archive(archive,sha,cache)
+                return item(name,version=version,sha=sha)
+            v1=package("Demo.Plugin",b"v1")
+            shared=package("Second.Plugin",b"shared")
+            lock1=build_lock([v1,shared],{"Demo.Plugin":"1.0.0","Second.Plugin":"1.0.0"})
+            self.assertEqual(sync_managed_plugins(lock1,cache,managed),
+                             ["Demo.Plugin.dll","Second.Plugin.dll"])
+            self.assertEqual((managed/"Demo.Plugin.dll").read_bytes(),b"v1")
+            self.assertEqual((managed/"UserCustom.dll").read_bytes(),b"user-plugin")
+            v2=package("Demo.Plugin",b"v2",version="2.0.0")
+            lock2=build_lock([v2],{"Demo.Plugin":"2.0.0"})
+            self.assertEqual(sync_managed_plugins(lock2,cache,managed),
+                             ["Demo.Plugin.dll"])
+            self.assertEqual((managed/"Demo.Plugin.dll").read_bytes(),b"v2")
+            self.assertFalse((managed/"Second.Plugin.dll").exists())
+            self.assertEqual((managed/"UserCustom.dll").read_bytes(),b"user-plugin")
+            self.assertEqual(sync_managed_plugins(lock2,cache,managed),
+                             ["Demo.Plugin.dll"])
+            bad=build_lock([package("Another.Plugin",b"missing")],
+                           {"Another.Plugin":"1.0.0"})
+            corrupt=cache/bad["packages"][0]["sha256"][:2]/bad["packages"][0]["sha256"]
+            corrupt.write_bytes(b"tampered")
+            with self.assertRaises(PackageError):
+                sync_managed_plugins(bad,cache,managed)
+            self.assertEqual((managed/"Demo.Plugin.dll").read_bytes(),b"v2")
+            self.assertFalse((managed/"Another.Plugin.dll").exists())
+            self.assertFalse(list(managed.parent.glob(".nengine-plugins-stage-*")))
+            self.assertFalse(list(managed.parent.glob(".nengine-plugins-backup-*")))
+
+    def test_managed_plugin_refuses_conflicting_user_dll(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);cache=root/"cache";cache.mkdir()
+            managed=root/"Managed";managed.mkdir()
+            (managed/"Custom.dll").write_bytes(b"owner")
+            archive=root/"new.dll";archive.write_bytes(b"package")
+            sha=hashlib.sha256(archive.read_bytes()).hexdigest()
+            cache_archive(archive,sha,cache)
+            lock=build_lock([item("Custom",sha=sha)],{"Custom":"1.0.0"})
+            with self.assertRaisesRegex(PackageError,"unmanaged"):
+                sync_managed_plugins(lock,cache,managed)
+            self.assertEqual((managed/"Custom.dll").read_bytes(),b"owner")
 
     def test_lock_atomic_transactional(self):
         with tempfile.TemporaryDirectory() as tmp:

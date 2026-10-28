@@ -1,4 +1,7 @@
+#include <algorithm>
 #include <array>
+#include <vector>
+#include <iterator>
 #include <cstdint>
 #include <cmath>
 #include <limits>
@@ -322,6 +325,35 @@ int main() {
         !std::filesystem::exists(
             report.bundle_root / "Content" / "Main.nscene"))
         return test_failure(8, __LINE__);
+    // BUILD-009: identical project content and engine build produce byte-
+    // identical Player data in different output directories. Relative paths
+    // and bytes must match; no wall clock timestamp is serialized into output.
+    {
+        auto repeated=settings;
+        repeated.destination=export_base/"ReproducibleBuild";
+        ExportReport repeated_report;
+        if(!export_player_data(repeated,repeated_report,&error))
+            return test_failure(9009,__LINE__);
+        std::vector<std::filesystem::path> original_files,duplicate_files;
+        for(const auto& entry:std::filesystem::recursive_directory_iterator(report.bundle_root))
+            if(entry.is_regular_file())
+                original_files.push_back(entry.path().lexically_relative(report.bundle_root));
+        for(const auto& entry:std::filesystem::recursive_directory_iterator(repeated_report.bundle_root))
+            if(entry.is_regular_file())
+                duplicate_files.push_back(entry.path().lexically_relative(repeated_report.bundle_root));
+        std::sort(original_files.begin(),original_files.end());
+        std::sort(duplicate_files.begin(),duplicate_files.end());
+        if(original_files!=duplicate_files || original_files.empty())
+            return test_failure(9010,__LINE__);
+        for(const auto& relative:original_files){
+            std::ifstream one(report.bundle_root/relative,std::ios::binary);
+            std::ifstream two(repeated_report.bundle_root/relative,std::ios::binary);
+            const std::string first(std::istreambuf_iterator<char>{one},{});
+            const std::string second(std::istreambuf_iterator<char>{two},{});
+            if(!one.is_open() || !two.is_open() || one.bad() || two.bad() || first!=second)
+                return test_failure(9011,__LINE__);
+        }
+    }
     // Data-only exports still need a valid empty catalog for PlayerRuntime.
     ExportSettings no_assets = settings;
     no_assets.copy_supported_assets = false;
