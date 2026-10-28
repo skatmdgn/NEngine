@@ -2820,6 +2820,43 @@ int main() {
         std::filesystem::remove_all(root,ec);
     }
 
+    // EDTOOL-005: manifest UI model lists, installs, updates and removes
+    // NuGet references; invalid changes must not corrupt the saved manifest.
+    {
+        std::error_code ec;
+        const auto root=std::filesystem::temp_directory_path()/"NEngine-Packages-Editor-Test";
+        std::filesystem::remove_all(root,ec);
+        editor::ProjectSession project;
+        std::string error;
+        check(project.open(root,&error),"EDTOOL-005 project opens");
+        editor::ManagedPackageRows rows;
+        check(editor::load_managed_packages(project,rows,&error)&&rows.empty(),
+              "EDTOOL-005 starts with empty package list");
+        check(editor::edit_managed_package(project,"Newtonsoft.Json","13.0.3",&error) &&
+              editor::edit_managed_package(project,"Alpha.Tool","1.2.0",&error) &&
+              editor::load_managed_packages(project,rows,&error) && rows.size()==2u &&
+              rows[0].id=="Alpha.Tool" && rows[1].id=="Newtonsoft.Json",
+              "EDTOOL-005 install and sorted package list");
+        check(editor::edit_managed_package(project,"Alpha.Tool","2.0.0",&error) &&
+              editor::load_managed_packages(project,rows,&error) &&
+              rows[0].version=="2.0.0",
+              "EDTOOL-005 update package version persists");
+        check(!editor::edit_managed_package(project,"../unsafe","1.0.0",&error) &&
+              !editor::edit_managed_package(project,"Alpha.Tool","version with space",&error),
+              "EDTOOL-005 invalid package metadata rejected");
+        check(editor::edit_managed_package(project,"Newtonsoft.Json","",&error) &&
+              editor::load_managed_packages(project,rows,&error) &&
+              rows.size()==1u&&rows[0].id=="Alpha.Tool",
+              "EDTOOL-005 remove package without retaining stale reference");
+        project.close();
+        check(project.open(root,&error) &&
+              editor::load_managed_packages(project,rows,&error) &&
+              rows.size()==1u && rows[0].version=="2.0.0",
+              "EDTOOL-005 package listing persists across editor reopen");
+        project.close();
+        std::filesystem::remove_all(root,ec);
+    }
+
     // EDTOOL-006: bounded live Editor/Game profile averages and peaks;
     // reject invalid samples before they can poison Profiler UI.
     {
