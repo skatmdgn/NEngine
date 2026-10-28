@@ -107,6 +107,15 @@ public:
     AssetActivation activation_for(
         assets::AssetGuid guid) const;
 
+    // EDIT-013: Asset Browser operations preserve GUID/meta identity.
+    // Mutations are confined under Assets and refresh the asset index.
+    bool import_external_asset(const std::filesystem::path& source,
+                               assets::AssetGuid* guid=nullptr,
+                               std::string* error=nullptr);
+    bool rename_asset(assets::AssetGuid guid,std::string new_stem,
+                      std::string* error=nullptr);
+    bool delete_asset(assets::AssetGuid guid,std::string* error=nullptr);
+
     // Resolve imported, confined project navigation data by stable AssetGuid.
     bool load_nav_mesh(assets::AssetGuid guid,
                        navigation::NavMesh& output,
