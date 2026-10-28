@@ -1,4 +1,5 @@
 #include "nengine/assets/import_pipeline.hpp"
+#include <algorithm>
 #include "nengine/assets/gltf_sidecars.hpp"
 #include "nengine/assets/obj_sidecars.hpp"
 
