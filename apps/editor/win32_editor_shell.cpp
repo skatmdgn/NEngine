@@ -3579,6 +3579,10 @@ struct Win32EditorShell::Impl {
         }
 
         if (!snapshot.valid) {
+            SendMessageW(anim_parameter_list,LB_RESETCONTENT,0,0);
+            anim_parameter_rows.clear();
+            EnableWindow(anim_parameter_list,FALSE);
+            EnableWindow(anim_parameter_apply,FALSE);
             set_text(name, "");
 
             SendMessageW(
@@ -3676,7 +3680,7 @@ struct Win32EditorShell::Impl {
         SendMessageW(anim_parameter_list,LB_RESETCONTENT,0,0);
         const auto* animator=world.get_component<nengine::render::SpriteAnimator>(
             snapshot.entity,nengine::render::sprite_animator_type());
-        if(animator && editor.is_playing()){
+        if(animator && editor.play_session().is_playing()){
             for(const auto& kv:animator->bool_parameters)
                 anim_parameter_rows.push_back(kv.first);
             std::sort(anim_parameter_rows.begin(),anim_parameter_rows.end());
@@ -3687,8 +3691,8 @@ struct Win32EditorShell::Impl {
                     reinterpret_cast<LPARAM>(display.c_str()));
             }
         }
-        EnableWindow(anim_parameter_list,animator!=nullptr && editor.is_playing());
-        EnableWindow(anim_parameter_apply,animator!=nullptr && editor.is_playing());
+        EnableWindow(anim_parameter_list,animator!=nullptr && editor.play_session().is_playing());
+        EnableWindow(anim_parameter_apply,animator!=nullptr && editor.play_session().is_playing());
 
         refresh_generic_property_editor(
             snapshot);
