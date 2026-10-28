@@ -78,6 +78,10 @@ enum ControlId : int {
     IdBuildAndroid,
     IdBuildToolchain,
     IdBuildApply,
+    IdAndroidSdkPath,
+    IdAndroidNdkPath,
+    IdAndroidJdkPath,
+    IdAndroidPathsApply,
     IdProfiler,
     IdCanvasEdit,
     IdCanvasName,
@@ -347,6 +351,10 @@ struct Win32EditorShell::Impl {
     HWND build_android{nullptr};
     HWND build_toolchain{nullptr};
     HWND build_apply{nullptr};
+    HWND android_sdk_path{nullptr};
+    HWND android_ndk_path{nullptr};
+    HWND android_jdk_path{nullptr};
+    HWND android_paths_apply{nullptr};
     bool build_settings_visible{false};
     HWND action_toggle{nullptr};
     HWND action_list{nullptr};
@@ -1327,7 +1335,12 @@ struct Win32EditorShell::Impl {
         build_android=create_control(host,L"BUTTON",L"Android (toolchain profile)",BS_AUTOCHECKBOX,IdBuildAndroid);
         build_toolchain=create_control(host,L"EDIT",L"",WS_BORDER|ES_AUTOHSCROLL,IdBuildToolchain);
         build_apply=create_control(host,L"BUTTON",L"Save Target Settings",BS_PUSHBUTTON,IdBuildApply);
-        if(!profiler_list||!build_name||!build_windows||!build_android||!build_toolchain||!build_apply||
+        android_sdk_path=create_control(host,L"EDIT",L"",WS_BORDER|ES_AUTOHSCROLL,IdAndroidSdkPath);
+        android_ndk_path=create_control(host,L"EDIT",L"",WS_BORDER|ES_AUTOHSCROLL,IdAndroidNdkPath);
+        android_jdk_path=create_control(host,L"EDIT",L"",WS_BORDER|ES_AUTOHSCROLL,IdAndroidJdkPath);
+        android_paths_apply=create_control(host,L"BUTTON",L"Validate and Save SDK / NDK / JDK",BS_PUSHBUTTON,IdAndroidPathsApply);
+        if(!android_sdk_path||!android_ndk_path||!android_jdk_path||!android_paths_apply||
+            !profiler_list||!build_name||!build_windows||!build_android||!build_toolchain||!build_apply||
             !action_list || !action_name || !action_key || !action_add ||
             !action_remove || !action_save ||
             !assets_list || !console) {
@@ -2435,8 +2448,9 @@ struct Win32EditorShell::Impl {
         const auto action_controls=std::array<HWND,6>{
             action_list,action_name,action_key,action_add,action_remove,action_save};
         for(auto ctrl:action_controls)ShowWindow(ctrl,action_editor_visible?SW_SHOW:SW_HIDE);
-        const auto build_controls=std::array<HWND,5>{
-            build_name,build_windows,build_android,build_toolchain,build_apply};
+        const auto build_controls=std::array<HWND,9>{
+            build_name,build_windows,build_android,build_toolchain,build_apply,
+            android_sdk_path,android_ndk_path,android_jdk_path,android_paths_apply};
         for(auto ctrl:build_controls)ShowWindow(ctrl,build_settings_visible?SW_SHOW:SW_HIDE);
         ShowWindow(profiler_list,profiler_visible?SW_SHOW:SW_HIDE);
         if(profiler_visible)
@@ -2448,6 +2462,10 @@ struct Win32EditorShell::Impl {
             MoveWindow(build_android,kPadding+w*3/4,bottom_y,w/4,24,TRUE);
             MoveWindow(build_toolchain,kPadding,bottom_y+33,w*2/3,25,TRUE);
             MoveWindow(build_apply,kPadding+w*2/3+8,bottom_y+33,w/3-8,25,TRUE);
+            MoveWindow(android_sdk_path,kPadding,bottom_y+66,w,24,TRUE);
+            MoveWindow(android_ndk_path,kPadding,bottom_y+96,w,24,TRUE);
+            MoveWindow(android_jdk_path,kPadding,bottom_y+126,w,24,TRUE);
+            MoveWindow(android_paths_apply,kPadding,bottom_y+156,w,24,TRUE);
         }
         if(action_editor_visible){
             const int x0=kPadding, w0=std::max(120,width/2-16);
@@ -4409,6 +4427,13 @@ struct Win32EditorShell::Impl {
                     const auto tool=utf8_to_wide(draft.android_toolchain);
                     SetWindowTextW(build_name,title.c_str());
                     SetWindowTextW(build_toolchain,tool.c_str());
+                    nengine::editor::AndroidToolPaths paths;
+                    std::string load_error;
+                    if(nengine::editor::load_android_tool_paths(editor.project(),paths,&load_error)){
+                        SetWindowTextW(android_sdk_path,utf8_to_wide(paths.sdk.generic_string()).c_str());
+                        SetWindowTextW(android_ndk_path,utf8_to_wide(paths.ndk.generic_string()).c_str());
+                        SetWindowTextW(android_jdk_path,utf8_to_wide(paths.jdk.generic_string()).c_str());
+                    }else editor.console().warning("Android tool paths",load_error);
                     SendMessageW(build_windows,BM_SETCHECK,draft.windows?BST_CHECKED:BST_UNCHECKED,0);
                     SendMessageW(build_android,BM_SETCHECK,draft.android?BST_CHECKED:BST_UNCHECKED,0);
                 }
@@ -4434,6 +4459,25 @@ struct Win32EditorShell::Impl {
                     editor.console().info("Build Settings",
                         "Windows/Android target configuration saved; APK execution still requires Android backend");
                 else editor.console().warning("Build Settings",error);
+            }
+            handled=true;break;
+        case IdAndroidPathsApply:
+            if(notification!=BN_CLICKED)return false;
+            {
+                wchar_t sdk[4096]{},ndk[4096]{},jdk[4096]{};
+                GetWindowTextW(android_sdk_path,sdk,4096);
+                GetWindowTextW(android_ndk_path,ndk,4096);
+                GetWindowTextW(android_jdk_path,jdk,4096);
+                nengine::editor::AndroidToolPaths paths{
+                    std::filesystem::path(sdk),
+                    std::filesystem::path(ndk),
+                    std::filesystem::path(jdk)};
+                std::string error;
+                if(nengine::editor::save_android_tool_paths(editor.project(),paths,&error))
+                    editor.console().info("Android tool paths",
+                        "SDK android-35, NDK 27.x and JDK bin/java validated and saved (not APK proof)");
+                else editor.console().warning("Android tool paths",error);
+                refresh_console();
             }
             handled=true;break;
         case IdActionList:
