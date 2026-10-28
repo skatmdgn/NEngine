@@ -2863,7 +2863,7 @@ int main() {
         const auto root=std::filesystem::temp_directory_path()/"NEngine-Browser-Operations";
         std::filesystem::remove_all(root,ec);
         std::filesystem::create_directories(root,ec);
-        const auto external=root/"external.txt";
+        const auto external=root/"external.nscene";
         {std::ofstream x(external);x<<"external fixture";}
         editor::ProjectSession project;
         std::string error;
