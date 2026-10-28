@@ -293,7 +293,7 @@ def sync_managed_plugins(lock, cache_root: Path, managed_dir: Path):
                 raise PackageError("staged managed plugin integrity failure")
         atomic_write(stage / state_name, (json.dumps({
             "schema": 1, "managed": sorted(new_files)
-        }, sort_keys=True, indent=2) + "\\n").encode("utf-8"))
+        }, sort_keys=True, indent=2) + "\n").encode("utf-8"))
         if managed_dir.exists():
             backup = Path(tempfile.mkdtemp(dir=managed_dir.parent, prefix=".nengine-plugins-backup-"))
             backup.rmdir()
@@ -331,6 +331,10 @@ def main(argv=None):
     verify = sub.add_parser("verify")
     verify.add_argument("lock_file", type=Path)
     verify.add_argument("directory", type=Path)
+    installed = sub.add_parser("sync-managed")
+    installed.add_argument("lock_file", type=Path)
+    installed.add_argument("cache_directory", type=Path)
+    installed.add_argument("managed_plugin_directory", type=Path)
     args = ap.parse_args(argv)
     try:
         if args.command == "validate":
@@ -347,6 +351,10 @@ def main(argv=None):
         elif args.command == "verify":
             if verify_lock(_read_json(args.lock_file), args.directory):
                 print("PASS cached package archive integrity")
+        elif args.command == "sync-managed":
+            installed_files = sync_managed_plugins(_read_json(args.lock_file),
+                args.cache_directory, args.managed_plugin_directory)
+            print(f"PASS installed {len(installed_files)} managed plug-in DLLs")
         return 0
     except (PackageError, OSError) as exc:
         print(f"Package error: {exc}", file=sys.stderr)
