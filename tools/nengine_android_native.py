@@ -8,7 +8,7 @@ import shutil
 import tempfile
 
 SUPPORTED_ABI = ("arm64-v8a",)
-SAFE_NAME = re.compile(r"lib[A-Za-z0-9_.-]{1,110}\\.so\\Z")
+SAFE_NAME = re.compile(r"lib[A-Za-z0-9_.-]{1,110}\.so\Z")
 
 
 class NativePluginError(ValueError):
