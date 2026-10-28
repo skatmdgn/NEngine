@@ -132,6 +132,11 @@ enum ControlId : int {
     IdAddComponentList,
     IdAddComponent,
     IdAssets,
+    IdAssetImport,
+    IdAssetRename,
+    IdAssetDelete,
+    IdAssetReimport,
+    IdAssetRenameName,
     IdConsole,
     IdSplitHierarchy,
     IdSplitInspector,
@@ -460,6 +465,11 @@ struct Win32EditorShell::Impl {
         nengine::core::Entity::invalid()};
 
     HWND assets_list{nullptr};
+    HWND asset_import_button{nullptr};
+    HWND asset_rename_button{nullptr};
+    HWND asset_delete_button{nullptr};
+    HWND asset_reimport_button{nullptr};
+    HWND asset_rename_name{nullptr};
     HWND console{nullptr};
 
     HWND split_hierarchy{nullptr};
@@ -1335,6 +1345,13 @@ struct Win32EditorShell::Impl {
             L"",
             LBS_NOTIFY | WS_BORDER | WS_VSCROLL | WS_HSCROLL,
             IdAssets);
+        asset_import_button=create_control(host,L"BUTTON",L"Import",BS_PUSHBUTTON,IdAssetImport);
+        asset_rename_button=create_control(host,L"BUTTON",L"Rename",BS_PUSHBUTTON,IdAssetRename);
+        asset_delete_button=create_control(host,L"BUTTON",L"Delete",BS_PUSHBUTTON,IdAssetDelete);
+        asset_reimport_button=create_control(host,L"BUTTON",L"Reimport",BS_PUSHBUTTON,IdAssetReimport);
+        asset_rename_name=create_control(host,L"EDIT",L"",WS_BORDER|ES_AUTOHSCROLL,IdAssetRenameName);
+        if(!asset_import_button||!asset_rename_button||!asset_delete_button||
+           !asset_reimport_button||!asset_rename_name)return false;
 
         console = create_control(
             host,
@@ -2472,12 +2489,17 @@ struct Win32EditorShell::Impl {
             assets_w +
             kPadding;
 
+        MoveWindow(asset_import_button,kPadding,bottom_y,65,24,TRUE);
+        MoveWindow(asset_rename_name,kPadding+69,bottom_y,assets_w-271,24,TRUE);
+        MoveWindow(asset_rename_button,kPadding+assets_w-198,bottom_y,60,24,TRUE);
+        MoveWindow(asset_reimport_button,kPadding+assets_w-134,bottom_y,70,24,TRUE);
+        MoveWindow(asset_delete_button,kPadding+assets_w-60,bottom_y,60,24,TRUE);
         MoveWindow(
             assets_list,
             kPadding,
-            bottom_y,
+            bottom_y+27,
             assets_w,
-            bottom_h,
+            std::max(30,bottom_h-27),
             TRUE);
 
         MoveWindow(
@@ -2491,6 +2513,10 @@ struct Win32EditorShell::Impl {
             TRUE);
         const bool tool_open=action_editor_visible||build_settings_visible||profiler_visible||package_editor_visible;
         ShowWindow(assets_list,tool_open?SW_HIDE:SW_SHOW);
+        for(HWND control:std::array<HWND,5>{
+            asset_import_button,asset_rename_button,asset_delete_button,
+            asset_reimport_button,asset_rename_name})
+            ShowWindow(control,tool_open?SW_HIDE:SW_SHOW);
         ShowWindow(console,tool_open?SW_HIDE:SW_SHOW);
         const auto action_controls=std::array<HWND,6>{
             action_list,action_name,action_key,action_add,action_remove,action_save};
@@ -4819,6 +4845,54 @@ struct Win32EditorShell::Impl {
             handled=true;
             break;
 
+        case IdAssetImport:
+        case IdAssetRename:
+        case IdAssetDelete:
+        case IdAssetReimport:
+            if(notification!=BN_CLICKED)return false;
+            {
+                if(!editor.project().is_open()||!editor.can_edit()){
+                    editor.console().warning("Assets","Open a project and stop Play before changing assets");
+                    refresh_console();handled=true;break;
+                }
+                std::string error;
+                bool ok=false;
+                if(id==IdAssetImport){
+                    wchar_t buffer[32768]{};
+                    OPENFILENAMEW dialog{};
+                    dialog.lStructSize=sizeof(dialog);
+                    dialog.hwndOwner=host;
+                    dialog.lpstrFile=buffer;
+                    dialog.nMaxFile=static_cast<DWORD>(std::size(buffer));
+                    dialog.lpstrFilter=L"All Files\0*.*\0\0";
+                    dialog.Flags=OFN_EXPLORER|OFN_PATHMUSTEXIST|OFN_FILEMUSTEXIST;
+                    if(GetOpenFileNameW(&dialog))
+                        ok=editor.project().import_external_asset(
+                            std::filesystem::path(buffer),nullptr,&error);
+                    else {handled=true;break;}
+                }else{
+                    const auto index=SendMessageW(assets_list,LB_GETCURSEL,0,0);
+                    if(index>=0&&static_cast<std::size_t>(index)<asset_rows.size()){
+                        const auto guid=asset_rows[static_cast<std::size_t>(index)].guid;
+                        if(id==IdAssetDelete)
+                            ok=editor.project().delete_asset(guid,&error);
+                        else if(id==IdAssetReimport)
+                            ok=editor.project().import_asset(guid).success;
+                        else {
+                            wchar_t stem[256]{};
+                            GetWindowTextW(asset_rename_name,stem,256);
+                            ok=editor.project().rename_asset(guid,wide_to_utf8(stem),&error);
+                        }
+                    }else error="Select an asset first";
+                }
+                if(ok){
+                    editor.console().info("Assets","Asset operation completed");
+                    refresh_assets_panel();
+                }else editor.console().warning("Assets",error.empty()?
+                    "Asset operation failed":error);
+                refresh_console();
+            }
+            handled=true;break;
         case IdAssets:
             if (notification == LBN_SELCHANGE) {
                 refresh_generic_property_value();
