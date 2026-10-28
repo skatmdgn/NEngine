@@ -4648,12 +4648,12 @@ struct Win32EditorShell::Impl {
         case IdPackageRemove:
             if(notification!=BN_CLICKED)return false;
             {
-                wchar_t id[200]{},version[200]{};
-                GetWindowTextW(package_id,id,200);
+                wchar_t package_id_text[200]{},version[200]{};
+                GetWindowTextW(package_id,package_id_text,200);
                 GetWindowTextW(package_version,version,200);
                 std::string error;
                 const auto value=(id==IdPackageRemove)?std::string{}:wide_to_utf8(version);
-                if(nengine::editor::edit_managed_package(editor.project(),wide_to_utf8(id),value,&error) &&
+                if(nengine::editor::edit_managed_package(editor.project(),wide_to_utf8(package_id_text),value,&error) &&
                    nengine::editor::load_managed_packages(editor.project(),package_rows,&error)){
                     SendMessageW(package_list,LB_RESETCONTENT,0,0);
                     for(const auto& p:package_rows){
