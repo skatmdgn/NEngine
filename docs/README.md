@@ -22,6 +22,13 @@ NEngine은 **Unity의 사용 경험과 개념에 익숙한 개발자가 쓸 수 
 - **Android 툴체인**은 버전별 SDK/NDK/JDK/Gradle 프로필로 관리한다. Windows 빌드 성공이 Android 앱 실행을 의미하지 않는다.
 - 목표는 Unity 전체 API·엔진 코드·패키지 재현이 아닌, 실제 2D/3D 게임 제작과 배포에 필요한 제한된 독립적 제품 완성이다.
 
+## 현재 검증 기준 — 2026-10-28
+
+2026-10-27 [PR #42](https://github.com/skatmdgn/NEngine/pull/42)가 `main`의 `880376e3c8a20647d2d3b896e300cda2d16b63dd`로 병합되었다. 같은 코드 트리에서 Windows/Ubuntu Release·Debug [CI 40477625560](https://github.com/skatmdgn/NEngine/actions/runs/40477625560) 성공을 확인했다. 현재 정식 원장은 285개 중 소스·자동화 수용 145개/미완료 140개다. 과거 아래의 '수용 후보' 숫자는 당시 PR 상태를 설명하는 역사적 기록이며 최신 상태가 아니다.
+
+- [C# SDK 사용자 가이드](../samples/managed/README.md), [실제 C# 컴파일 대상](../samples/managed/NavQuickstart.cs), [2D/3D CLI 예제](../samples/README.md)는 0.9.0-dev API 범위만 설명한다.
+- Windows 실제 GUI/GPU·오디오 및 Android APK/단말 실행은 아직 개별 수용되지 않았다.
+
 ## 2026-10-27 PR #42 — 외부 C# 라이브러리/패키지 파이프라인
 
 - [PR #42](https://github.com/skatmdgn/NEngine/pull/42): PLUG-004/005/006/009/017 및 CS-005/006/007/008/013의 정확히 10개 기존 소스 수용 후보. 기존 `main` 135/285와 구별해서, PR 브랜치는 최종 Windows/Ubuntu CI 성공을 조건으로 145/285를 기록한다.
