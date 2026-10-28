@@ -4543,7 +4543,7 @@ struct Win32EditorShell::Impl {
                 GetWindowTextW(package_id,id,200);
                 GetWindowTextW(package_version,version,200);
                 std::string error;
-                const auto value=(id_control==IdPackageRemove)?std::string{}:wide_to_utf8(version);
+                const auto value=(id==IdPackageRemove)?std::string{}:wide_to_utf8(version);
                 if(nengine::editor::edit_managed_package(editor.project(),wide_to_utf8(id),value,&error) &&
                    nengine::editor::load_managed_packages(editor.project(),package_rows,&error)){
                     SendMessageW(package_list,LB_RESETCONTENT,0,0);
