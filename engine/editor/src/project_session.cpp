@@ -398,6 +398,115 @@ void ProjectSession::close() {
     generated_subasset_parents_.clear();
 }
 
+
+namespace {
+bool asset_edit_error(std::string* error,const std::string& why){
+    if(error)*error=why;
+    return false;
+}
+bool safe_asset_stem(const std::string& stem){
+    if(stem.empty()||stem.size()>128u||stem=="."||stem=="..")return false;
+    for(unsigned char c:stem){
+        if(c<32u||c=='/'||c=='\\\\'||c==':'||c=='*'||c=='?'||
+           c=='"'||c=='<'||c=='>'||c=='|')return false;
+    }
+    return stem.back()!='.'&&stem.back()!=' ';
+}
+bool real_source(const std::filesystem::path& file){
+    std::error_code ec;
+    return !std::filesystem::is_symlink(file,ec)&&!ec&&
+           std::filesystem::is_regular_file(file,ec)&&!ec;
+}
+}
+bool ProjectSession::import_external_asset(
+    const std::filesystem::path& source,assets::AssetGuid* guid,std::string* error){
+    if(!open_)return asset_edit_error(error,"no project is open");
+    if(!real_source(source)||source.filename().empty())
+        return asset_edit_error(error,"invalid import source");
+    const auto size=std::filesystem::file_size(source);
+    if(size>64u*1024u*1024u)
+        return asset_edit_error(error,"import source exceeds 64 MiB");
+    const auto destination=assets_path_/"Imported"/source.filename();
+    std::error_code ec;
+    std::filesystem::create_directories(destination.parent_path(),ec);
+    if(ec || std::filesystem::exists(destination,ec)||ec)
+        return asset_edit_error(error,"import destination exists or cannot be created");
+    std::filesystem::copy_file(source,destination,std::filesystem::copy_options::none,ec);
+    if(ec)return asset_edit_error(error,"import copy failed");
+    refresh_assets();
+    const auto relative=destination.lexically_relative(assets_path_).generic_string();
+    const auto* record=assets_.find_relative(relative);
+    if(!record){
+        std::filesystem::remove(destination,ec);
+        return asset_edit_error(error,"asset import indexing failed");
+    }
+    if(guid)*guid=record->guid;
+    import_asset(record->guid);
+    if(error)error->clear();
+    return true;
+}
+bool ProjectSession::rename_asset(assets::AssetGuid guid,
+                                  std::string new_stem,std::string* error){
+    if(!open_||!safe_asset_stem(new_stem))
+        return asset_edit_error(error,"invalid asset rename");
+    const auto* record=assets_.find(guid);
+    if(!record)return asset_edit_error(error,"asset GUID missing");
+    const auto old_source=record->source_path,old_meta=record->meta_path;
+    if(!real_source(old_source)||!real_source(old_meta))
+        return asset_edit_error(error,"unsafe asset or meta source");
+    auto next=old_source.parent_path()/(new_stem+old_source.extension().string());
+    const auto next_meta=std::filesystem::path(next.string()+".meta");
+    std::error_code ec;
+    if(next==old_source){if(error)error->clear();return true;}
+    if(std::filesystem::exists(next,ec)||std::filesystem::exists(next_meta,ec)||ec)
+        return asset_edit_error(error,"rename target exists");
+    std::filesystem::rename(old_source,next,ec);
+    if(ec)return asset_edit_error(error,"asset source rename failed");
+    std::filesystem::rename(old_meta,next_meta,ec);
+    if(ec){
+        std::error_code rollback;
+        std::filesystem::rename(next,old_source,rollback);
+        return asset_edit_error(error,"asset meta rename failed (source rolled back)");
+    }
+    refresh_assets();
+    const auto* updated=assets_.find(guid);
+    if(!updated||updated->source_path!=next)
+        return asset_edit_error(error,"renamed asset not indexed with original GUID");
+    import_asset(guid);
+    if(error)error->clear();
+    return true;
+}
+bool ProjectSession::delete_asset(assets::AssetGuid guid,std::string* error){
+    if(!open_)return asset_edit_error(error,"no project is open");
+    const auto* record=assets_.find(guid);
+    if(!record)return asset_edit_error(error,"asset GUID missing");
+    const auto source=record->source_path,meta=record->meta_path;
+    if(!real_source(source)||!real_source(meta))
+        return asset_edit_error(error,"unsafe asset delete source");
+    const auto moved=std::filesystem::path(source.string()+".nengine-delete");
+    const auto moved_meta=std::filesystem::path(meta.string()+".nengine-delete");
+    std::error_code ec;
+    if(std::filesystem::exists(moved,ec)||std::filesystem::exists(moved_meta,ec)||ec)
+        return asset_edit_error(error,"asset delete staging already exists");
+    std::filesystem::rename(source,moved,ec);
+    if(ec)return asset_edit_error(error,"could not stage asset delete");
+    std::filesystem::rename(meta,moved_meta,ec);
+    if(ec){
+        std::error_code rollback;
+        std::filesystem::rename(moved,source,rollback);
+        return asset_edit_error(error,"could not stage meta delete");
+    }
+    std::filesystem::remove(moved,ec);
+    if(ec)return asset_edit_error(error,"asset deletion failed");
+    std::filesystem::remove(moved_meta,ec);
+    if(ec)return asset_edit_error(error,"asset meta deletion failed");
+    refresh_assets();
+    if(assets_.find(guid))
+        return asset_edit_error(error,"deleted asset remains indexed");
+    if(error)error->clear();
+    return true;
+}
+
 assets::AssetScanResult ProjectSession::refresh_assets() {
     if (!open_) return {};
     return assets_.scan(true);
