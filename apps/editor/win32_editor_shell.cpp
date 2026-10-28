@@ -36,6 +36,7 @@
 #include "nengine/editor/performance_profiler.hpp"
 #include "nengine/scripting/managed_runtime.hpp"
 #include "nengine/render/vulkan_context.hpp"
+#include "nengine/render/components.hpp"
 #include "nengine/render/vulkan_diagnostic_scene.hpp"
 
 namespace nengine::app {
@@ -88,6 +89,10 @@ enum ControlId : int {
     IdPackageVersion,
     IdPackageAdd,
     IdPackageRemove,
+    IdAnimParameterList,
+    IdAnimParameterName,
+    IdAnimParameterValue,
+    IdAnimParameterApply,
     IdProfiler,
     IdCanvasEdit,
     IdCanvasName,
@@ -421,6 +426,11 @@ struct Win32EditorShell::Impl {
     HWND parent_hierarchy{nullptr};
     HWND scene{nullptr};
 
+    HWND anim_parameter_list{nullptr};
+    HWND anim_parameter_name{nullptr};
+    HWND anim_parameter_value{nullptr};
+    HWND anim_parameter_apply{nullptr};
+    std::vector<std::string> anim_parameter_rows{};
     HWND inspector_title{nullptr};
     HWND label_name{nullptr};
     HWND label_position{nullptr};
@@ -1111,6 +1121,16 @@ struct Win32EditorShell::Impl {
         SendMessageW(game_toggle,BM_SETCHECK,BST_CHECKED,0);
         shell_log("creating inspector controls");
         inspector_title = create_control(host, L"STATIC", L"Inspector", SS_LEFT);
+        anim_parameter_list=create_control(host,L"LISTBOX",L"",
+            WS_BORDER|LBS_NOTIFY|WS_VSCROLL,IdAnimParameterList);
+        anim_parameter_name=create_control(host,L"EDIT",L"",
+            WS_BORDER|ES_AUTOHSCROLL,IdAnimParameterName);
+        anim_parameter_value=create_control(host,L"BUTTON",L"True",
+            BS_AUTOCHECKBOX,IdAnimParameterValue);
+        anim_parameter_apply=create_control(host,L"BUTTON",L"Apply Anim Bool",
+            BS_PUSHBUTTON,IdAnimParameterApply);
+        if(!anim_parameter_list||!anim_parameter_name||!anim_parameter_value||!anim_parameter_apply)
+            return false;
         label_name = create_control(host, L"STATIC", L"Name", SS_LEFT);
         name = create_control(host, L"EDIT", L"", WS_BORDER | ES_AUTOHSCROLL, IdName);
         active = create_control(host, L"BUTTON", L"Active", BS_AUTOCHECKBOX, IdActive);
@@ -2203,11 +2223,12 @@ struct Win32EditorShell::Impl {
             MoveWindow(canvas_apply_geometry, ix, iy, iw, 26, TRUE); iy += 32;
         }
 
-        const std::array<HWND, 18> native_inspector{
+        const std::array<HWND, 22> native_inspector{
             inspector_title, label_name, name, active, label_position,
             label_rotation, label_scale, apply_transform, generic_title,
             generic_properties, generic_value, assign_asset, apply_property,
-            remove_component,add_component_list, add_component, position[0], position[1]};
+            remove_component,add_component_list, add_component, position[0], position[1],
+            anim_parameter_list,anim_parameter_name,anim_parameter_value,anim_parameter_apply};
         for (HWND control : native_inspector)
             ShowWindow(control, ui_authoring ? SW_HIDE : SW_SHOW);
         for (HWND control : position)
@@ -2347,7 +2368,7 @@ struct Win32EditorShell::Impl {
                 60,
                 inspector_bottom -
                     iy -
-                    96);
+                    173);
 
         MoveWindow(
             generic_properties,
@@ -2423,7 +2444,11 @@ struct Win32EditorShell::Impl {
             add_button_width,
             24,
             TRUE);
-
+        iy+=28;
+        MoveWindow(anim_parameter_list,ix,iy,iw,54,TRUE);iy+=57;
+        MoveWindow(anim_parameter_name,ix,iy,iw/2,24,TRUE);
+        MoveWindow(anim_parameter_value,ix+iw/2+3,iy,iw/2-3,24,TRUE);iy+=28;
+        MoveWindow(anim_parameter_apply,ix,iy,iw,24,TRUE);
         }
         const int bottom_y =
             bottom_split_y +
@@ -3645,6 +3670,26 @@ struct Win32EditorShell::Impl {
             scale[2],
             transform->local_scale.z);
 
+        // ANIM-009: inspect current Play Mode controller bools on selected
+        // entity; these reflect the runtime World, not the authoring Scene.
+        anim_parameter_rows.clear();
+        SendMessageW(anim_parameter_list,LB_RESETCONTENT,0,0);
+        const auto* animator=world.get_component<nengine::render::SpriteAnimator>(
+            snapshot.entity,nengine::render::sprite_animator_type());
+        if(animator && editor.is_playing()){
+            for(const auto& kv:animator->bool_parameters)
+                anim_parameter_rows.push_back(kv.first);
+            std::sort(anim_parameter_rows.begin(),anim_parameter_rows.end());
+            for(const auto& key:anim_parameter_rows){
+                const auto display=utf8_to_wide(key+
+                    (animator->bool_parameters.at(key)?" = true":" = false"));
+                SendMessageW(anim_parameter_list,LB_ADDSTRING,0,
+                    reinterpret_cast<LPARAM>(display.c_str()));
+            }
+        }
+        EnableWindow(anim_parameter_list,animator!=nullptr && editor.is_playing());
+        EnableWindow(anim_parameter_apply,animator!=nullptr && editor.is_playing());
+
         refresh_generic_property_editor(
             snapshot);
 
@@ -4498,6 +4543,40 @@ struct Win32EditorShell::Impl {
                     editor.console().info("Build Settings",
                         "Windows/Android target configuration saved; APK execution still requires Android backend");
                 else editor.console().warning("Build Settings",error);
+            }
+            handled=true;break;
+        case IdAnimParameterList:
+            if(notification!=LBN_SELCHANGE)return false;
+            {
+                const auto index=SendMessageW(anim_parameter_list,LB_GETCURSEL,0,0);
+                if(index>=0&&static_cast<std::size_t>(index)<anim_parameter_rows.size()){
+                    const auto& key=anim_parameter_rows[static_cast<std::size_t>(index)];
+                    SetWindowTextW(anim_parameter_name,utf8_to_wide(key).c_str());
+                    const auto entity=editor.selection().active();
+                    const auto* animator=editor.presentation_world().
+                        get_component<nengine::render::SpriteAnimator>(
+                            entity,nengine::render::sprite_animator_type());
+                    if(animator){
+                        const auto it=animator->bool_parameters.find(key);
+                        SendMessageW(anim_parameter_value,BM_SETCHECK,
+                            it!=animator->bool_parameters.end()&&it->second?
+                            BST_CHECKED:BST_UNCHECKED,0);
+                    }
+                }
+            }
+            handled=true;break;
+        case IdAnimParameterApply:
+            if(notification!=BN_CLICKED)return false;
+            {
+                wchar_t field[256]{};
+                GetWindowTextW(anim_parameter_name,field,256);
+                const bool value=SendMessageW(anim_parameter_value,BM_GETCHECK,0,0)==BST_CHECKED;
+                if(editor.set_sprite_controller_bool(editor.selection().active(),
+                       wide_to_utf8(field),value))
+                    editor.console().info("Animator","Play Mode bool parameter updated");
+                else editor.console().warning("Animator","Select an active SpriteAnimator controller");
+                refresh_inspector();
+                refresh_console();
             }
             handled=true;break;
         case IdPackages:
