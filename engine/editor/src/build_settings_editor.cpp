@@ -3,6 +3,9 @@
 #include <iomanip>
 #include <system_error>
 #include <utility>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 namespace nengine::editor {
 BuildSettingsDraft read_build_settings(const ProjectSession& project){
     const auto& m=project.manifest();
@@ -78,11 +81,16 @@ bool save_android_tool_paths(const ProjectSession& project,
     const auto target=paths_file(project);
     std::error_code ec;
     std::filesystem::create_directories(target.parent_path(),ec);
-    if(ec || std::filesystem::is_symlink(target,ec) || ec)
-        return tool_error(error,"unsafe Android toolchain settings target");
+    if(ec)return tool_error(error,"cannot create Android settings directory");
+    if(std::filesystem::exists(target,ec)){
+        if(ec||std::filesystem::is_symlink(target,ec)||ec)
+            return tool_error(error,"unsafe Android toolchain settings target");
+    }else if(ec)return tool_error(error,"cannot stat Android settings target");
     const auto temp=target.string()+".tmp";
-    if(std::filesystem::is_symlink(temp,ec)||ec)
-        return tool_error(error,"unsafe Android settings temporary path");
+    if(std::filesystem::exists(temp,ec)){
+        if(ec||std::filesystem::is_symlink(temp,ec)||ec)
+            return tool_error(error,"unsafe Android settings temporary path");
+    }else if(ec)return tool_error(error,"cannot stat Android settings temp path");
     {
         std::ofstream stream(temp,std::ios::binary|std::ios::trunc);
         if(!stream)return tool_error(error,"cannot write Android tool paths");
@@ -92,11 +100,19 @@ bool save_android_tool_paths(const ProjectSession& project,
               <<std::quoted(paths.jdk.generic_string())<<"\n";
         if(!stream.good())return tool_error(error,"Android tool path write failed");
     }
+#ifdef _WIN32
+    if(!MoveFileExW(std::filesystem::path(temp).c_str(),target.c_str(),
+                    MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)){
+        std::filesystem::remove(temp);
+        return tool_error(error,"cannot atomically publish Android settings");
+    }
+#else
     std::filesystem::rename(temp,target,ec);
     if(ec){
         std::filesystem::remove(temp);
         return tool_error(error,"cannot publish Android tool settings");
     }
+#endif
     if(error)error->clear();
     return true;
 }
