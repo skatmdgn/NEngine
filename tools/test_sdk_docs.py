@@ -37,7 +37,7 @@ class SdkDocsContractTests(unittest.TestCase):
 
     def test_docs_do_not_claim_android_or_hardware_acceptance(self):
         guide = (ROOT / "samples/managed/README.md").read_text(encoding="utf-8")
-        self.assertIn("does **not**", guide)
+        self.assertIn("**does not**", guide)
         self.assertIn("APK", guide)
         self.assertIn("not a production-ready 1.0", guide)
 
