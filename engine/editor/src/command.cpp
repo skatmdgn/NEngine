@@ -1,4 +1,5 @@
 #include "nengine/editor/command.hpp"
+#include <algorithm>
 
 namespace nengine::editor {
 
