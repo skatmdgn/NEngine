@@ -350,7 +350,7 @@ int main() {
             std::ifstream two(repeated_report.bundle_root/relative,std::ios::binary);
             const std::string first(std::istreambuf_iterator<char>{one},{});
             const std::string second(std::istreambuf_iterator<char>{two},{});
-            if(!one.eof() || !two.eof() || first!=second)
+            if(!one.is_open() || !two.is_open() || one.bad() || two.bad() || first!=second)
                 return test_failure(9011,__LINE__);
         }
     }
