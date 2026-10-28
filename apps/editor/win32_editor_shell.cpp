@@ -82,6 +82,12 @@ enum ControlId : int {
     IdAndroidNdkPath,
     IdAndroidJdkPath,
     IdAndroidPathsApply,
+    IdPackages,
+    IdPackageList,
+    IdPackageId,
+    IdPackageVersion,
+    IdPackageAdd,
+    IdPackageRemove,
     IdProfiler,
     IdCanvasEdit,
     IdCanvasName,
@@ -345,6 +351,14 @@ struct Win32EditorShell::Impl {
     bool profiler_visible{false};
     ULONGLONG next_profiler_refresh{0};
     nengine::editor::PerformanceProfiler profiler_samples{};
+    HWND package_toggle{nullptr};
+    HWND package_list{nullptr};
+    HWND package_id{nullptr};
+    HWND package_version{nullptr};
+    HWND package_add{nullptr};
+    HWND package_remove{nullptr};
+    bool package_editor_visible{false};
+    nengine::editor::ManagedPackageRows package_rows{};
     HWND build_toggle{nullptr};
     HWND build_name{nullptr};
     HWND build_windows{nullptr};
@@ -979,6 +993,7 @@ struct Win32EditorShell::Impl {
         game_toggle = create_control(host,L"BUTTON",L"Game View",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdGameView);
         action_toggle = create_control(host,L"BUTTON",L"Input Actions",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdActionEditor);
         build_toggle = create_control(host,L"BUTTON",L"Build Settings",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdBuildSettings);
+        package_toggle = create_control(host,L"BUTTON",L"Packages",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdPackages);
         profiler_toggle = create_control(host,L"BUTTON",L"Profiler",BS_AUTOCHECKBOX | BS_PUSHLIKE,IdProfiler);
         vulkan_preview = create_control(
             host,
@@ -987,7 +1002,7 @@ struct Win32EditorShell::Impl {
             BS_AUTOCHECKBOX | BS_PUSHLIKE,
             IdVulkanPreview);
 
-        if (!game_toggle || !action_toggle || !build_toggle || !profiler_toggle || !open_scene || !save_scene || !new_entity || !delete_entity ||
+        if (!package_toggle || !game_toggle || !action_toggle || !build_toggle || !profiler_toggle || !open_scene || !save_scene || !new_entity || !delete_entity ||
             !refresh_assets || !scripts || !build_scripts || !undo || !redo ||
             !play || !pause || !step || !stop ||
             !vulkan_preview) {
@@ -1339,7 +1354,13 @@ struct Win32EditorShell::Impl {
         android_ndk_path=create_control(host,L"EDIT",L"",WS_BORDER|ES_AUTOHSCROLL,IdAndroidNdkPath);
         android_jdk_path=create_control(host,L"EDIT",L"",WS_BORDER|ES_AUTOHSCROLL,IdAndroidJdkPath);
         android_paths_apply=create_control(host,L"BUTTON",L"Validate and Save SDK / NDK / JDK",BS_PUSHBUTTON,IdAndroidPathsApply);
-        if(!android_sdk_path||!android_ndk_path||!android_jdk_path||!android_paths_apply||
+        package_list=create_control(host,L"LISTBOX",L"",WS_BORDER|LBS_NOTIFY|WS_VSCROLL,IdPackageList);
+        package_id=create_control(host,L"EDIT",L"",WS_BORDER|ES_AUTOHSCROLL,IdPackageId);
+        package_version=create_control(host,L"EDIT",L"",WS_BORDER|ES_AUTOHSCROLL,IdPackageVersion);
+        package_add=create_control(host,L"BUTTON",L"Install / Update",BS_PUSHBUTTON,IdPackageAdd);
+        package_remove=create_control(host,L"BUTTON",L"Remove",BS_PUSHBUTTON,IdPackageRemove);
+        if(!package_list||!package_id||!package_version||!package_add||!package_remove||
+            !android_sdk_path||!android_ndk_path||!android_jdk_path||!android_paths_apply||
             !profiler_list||!build_name||!build_windows||!build_android||!build_toolchain||!build_apply||
             !action_list || !action_name || !action_key || !action_add ||
             !action_remove || !action_save ||
@@ -2014,6 +2035,7 @@ struct Win32EditorShell::Impl {
         MoveWindow(action_toggle,kPadding+116,38,120,26,TRUE);
         MoveWindow(build_toggle,kPadding+242,38,122,26,TRUE);
         MoveWindow(profiler_toggle,kPadding+370,38,110,26,TRUE);
+        MoveWindow(package_toggle,kPadding+486,38,110,26,TRUE);
         const int content_top =
             kToolbarHeight;
 
@@ -2442,7 +2464,7 @@ struct Win32EditorShell::Impl {
                 kPadding,
             bottom_h,
             TRUE);
-        const bool tool_open=action_editor_visible||build_settings_visible||profiler_visible;
+        const bool tool_open=action_editor_visible||build_settings_visible||profiler_visible||package_editor_visible;
         ShowWindow(assets_list,tool_open?SW_HIDE:SW_SHOW);
         ShowWindow(console,tool_open?SW_HIDE:SW_SHOW);
         const auto action_controls=std::array<HWND,6>{
@@ -2452,6 +2474,17 @@ struct Win32EditorShell::Impl {
             build_name,build_windows,build_android,build_toolchain,build_apply,
             android_sdk_path,android_ndk_path,android_jdk_path,android_paths_apply};
         for(auto ctrl:build_controls)ShowWindow(ctrl,build_settings_visible?SW_SHOW:SW_HIDE);
+        const auto package_controls=std::array<HWND,5>{
+            package_list,package_id,package_version,package_add,package_remove};
+        for(auto ctrl:package_controls)ShowWindow(ctrl,package_editor_visible?SW_SHOW:SW_HIDE);
+        if(package_editor_visible){
+            const int pw=std::max(380,width-3*kPadding), half=pw/2;
+            MoveWindow(package_list,kPadding,bottom_y,half-12,bottom_h,TRUE);
+            MoveWindow(package_id,kPadding+half,bottom_y,pw-half,25,TRUE);
+            MoveWindow(package_version,kPadding+half,bottom_y+34,pw-half,25,TRUE);
+            MoveWindow(package_add,kPadding+half,bottom_y+68,(pw-half)/2-4,26,TRUE);
+            MoveWindow(package_remove,kPadding+half+(pw-half)/2,bottom_y+68,(pw-half)/2,26,TRUE);
+        }
         ShowWindow(profiler_list,profiler_visible?SW_SHOW:SW_HIDE);
         if(profiler_visible)
             MoveWindow(profiler_list,kPadding,bottom_y,width-2*kPadding,bottom_h,TRUE);
@@ -4377,6 +4410,8 @@ struct Win32EditorShell::Impl {
             if(action_editor_visible){
                 profiler_visible=false;
                 SendMessageW(profiler_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                package_editor_visible=false;
+                SendMessageW(package_toggle,BM_SETCHECK,BST_UNCHECKED,0);
                 build_settings_visible=false;
                 SendMessageW(build_toggle,BM_SETCHECK,BST_UNCHECKED,0);
                 std::string error;
@@ -4399,6 +4434,8 @@ struct Win32EditorShell::Impl {
             if(profiler_visible){
                 action_editor_visible=false;
                 build_settings_visible=false;
+                package_editor_visible=false;
+                SendMessageW(package_toggle,BM_SETCHECK,BST_UNCHECKED,0);
                 SendMessageW(action_toggle,BM_SETCHECK,BST_UNCHECKED,0);
                 SendMessageW(build_toggle,BM_SETCHECK,BST_UNCHECKED,0);
                 refresh_profiler();
@@ -4413,6 +4450,8 @@ struct Win32EditorShell::Impl {
             if(notification!=BN_CLICKED)return false;
             build_settings_visible=SendMessageW(build_toggle,BM_GETCHECK,0,0)==BST_CHECKED;
             if(build_settings_visible){
+                package_editor_visible=false;
+                SendMessageW(package_toggle,BM_SETCHECK,BST_UNCHECKED,0);
                 profiler_visible=false;
                 SendMessageW(profiler_toggle,BM_SETCHECK,BST_UNCHECKED,0);
                 action_editor_visible=false;
@@ -4459,6 +4498,62 @@ struct Win32EditorShell::Impl {
                     editor.console().info("Build Settings",
                         "Windows/Android target configuration saved; APK execution still requires Android backend");
                 else editor.console().warning("Build Settings",error);
+            }
+            handled=true;break;
+        case IdPackages:
+            if(notification!=BN_CLICKED)return false;
+            package_editor_visible=SendMessageW(package_toggle,BM_GETCHECK,0,0)==BST_CHECKED;
+            if(package_editor_visible){
+                build_settings_visible=false;
+                action_editor_visible=false;
+                profiler_visible=false;
+                SendMessageW(build_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                SendMessageW(action_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                SendMessageW(profiler_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                std::string error;
+                if(!nengine::editor::load_managed_packages(editor.project(),package_rows,&error)){
+                    package_editor_visible=false;
+                    SendMessageW(package_toggle,BM_SETCHECK,BST_UNCHECKED,0);
+                    editor.console().warning("Packages",error);
+                }else{
+                    SendMessageW(package_list,LB_RESETCONTENT,0,0);
+                    for(const auto& p:package_rows){
+                        const auto display=utf8_to_wide(p.id+" @ "+p.version);
+                        SendMessageW(package_list,LB_ADDSTRING,0,reinterpret_cast<LPARAM>(display.c_str()));
+                    }
+                }
+            }
+            {RECT rect{};GetClientRect(host,&rect);layout(rect.right,rect.bottom);}
+            handled=true;break;
+        case IdPackageList:
+            if(notification!=LBN_SELCHANGE)return false;
+            {
+                const auto i=SendMessageW(package_list,LB_GETCURSEL,0,0);
+                if(i>=0 && static_cast<std::size_t>(i)<package_rows.size()){
+                    SetWindowTextW(package_id,utf8_to_wide(package_rows[static_cast<std::size_t>(i)].id).c_str());
+                    SetWindowTextW(package_version,utf8_to_wide(package_rows[static_cast<std::size_t>(i)].version).c_str());
+                }
+            }
+            handled=true;break;
+        case IdPackageAdd:
+        case IdPackageRemove:
+            if(notification!=BN_CLICKED)return false;
+            {
+                wchar_t id[200]{},version[200]{};
+                GetWindowTextW(package_id,id,200);
+                GetWindowTextW(package_version,version,200);
+                std::string error;
+                const auto value=(id_control==IdPackageRemove)?std::string{}:wide_to_utf8(version);
+                if(nengine::editor::edit_managed_package(editor.project(),wide_to_utf8(id),value,&error) &&
+                   nengine::editor::load_managed_packages(editor.project(),package_rows,&error)){
+                    SendMessageW(package_list,LB_RESETCONTENT,0,0);
+                    for(const auto& p:package_rows){
+                        const auto display=utf8_to_wide(p.id+" @ "+p.version);
+                        SendMessageW(package_list,LB_ADDSTRING,0,reinterpret_cast<LPARAM>(display.c_str()));
+                    }
+                    editor.console().info("Packages","NuGet manifest saved; select Build C# to restore packages");
+                }else editor.console().warning("Packages",error);
+                refresh_console();
             }
             handled=true;break;
         case IdAndroidPathsApply:
