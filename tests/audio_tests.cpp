@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -777,6 +778,99 @@ int main() {
         std::abs(rendered_audio[6] + 0.5f) < 0.0001f &&
         std::abs(rendered_audio[7] + 1.0f) < 0.0001f,
         "software audio renderer mixes mono PCM into stereo gains");
+
+    // AUD-005: suppress a 18kHz tone when downsampling 48kHz -> 16kHz.
+    // 18kHz is out of band; without prefiltering it folds to 2kHz.
+    audio::AudioClipData aliased;
+    aliased.sample_rate=48000u;
+    aliased.channels=1u;
+    aliased.samples.reserve(4800u);
+    constexpr double two_pi=6.283185307179586;
+    for(std::size_t i=0;i<4800u;++i)
+        aliased.samples.push_back(static_cast<float>(
+            std::sin(two_pi*18000.0*static_cast<double>(i)/48000.0)));
+    auto lowpass_source=render_source;
+    lowpass_source.left_gain=1.f;
+    lowpass_source.right_gain=1.f;
+    lowpass_source.loop=true;
+    audio::AudioMixSnapshot lowpass_snapshot;
+    lowpass_snapshot.sources.push_back(lowpass_source);
+    std::vector<float> downsampled;
+    const auto lp_stats=audio::render_stereo_mix(lowpass_snapshot,
+        [&](assets::AssetGuid){return &aliased;},16000u,1400u,downsampled);
+    double power=0.0;
+    for(std::size_t i=20u;i<downsampled.size()/2u;++i)
+        power+=static_cast<double>(downsampled[i*2u])*
+               static_cast<double>(downsampled[i*2u]);
+    power/=1380.0;
+    check(lp_stats.sources_mixed==1u && downsampled.size()==2800u &&
+          power<0.015,
+          "AUD-005 48k to 16k band-limited resampling suppresses alias above Nyquist");
+    aliased.sample_rate=48000u;
+    for(std::size_t i=0;i<4800u;++i)
+        aliased.samples[i]=static_cast<float>(
+            std::sin(two_pi*1000.0*static_cast<double>(i)/48000.0));
+    audio::render_stereo_mix(lowpass_snapshot,
+        [&](assets::AssetGuid){return &aliased;},16000u,1400u,downsampled);
+    double lowpass_rms=0.0;
+    for(std::size_t i=20u;i<1400u;++i)
+        lowpass_rms+=static_cast<double>(downsampled[i*2u])*
+                     static_cast<double>(downsampled[i*2u]);
+    lowpass_rms=std::sqrt(lowpass_rms/1380.0);
+    check(lowpass_rms>0.6 && lowpass_rms<0.8,
+          "AUD-005 in-band audio remains audible after sample-rate conversion");
+    lowpass_source.pitch=std::numeric_limits<float>::infinity();
+    lowpass_snapshot.sources[0]=lowpass_source;
+    const auto invalid_render=audio::render_stereo_mix(lowpass_snapshot,
+        [&](assets::AssetGuid){return &aliased;},16000u,100u,downsampled);
+    check(invalid_render.sources_mixed==0u &&
+          std::all_of(downsampled.begin(),downsampled.end(),
+              [](float sample){return std::isfinite(sample)&&sample==0.0f;}),
+          "AUD-005 invalid pitch yields safe silence without undefined float conversion");
+
+    // AUD-009: sustained BGM plus concurrent SFX at different rates/pans.
+    // Bounded deterministic stress cannot replace a physical audio device soak.
+    audio::AudioClipData bgm;
+    bgm.sample_rate=44100u; bgm.channels=2u;
+    bgm.samples.assign(4410u*2u,0.2f);
+    audio::AudioClipData sfx;
+    sfx.sample_rate=32000u; sfx.channels=1u;
+    sfx.samples.assign(320u,0.1f);
+    audio::AudioMixSnapshot load_snapshot;
+    auto bgm_state=render_source;
+    bgm_state.time_seconds=0.f;bgm_state.left_gain=0.4f;
+    bgm_state.right_gain=0.4f;bgm_state.loop=true;
+    load_snapshot.sources.push_back(bgm_state);
+    const auto sfx_guid=assets::AssetGuid::generate();
+    for(int i=0;i<48;++i){
+        auto effect=render_source;
+        effect.clip=sfx_guid;
+        effect.time_seconds=0.f;
+        effect.loop=true;
+        effect.left_gain=i%2?0.02f:0.01f;
+        effect.right_gain=i%2?0.01f:0.02f;
+        load_snapshot.sources.push_back(effect);
+    }
+    std::vector<float> mix_chunk;
+    bool finite_mix=true;
+    std::size_t combined_frames=0u;
+    for(int block=0;block<512;++block){
+        const auto rendered=audio::render_stereo_mix(load_snapshot,
+            [&](assets::AssetGuid guid)->const audio::AudioClipData*{
+                return guid==sfx_guid?&sfx:&bgm;
+            },48000u,128u,mix_chunk);
+        if(rendered.sources_mixed!=49u || mix_chunk.size()!=256u ||
+           !std::all_of(mix_chunk.begin(),mix_chunk.end(),
+             [](float f){return std::isfinite(f)&&f>=-1.0f&&f<=1.0f;})){
+            finite_mix=false;break;
+        }
+        combined_frames+=rendered.frames_rendered;
+        load_snapshot.sources[0].time_seconds=
+            static_cast<float>(combined_frames)/48000.0f;
+    }
+    check(finite_mix && combined_frames==512u*128u,
+          "AUD-009 sustained BGM and 48 SFX sources mix without drop, overflow or NaN");
+
 
     audio::AudioOutputDevice output_device;
     std::string device_error;
