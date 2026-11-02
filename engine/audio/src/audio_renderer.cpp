@@ -102,6 +102,46 @@ float sample_linear(
             fraction;
 }
 
+// AUD-005: finite 12-tap low-pass reconstruction on downsampling.
+// Linear interpolation aliases when source_rate*pitch > output_rate.
+// Keep the linear path for 1:1/up-sampling to avoid changing existing
+// sample-exact startup behavior.
+float sample_resampled(const AudioClipData& clip, double frame_position,
+                       std::uint16_t channel, bool loop, double step) noexcept {
+    if (!std::isfinite(frame_position) || !std::isfinite(step) || step<=0.0)
+        return 0.0f;
+    if (step<=1.0 || clip.frame_count()<4u)
+        return sample_linear(clip,frame_position,channel,loop);
+    const double radius=12.0, cutoff=std::min(1.0,1.0/step);
+    constexpr double pi=3.14159265358979323846;
+    if (!loop && frame_position>=static_cast<double>(clip.frame_count()))
+        return 0.0f;
+    double weighted=0.0,weight_sum=0.0;
+    const double center=std::floor(frame_position);
+    for(int k=-11;k<=12;++k){
+        const double pos=center+static_cast<double>(k);
+        const double offset=frame_position-pos;
+        if (std::abs(offset)>=radius)continue;
+        const double sinc_argument=pi*cutoff*offset;
+        const double sinc=std::abs(sinc_argument)<1e-9?
+            1.0:std::sin(sinc_argument)/sinc_argument;
+        const double window=0.5+0.5*std::cos(pi*offset/radius);
+        const double weight=cutoff*sinc*window;
+        auto index=static_cast<std::int64_t>(pos);
+        if(loop){
+            const auto count=static_cast<std::int64_t>(clip.frame_count());
+            index=((index%count)+count)%count;
+        }else{
+            index=std::clamp<std::int64_t>(
+                index,0,static_cast<std::int64_t>(clip.frame_count())-1);
+        }
+        weighted+=weight*sample_channel(clip,static_cast<std::size_t>(index),channel);
+        weight_sum+=weight;
+    }
+    return std::abs(weight_sum)>1e-9?
+        static_cast<float>(weighted/weight_sum):0.0f;
+}
+
 } // namespace
 
 AudioRenderStats render_stereo_mix(
@@ -131,7 +171,7 @@ AudioRenderStats render_stereo_mix(
 
         if (!source.playing ||
             !source.clip.valid() ||
-            source.pitch <= 0.0f) {
+            !std::isfinite(source.pitch) || source.pitch <= 0.0f) {
             continue;
         }
 
@@ -191,28 +231,28 @@ AudioRenderStats render_stereo_mix(
 
             if (clip->channels == 1u) {
                 const float mono =
-                    sample_linear(
+                    sample_resampled(
                         *clip,
                         position,
                         0u,
-                        source.loop);
+                        source.loop,step);
 
                 left_sample = mono;
                 right_sample = mono;
             } else {
                 left_sample =
-                    sample_linear(
+                    sample_resampled(
                         *clip,
                         position,
                         0u,
-                        source.loop);
+                        source.loop,step);
 
                 right_sample =
-                    sample_linear(
+                    sample_resampled(
                         *clip,
                         position,
                         1u,
-                        source.loop);
+                        source.loop,step);
             }
 
             const auto index =
