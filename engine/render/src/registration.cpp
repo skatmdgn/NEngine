@@ -408,6 +408,9 @@ bool register_component_metadata(
                 core::PropertyFlags::Serializable |
                     core::PropertyFlags::Editable
             }) && ok;
+    ok = registry.register_property(
+        sprite_renderer_type(), {"Pivot",core::PropertyKind::Vec3,
+            core::PropertyFlags::Serializable|core::PropertyFlags::Editable}) && ok;
 
     ok =
         registry.register_property(
@@ -855,6 +858,7 @@ bool register_component_serializers(
                     integer_property(
                         "Sort Order",
                         renderer->sort_order),
+                    vec3_property("Pivot",renderer->pivot),
                     boolean_property(
                         "Flip X",
                         renderer->flip_x),
@@ -906,6 +910,16 @@ bool register_component_serializers(
                     return false;
                 }
 
+                // Scene v3 sources that predate Pivot retain centered quads.
+                const auto has_pivot=std::any_of(data.properties.begin(),
+                    data.properties.end(),[](const auto& p){return p.name=="Pivot";});
+                if((has_pivot && !read_vec3(data,"Pivot",value.pivot))||
+                   !std::isfinite(value.pivot.x)||!std::isfinite(value.pivot.y)||
+                   value.pivot.x<0.f||value.pivot.x>1.f||
+                   value.pivot.y<0.f||value.pivot.y>1.f){
+                    if(error)*error="invalid SpriteRenderer normalized Pivot";
+                    return false;
+                }
                 auto* renderer =
                     world.get_component<SpriteRenderer>(
                         entity,
