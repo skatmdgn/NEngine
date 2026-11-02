@@ -30,6 +30,8 @@ struct AnimationTransition {
     std::string bool_parameter{};
     bool expected{true};
     float minimum_exit_seconds{0.0f};
+    // ANIM-005: blend time for state speed interpolation; 0 = instant.
+    float blend_seconds{0.0f};
 };
 
 struct AnimationController {
@@ -52,6 +54,14 @@ bool write_animation_controller(
 struct AnimationControllerPlayer {
     std::string state{};
     std::unordered_map<std::string, bool> bools{};
+    std::string previous_state{};
+    float blend_elapsed_seconds{0.f};
+    float blend_duration_seconds{0.f};
+    float last_elapsed_seconds{0.f};
+    float blend_weight() const noexcept;
+    bool blending() const noexcept {
+        return blend_duration_seconds>0.f && blend_elapsed_seconds<blend_duration_seconds;
+    }
 
     void set_bool(std::string parameter, bool value);
     bool get_bool(std::string_view parameter) const;
