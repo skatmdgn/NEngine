@@ -22,6 +22,14 @@ NEngine은 **Unity의 사용 경험과 개념에 익숙한 개발자가 쓸 수 
 - **Android 툴체인**은 버전별 SDK/NDK/JDK/Gradle 프로필로 관리한다. Windows 빌드 성공이 Android 앱 실행을 의미하지 않는다.
 - 목표는 Unity 전체 API·엔진 코드·패키지 재현이 아닌, 실제 2D/3D 게임 제작과 배포에 필요한 제한된 독립적 제품 완성이다.
 
+## 2026-11-02 PR #44 — 오디오·2D·재질 7개 소스 수용 후보
+
+- `AUD-005/009`: 12-tap 대역 제한 다운샘플링과 24 SFX+BGM 부하 검증(실음향/장기 재생 미검증).
+- `REND-011/012`: 정규화 피벗 및 결정적 스프라이트 정렬, 가변 카메라 종횡비/유효하지 않은 viewport 제어. 실 Vulkan 픽셀/스왑체인 동작은 별도다.
+- `SHDR-004/006`: opaque/blend × cull/double-sided 키의 명시적 fallback 및 동일 렌더 경로 통합. mask 전용 alpha discard나 실제 GPU 셰이더 픽셀 일치 시험은 별도다.
+- `ANIM-005`: 컨트롤러 v2 블렌드 지속시간과 상태 중단/재진입, 애니메이터 속도 보간. 프레임 텍스처 동시 혼합이나 3D 스켈레탈 크로스페이드를 의미하지 않는다.
+- 7개는 소스·자동화 범위의 조건부 후보이며 PR #44 최종 동일 HEAD CI가 성공하고 병합되기 전 `main`의 공식 수치는 153/285를 유지한다.
+
 ## 2026-10-28 PR #43 — 8개 소스 수용 후보
 
 - `main`의 145/285 검증 기준을 바탕으로 Editor Asset Browser 가져오기·이름변경·삭제, SpriteAnimator bool Inspector, Android SDK/NDK/JDK 경로 설정, NuGet Packages UI, SHA256 검증 기반 관리형 DLL 교체/삭제, Android ABI별 Gradle jniLibs 스테이징, Player 번들 콘텐츠 재현성, C# SDK 사용자 가이드와 API 계약 테스트의 8개 기존 ID를 추가.

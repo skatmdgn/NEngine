@@ -13,6 +13,8 @@
 #include "nengine/render/matrix.hpp"
 #include "nengine/render/model_importer.hpp"
 #include "nengine/render/render_snapshot.hpp"
+#include "nengine/render/material_pipeline_selection.hpp"
+#include "nengine/render/sprite_geometry.hpp"
 
 namespace nengine::render {
 
@@ -25,22 +27,16 @@ select_material_pipeline(
     const VulkanGraphicsPipeline& double_sided,
     const VulkanGraphicsPipeline& blend,
     const VulkanGraphicsPipeline& blend_double_sided) noexcept {
-
-    if (!material) {
-        return &opaque;
+    switch(select_material_variant(material)){
+        case MaterialPipelineVariant::OpaqueDoubleSided:
+            return &double_sided;
+        case MaterialPipelineVariant::BlendCull:
+            return &blend;
+        case MaterialPipelineVariant::BlendDoubleSided:
+            return &blend_double_sided;
+        default:
+            return &opaque;
     }
-
-    if (material->alpha_mode ==
-        MaterialAlphaMode::Blend) {
-
-        return material->double_sided
-            ? &blend_double_sided
-            : &blend;
-    }
-
-    return material->double_sided
-        ? &double_sided
-        : &opaque;
 }
 
 } // namespace
@@ -777,15 +773,7 @@ bool VulkanDiagnosticScene::present_world(
         auto sprites =
             snapshot.sprites;
 
-        std::stable_sort(
-            sprites.begin(),
-            sprites.end(),
-            [](const auto& left,
-               const auto& right) {
-                return
-                    left.renderer.sort_order <
-                    right.renderer.sort_order;
-            });
+        sort_sprites_for_draw(sprites);
 
         for (const auto& item :
              sprites) {
@@ -870,21 +858,8 @@ bool VulkanDiagnosticScene::present_world(
                 item.renderer
                     .pixels_per_unit;
 
-            const auto sprite_scale =
-                scaling_matrix({
-                    item.renderer.flip_x
-                        ? -width_units
-                        : width_units,
-                    item.renderer.flip_y
-                        ? -height_units
-                        : height_units,
-                    1.0f
-                });
-
             const auto sprite_world =
-                multiply(
-                    item.world,
-                    sprite_scale);
+                sprite_model_matrix(item,width_units,height_units);
 
             draws.push_back({
                 &sprite_pipeline_,

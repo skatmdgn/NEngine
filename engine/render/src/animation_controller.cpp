@@ -2,6 +2,7 @@
 #include "nengine/render/components.hpp"
 #include "nengine/assets/bounded_input.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <iomanip>
 #include <sstream>
@@ -38,7 +39,9 @@ bool AnimationController::validate(std::string* error) const {
         if ((!edge.from.empty() && !find(edge.from)) ||
             !find(edge.to) || edge.bool_parameter.empty() ||
             !std::isfinite(edge.minimum_exit_seconds) ||
-            edge.minimum_exit_seconds < 0.0f)
+            edge.minimum_exit_seconds < 0.0f ||
+            !std::isfinite(edge.blend_seconds) || edge.blend_seconds<0.f ||
+            edge.blend_seconds>60.f)
             return fail("animation controller transition is invalid");
     }
     if (error) error->clear();
@@ -52,7 +55,9 @@ bool write_animation_controller(
     if (!controller.validate(error)) return false;
     std::ostringstream staged;
     staged << std::setprecision(std::numeric_limits<float>::max_digits10);
-    staged << "NENGINE_ANIMATION_CONTROLLER 1\n"
+    const bool v2=std::any_of(controller.transitions.begin(),
+        controller.transitions.end(),[](const auto& edge){return edge.blend_seconds>0.f;});
+    staged << "NENGINE_ANIMATION_CONTROLLER " << (v2?2:1) << "\n"
            << "DEFAULT " << std::quoted(controller.default_state) << "\n"
            << "STATES " << controller.states.size() << "\n";
     for (const auto& state : controller.states) {
@@ -66,7 +71,9 @@ bool write_animation_controller(
                << std::quoted(edge.to) << ' '
                << std::quoted(edge.bool_parameter) << ' '
                << (edge.expected ? 1 : 0) << ' '
-               << edge.minimum_exit_seconds << "\n";
+               << edge.minimum_exit_seconds;
+        if(v2)staged << ' ' << edge.blend_seconds;
+        staged << "\n";
     }
     staged << "END_ANIMATION_CONTROLLER\n";
     output << staged.str();
@@ -94,7 +101,7 @@ bool read_animation_controller(
     unsigned version = 0;
     AnimationController candidate;
     if (!(input >> tag >> version) ||
-        tag != "NENGINE_ANIMATION_CONTROLLER" || version != 1u ||
+        tag != "NENGINE_ANIMATION_CONTROLLER" || (version != 1u && version != 2u) ||
         !(input >> tag) || tag != "DEFAULT" ||
         !(input >> std::quoted(candidate.default_state)))
         return fail("invalid animation controller header/default");
@@ -135,6 +142,8 @@ bool read_animation_controller(
                     edge.minimum_exit_seconds) ||
             (expected != 0 && expected != 1))
             return fail("malformed animation controller transition");
+        if(version==2u && !(input >> edge.blend_seconds))
+            return fail("malformed v2 animation transition blend seconds");
         edge.expected = expected == 1;
         candidate.transitions.push_back(std::move(edge));
     }
@@ -162,8 +171,17 @@ bool AnimationControllerPlayer::get_bool(
     return it != bools.end() && it->second;
 }
 
+float AnimationControllerPlayer::blend_weight() const noexcept {
+    return blend_duration_seconds>0.f?
+        std::clamp(blend_elapsed_seconds/blend_duration_seconds,0.f,1.f):1.f;
+}
+
 void AnimationControllerPlayer::reset() noexcept {
     state.clear();
+    previous_state.clear();
+    blend_elapsed_seconds=0.f;
+    blend_duration_seconds=0.f;
+    last_elapsed_seconds=0.f;
     bools.clear();
 }
 
@@ -176,9 +194,17 @@ bool AnimationControllerPlayer::evaluate(
 
     if (!controller.find(state)) {
         state = controller.default_state;
+        previous_state.clear();
+        blend_elapsed_seconds=0.f;
+        blend_duration_seconds=0.f;
+        last_elapsed_seconds=0.f;
         return true;
     }
-
+    const float delta=std::max(0.f,elapsed_seconds-last_elapsed_seconds);
+    if(blend_duration_seconds>0.f)
+        blend_elapsed_seconds=std::min(blend_duration_seconds,
+            blend_elapsed_seconds+delta);
+    last_elapsed_seconds=elapsed_seconds;
     for (const auto& edge : controller.transitions) {
         if ((!edge.from.empty() && edge.from != state) ||
             edge.to == state ||
@@ -186,7 +212,11 @@ bool AnimationControllerPlayer::evaluate(
             get_bool(edge.bool_parameter) != edge.expected)
             continue;
 
+        previous_state = state;
         state = edge.to;
+        blend_elapsed_seconds=0.f;
+        blend_duration_seconds=edge.blend_seconds;
+        last_elapsed_seconds=0.f;
         return true;
     }
     return false;
@@ -207,16 +237,18 @@ bool apply_sprite_controller(
         !world.get_component<SpriteRenderer>(entity, sprite_renderer_type()))
         return false;
 
-    if (!player.evaluate(definition, animator->time_seconds))
-        return false;
-
-    const auto* state = definition.find(player.state);
-    if (!state) return false;
-    animator->clip = state->clip;
-    animator->speed = state->speed;
-    animator->loop = state->loop;
-    animator->time_seconds = 0.0f;
-    animator->playing = true;
+    const bool entered=player.evaluate(definition,animator->time_seconds);
+    const auto* state=definition.find(player.state);
+    if(!state)return false;
+    const auto* previous=definition.find(player.previous_state);
+    const float weight=player.blend_weight();
+    const float previous_speed=previous?previous->speed:state->speed;
+    animator->speed=previous_speed*(1.f-weight)+state->speed*weight;
+    if(!entered)return false;
+    animator->clip=state->clip;
+    animator->loop=state->loop;
+    animator->time_seconds=0.f;
+    animator->playing=true;
     return true;
 }
 

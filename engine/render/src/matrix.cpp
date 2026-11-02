@@ -539,6 +539,11 @@ build_camera_matrices(
         return std::nullopt;
     }
 
+    // REND-012: resizing/swapchain recreation may temporarily supply zero,
+    // NaN or infinity. Reject invalid dimensions instead of publishing NaN MVPs.
+    if(!std::isfinite(aspect)||aspect<=0.f||
+       !std::isfinite(viewport_height)||viewport_height<0.f)
+        return std::nullopt;
     CameraMatrices result;
 
     result.world =

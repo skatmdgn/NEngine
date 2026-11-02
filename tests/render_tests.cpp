@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <limits>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -26,12 +27,14 @@
 #include "nengine/render/diagnostic_shaders.hpp"
 #include "nengine/render/gltf_mesh.hpp"
 #include "nengine/render/material_asset.hpp"
+#include "nengine/render/material_pipeline_selection.hpp"
 #include "nengine/render/matrix.hpp"
 #include "nengine/render/mesh_data.hpp"
 #include "nengine/render/model_importer.hpp"
 #include "nengine/render/obj_mesh.hpp"
 #include "nengine/render/registration.hpp"
 #include "nengine/render/render_snapshot.hpp"
+#include "nengine/render/sprite_geometry.hpp"
 #include "nengine/render/rhi.hpp"
 #include "nengine/render/sprite_animation.hpp"
 #include "nengine/render/animation_controller.hpp"
@@ -71,6 +74,92 @@ void check(
 
 int main() {
     using namespace nengine;
+
+    // REND-011: pivots are normalized and sorting is deterministic even
+    // when two sprites share the same layer.
+    {
+        render::SpriteItem bottom,top;
+        bottom.entity=core::Entity::make(8,1);
+        top.entity=core::Entity::make(4,1);
+        bottom.renderer.sort_order=3;
+        top.renderer.sort_order=3;
+        bottom.world=render::Mat4::identity();
+        top.world=render::Mat4::identity();
+        bottom.renderer.pivot={0.f,0.f,0.f};
+        top.renderer.pivot={1.f,1.f,0.f};
+        auto bottom_transform=render::sprite_model_matrix(bottom,2.f,4.f);
+        auto top_transform=render::sprite_model_matrix(top,2.f,4.f);
+        check(std::abs(bottom_transform.at(0,3)-1.f)<1e-5f &&
+              std::abs(bottom_transform.at(1,3)-2.f)<1e-5f &&
+              std::abs(top_transform.at(0,3)+1.f)<1e-5f &&
+              std::abs(top_transform.at(1,3)+2.f)<1e-5f,
+              "REND-011 SpriteRenderer normalized pivot offsets quad in world coordinates");
+        auto layered=std::vector<render::SpriteItem>{bottom,top};
+        render::sort_sprites_for_draw(layered);
+        check(layered[0].entity==top.entity && layered[1].entity==bottom.entity,
+              "REND-011 same-layer sprites draw deterministically by Entity identity");
+        top.renderer.sort_order=-2;
+        layered={bottom,top};
+        render::sort_sprites_for_draw(layered);
+        check(layered[0].entity==top.entity,
+              "REND-011 explicit sort layer wins over Entity identity");
+    }
+    // REND-012: resizing orthographic/perspective viewports updates camera
+    // projection without disturbing the scene or emitting nonfinite matrices.
+    {
+        core::World preview;
+        auto camera_entity=preview.create("Resizable Camera");
+        auto* c=preview.add_component<render::Camera>(
+            camera_entity,render::camera_type());
+        check(c!=nullptr,"REND-012 test camera component registered");
+        if(c){
+            c->projection=render::ProjectionMode::Orthographic;
+            c->orthographic_size=5.f;
+            const auto normal=render::build_camera_matrices(preview,camera_entity,16.f/9.f,1080.f);
+            const auto tall=render::build_camera_matrices(preview,camera_entity,9.f/16.f,1920.f);
+            check(normal&&tall &&
+                  std::abs(normal->projection.at(1,1)-tall->projection.at(1,1))<1e-6f &&
+                  normal->projection.at(0,0)<tall->projection.at(0,0),
+                  "REND-012 landscape to portrait resize updates horizontal field of view");
+            check(!render::build_camera_matrices(preview,camera_entity,0.f) &&
+                  !render::build_camera_matrices(preview,camera_entity,
+                        std::numeric_limits<float>::infinity()) &&
+                  !render::build_camera_matrices(preview,camera_entity,
+                        std::numeric_limits<float>::quiet_NaN()),
+                  "REND-012 resize rejects zero and nonfinite dimensions");
+            c->pixel_perfect=true;
+            c->pixels_per_unit=100.f;
+            const auto pix=render::build_camera_matrices(preview,camera_entity,4.f/3.f,900.f);
+            check(pix&&std::isfinite(pix->projection.at(0,0)) &&
+                  std::isfinite(pix->projection.at(1,1)),
+                  "REND-012 pixel-perfect camera remains finite after resizing");
+        }
+    }
+
+    // SHDR-004/006: exact material flags choose the same CPU-side
+    // Vulkan pipeline key in Editor and standalone Player. Missing/invalid
+    // material resolves to a deterministic opaque fallback.
+    {
+        using V=render::MaterialPipelineVariant;
+        render::MaterialAssetData mat;
+        check(render::select_material_variant(nullptr)==V::OpaqueCull,
+              "SHDR-004 missing material falls back to opaque culling pipeline");
+        mat.alpha_mode=render::MaterialAlphaMode::Opaque;
+        mat.double_sided=false;
+        check(render::select_material_variant(&mat)==V::OpaqueCull,
+              "SHDR-004 explicit opaque material selects opaque shader");
+        mat.double_sided=true;
+        check(render::select_material_variant(&mat)==V::OpaqueDoubleSided &&
+              render::variant_is_double_sided(render::select_material_variant(&mat)),
+              "SHDR-006 double-sided shader keyword toggles culling variant");
+        mat.alpha_mode=render::MaterialAlphaMode::Blend;
+        check(render::select_material_variant(&mat)==V::BlendDoubleSided &&
+              render::variant_is_blended(render::select_material_variant(&mat)),
+              "SHDR-006 alpha-blend keyword selects blend/double-sided variant");
+        mat.double_sided=false;
+        check(render::select_material_variant(&mat)==V::BlendCull,
+              "SHDR-006 alpha and culling variants remain independent");
+    }
 
     // Controller validation and deterministic, priority-ordered switching.
     render::AnimationController animation_graph;

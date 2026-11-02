@@ -1,3 +1,5 @@
+PR [#44](https://github.com/skatmdgn/NEngine/pull/44) proposes 7 additional audio, sprite, camera, material and animation **source/CI-scope** IDs (AUD-005/009, REND-011/012, SHDR-004/006, ANIM-005): branch-only 160/285 checked and 125 remaining, contingent on exact-HEAD Windows/Ubuntu Release/Debug CI and merge. GPU pixels, actual audio output, complete sprite crossfade and Android device acceptance are not claimed.
+
 # NEngine
 
 NEngine is an independent, clean-room game engine for developers familiar with Unity-style **GameObject / Component / Transform / Scene / Prefab** workflows. It targets **Windows 10/11 Editor**, **Windows x64 Player**, **Android Player**, **2D/3D**, **C# gameplay**, and integration with third-party SDKs via package/plugin adapters. Unity source, binary or project compatibility is not a goal.

@@ -1794,8 +1794,14 @@ int main() {
     check(
         sprite_component !=
             sprite_inspector.components.end() &&
-        sprite_component->fields.size() == 6u,
-        "generic Inspector exposes SpriteRenderer texture PPU sort and flip properties");
+        sprite_component->fields.size() == 7u &&
+        std::any_of(sprite_component->fields.begin(),
+                    sprite_component->fields.end(),
+                    [](const auto& field){
+                        return field.property_path=="Pivot" &&
+                               field.kind==core::PropertyKind::Vec3;
+                    }),
+        "generic Inspector exposes sprite texture PPU sort, flip and normalized Pivot");
 
     check(
         model.commands().execute(

@@ -47,6 +47,8 @@ struct SpriteRenderer {
     assets::AssetGuid texture{};
     float pixels_per_unit{100.0f};
     std::int64_t sort_order{0};
+    // Normalized pivot: (0,0) bottom-left, (0.5,0.5) center.
+    core::Vec3 pivot{0.5f,0.5f,0.0f};
     bool flip_x{false};
     bool flip_y{false};
 };
