@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <sstream>
 #include <limits>
 #include "nengine/render/animation_controller.hpp"
 #include "nengine/render/sprite_animation.hpp"
@@ -38,6 +39,58 @@ void animation_transitions() {
     check(!ctrl.validate(&error)&&!error.empty(),
           "ANIM-004: invalid state reference rejected");
 }
+// ANIM-005: v2 blend graph retains duration, supports interruption/reentry
+// and deterministically mixes runtime speeds without a dropped state.
+void animation_blend_interruptions() {
+    using namespace nengine;
+    render::AnimationController graph;
+    auto idle=assets::AssetGuid::generate(),run=assets::AssetGuid::generate();
+    graph.default_state="Idle";
+    graph.states={{"Idle",idle,true,1.f},{"Run",run,true,3.f}};
+    graph.transitions={{"Idle","Run","move",true,0.f,0.5f},
+                       {"Run","Idle","move",false,0.f,0.25f}};
+    std::string error;
+    check(graph.validate(&error),"ANIM-005 valid blended state graph");
+    std::stringstream encoded;
+    check(render::write_animation_controller(encoded,graph,&error) &&
+          encoded.str().find("NENGINE_ANIMATION_CONTROLLER 2")!=std::string::npos,
+          "ANIM-005 blend durations write versioned controller v2");
+    render::AnimationController restored;
+    check(render::read_animation_controller(encoded,restored,&error) &&
+          restored.transitions.size()==2u &&
+          std::abs(restored.transitions[0].blend_seconds-0.5f)<1e-6f,
+          "ANIM-005 blend durations survive controller roundtrip");
+    render::AnimationControllerPlayer player;
+    check(player.evaluate(graph,0.f)&&player.state=="Idle",
+          "ANIM-005 enters initial state");
+    player.set_bool("move",true);
+    check(player.evaluate(graph,0.f)&&player.state=="Run" &&
+          player.blending() && player.blend_weight()==0.f,
+          "ANIM-005 transition begins with zero target weight");
+    check(!player.evaluate(graph,0.25f)&&
+          std::abs(player.blend_weight()-0.5f)<1e-5f,
+          "ANIM-005 blending interpolates halfway after 250 ms");
+    player.set_bool("move",false);
+    check(player.evaluate(graph,0.25f)&&player.state=="Idle" &&
+          player.previous_state=="Run"&&
+          std::abs(player.blend_weight())<1e-5f,
+          "ANIM-005 interrupted transition resets blend origin to running state");
+    check(!player.evaluate(graph,0.125f)&&
+          std::abs(player.blend_weight()-0.5f)<1e-5f,
+          "ANIM-005 interrupted reverse blend advances independently");
+    player.set_bool("move",true);
+    check(player.evaluate(graph,0.125f)&&player.state=="Run" &&
+          player.previous_state=="Idle",
+          "ANIM-005 reentry returns to Run during reverse blend");
+    check(!player.evaluate(graph,0.5f) && !player.blending() &&
+          player.blend_weight()==1.f,
+          "ANIM-005 blend reaches exact target weight");
+    graph.transitions[0].blend_seconds=
+        std::numeric_limits<float>::quiet_NaN();
+    check(!graph.validate(&error),
+          "ANIM-005 nonfinite blend duration rejected");
+}
+
 void animation_endurance() {
     using namespace nengine;
     render::SpriteAnimationClip clip;
@@ -218,7 +271,8 @@ void separate_domains() {
 }
 }
 int main(){
- animation_transitions();animation_endurance();filtering();separate_domains();high_speed_collision();
+ animation_transitions();
+    animation_blend_interruptions();animation_endurance();filtering();separate_domains();high_speed_collision();
  if(!failures)std::cout<<"RoundTwoAnimPhysicsAcceptanceTests PASS\n";
  return failures?EXIT_FAILURE:EXIT_SUCCESS;
 }
