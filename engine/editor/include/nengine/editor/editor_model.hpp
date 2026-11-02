@@ -23,6 +23,8 @@
 #include "nengine/editor/console_model.hpp"
 #include "nengine/editor/editor_layout.hpp"
 #include "nengine/editor/play_session.hpp"
+#include "nengine/editor/prefab_isolation.hpp"
+#include "nengine/editor/sprite_sheet_editor.hpp"
 #include "nengine/editor/project_session.hpp"
 #include "nengine/editor/property_access.hpp"
 #include "nengine/editor/selection.hpp"
@@ -30,6 +32,7 @@
 #include "nengine/physics/contact_events.hpp"
 #include "nengine/physics/collision.hpp"
 #include "nengine/render/sprite_animation.hpp"
+#include "nengine/render/particle.hpp"
 #include "nengine/render/animation_controller_asset.hpp"
 #include "nengine/ui/canvas_asset.hpp"
 #include "nengine/ui/pointer_router.hpp"
@@ -45,17 +48,31 @@ class EditorModel {
 public:
     EditorModel();
 
-    core::World& world() noexcept { return world_; }
-    const core::World& world() const noexcept { return world_; }
+    core::World& world() noexcept {
+        if(auto* isolated=prefab_editor_.world())return *isolated;
+        return world_;
+    }
+    const core::World& world() const noexcept {
+        if(const auto* isolated=prefab_editor_.world())return *isolated;
+        return world_;
+    }
+    // Isolated editing uses a separate world; caller owns the saved PrefabData.
+    bool begin_prefab_isolation(const core::PrefabData& prefab,
+                                std::string* error=nullptr);
+    bool end_prefab_isolation(bool commit,core::PrefabData* output=nullptr,
+                              std::string* error=nullptr);
+    bool prefab_isolation_active() const noexcept {
+        return prefab_editor_.active();
+    }
 
     core::World& presentation_world() noexcept {
         if (auto* runtime = play_session_.runtime_world()) return *runtime;
-        return world_;
+        return world();
     }
 
     const core::World& presentation_world() const noexcept {
         if (const auto* runtime = play_session_.runtime_world()) return *runtime;
-        return world_;
+        return world();
     }
 
     core::ComponentRegistry& component_registry() noexcept {
@@ -100,6 +117,16 @@ public:
 
     EditorLayoutState& layout() noexcept { return layout_; }
     const EditorLayoutState& layout() const noexcept { return layout_; }
+
+    // EDIT-016: switch projects without carrying World/Undo/UI/asset caches.
+    bool open_project(const std::filesystem::path& root,
+                      std::string* error = nullptr);
+    // TWOD-005: sheet regions authoring; no texture pixels are modified.
+    bool begin_sprite_sheet_edit(assets::AssetGuid texture,
+                                 std::uint32_t width,std::uint32_t height,
+                                 std::string* error=nullptr);
+    SpriteSheetEditor& sprite_sheet_editor() noexcept { return sprite_sheet_editor_; }
+    bool save_sprite_sheet_edit(std::string* error=nullptr);
 
     ProjectSession& project() noexcept { return project_; }
     const ProjectSession& project() const noexcept { return project_; }
@@ -281,6 +308,12 @@ public:
 
 
     // Set named controller parameters on a Play Mode SpriteAnimator.
+    // VFX-005: mutate only Play Mode's emitter, never the authored Scene.
+    bool set_play_particle_emitter(core::Entity entity,
+                                   const render::ParticleEmitter& emitter);
+    std::size_t play_particle_count(core::Entity entity) const noexcept;
+    void step_particle_preview(float delta_seconds);
+
     bool set_sprite_controller_bool(
         core::Entity entity, std::string parameter, bool value);
 
@@ -322,9 +355,11 @@ private:
     CommandStack commands_{};
     ComponentFactoryRegistry component_factories_{};
     PlaySession play_session_{};
+    PrefabIsolationSession prefab_editor_{};
     ConsoleModel console_{};
     EditorLayoutState layout_{};
     ProjectSession project_{};
+    SpriteSheetEditor sprite_sheet_editor_{};
     PropertyAccessRegistry property_access_{};
     ui::CanvasAssetCache canvas_cache_{};
     ui::CanvasEditHistory ui_edit_history_{};
@@ -356,6 +391,9 @@ private:
     void sync_sprite_controllers(core::World& runtime);
     void bind_managed_ui();
 
+
+    std::unordered_map<core::Entity::value_type,render::ParticleSimulation>
+        play_particle_simulations_{};
 
     audio::AudioClipCache
         audio_clip_cache_{};

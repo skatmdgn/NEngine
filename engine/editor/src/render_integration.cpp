@@ -7,6 +7,9 @@
 #include "nengine/assets/asset_guid.hpp"
 #include "nengine/render/components.hpp"
 #include "nengine/render/registration.hpp"
+#include "nengine/render/particle.hpp"
+#include <cmath>
+#include <limits>
 
 namespace nengine::editor {
 namespace {
@@ -1049,6 +1052,82 @@ bool register_render_integration(
                         });
             }) && ok;
 
+    // VFX-005: ParticleEmitter has Scene metadata already; register actual
+    // Inspector read/write routes, validated before mutation.
+    const auto particle_type=render::particle_emitter_type();
+    const auto register_float=[&](const char* label,float render::ParticleEmitter::* member) {
+        ok=properties.register_property(particle_type,label,core::PropertyKind::Float,
+            [particle_type,member](const core::World& world,core::Entity entity)
+                -> std::optional<core::PropertyValue> {
+                auto* p=world.get_component<render::ParticleEmitter>(entity,particle_type);
+                if(!p)return std::nullopt;
+                return core::PropertyValue{static_cast<double>(p->*member)};
+            },
+            [particle_type,member](core::World& world,core::Entity entity,const core::PropertyValue& raw){
+                auto* p=world.get_component<render::ParticleEmitter>(entity,particle_type);
+                auto* v=std::get_if<double>(&raw);
+                if(!p||!v||!std::isfinite(*v)||
+                   *v>static_cast<double>(std::numeric_limits<float>::max()) ||
+                   *v<-static_cast<double>(std::numeric_limits<float>::max()))return false;
+                auto next=*p;next.*member=static_cast<float>(*v);
+                if(!next.valid())return false;
+                *p=next;return true;
+            })&&ok;
+    };
+    const auto register_vec=[&](const char* label,core::Vec3 render::ParticleEmitter::* member) {
+        ok=properties.register_property(particle_type,label,core::PropertyKind::Vec3,
+            [particle_type,member](const core::World& world,core::Entity entity)
+                -> std::optional<core::PropertyValue> {
+                auto* p=world.get_component<render::ParticleEmitter>(entity,particle_type);
+                if(!p)return std::nullopt;
+                return core::PropertyValue{p->*member};
+            },
+            [particle_type,member](core::World& world,core::Entity entity,const core::PropertyValue& raw){
+                auto* p=world.get_component<render::ParticleEmitter>(entity,particle_type);
+                auto* v=std::get_if<core::Vec3>(&raw);
+                if(!p||!v)return false;
+                auto next=*p;next.*member=*v;
+                if(!next.valid())return false;
+                *p=next;return true;
+            })&&ok;
+    };
+    const auto register_uint=[&](const char* label,std::uint32_t render::ParticleEmitter::* member) {
+        ok=properties.register_property(particle_type,label,core::PropertyKind::Integer,
+            [particle_type,member](const core::World& world,core::Entity entity)
+                -> std::optional<core::PropertyValue> {
+                auto* p=world.get_component<render::ParticleEmitter>(entity,particle_type);
+                if(!p)return std::nullopt;
+                return core::PropertyValue{static_cast<std::int64_t>(p->*member)};
+            },
+            [particle_type,member](core::World& world,core::Entity entity,const core::PropertyValue& raw){
+                auto* p=world.get_component<render::ParticleEmitter>(entity,particle_type);
+                auto* v=std::get_if<std::int64_t>(&raw);
+                if(!p||!v||*v<0||*v>4096)return false;
+                auto next=*p;next.*member=static_cast<std::uint32_t>(*v);
+                if(!next.valid())return false;
+                *p=next;return true;
+            })&&ok;
+    };
+    ok=properties.register_property(particle_type,"Enabled",core::PropertyKind::Boolean,
+        [particle_type](const core::World& world,core::Entity entity)->std::optional<core::PropertyValue>{
+            auto* p=world.get_component<render::ParticleEmitter>(entity,particle_type);
+            if(!p)return std::nullopt;return core::PropertyValue{p->enabled};
+        },
+        [particle_type](core::World& world,core::Entity entity,const core::PropertyValue& raw){
+            auto* p=world.get_component<render::ParticleEmitter>(entity,particle_type);
+            auto* v=std::get_if<bool>(&raw);
+            if(!p||!v)return false;p->enabled=*v;return true;
+        })&&ok;
+    register_float("Rate",&render::ParticleEmitter::rate_per_second);
+    register_float("Lifetime",&render::ParticleEmitter::lifetime_seconds);
+    register_float("Start Size",&render::ParticleEmitter::start_size);
+    register_float("End Size",&render::ParticleEmitter::end_size);
+    register_vec("Start Color",&render::ParticleEmitter::start_color);
+    register_vec("End Color",&render::ParticleEmitter::end_color);
+    register_vec("Velocity",&render::ParticleEmitter::velocity);
+    register_vec("Gravity",&render::ParticleEmitter::gravity);
+    register_uint("Burst",&render::ParticleEmitter::initial_burst);
+    register_uint("Max Particles",&render::ParticleEmitter::max_particles);
     return ok;
 }
 
@@ -1128,6 +1207,12 @@ bool register_render_component_factories(
             }) &&
         ok;
 
+    // Expose ParticleEmitter in generic Add Component UI.
+    ok=factories.register_factory(render::particle_emitter_type(),
+        [](core::World& world,core::Entity entity){
+            return world.add_component<render::ParticleEmitter>(
+                entity,render::particle_emitter_type())!=nullptr;
+        })&&ok;
     return ok;
 }
 

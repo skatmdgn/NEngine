@@ -2,6 +2,7 @@
 
 #include <windows.h>
 #include <windowsx.h>
+#include <xinput.h>
 
 #include <algorithm>
 #include <string_view>
@@ -276,6 +277,18 @@ void Window::close() {
 
 bool Window::poll_events() {
     impl_->input_state.begin_frame();
+    // Load XInput dynamically: Windows installations lacking the DLL still run.
+    using ReadGamepad=DWORD (WINAPI*)(DWORD,XINPUT_STATE*);
+    static const ReadGamepad read_gamepad=[]()->ReadGamepad{
+        for(const wchar_t* dll:{L"xinput1_4.dll",L"xinput1_3.dll",L"xinput9_1_0.dll"}){
+            if(auto module=LoadLibraryW(dll)){
+                if(auto method=GetProcAddress(module,"XInputGetState"))
+                    return reinterpret_cast<ReadGamepad>(method);
+                FreeLibrary(module);
+            }
+        }
+        return nullptr;
+    }();
 
     MSG message{};
     while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
@@ -311,6 +324,22 @@ bool Window::poll_events() {
                         cursor.y));
         }
     }
+
+    // Poll only while focused. Disconnect/focus loss releases held buttons.
+    XINPUT_STATE pad{};
+    const bool focused=impl_->hwnd && GetForegroundWindow()==impl_->hwnd;
+    const bool connected=focused && read_gamepad &&
+        read_gamepad(0,&pad)==ERROR_SUCCESS;
+    if(connected){
+        const auto& p=pad.Gamepad;
+        impl_->input_state.set_gamepad(true,p.wButtons,
+            static_cast<float>(p.sThumbLX)/32768.f,
+            static_cast<float>(p.sThumbLY)/32768.f,
+            static_cast<float>(p.sThumbRX)/32768.f,
+            static_cast<float>(p.sThumbRY)/32768.f,
+            static_cast<float>(p.bLeftTrigger)/255.f,
+            static_cast<float>(p.bRightTrigger)/255.f);
+    }else impl_->input_state.set_gamepad(false,0);
 
     if (impl_->close_requested &&
         impl_->hwnd) {

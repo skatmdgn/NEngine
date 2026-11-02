@@ -477,6 +477,171 @@ EditorModel::EditorModel() {
 }
 
 
+bool EditorModel::begin_sprite_sheet_edit(assets::AssetGuid texture,
+    std::uint32_t width,std::uint32_t height,std::string* error) {
+    if(!can_edit() || !project_.is_open()){
+        if(error)*error="sprite sheet editing requires an open project in Edit Mode";
+        return false;
+    }
+    const auto* source=project_.assets().find(texture);
+    if(!source || source->importer_id!="NEngine.Texture" ||
+       !sprite_sheet_editor_.open(texture,width,height)){
+        if(error)*error="sprite sheet requires an imported texture and valid dimensions";
+        return false;
+    }
+    if(error)error->clear();
+    return true;
+}
+bool EditorModel::save_sprite_sheet_edit(std::string* error) {
+    if(!can_edit() || !project_.is_open() ||
+       sprite_sheet_editor_.regions().empty()){
+        if(error)*error="sprite sheet has no valid authored slices";
+        return false;
+    }
+    const auto* texture=project_.assets().find(sprite_sheet_editor_.texture());
+    if(!texture || texture->importer_id!="NEngine.Texture"){
+        if(error)*error="sheet texture is no longer part of this project";
+        return false;
+    }
+    std::error_code ec;
+    const auto root=std::filesystem::canonical(project_.assets_path(),ec);
+    if(ec)return false;
+    const auto source=std::filesystem::canonical(texture->source_path,ec);
+    if(ec || std::filesystem::is_symlink(texture->source_path)){
+        if(error)*error="sprite source cannot be a symlink";
+        return false;
+    }
+    const auto relative=source.lexically_relative(root);
+    if(relative.empty()||relative.is_absolute()||
+       *relative.begin()==".."){
+        if(error)*error="sprite texture must remain inside project Assets";
+        return false;
+    }
+    auto output=source;output+=std::filesystem::path{".nslices"};
+    auto staged=output;staged+=std::filesystem::path{".nengine-stage"};
+    if(std::filesystem::exists(staged)){
+        if(error)*error="sprite slice staging path already exists";
+        return false;
+    }
+    {
+        std::ofstream file(staged,std::ios::binary|std::ios::trunc);
+        if(!file || !sprite_sheet_editor_.write(file)){
+            file.close();std::filesystem::remove(staged,ec);
+            if(error)*error="failed to serialize sprite sheet regions";
+            return false;
+        }
+    }
+    // Safe replacement with rollback when a previously saved sheet exists.
+    auto backup=output;backup+=std::filesystem::path{".nengine-backup"};
+    if(std::filesystem::exists(backup)){
+        std::filesystem::remove(staged,ec);
+        if(error)*error="sprite slice backup already exists";
+        return false;
+    }
+    const bool had_source=std::filesystem::exists(output);
+    if(had_source){
+        if(std::filesystem::is_symlink(output) || !std::filesystem::is_regular_file(output)){
+            std::filesystem::remove(staged,ec);
+            if(error)*error="sprite slice target is not a regular file";
+            return false;
+        }
+        std::filesystem::rename(output,backup,ec);
+        if(ec){std::filesystem::remove(staged,ec);return false;}
+    }
+    ec.clear();
+    std::filesystem::rename(staged,output,ec);
+    if(ec){
+        if(had_source){
+            std::error_code restore;
+            std::filesystem::rename(backup,output,restore);
+        }
+        std::filesystem::remove(staged,ec);
+        if(error)*error="sprite slice save failed; old source restored where possible";
+        return false;
+    }
+    if(had_source)std::filesystem::remove(backup,ec);
+    project_.refresh_assets();
+    if(error)error->clear();
+    return true;
+}
+
+bool EditorModel::begin_prefab_isolation(
+    const core::PrefabData& prefab,std::string* error) {
+    if(!can_edit() || ui_edit_dirty()){
+        if(error)*error="finish Play Mode or unsaved Canvas edits first";
+        return false;
+    }
+    if(!prefab_editor_.open(prefab,component_serialization_,error))return false;
+    selection_.clear();
+    commands_.clear();
+    mark_scene_saved();
+    return true;
+}
+bool EditorModel::end_prefab_isolation(
+    bool commit,core::PrefabData* output,std::string* error) {
+    if(!prefab_editor_.active())return false;
+    if(commit){
+        if(!output){
+            if(error)*error="prefab commit requires output";
+            return false;
+        }
+        core::PrefabData candidate;
+        if(!prefab_editor_.save(candidate,error))return false;
+        *output=std::move(candidate);
+    }
+    prefab_editor_.cancel();
+    selection_.clear();
+    commands_.clear();
+    mark_scene_saved();
+    if(error)error->clear();
+    return true;
+}
+
+bool EditorModel::open_project(const std::filesystem::path& root,
+                               std::string* error) {
+    // Teardown is unconditional: a malformed second project must never
+    // leave old scene objects, source GUIDs, watchers or runtime handles.
+    if(play_session_.is_playing())stop_play_mode();
+    shutdown_managed_runtime();
+    project_.close();
+    prefab_editor_.cancel();
+    sprite_sheet_editor_=SpriteSheetEditor{};
+    world_=core::World{};
+    navigation_={};
+    selection_.clear();
+    commands_.clear();
+    saved_scene_state_id_=commands_.state_id();
+    invalidate_runtime_asset_caches();
+    play_particle_simulations_.clear();
+    ui_edit_open_=false;
+    ui_edit_asset_={};
+    ui_edit_selected_=ui::invalid_widget;
+    ui_edit_selection_.clear();
+    ui_edit_drag_active_=false;
+    ui_edit_drag_widget_=ui::invalid_widget;
+    ui_edit_drag_targets_.clear();
+    ui_edit_preview_.reset();
+    ui_edit_history_=ui::CanvasEditHistory{};
+    ui_canvas_asset_={};
+    ui_canvas_reload_pending_=false;
+    ui_events_.clear();
+    input_state_.release_all();
+
+    if(!project_.open(root,error))return false;
+    core::SceneData startup;
+    core::World next;
+    if(!core::SceneSerializer::load_file(
+            project_.startup_scene_path(),startup,error) ||
+       !core::SceneSerializer::instantiate(
+            startup,next,error,&component_serialization_)) {
+        project_.close();
+        return false;
+    }
+    world_=std::move(next);
+    if(error)error->clear();
+    return true;
+}
+
 bool EditorModel::load_navigation(assets::AssetGuid guid,
                                    std::string* error) {
     if (!can_edit()) {
@@ -490,6 +655,7 @@ bool EditorModel::load_navigation(assets::AssetGuid guid,
 }
 
 bool EditorModel::begin_play_mode() {
+    if(prefab_editor_.active())return false;
     // Prefer an optional project Canvas convention without requiring
     // a new scene/component format for this diagnostic preview.
     if (!ui_canvas_asset_.valid()) {
@@ -512,6 +678,7 @@ bool EditorModel::begin_play_mode() {
         sync_sprite_controllers(*runtime);
     audio_playback_system_.reset();
     audio_mix_snapshot_ = {};
+    play_particle_simulations_.clear();
 
     std::string audio_device_error;
 
@@ -558,6 +725,7 @@ bool EditorModel::begin_play_mode() {
 }
 
 bool EditorModel::stop_play_mode() {
+    play_particle_simulations_.clear();
     ui_clicked_widgets_.clear();
     ui_keyboard_router_.reset();
     ui_pointer_router_.reset();
@@ -1303,6 +1471,43 @@ void EditorModel::sync_sprite_controllers(core::World& runtime) {
     }
 }
 
+bool EditorModel::set_play_particle_emitter(
+    core::Entity entity,const render::ParticleEmitter& emitter) {
+    auto* runtime=play_session_.runtime_world();
+    if(!runtime || !runtime->is_alive(entity) || !emitter.valid())return false;
+    auto* target=runtime->get_component<render::ParticleEmitter>(
+        entity,render::particle_emitter_type());
+    if(!target)return false;
+    *target=emitter;
+    return true;
+}
+std::size_t EditorModel::play_particle_count(core::Entity entity) const noexcept {
+    auto found=play_particle_simulations_.find(entity.value);
+    return found==play_particle_simulations_.end()?0u:found->second.particles().size();
+}
+void EditorModel::step_particle_preview(float dt) {
+    auto* world=play_session_.runtime_world();
+    if(!world||!std::isfinite(dt)||dt<0.f||dt>1.f)return;
+    for(auto it=play_particle_simulations_.begin();
+        it!=play_particle_simulations_.end();) {
+        const auto entity=core::Entity{it->first};
+        if(!world->is_alive(entity)||
+           !world->get_component<render::ParticleEmitter>(
+               entity,render::particle_emitter_type()))
+            it=play_particle_simulations_.erase(it);
+        else ++it;
+    }
+    for(const auto entity:world->entities()){
+        if(!world->active(entity))continue;
+        const auto* emitter=world->get_component<render::ParticleEmitter>(
+            entity,render::particle_emitter_type());
+        const auto* transform=world->transform(entity);
+        if(!emitter||!transform)continue;
+        play_particle_simulations_[entity.value].update(
+            *emitter,transform->local_position,dt);
+    }
+}
+
 bool EditorModel::set_sprite_controller_bool(
     core::Entity entity, std::string parameter, bool value) {
 
@@ -1366,6 +1571,11 @@ void EditorModel::tick_runtime(
         static_cast<float>(
             play_session_
                 .fixed_delta_seconds());
+    // Preview emitter settings are read from mutable Play World each tick.
+    // Edit World is unaffected, and paused mode advances only on explicit Step.
+    if(steps>0u)for(std::uint32_t i=0;i<steps;++i)
+        step_particle_preview(fixed_delta);
+
 
     std::string animation_error;
     std::string script_error;

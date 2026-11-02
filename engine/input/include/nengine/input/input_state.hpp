@@ -34,6 +34,11 @@ enum class Key : std::uint16_t {
     MouseLeft,
     MouseRight,
     MouseMiddle,
+    // INPUT-008: append; preserve existing serialized Key ordinal values.
+    GamepadA, GamepadB, GamepadX, GamepadY,
+    GamepadLeftShoulder, GamepadRightShoulder,
+    GamepadDpadUp, GamepadDpadDown, GamepadDpadLeft, GamepadDpadRight,
+    GamepadStart, GamepadBack, GamepadLeftStick, GamepadRightStick,
     Count
 };
 
@@ -45,6 +50,13 @@ struct PointerState {
     float wheel_y{0.0f};
 };
 
+struct GamepadState {
+    bool connected{false};
+    std::uint16_t buttons{0};
+    float left_x{0.f}, left_y{0.f}, right_x{0.f}, right_y{0.f};
+    float left_trigger{0.f}, right_trigger{0.f};
+};
+
 class InputState {
 public:
     void begin_frame() noexcept;
@@ -54,6 +66,11 @@ public:
         bool held) noexcept;
 
     void release_all() noexcept;
+    // Normalize XInput-compatible buttons/axes; safe for disconnect/reconnect.
+    void set_gamepad(bool connected, std::uint16_t buttons,
+                     float lx=0.f,float ly=0.f,float rx=0.f,float ry=0.f,
+                     float lt=0.f,float rt=0.f) noexcept;
+    const GamepadState& gamepad() const noexcept { return gamepad_; }
 
     // A UI-consumed key stays observable to UI/diagnostics, but is not
     // delivered to gameplay actions during the current frame.
@@ -102,6 +119,7 @@ private:
     std::array<bool, key_count> pressed_{};
     std::array<bool, key_count> released_{};
     PointerState pointer_{};
+    GamepadState gamepad_{};
     bool pointer_initialized_{false};
     std::uint64_t frame_index_{0};
 };

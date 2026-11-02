@@ -21,6 +21,37 @@ void check(bool condition, const char* message) {
 int main() {
     using namespace nengine::input;
 
+    // INPUT-008: XInput mapping through the portable input event pipeline.
+    InputState pad;
+    ActionMap pad_actions;
+    check(pad_actions.bind("Jump",Key::GamepadA),
+          "gamepad action maps to A button");
+    pad.begin_frame();
+    pad.set_gamepad(true,0x1000,0.10f,-0.8f,2.f,0.f,0.8f,1.4f);
+    check(pad.gamepad().connected && pad.held(Key::GamepadA) &&
+          pad.pressed(Key::GamepadA) && pad_actions.pressed("Jump",pad) &&
+          pad.gamepad().left_x==0.f && pad.gamepad().left_y<-.7f &&
+          pad.gamepad().right_x==1.f && pad.gamepad().right_trigger==1.f,
+          "INPUT-008 button and axis normalization with deadzone/trigger clamp");
+    pad.begin_frame();
+    pad.set_gamepad(true,0x1000);
+    check(pad.held(Key::GamepadA)&&!pad.pressed(Key::GamepadA),
+          "INPUT-008 held gamepad button does not fire twice");
+    pad.begin_frame();
+    pad.set_gamepad(false,0);
+    check(!pad.gamepad().connected && !pad.held(Key::GamepadA) &&
+          pad.released(Key::GamepadA) && pad_actions.released("Jump",pad),
+          "INPUT-008 disconnect releases actions in current frame");
+    pad.begin_frame();
+    pad.set_gamepad(true,0x1000);
+    check(pad.gamepad().connected && pad.pressed(Key::GamepadA),
+          "INPUT-008 reconnect creates fresh key press");
+    pad.begin_frame();
+    pad.set_gamepad(true,0x1000,
+        std::numeric_limits<float>::quiet_NaN());
+    check(!pad.gamepad().connected && !pad.held(Key::GamepadA) &&
+          pad.released(Key::GamepadA),
+          "INPUT-008 invalid XInput sample fails closed");
     InputState input;
 
     input.begin_frame();
