@@ -6,6 +6,7 @@
 #include <limits>
 #include "nengine/render/animation_controller.hpp"
 #include "nengine/render/sprite_animation.hpp"
+#include "nengine/render/components.hpp"
 #include "nengine/physics/components.hpp"
 #include "nengine/physics/collision.hpp"
 #include "nengine/physics/simulation.hpp"
@@ -85,6 +86,38 @@ void animation_blend_interruptions() {
     check(!player.evaluate(graph,0.5f) && !player.blending() &&
           player.blend_weight()==1.f,
           "ANIM-005 blend reaches exact target weight");
+    // Exercise the actual SpriteAnimator component, not only player math.
+    core::World world;
+    const auto entity=world.create("Blended Sprite");
+    auto* sprite=world.add_component<render::SpriteRenderer>(
+        entity,render::sprite_renderer_type());
+    auto* animator=world.add_component<render::SpriteAnimator>(
+        entity,render::sprite_animator_type());
+    render::AnimationControllerPlayer runtime_player;
+    check(sprite && animator &&
+          render::apply_sprite_controller(world,entity,graph,runtime_player) &&
+          animator->clip==idle &&
+          std::abs(animator->speed-1.f)<1e-6f,
+          "ANIM-005 initial runtime clip remains at idle speed");
+    runtime_player.set_bool("move",true);
+    check(render::apply_sprite_controller(world,entity,graph,runtime_player) &&
+          animator->clip==run &&
+          std::abs(animator->speed-1.f)<1e-6f,
+          "ANIM-005 runtime transition begins at source speed");
+    animator->time_seconds=0.25f;
+    check(!render::apply_sprite_controller(world,entity,graph,runtime_player) &&
+          std::abs(animator->speed-2.f)<1e-5f,
+          "ANIM-005 runtime Animator speed is linearly interpolated");
+    runtime_player.set_bool("move",false);
+    check(render::apply_sprite_controller(world,entity,graph,runtime_player) &&
+          animator->clip==idle &&
+          std::abs(animator->speed-3.f)<1e-5f,
+          "ANIM-005 interrupted runtime Animator starts reverse from Run speed");
+    animator->time_seconds=0.125f;
+    check(!render::apply_sprite_controller(world,entity,graph,runtime_player) &&
+          std::abs(animator->speed-2.f)<1e-5f,
+          "ANIM-005 runtime reverse blend interpolates back toward Idle");
+
     graph.transitions[0].blend_seconds=
         std::numeric_limits<float>::quiet_NaN();
     check(!graph.validate(&error),
