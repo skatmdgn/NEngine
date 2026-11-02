@@ -13,6 +13,7 @@
 #include "nengine/render/matrix.hpp"
 #include "nengine/render/model_importer.hpp"
 #include "nengine/render/render_snapshot.hpp"
+#include "nengine/render/material_pipeline_selection.hpp"
 #include "nengine/render/sprite_geometry.hpp"
 
 namespace nengine::render {
@@ -26,22 +27,16 @@ select_material_pipeline(
     const VulkanGraphicsPipeline& double_sided,
     const VulkanGraphicsPipeline& blend,
     const VulkanGraphicsPipeline& blend_double_sided) noexcept {
-
-    if (!material) {
-        return &opaque;
+    switch(select_material_variant(material)){
+        case MaterialPipelineVariant::OpaqueDoubleSided:
+            return &double_sided;
+        case MaterialPipelineVariant::BlendCull:
+            return &blend;
+        case MaterialPipelineVariant::BlendDoubleSided:
+            return &blend_double_sided;
+        default:
+            return &opaque;
     }
-
-    if (material->alpha_mode ==
-        MaterialAlphaMode::Blend) {
-
-        return material->double_sided
-            ? &blend_double_sided
-            : &blend;
-    }
-
-    return material->double_sided
-        ? &double_sided
-        : &opaque;
 }
 
 } // namespace
