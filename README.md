@@ -1,4 +1,4 @@
-PR [#44](https://github.com/skatmdgn/NEngine/pull/44) proposes 7 additional audio, sprite, camera, material and animation **source/CI-scope** IDs (AUD-005/009, REND-011/012, SHDR-004/006, ANIM-005): branch-only 160/285 checked and 125 remaining, contingent on exact-HEAD Windows/Ubuntu Release/Debug CI and merge. GPU pixels, actual audio output, complete sprite crossfade and Android device acceptance are not claimed.
+**Development workflow (since 2026-11-02):** complete the full user-requested batch of N stable checklist IDs in a temporary workspace before **one final development-branch commit**, then one PR and exact-head Windows/Ubuntu CI. No per-feature commits; only grouped CI-fix commits if required. Canonical policy: [docs/WORKFLOW.md](docs/WORKFLOW.md) §4. PR #45 contains five *source/CI-scope* candidates (EDIT-016, INPUT-008, TWOD-005, VFX-005, EDTOOL-002), subject to final SHA CI; hardware and complete Win32 GUI UX are separate.
 
 # NEngine
 

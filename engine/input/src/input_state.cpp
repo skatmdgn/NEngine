@@ -55,7 +55,36 @@ void InputState::set_key(
     }
 }
 
+void InputState::set_gamepad(bool connected, std::uint16_t buttons,
+    float lx,float ly,float rx,float ry,float lt,float rt) noexcept {
+    // Invalid reports are treated as disconnected rather than leaking NaNs
+    // into the gameplay API. The per-key transitions are stateful.
+    const bool valid=std::isfinite(lx)&&std::isfinite(ly)&&
+        std::isfinite(rx)&&std::isfinite(ry)&&std::isfinite(lt)&&std::isfinite(rt);
+    connected=connected&&valid;
+    constexpr std::array<std::pair<Key,std::uint16_t>,14> mapping{{
+        {Key::GamepadA,0x1000},{Key::GamepadB,0x2000},
+        {Key::GamepadX,0x4000},{Key::GamepadY,0x8000},
+        {Key::GamepadLeftShoulder,0x0100},{Key::GamepadRightShoulder,0x0200},
+        {Key::GamepadDpadUp,0x0001},{Key::GamepadDpadDown,0x0002},
+        {Key::GamepadDpadLeft,0x0004},{Key::GamepadDpadRight,0x0008},
+        {Key::GamepadStart,0x0010},{Key::GamepadBack,0x0020},
+        {Key::GamepadLeftStick,0x0040},{Key::GamepadRightStick,0x0080}
+    }};
+    for(auto [key,bit]:mapping)set_key(key,connected&&(buttons&bit)!=0);
+    gamepad_={};
+    if(!connected)return;
+    auto stick=[](float value){return std::abs(value)<0.15f?0.f:
+        std::clamp(value,-1.f,1.f);};
+    gamepad_.connected=true;gamepad_.buttons=buttons;
+    gamepad_.left_x=stick(lx);gamepad_.left_y=stick(ly);
+    gamepad_.right_x=stick(rx);gamepad_.right_y=stick(ry);
+    gamepad_.left_trigger=std::clamp(lt,0.f,1.f);
+    gamepad_.right_trigger=std::clamp(rt,0.f,1.f);
+}
+
 void InputState::release_all() noexcept {
+    set_gamepad(false,0);
     // Focus-loss is a cancellation, not a key press. Suppress any Down
     // observed earlier in this frame before releasing held keys.
     pressed_.fill(false);

@@ -2,7 +2,7 @@
 
 **검증 기준선:** PR #40의 정확한 소스 SHA `acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7` (2026-10-26), [Windows/Ubuntu CI 40279093322](https://github.com/skatmdgn/NEngine/actions/runs/40279093322) — Windows·Ubuntu 각각 Release/Debug **38/38 CTest PASS**. C# 실제 .NET 컴파일·코루틴·Debug 로그 회귀 테스트 포함. 실제 Windows GPU/오디오·Android 실기기·설치된 Visual Studio/Rider GUI 열기는 이 CI가 증명하지 않으며 각각 별도 검증 대상이다. 병합 후 `main` CI는 별도 확인한다.
 
-**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 160개, 미완료 125개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
+**현재 집계:** 총 285개, 좁은 소스·자동테스트 범위 확인 165개, 미완료 120개. 항목 수는 **엔진 개발 퍼센트나 남은 시간과 같지 않다.** 새로운 ID 추가·분할은 추적하고, 완료 항목에 항상 검증된 SHA와 증거를 남긴다. 이미 [x]인 항목은 소스/CI 한정으로, 다른 실사용 항목을 자동으로 닫지 않는다.
 
 **우선 순위:** Windows Editor의 실제 Vulkan Scene/Game 렌더링·실기기 Player, Android APK/AAB 빌드 및 기기 실행, 외부 SDK/플러그인 연동을 우선한다. PR #40은 NavMeshAgent 다중 객체 회피·C# 코루틴·Debug 로그·컴파일 진단·C# 예제·에디터 컴포넌트 메뉴·IDE 시작 경로의 **소스·자동화 검증** 7개 ID를 추가하지만, NAV-006 보행 비용 UI/NAV-014/015 실기기 검증 및 설치된 Visual Studio/Rider 실제 GUI 실행 검증은 포함하지 않는다. 작업 규칙은 [WORKFLOW.md](WORKFLOW.md).
 
@@ -13,6 +13,8 @@
 **2026-10-28 PR #43 조건부 소스 수용:** 기존 고정 ID 8개 EDIT-013, ANIM-009, PLUG-012, PLUG-018, QA-013, EDTOOL-005/009, BUILD-009. 현재 PR 브랜치가 153/285 체크 후보인 것은 최종 정확한 HEAD Windows/Ubuntu Debug·Release 빌드·CTest·Python 회귀 모두 성공함을 전제로 한다. 병합 전 `main`은 여전히 145/285, 미완료 140. Android APK/AAB, 실제 GPU/오디오/Win32 GUI 조작, 실제 네이티브 플러그인 앱 핫리로드, 모든 실행 파일의 비트 동일성은 이 PR로 검증되지 않는다.
 
 **2026-11-02 PR #44 소스·자동화 한정 수용 후보:** AUD-005/009, REND-011/012, SHDR-004/006, ANIM-005 기존 7개 ID. PR 브랜치의 160/285 체크는 최종 동일 HEAD Windows/Ubuntu Release/Debug CTest 및 Python CI 성공 조건부. 병합 전 확정 main은 153/285·132 미완료. 파일 기반 애니메이션 상태 속도 블렌딩은 실제 텍스처 크로스페이드가 아니며, 샘플레이트 변환의 실 청취·Vulkan 출력·실기기 리사이즈·GPU 셰이더 픽셀 동등성은 별도 하드웨어 수용이다.
+
+**2026-11-02 PR #45 — 요청 5개 단일 개발 커밋 소스 후보:** EDIT-016, INPUT-008, TWOD-005, VFX-005, EDTOOL-002. 2026-11-02 기준 main `663fc6c0a6c11e857754018d8cb4a6ac2ec0e39c`(160/285)에서 5개를 별도 commit 없이 일괄 구현·임시 blob/tree로 준비하고, 하나의 Git 커밋에 모아 최종 PR CI를 실행한다. PR 브랜치 165/285는 최종 동일 SHA의 Windows/Ubuntu Release+Debug CTest/Python CI 통과 조건부다. Win32 전용 조작 UI, 실제 패드 테스트, Vulkan 파티클 표시, UV 서브텍스처 렌더링 및 prefab 파일 영구 저장 UX는 **별도 미검증**이며 이 소스 수용을 완제품 1.0 확인으로 해석하지 않는다. 개발·커밋 원칙은 [WORKFLOW.md](WORKFLOW.md) §4.
 
 ## GOV — 개발 관리·검증 (10/10)
 
@@ -46,7 +48,7 @@
 - [x] CORE-011 Scene 저장 도중 쓰기 실패에 데이터가 보존된다 — 증거: PR #32, NEngineRoundTwoCoreTests, 씬 손상 저장·권한 실패 시 원본 보존과 atomic publish, Windows/Ubuntu CI
 - [x] CORE-012 최소 2D·3D Scene이 Player에서 동일하게 실행된다 — 증거: PR #36, both NEngineMiniRunner2D and NEngineMiniRunner3D use the same PlayerRuntime Scene serialization, export and frame loop; Windows/Ubuntu Debug+Release CI
 
-## EDIT — Windows Editor (7/16)
+## EDIT — Windows Editor (8/16)
 
 참조: apps/editor; engine/editor; tests/editor_tests.cpp
 
@@ -65,7 +67,7 @@
 - [x] EDIT-013 Asset Browser에서 가져오기·이름변경·삭제·재가져오기를 검증한다 — 증거: PR #43, 개발 소스 3da41744b85ce1b5364bc80ac329be3da884c627; ProjectSession GUID-preserving import/rename/delete/reimport + Win32 Asset Browser controls, NEngineEditorTests negative path tests; 최종 PR HEAD Windows/Ubuntu Release·Debug CI·CTest·Python 테스트 성공 조건의 소스/자동화 범위
 - [x] EDIT-014 C# 컴파일 진단을 Console과 소스 파일 위치에 표시한다 — 증거: PR #40, 코드 SHA acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7, CI 40279093322 Windows/Ubuntu Debug·Release 38/38 CTest PASS; NEngineEditorTests compiler diagnostic source+line+column parser, project-root guard and Win32 Console entry double-click; raw dotnet build output captured.
 - [ ] EDIT-015 Play/Pause/Step/Stop을 실제 2D·3D 게임에 적용한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] EDIT-016 다중 프로젝트 전환 시 파일 감시·캐시·핸들을 안전하게 복구한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] EDIT-016 다중 프로젝트 전환 시 파일 감시·캐시·핸들을 안전하게 복구한다 — 증거: PR #45, EditorModel::open_project 및 Win32 시작 경로 전환, Scene/Watcher/UI/managed/Undo 캐시 초기화, NEngineEditorTests 프로젝트 교차·잘못된 manifest·복구 회귀; 최종 동일 PR HEAD Windows/Ubuntu Release+Debug CI 성공 조건의 좁은 소스/자동 테스트 수용 후보
 
 ## ASSET — 에셋 파이프라인 (10/15)
 
@@ -162,7 +164,7 @@
 - [ ] AUD-011 C# AudioSource Play/Stop/Loop/Volume이 Player에서 동작한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] AUD-012 소리 장치 실패 시 안전하게 폴백하고 오류를 표시한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## INPUT — Input (7/11)
+## INPUT — Input (8/11)
 
 참조: engine/input; tests/input_tests.cpp
 
@@ -173,7 +175,7 @@
 - [ ] INPUT-005 C# 액션 입력과 물리 키 상태가 실제 키보드에서 일치한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] INPUT-006 마우스 버튼·좌표·스크롤이 DPI 변경 시 정상 동작한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] INPUT-007 포커스를 잃으면 눌린 입력이 고착되지 않는다 — 증거: PR #32, NEngineRoundTwoInputUiTests, 같은 프레임 focus-loss 키·마우스 취소 및 커서 리셋; input_state.cpp 수정, Windows/Ubuntu CI
-- [ ] INPUT-008 게임패드 입력·연결 해제·재연결을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] INPUT-008 게임패드 입력·연결 해제·재연결을 구현한다 — 증거: PR #45, Win32 동적 XInput 폴링과 InputState Gamepad key/action/axis/deadzone 재연결·포커스 해제 경로, NEngineInputTests 연결/분리/NaN 경계; 최종 동일 PR HEAD Windows/Ubuntu Release+Debug CI 성공 조건의 좁은 소스/자동 테스트 수용 후보
 - [ ] INPUT-009 Android 터치·멀티 터치를 실제 기기에서 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] INPUT-010 UI가 소비한 입력을 게임플레이가 중복 처리하지 않는다 — 증거: PR #35, InputState gameplay-consumed mask, PlayerUiRuntime pointer/keyboard routing, C# raw key callbacks, NEngineRoundFiveRuntimeTests, Windows/Ubuntu Release+Debug CI
 - [x] INPUT-011 입력맵 부재·손상 오류를 안전하게 처리한다 — 증거: PR #32, NEngineRoundTwoInputUiTests, 악성·누락·과대 ActionMap 거부·기존 Action 보존, Windows/Ubuntu CI
@@ -342,7 +344,7 @@
 - [ ] SCN-006 Scriptable 데이터 에셋을 C# 스크립트에서 조회·변경한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] SCN-007 씬 로드·전환·추가 로드 후 엔티티 참조를 검증한다 — 증거: PR #34, engine/core/additive_scene.cpp Scene-local refs·중복 ID·unload invalid refs, NEngineAdditiveSceneTests, Windows/Ubuntu CI
 
-## TWOD — 2D 편집·Tilemap (3/7)
+## TWOD — 2D 편집·Tilemap (4/7)
 
 참조: engine/render; apps/editor
 
@@ -350,11 +352,11 @@
 - [ ] TWOD-002 Tilemap을 Editor Scene 뷰에서 배치·페인팅한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] TWOD-003 Tilemap 렌더링을 Sprite 레이어 순서와 일치시킨다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] TWOD-004 Tilemap Collider를 2D Physics에 연동한다 — 증거: PR #35, engine/render/tilemap_physics.cpp, NEngineRoundFiveRuntimeTests (BoxCollider2D run-merge/rebuild/rollback), Windows/Ubuntu Release+Debug CI
-- [ ] TWOD-005 스프라이트 시트 자동·수동 슬라이싱을 Editor에 제공한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] TWOD-005 스프라이트 시트 자동·수동 슬라이싱을 Editor에 제공한다 — 증거: PR #45, SpriteSheetEditor 자동 grid/수동 rect 삭제·버전 1 직렬화·트랜잭션 load, EditorModel imported texture 인접 .nslices 파일 저장/재저장, NEngineFiveBatchTests; 런타임 sprite UV 및 Win32 클릭 UI 별도; 최종 동일 PR HEAD Windows/Ubuntu Release+Debug CI 성공 조건의 좁은 소스/자동 테스트 수용 후보
 - [x] TWOD-006 2D 카메라의 픽셀 퍼펙트 및 픽셀 스냅을 검증한다 — 증거: PR #36, NEngineFollowupAcceptanceTests, world pixel grid snap + orthographic viewport density + Scene camera roundtrip; Windows/Ubuntu Debug+Release CI
 - [ ] TWOD-007 2D 프로젝트 시작 템플릿에서 Tilemap과 Sprite를 함께 실행한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
-## VFX — 파티클·효과 (3/6)
+## VFX — 파티클·효과 (4/6)
 
 참조: engine/render; engine/player
 
@@ -362,7 +364,7 @@
 - [x] VFX-002 파티클 생성율·수명·색상·크기를 시간에 따라 평가한다 — 증거: PR #33, 파티클 생성률·수명·색상·크기 시간 보간 NEngineRoundThreeFeatureTests, Windows/Ubuntu Release CI
 - [x] VFX-003 파티클 중력·속도·기본 버스트 방출을 구현한다 — 증거: PR #33, 파티클 중력·속도·burst 방출 NEngineRoundThreeFeatureTests, Windows/Ubuntu Release CI
 - [ ] VFX-004 2D/3D 파티클을 Vulkan 경로로 그린다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [ ] VFX-005 ParticleSystem Inspector·Play Mode 조절을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] VFX-005 ParticleSystem Inspector·Play Mode 조절을 구현한다 — 증거: PR #45, Render ParticleEmitter 실제 Inspector property read/write+Add Component, Play Mode 별도 World emitter 변경 및 CPU ParticleSimulation preview, NEngineFiveBatchTests; Vulkan 파티클 출력/UI 전용 패널 별도; 최종 동일 PR HEAD Windows/Ubuntu Release+Debug CI 성공 조건의 좁은 소스/자동 테스트 수용 후보
 - [ ] VFX-006 Windows Player에서 다중 파티클 효과를 실제 GPU로 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 
 ## SHDR — 셰이더 도구·재질 (6/6)
@@ -376,12 +378,12 @@
 - [x] SHDR-005 무효/비정상 셰이더를 불러오면 원인 진단 후 안전하게 유지한다 — 증거: PR #34, tools/nengine_shaders.py invalid shader/invalid SPIR-V 진단·last-good shader pointer 유지, test_nengine_shaders.py, Windows/Ubuntu CI
 - [x] SHDR-006 Shader variant/키워드 변경 후 Player 재질이 동일하다 — 증거: PR #44, 소스 3c07d274d3d0e68a5decf3677eeeb814a6c2f0bd; same pipeline key selects opaque/blend and cull/double-sided variants consistently with material flags, NEngineRenderTests; shader bytecode/pixel parity not proven; exact final PR HEAD Windows/Ubuntu Release+Debug CI 통과 조건의 좁은 소스/자동 회귀 범위
 
-## EDTOOL — Editor 생산성 도구 (7/9)
+## EDTOOL — Editor 생산성 도구 (8/9)
 
 참조: apps/editor; engine/editor
 
 - [x] EDTOOL-001 Scene View와 분리된 Game View를 제공한다 — 증거: PR #41, 코드 SHA f6160c138fc0669e834f8d48a5c2e960239300dd; NEngineEditorTests PlaySession runtime World와 authoring World 분리; Win32 Scene View와 별도 Game View 창; Windows/Ubuntu Debug·Release 최종 PR HEAD CI 및 CTest 수용 게이트(실기기 별도).
-- [ ] EDTOOL-002 Prefab 격리 편집 모드를 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
+- [x] EDTOOL-002 Prefab 격리 편집 모드를 구현한다 — 증거: PR #45, PrefabIsolationSession 별도 World, EditorModel 모드 진입/저장/취소/Play 금지, 검증된 PrefabData 출력과 원본 Scene 불변 NEngineFiveBatchTests; Win32 격리 버튼·자산 파일 저장 UI 별도; 최종 동일 PR HEAD Windows/Ubuntu Release+Debug CI 성공 조건의 좁은 소스/자동 테스트 수용 후보
 - [x] EDTOOL-003 실제 선택 객체와 연결되는 Component Add 메뉴를 완성한다 — 증거: PR #40, 코드 SHA acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7, CI 40279093322 Windows/Ubuntu Debug·Release 38/38 CTest PASS; NEngineEditorTests selection-derived actual Add Component list/action, duplicate rejection and Undo/Redo, Win32 menu sharing the model command.
 - [x] EDTOOL-004 C# 프로젝트를 Visual Studio/Rider로 여는 동작을 검증한다 — 증거: PR #40, 코드 SHA acbff3df04b50c6dbc55ef59a6fc71fd4b4ba1f7, CI 40279093322 Windows/Ubuntu Debug·Release 38/38 CTest PASS; Win32 Scripts .sln association/Ctrl VS/Shift Rider launch implementation, NEngineEditorTests Unicode paths/IDE selection/invalid solution; installed IDE GUI not manually confirmed.
 - [x] EDTOOL-005 에디터 패키지 목록·설치·제거 UI를 제공한다 — 증거: PR #43, 개발 소스 3da41744b85ce1b5364bc80ac329be3da884c627; Win32 NuGet Packages list/add/update/remove via atomic project manifest model, NEngineEditorTests; no native GUI hardware check; 최종 PR HEAD Windows/Ubuntu Release·Debug CI·CTest·Python 테스트 성공 조건의 소스/자동화 범위
@@ -447,3 +449,5 @@
 - 2026-10-28: PR #43 기존 8개 고정 ID EDIT-013, ANIM-009, PLUG-012, PLUG-018, QA-013, EDTOOL-005, EDTOOL-009, BUILD-009의 소스·자동화 수용 후보. 시작 main `880376e3c8a20647d2d3b896e300cda2d16b63dd`, 소스 3da41744b85ce1b5364bc80ac329be3da884c627, 최종 PR HEAD 동일 Windows/Ubuntu Release/Debug CI 성공 필수. 총 285개 유지, 145→153 체크/140→132 미완료. 실제 hardware/Android APK 및 완제품 일괄 수용 아님.
 
 - 2026-11-02: PR #44 고유 기존 ID 7개 REND-011, REND-012, AUD-005, AUD-009, ANIM-005, SHDR-004, SHDR-006 소스·자동화 수용 후보, 소스 `3c07d274d3d0e68a5decf3677eeeb814a6c2f0bd`. 최종 동일 HEAD CI 성공 시 좁은 소스 검증 기준 153→160, 잔여 132→125; 실 Windows GPU/오디오/Android 하드웨어 증명 없음.
+
+- 2026-11-02 PR #45: 시작 main `663fc6c0a6c11e857754018d8cb4a6ac2ec0e39c`; 사용자가 지시한 **5개 일괄 선개발 → GitHub 최종 단일 통합 커밋** 방식으로 기존 ID EDIT-016, INPUT-008, TWOD-005, VFX-005, EDTOOL-002 소스·자동화 검증 후보 추가. 새 ID/삭제/분할 없음. 동일 HEAD CI 통과 시 160→165 / 125→120. GitHub CI 실패에 따른 후속 수정 커밋만 예외 허용.

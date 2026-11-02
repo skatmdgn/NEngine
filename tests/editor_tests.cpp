@@ -2863,6 +2863,42 @@ int main() {
         std::filesystem::remove_all(root,ec);
     }
 
+    // EDIT-016: project switch resets native editor state and watcher snapshot.
+    {
+        editor::EditorModel switching;
+        const auto root_a=project_root/"switchA";
+        const auto root_b=project_root/"switchB";
+        std::string error;
+        check(switching.open_project(root_a,&error) &&
+              switching.project().is_open() && switching.world().size()>0,
+              "EDIT-016 initial project bootstraps scene");
+        const auto old_entity=switching.world().create("OldOnly");
+        switching.selection().set(old_entity);
+        const auto old_asset=root_a/"Assets"/"OnlyInA.txt";
+        {std::ofstream file(old_asset);file<<"A";}
+        switching.project().poll_assets();
+        check(switching.open_project(root_b,&error) &&
+              switching.project().is_open() &&
+              switching.project().root()==std::filesystem::absolute(root_b) &&
+              switching.selection().active()==core::Entity::invalid() &&
+              !switching.project().assets().find_relative("OnlyInA.txt") &&
+              switching.project().poll_assets().changes.empty() &&
+              switching.world().size()>0,
+              "EDIT-016 second project clears selection, assets and watcher baseline");
+        const auto bad_root=project_root/"switchInvalid";
+        std::filesystem::create_directories(bad_root);
+        {std::ofstream file(bad_root/"NEngine.nproject");file<<"INVALID"; }
+        check(!switching.open_project(bad_root,&error) &&
+              !error.empty() && !switching.project().is_open() &&
+              switching.world().size()==0 &&
+              switching.selection().active()==core::Entity::invalid(),
+              "EDIT-016 invalid replacement fails without stale scene or project handles");
+        check(switching.open_project(root_a,&error) &&
+              switching.project().is_open() &&
+              switching.project().assets().find_relative("OnlyInA.txt"),
+              "EDIT-016 recovery reopens original project after failed transition");
+    }
+
     // EDIT-013: end-to-end ProjectSession asset operations through stable GUID.
     {
         std::error_code ec;

@@ -229,3 +229,9 @@ add_executable(NEngineGameSaveRecoveryTests save_recovery_tests.cpp)
 target_link_libraries(NEngineGameSaveRecoveryTests PRIVATE NEnginePlayerKit)
 target_compile_features(NEngineGameSaveRecoveryTests PRIVATE cxx_std_20)
 add_test(NAME NEngineGameSaveRecoveryTests COMMAND NEngineGameSaveRecoveryTests)
+
+# Five-ID batched acceptance: VFX-005/EDTOOL-002/TWOD-005.
+add_executable(NEngineFiveBatchTests batch_five_acceptance_tests.cpp)
+target_link_libraries(NEngineFiveBatchTests PRIVATE NEngineEditorModel)
+target_compile_features(NEngineFiveBatchTests PRIVATE cxx_std_20)
+add_test(NAME NEngineFiveBatchTests COMMAND NEngineFiveBatchTests)
