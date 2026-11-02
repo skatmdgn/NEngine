@@ -26,6 +26,7 @@
 #include "nengine/render/diagnostic_shaders.hpp"
 #include "nengine/render/gltf_mesh.hpp"
 #include "nengine/render/material_asset.hpp"
+#include "nengine/render/material_pipeline_selection.hpp"
 #include "nengine/render/matrix.hpp"
 #include "nengine/render/mesh_data.hpp"
 #include "nengine/render/model_importer.hpp"
@@ -132,6 +133,31 @@ int main() {
                   std::isfinite(pix->projection.at(1,1)),
                   "REND-012 pixel-perfect camera remains finite after resizing");
         }
+    }
+
+    // SHDR-004/006: exact material flags choose the same CPU-side
+    // Vulkan pipeline key in Editor and standalone Player. Missing/invalid
+    // material resolves to a deterministic opaque fallback.
+    {
+        using V=render::MaterialPipelineVariant;
+        render::MaterialAssetData mat;
+        check(render::select_material_variant(nullptr)==V::OpaqueCull,
+              "SHDR-004 missing material falls back to opaque culling pipeline");
+        mat.alpha_mode=render::MaterialAlphaMode::Opaque;
+        mat.double_sided=false;
+        check(render::select_material_variant(&mat)==V::OpaqueCull,
+              "SHDR-004 explicit opaque material selects opaque shader");
+        mat.double_sided=true;
+        check(render::select_material_variant(&mat)==V::OpaqueDoubleSided &&
+              render::variant_is_double_sided(render::select_material_variant(&mat)),
+              "SHDR-006 double-sided shader keyword toggles culling variant");
+        mat.alpha_mode=render::MaterialAlphaMode::Blend;
+        check(render::select_material_variant(&mat)==V::BlendDoubleSided &&
+              render::variant_is_blended(render::select_material_variant(&mat)),
+              "SHDR-006 alpha-blend keyword selects blend/double-sided variant");
+        mat.double_sided=false;
+        check(render::select_material_variant(&mat)==V::BlendCull,
+              "SHDR-006 alpha and culling variants remain independent");
     }
 
     // Controller validation and deterministic, priority-ordered switching.
