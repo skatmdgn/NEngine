@@ -827,6 +827,16 @@ int main() {
           std::all_of(downsampled.begin(),downsampled.end(),
               [](float sample){return std::isfinite(sample)&&sample==0.0f;}),
           "AUD-005 invalid pitch yields safe silence without undefined float conversion");
+    lowpass_snapshot.sources[0].pitch=2.5f;
+    lowpass_snapshot.sources[0].time_seconds=1.0e24f;
+    const auto long_loop=audio::render_stereo_mix(lowpass_snapshot,
+        [&](assets::AssetGuid){return &aliased;},16000u,96u,downsampled);
+    check(long_loop.sources_mixed==1u &&
+          std::all_of(downsampled.begin(),downsampled.end(),
+              [](float sample){return std::isfinite(sample);}),
+          "AUD-005 long looping clip normalizes sample indices without overflow");
+    lowpass_snapshot.sources[0].time_seconds=0.f;
+
 
     // AUD-009: sustained BGM plus concurrent SFX at different rates/pans.
     // Bounded deterministic stress cannot replace a physical audio device soak.
