@@ -414,7 +414,21 @@ constexpr std::array<std::string_view,
     "RightAlt",
     "MouseLeft",
     "MouseRight",
-    "MouseMiddle"
+    "MouseMiddle",
+    "GamepadA",
+    "GamepadB",
+    "GamepadX",
+    "GamepadY",
+    "GamepadLeftShoulder",
+    "GamepadRightShoulder",
+    "GamepadDpadUp",
+    "GamepadDpadDown",
+    "GamepadDpadLeft",
+    "GamepadDpadRight",
+    "GamepadStart",
+    "GamepadBack",
+    "GamepadLeftStick",
+    "GamepadRightStick"
 }};
 
 std::string_view key_name(Key key) noexcept {
