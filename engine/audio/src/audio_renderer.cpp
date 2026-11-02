@@ -114,8 +114,16 @@ float sample_resampled(const AudioClipData& clip, double frame_position,
         return sample_linear(clip,frame_position,channel,loop);
     const double radius=12.0, cutoff=std::min(1.0,1.0/step);
     constexpr double pi=3.14159265358979323846;
-    if (!loop && frame_position>=static_cast<double>(clip.frame_count()))
+    const auto count=static_cast<double>(clip.frame_count());
+    if(count<=0.0)return 0.f;
+    // Normalize before converting a potentially long-running playback time
+    // to integer sample indices (avoids overflow/undefined conversions).
+    if(loop){
+        frame_position=std::fmod(frame_position,count);
+        if(frame_position<0.0)frame_position+=count;
+    }else if(frame_position>=count || frame_position<0.0){
         return 0.0f;
+    }
     double weighted=0.0,weight_sum=0.0;
     const double center=std::floor(frame_position);
     for(int k=-11;k<=12;++k){
