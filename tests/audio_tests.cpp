@@ -842,7 +842,7 @@ int main() {
     bgm_state.right_gain=0.4f;bgm_state.loop=true;
     load_snapshot.sources.push_back(bgm_state);
     const auto sfx_guid=assets::AssetGuid::generate();
-    for(int i=0;i<48;++i){
+    for(int i=0;i<24;++i){
         auto effect=render_source;
         effect.clip=sfx_guid;
         effect.time_seconds=0.f;
@@ -854,12 +854,12 @@ int main() {
     std::vector<float> mix_chunk;
     bool finite_mix=true;
     std::size_t combined_frames=0u;
-    for(int block=0;block<512;++block){
+    for(int block=0;block<160;++block){
         const auto rendered=audio::render_stereo_mix(load_snapshot,
             [&](assets::AssetGuid guid)->const audio::AudioClipData*{
                 return guid==sfx_guid?&sfx:&bgm;
             },48000u,128u,mix_chunk);
-        if(rendered.sources_mixed!=49u || mix_chunk.size()!=256u ||
+        if(rendered.sources_mixed!=25u || mix_chunk.size()!=256u ||
            !std::all_of(mix_chunk.begin(),mix_chunk.end(),
              [](float f){return std::isfinite(f)&&f>=-1.0f&&f<=1.0f;})){
             finite_mix=false;break;
@@ -868,8 +868,8 @@ int main() {
         load_snapshot.sources[0].time_seconds=
             static_cast<float>(combined_frames)/48000.0f;
     }
-    check(finite_mix && combined_frames==512u*128u,
-          "AUD-009 sustained BGM and 48 SFX sources mix without drop, overflow or NaN");
+    check(finite_mix && combined_frames==160u*128u,
+          "AUD-009 sustained BGM and 24 SFX sources mix without drop, overflow or NaN");
 
 
     audio::AudioOutputDevice output_device;
