@@ -101,8 +101,8 @@
 - [ ] REND-008 다중 조명과 그림자 렌더링을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] REND-009 PBR 금속성·거칠기·노멀 맵을 참조 장면으로 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] REND-010 알파 테스트·블렌딩·투명 정렬을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [x] REND-011 2D 스프라이트 피벗·정렬 레이어와 깊이를 검증한다 — 증거: PR #44, 소스 d1b2da0e5ca00df19f545c91515fb37550934deb; SpriteRenderer Pivot Vec3 serialized/backward-compatible, sprite_geometry.hpp deterministic layer sorting and pivot matrix, Vulkan sprite draw integration + NEngineRenderTests; real GPU pixel result untested; exact final PR HEAD Windows/Ubuntu Release+Debug CI 통과 조건의 좁은 소스/자동 회귀 범위
-- [x] REND-012 화면 크기와 카메라 종횡비 변경 때 출력이 유지된다 — 증거: PR #44, 소스 d1b2da0e5ca00df19f545c91515fb37550934deb; matrix.cpp camera viewport invalid/NaN aspect rejection and NEngineRenderTests landscape/portrait/pixel-perfect aspect update; real swapchain resize untested; exact final PR HEAD Windows/Ubuntu Release+Debug CI 통과 조건의 좁은 소스/자동 회귀 범위
+- [x] REND-011 2D 스프라이트 피벗·정렬 레이어와 깊이를 검증한다 — 증거: PR #44, 소스 23dcaf67a5c744cf98751860e8b774a0eaaa86c6; SpriteRenderer Pivot Vec3 serialized/backward-compatible, sprite_geometry.hpp deterministic layer sorting and pivot matrix, Vulkan sprite draw integration + NEngineRenderTests; real GPU pixel result untested; exact final PR HEAD Windows/Ubuntu Release+Debug CI 통과 조건의 좁은 소스/자동 회귀 범위
+- [x] REND-012 화면 크기와 카메라 종횡비 변경 때 출력이 유지된다 — 증거: PR #44, 소스 23dcaf67a5c744cf98751860e8b774a0eaaa86c6; matrix.cpp camera viewport invalid/NaN aspect rejection and NEngineRenderTests landscape/portrait/pixel-perfect aspect update; real swapchain resize untested; exact final PR HEAD Windows/Ubuntu Release+Debug CI 통과 조건의 좁은 소스/자동 회귀 범위
 - [ ] REND-013 멀티 카메라와 렌더 타깃을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] REND-014 텍스처/메시 핫리로드 시 GPU 메모리가 누출되지 않는다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] REND-015 프레임 시간·드로우 콜·GPU 메모리 기준을 작성해 회귀를 막는다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -153,11 +153,11 @@
 - [x] AUD-002 AudioSource/Listener 기본 회귀 테스트가 통과한다 — 증거: tests/audio_tests.cpp / CI run 39713209272
 - [ ] AUD-003 Windows WASAPI shared 실출력을 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] AUD-004 오디오 장치 연결·해제·전환 후 재생이 복구된다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [x] AUD-005 샘플레이트 차이를 리샘플링해 아티팩트 없이 출력한다 — 증거: PR #44, 소스 d1b2da0e5ca00df19f545c91515fb37550934deb; engine/audio/src/audio_renderer.cpp band-limited windowed-sinc downsample + tests/audio_tests.cpp Nyquist alias suppression, in-band RMS and nonfinite-pitch rejection; physical speaker listening not tested; exact final PR HEAD Windows/Ubuntu Release+Debug CI 통과 조건의 좁은 소스/자동 회귀 범위
+- [x] AUD-005 샘플레이트 차이를 리샘플링해 아티팩트 없이 출력한다 — 증거: PR #44, 소스 23dcaf67a5c744cf98751860e8b774a0eaaa86c6; engine/audio/src/audio_renderer.cpp band-limited windowed-sinc downsample + tests/audio_tests.cpp Nyquist alias suppression, in-band RMS and nonfinite-pitch rejection; physical speaker listening not tested; exact final PR HEAD Windows/Ubuntu Release+Debug CI 통과 조건의 좁은 소스/자동 회귀 범위
 - [ ] AUD-006 OGG Vorbis 디코딩·스트리밍을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] AUD-007 MP3 디코딩·스트리밍을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] AUD-008 FLAC 디코딩·스트리밍을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
-- [x] AUD-009 BGM 길이·동시 SFX 부하 테스트를 수행한다 — 증거: PR #44, 소스 d1b2da0e5ca00df19f545c91515fb37550934deb; tests/audio_tests.cpp deterministic 24 concurrent SFX plus BGM bounded load across 160 mix blocks, finite and clipped PCM + frame accounting; long hardware soak not tested; exact final PR HEAD Windows/Ubuntu Release+Debug CI 통과 조건의 좁은 소스/자동 회귀 범위
+- [x] AUD-009 BGM 길이·동시 SFX 부하 테스트를 수행한다 — 증거: PR #44, 소스 23dcaf67a5c744cf98751860e8b774a0eaaa86c6; tests/audio_tests.cpp deterministic 24 concurrent SFX plus BGM bounded load across 160 mix blocks, finite and clipped PCM + frame accounting; long hardware soak not tested; exact final PR HEAD Windows/Ubuntu Release+Debug CI 통과 조건의 좁은 소스/자동 회귀 범위
 - [ ] AUD-010 공간음향 거리 감쇠·패닝을 실제 출력에서 검증한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] AUD-011 C# AudioSource Play/Stop/Loop/Volume이 Player에서 동작한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] AUD-012 소리 장치 실패 시 안전하게 폴백하고 오류를 표시한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -186,7 +186,7 @@
 - [ ] ANIM-002 스프라이트 시트·클립·타임라인 Editor를 완성한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [x] ANIM-003 2D SpriteAnimator 클립을 Scene 저장 후 Player에서 재생한다 — 증거: PR #41, 코드 SHA f6160c138fc0669e834f8d48a5c2e960239300dd; NEnginePlayerTests Scene SpriteAnimator clip 직렬화와 Player 번들 로드/프레임 재생; Windows/Ubuntu Debug·Release 최종 PR HEAD CI 및 CTest 수용 게이트(실기기 별도).
 - [x] ANIM-004 애니메이션 상태 머신 Transition 조건을 검증한다 — 증거: PR #32, NEngineRoundTwoAnimPhysicsTests, 상태머신 전이 조건·exit 시간·복귀·잘못된 참조 검증, Windows/Ubuntu CI
-- [x] ANIM-005 Blend Tree 보간과 중단·재진입을 검증한다 — 증거: PR #44, 소스 d1b2da0e5ca00df19f545c91515fb37550934deb; animation_controller.cpp .nanimctrl v2 transition blend duration, SpriteControllerRuntime speed interpolation, interrupted/reentered state and v1 compatibility + round_two_anim_physics_tests; simultaneous visual clip crossfade not implemented; exact final PR HEAD Windows/Ubuntu Release+Debug CI 통과 조건의 좁은 소스/자동 회귀 범위
+- [x] ANIM-005 Blend Tree 보간과 중단·재진입을 검증한다 — 증거: PR #44, 소스 23dcaf67a5c744cf98751860e8b774a0eaaa86c6; animation_controller.cpp .nanimctrl v2 transition blend duration, SpriteControllerRuntime speed interpolation, interrupted/reentered state and v1 compatibility + round_two_anim_physics_tests; simultaneous visual clip crossfade not implemented; exact final PR HEAD Windows/Ubuntu Release+Debug CI 통과 조건의 좁은 소스/자동 회귀 범위
 - [ ] ANIM-006 애니메이션 이벤트를 ScriptBehaviour에 전달한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] ANIM-007 3D 스켈레탈 애니메이션 가져오기·스키닝을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
 - [ ] ANIM-008 Root Motion과 시간 배율을 구현한다 — 수용: 구현 + 해당 회귀 테스트 + 환경 검증(필요시) + PR/SHA
@@ -372,9 +372,9 @@
 - [x] SHDR-001 HLSL 소스에서 SPIR-V를 생성하는 도구 경로를 구현한다 — 증거: PR #34, tools/compile_shader.py HLSL -D/-e main·glslc -x hlsl, engine/render/shaders/acceptance.frag.hlsl Linux compiler CTest, Windows/Ubuntu CI
 - [x] SHDR-002 GLSL/SPIR-V 컴파일러 버전을 고정하고 오류 메시지를 검증한다 — 증거: PR #34, tools/nengine_shaders.py compiler identity 강제·불일치 거부, test_nengine_shaders.py, Windows/Ubuntu CI
 - [x] SHDR-003 사용자 셰이더 에셋 등록과 캐시 키를 구현한다 — 증거: PR #34, tools/nengine_shaders.py GUID descriptor·source/compiler/target 캐시 키, test_nengine_shaders.py, Windows/Ubuntu CI
-- [x] SHDR-004 셰이더-재질 속성 바인딩과 기본 폴백을 검증한다 — 증거: PR #44, 소스 d1b2da0e5ca00df19f545c91515fb37550934deb; material_pipeline_selection.hpp explicit missing-material opaque fallback shared with Vulkan draw selection, NEngineRenderTests; real GPU binding verification separate; exact final PR HEAD Windows/Ubuntu Release+Debug CI 통과 조건의 좁은 소스/자동 회귀 범위
+- [x] SHDR-004 셰이더-재질 속성 바인딩과 기본 폴백을 검증한다 — 증거: PR #44, 소스 23dcaf67a5c744cf98751860e8b774a0eaaa86c6; material_pipeline_selection.hpp explicit missing-material opaque fallback shared with Vulkan draw selection, NEngineRenderTests; real GPU binding verification separate; exact final PR HEAD Windows/Ubuntu Release+Debug CI 통과 조건의 좁은 소스/자동 회귀 범위
 - [x] SHDR-005 무효/비정상 셰이더를 불러오면 원인 진단 후 안전하게 유지한다 — 증거: PR #34, tools/nengine_shaders.py invalid shader/invalid SPIR-V 진단·last-good shader pointer 유지, test_nengine_shaders.py, Windows/Ubuntu CI
-- [x] SHDR-006 Shader variant/키워드 변경 후 Player 재질이 동일하다 — 증거: PR #44, 소스 d1b2da0e5ca00df19f545c91515fb37550934deb; same pipeline key selects opaque/blend and cull/double-sided variants consistently with material flags, NEngineRenderTests; shader bytecode/pixel parity not proven; exact final PR HEAD Windows/Ubuntu Release+Debug CI 통과 조건의 좁은 소스/자동 회귀 범위
+- [x] SHDR-006 Shader variant/키워드 변경 후 Player 재질이 동일하다 — 증거: PR #44, 소스 23dcaf67a5c744cf98751860e8b774a0eaaa86c6; same pipeline key selects opaque/blend and cull/double-sided variants consistently with material flags, NEngineRenderTests; shader bytecode/pixel parity not proven; exact final PR HEAD Windows/Ubuntu Release+Debug CI 통과 조건의 좁은 소스/자동 회귀 범위
 
 ## EDTOOL — Editor 생산성 도구 (7/9)
 
@@ -446,4 +446,4 @@
 
 - 2026-10-28: PR #43 기존 8개 고정 ID EDIT-013, ANIM-009, PLUG-012, PLUG-018, QA-013, EDTOOL-005, EDTOOL-009, BUILD-009의 소스·자동화 수용 후보. 시작 main `880376e3c8a20647d2d3b896e300cda2d16b63dd`, 소스 3da41744b85ce1b5364bc80ac329be3da884c627, 최종 PR HEAD 동일 Windows/Ubuntu Release/Debug CI 성공 필수. 총 285개 유지, 145→153 체크/140→132 미완료. 실제 hardware/Android APK 및 완제품 일괄 수용 아님.
 
-- 2026-11-02: PR #44 고유 기존 ID 7개 REND-011, REND-012, AUD-005, AUD-009, ANIM-005, SHDR-004, SHDR-006 소스·자동화 수용 후보, 소스 `d1b2da0e5ca00df19f545c91515fb37550934deb`. 최종 동일 HEAD CI 성공 시 좁은 소스 검증 기준 153→160, 잔여 132→125; 실 Windows GPU/오디오/Android 하드웨어 증명 없음.
+- 2026-11-02: PR #44 고유 기존 ID 7개 REND-011, REND-012, AUD-005, AUD-009, ANIM-005, SHDR-004, SHDR-006 소스·자동화 수용 후보, 소스 `23dcaf67a5c744cf98751860e8b774a0eaaa86c6`. 최종 동일 HEAD CI 성공 시 좁은 소스 검증 기준 153→160, 잔여 132→125; 실 Windows GPU/오디오/Android 하드웨어 증명 없음.
